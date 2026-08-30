@@ -1,5 +1,6 @@
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "motion/react";
 import AuraLoader from "@/components/aura/AuraLoader";
 import ChromeCursor from "@/components/aura/ChromeCursor";
 import Navbar from "@/components/aura/Navbar";
@@ -9,7 +10,11 @@ import SkillTree from "@/components/aura/SkillTree";
 import Certification from "@/components/aura/Certification";
 import Footer from "@/components/aura/Footer";
 
-const Index = () => {
+export const Route = createFileRoute("/")({
+  component: Index,
+});
+
+function Index() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +43,4 @@ const Index = () => {
       <Footer />
     </div>
   );
-};
-
-export default Index;
+}

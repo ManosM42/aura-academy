@@ -69,6 +69,19 @@
   --color-chrome-mid: var(--chrome-mid);
   --color-chrome-dark: var(--chrome-dark);
   --shadow-chrome: 0 0 28px color-mix(in oklab, var(--chrome-light) 12%, transparent);
+    /* AURA brand palette (used by src/components/aura/*) */
+  --color-aura-bg: #050505;
+  --color-aura-bg2: #0a0a0a;
+  --color-aura-surface: #111111;
+  --color-aura-elevated: #171717;
+  --color-aura-gunmetal: #222222;
+  --color-aura-text: #f5f5f5;
+  --color-aura-text-secondary: #a8a8a8;
+  --color-aura-text-muted: #6f6f6f;
+  --color-aura-chrome-light: #f2f2f2;
+  --color-aura-chrome-mid: #bfc0c2;
+  --color-aura-chrome-dark: #6e7073;
+  --color-aura-white: #ffffff;
 }
 
 :root {
@@ -239,7 +252,7 @@
 }
 /* ===== AURA brand layer ===== */
 .font-aura {
-  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
 
@@ -319,4 +332,8 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+@keyframes sweep {
+  0% { transform: translateX(-160%); }
+  100% { transform: translateX(160%); }
 }

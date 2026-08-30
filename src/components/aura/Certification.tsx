@@ -1,4 +1,4 @@
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import ChromeButton from "./ChromeButton";
 
 export default function Certification() {
