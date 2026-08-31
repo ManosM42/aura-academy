@@ -39,3 +39,17 @@ export function isAdminRole(role: string | null | undefined): boolean {
 export function hasAtLeastRole(role: string | null | undefined, minimum: KnownRole): boolean {
   return roleRank(role) >= ROLE_RANK[minimum];
 }
+export const CONTENT_ROLES = [
+  "content_manager",
+  "operations",
+  "admin",
+  "super_admin",
+] as const;
+
+export type ContentRole = (typeof CONTENT_ROLES)[number];
+
+export function isContentRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const key = role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return (CONTENT_ROLES as readonly string[]).includes(key);
+}
