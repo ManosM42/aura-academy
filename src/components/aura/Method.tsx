@@ -28,7 +28,7 @@ export default function Method() {
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
         className="chrome-text font-aura mb-16 text-4xl font-extrabold tracking-tight md:text-5xl"
       >
-        MASTER THE CRAFT.
+        HAIR METHOD.
       </motion.h2>
 
       <div className="grid gap-6 md:grid-cols-3">

@@ -1,26 +1,19 @@
-import { createClient } from "@supabase/supabase-js";
+// src/lib/supabase.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
+import { supabase as generatedClient } from "@/integrations/supabase/client";
 
-// Οι τιμές έρχονται από το .env (Vite → πρόθεμα VITE_).
-// Lovable/Vite convention:
-//   VITE_SUPABASE_URL=https://xxxx.supabase.co
-//   VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as
-  | string
-  | undefined;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Λείπουν οι μεταβλητές VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY. " +
-      "Έλεγξε το αρχείο .env στη ρίζα του project και κάνε restart τον dev server.",
-  );
-}
-
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true, // χρειάζεται για το Google OAuth redirect
-  },
-});
+/**
+ * ΜΙΑ μόνο instance Supabase για όλη την εφαρμογή.
+ *
+ * Πριν υπήρχαν δύο: αυτό το αρχείο έφτιαχνε δικό του client με
+ * VITE_SUPABASE_ANON_KEY + localStorage, ενώ το generated client
+ * χρησιμοποιεί VITE_SUPABASE_PUBLISHABLE_KEY + brokeredPreviewStorage()
+ * (απαραίτητο μέσα στο preview iframe). Αποτέλεσμα: το session της Google
+ * γραφόταν στον έναν και το /checkout διάβαζε τον άλλον.
+ *
+ * Το cast υπάρχει επειδή το generated client είναι τυποποιημένο με το
+ * ./integrations/supabase/types, ενώ τα queries.ts βασίζονται στο
+ * @/lib/database.types. Το ίδιο σχήμα, δύο generated αρχεία.
+ */
+export const supabase = generatedClient as unknown as SupabaseClient<Database>;

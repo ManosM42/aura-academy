@@ -1,7 +1,7 @@
 // src/hooks/useAuth.tsx
 import { useCallback, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 
 interface AuthState {
   session: Session | null;
@@ -14,8 +14,8 @@ interface AuthState {
 }
 
 /**
- * Subscribes to the Supabase session. Client-side only — the app reads
- * auth in the browser rather than SSR.
+ * Παρακολουθεί το Supabase session. Μόνο client-side — η εφαρμογή διαβάζει
+ * το auth στον browser, όχι σε SSR.
  */
 export function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(null);
@@ -38,6 +38,8 @@ export function useAuth(): AuthState {
       });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      // Ο έλεγχος mounted έλειπε εδώ: μετά το unmount γινόταν setState.
+      if (!mounted) return;
       setSession(next);
       setUser(next?.user ?? null);
       setLoading(false);
@@ -57,21 +59,28 @@ export function useAuth(): AuthState {
   const signUp = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) throw error;
-    // If email confirmation is enabled, there is no active session yet.
-    const needsConfirmation = !data.session;
-    return { needsConfirmation };
+    // Αν είναι ενεργή η επιβεβαίωση email, δεν υπάρχει ακόμα session.
+    return { needsConfirmation: !data.session };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
+    // ΕΔΩ ήταν το bug: redirectTo `${origin}/dashboard`.
+    // Το /auth/callback είναι αυτό που αποφασίζει αν ο χρήστης πάει σε
+    // Stripe checkout (υπάρχει checkout intent) ή στο dashboard.
+    const origin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : ((import.meta.env["VITE_SITE_URL"] as string | undefined) ?? "");
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${origin}/auth/callback`,
+        queryParams: { prompt: "select_account" },
       },
     });
     if (error) throw error;
-    // Note: this triggers a full-page redirect to Google, so no local
-    // navigation is needed here — Supabase returns to /dashboard after.
+    // Full-page redirect στη Google — δεν χρειάζεται τοπικό navigate.
   }, []);
 
   const signOut = useCallback(async () => {
