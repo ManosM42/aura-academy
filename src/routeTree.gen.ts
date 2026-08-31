@@ -10,33 +10,193 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as AcademyIndexRouteImport } from './routes/academy.index'
+import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as LessonLessonIdRouteImport } from './routes/lesson.$lessonId'
+import { Route as PracticeAssignmentIdRouteImport } from './routes/practice.$assignmentId'
+import { Route as ReviewIndexRouteImport } from './routes/review.index'
+import { Route as ReviewSubmissionIdRouteImport } from './routes/review.$submissionId'
+import { Route as SkillsIndexRouteImport } from './routes/skills.index'
+import { Route as VerifyIdRouteImport } from './routes/verify.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcademyIndexRoute = AcademyIndexRouteImport.update({
+  id: '/academy/',
+  path: '/academy/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcademySlugRoute = AcademySlugRouteImport.update({
+  id: '/academy/$slug',
+  path: '/academy/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LessonLessonIdRoute = LessonLessonIdRouteImport.update({
+  id: '/lesson/$lessonId',
+  path: '/lesson/$lessonId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PracticeAssignmentIdRoute = PracticeAssignmentIdRouteImport.update({
+  id: '/practice/$assignmentId',
+  path: '/practice/$assignmentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewIndexRoute = ReviewIndexRouteImport.update({
+  id: '/review/',
+  path: '/review/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewSubmissionIdRoute = ReviewSubmissionIdRouteImport.update({
+  id: '/review/$submissionId',
+  path: '/review/$submissionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SkillsIndexRoute = SkillsIndexRouteImport.update({
+  id: '/skills/',
+  path: '/skills/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyIdRoute = VerifyIdRouteImport.update({
+  id: '/verify/$id',
+  path: '/verify/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
+  '/academy/$slug': typeof AcademySlugRoute
+  '/lesson/$lessonId': typeof LessonLessonIdRoute
+  '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
+  '/review/$submissionId': typeof ReviewSubmissionIdRoute
+  '/verify/$id': typeof VerifyIdRoute
+  '/academy/': typeof AcademyIndexRoute
+  '/admin/': typeof AdminIndexRoute
+  '/review/': typeof ReviewIndexRoute
+  '/skills/': typeof SkillsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
+  '/academy/$slug': typeof AcademySlugRoute
+  '/lesson/$lessonId': typeof LessonLessonIdRoute
+  '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
+  '/review/$submissionId': typeof ReviewSubmissionIdRoute
+  '/verify/$id': typeof VerifyIdRoute
+  '/academy': typeof AcademyIndexRoute
+  '/admin': typeof AdminIndexRoute
+  '/review': typeof ReviewIndexRoute
+  '/skills': typeof SkillsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginRoute
+  '/profile': typeof ProfileRoute
+  '/academy/$slug': typeof AcademySlugRoute
+  '/lesson/$lessonId': typeof LessonLessonIdRoute
+  '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
+  '/review/$submissionId': typeof ReviewSubmissionIdRoute
+  '/verify/$id': typeof VerifyIdRoute
+  '/academy/': typeof AcademyIndexRoute
+  '/admin/': typeof AdminIndexRoute
+  '/review/': typeof ReviewIndexRoute
+  '/skills/': typeof SkillsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/profile'
+    | '/academy/$slug'
+    | '/lesson/$lessonId'
+    | '/practice/$assignmentId'
+    | '/review/$submissionId'
+    | '/verify/$id'
+    | '/academy/'
+    | '/admin/'
+    | '/review/'
+    | '/skills/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/profile'
+    | '/academy/$slug'
+    | '/lesson/$lessonId'
+    | '/practice/$assignmentId'
+    | '/review/$submissionId'
+    | '/verify/$id'
+    | '/academy'
+    | '/admin'
+    | '/review'
+    | '/skills'
+  id:
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/login'
+    | '/profile'
+    | '/academy/$slug'
+    | '/lesson/$lessonId'
+    | '/practice/$assignmentId'
+    | '/review/$submissionId'
+    | '/verify/$id'
+    | '/academy/'
+    | '/admin/'
+    | '/review/'
+    | '/skills/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DashboardRoute: typeof DashboardRoute
+  LoginRoute: typeof LoginRoute
+  ProfileRoute: typeof ProfileRoute
+  AcademySlugRoute: typeof AcademySlugRoute
+  LessonLessonIdRoute: typeof LessonLessonIdRoute
+  PracticeAssignmentIdRoute: typeof PracticeAssignmentIdRoute
+  ReviewSubmissionIdRoute: typeof ReviewSubmissionIdRoute
+  VerifyIdRoute: typeof VerifyIdRoute
+  AcademyIndexRoute: typeof AcademyIndexRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  ReviewIndexRoute: typeof ReviewIndexRoute
+  SkillsIndexRoute: typeof SkillsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +208,107 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/academy/': {
+      id: '/academy/'
+      path: '/academy'
+      fullPath: '/academy/'
+      preLoaderRoute: typeof AcademyIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/academy/$slug': {
+      id: '/academy/$slug'
+      path: '/academy/$slug'
+      fullPath: '/academy/$slug'
+      preLoaderRoute: typeof AcademySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lesson/$lessonId': {
+      id: '/lesson/$lessonId'
+      path: '/lesson/$lessonId'
+      fullPath: '/lesson/$lessonId'
+      preLoaderRoute: typeof LessonLessonIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/practice/$assignmentId': {
+      id: '/practice/$assignmentId'
+      path: '/practice/$assignmentId'
+      fullPath: '/practice/$assignmentId'
+      preLoaderRoute: typeof PracticeAssignmentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review/': {
+      id: '/review/'
+      path: '/review'
+      fullPath: '/review/'
+      preLoaderRoute: typeof ReviewIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review/$submissionId': {
+      id: '/review/$submissionId'
+      path: '/review/$submissionId'
+      fullPath: '/review/$submissionId'
+      preLoaderRoute: typeof ReviewSubmissionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/skills/': {
+      id: '/skills/'
+      path: '/skills'
+      fullPath: '/skills/'
+      preLoaderRoute: typeof SkillsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify/$id': {
+      id: '/verify/$id'
+      path: '/verify/$id'
+      fullPath: '/verify/$id'
+      preLoaderRoute: typeof VerifyIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DashboardRoute: DashboardRoute,
+  LoginRoute: LoginRoute,
+  ProfileRoute: ProfileRoute,
+  AcademySlugRoute: AcademySlugRoute,
+  LessonLessonIdRoute: LessonLessonIdRoute,
+  PracticeAssignmentIdRoute: PracticeAssignmentIdRoute,
+  ReviewSubmissionIdRoute: ReviewSubmissionIdRoute,
+  VerifyIdRoute: VerifyIdRoute,
+  AcademyIndexRoute: AcademyIndexRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  ReviewIndexRoute: ReviewIndexRoute,
+  SkillsIndexRoute: SkillsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

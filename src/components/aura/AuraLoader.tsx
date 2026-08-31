@@ -1,75 +1,89 @@
-import { motion, useReducedMotion } from "motion/react";
+// src/components/aura/AuraLoader.tsx
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import auraLogo from "@/assets/aura.JPG";
+
+interface AuraLoaderProps {
+  /** Called once the intro finishes (after the fade-out). Optional. */
+  onComplete?: () => void;
+  /** How long the loader stays on screen before fading out, in ms. */
+  duration?: number;
+}
 
 /**
- * Cinematic AURA loading sequence:
- * black -> faint light -> chrome emblem emerges -> thin silver ring draws -> wordmark.
- * Swap the <span> emblem for your real chrome logo <img> when ready.
+ * The AURA intro loader: the brand image (aura.JPG) framed in a chrome disc,
+ * a slow rotating chrome ring, a shimmering wordmark, and a progress line
+ * that fills before handing off to the app. Monochrome / chrome only.
  */
-export default function AuraLoader() {
-  const reduced = useReducedMotion();
+export default function AuraLoader({
+  onComplete,
+  duration = 2400,
+}: AuraLoaderProps) {
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const hide = window.setTimeout(() => setVisible(false), duration);
+    // Fire onComplete slightly after the exit animation (0.6s) has run.
+    const done = window.setTimeout(() => onComplete?.(), duration + 650);
+    return () => {
+      window.clearTimeout(hide);
+      window.clearTimeout(done);
+    };
+  }, [duration, onComplete]);
 
   return (
-    <motion.div
-      key="aura-loader"
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-aura-bg"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0, filter: "blur(6px)" }}
-      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-    >
-      {/* faint ambient light */}
-      <motion.div
-        aria-hidden
-        className="absolute h-[420px] w-[420px] rounded-full"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(255,255,255,0.06), transparent 65%)",
-        }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: reduced ? 0.4 : [0, 0.9, 0.5] }}
-        transition={{ duration: 2.2, ease: "easeInOut" }}
-      />
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          key="aura-loader"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0, filter: "blur(8px)" }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-aura-bg"
+        >
+          <div className="aura-grain" aria-hidden />
+          <div className="hero-atmosphere absolute inset-0" aria-hidden />
 
-      {/* thin silver ring drawing around emblem */}
-      <svg
-        className="absolute h-[220px] w-[220px] -rotate-90"
-        viewBox="0 0 220 220"
-        aria-hidden
-      >
-        <motion.circle
-          cx="110"
-          cy="110"
-          r="104"
-          fill="none"
-          stroke="rgba(255,255,255,0.35)"
-          strokeWidth="1"
-          initial={{ pathLength: 0, opacity: 0 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={{ duration: reduced ? 0.4 : 2, ease: "easeInOut", delay: 0.3 }}
-        />
-      </svg>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, filter: "blur(6px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 flex flex-col items-center"
+          >
+            {/* Emblem: rotating chrome ring around the brand image */}
+            <div className="aura-loader-emblem">
+              <span className="aura-loader-ring" aria-hidden />
+              <span className="aura-loader-disc">
+                <img
+                  src={auraLogo}
+                  alt="AURA"
+                  className="aura-loader-img"
+                  draggable={false}
+                />
+                <span className="aura-mark-sweep" aria-hidden />
+              </span>
+            </div>
 
-      {/* chrome emblem */}
-      <motion.span
-        className="chrome-text font-aura select-none text-6xl font-extrabold tracking-tight"
-        style={{
-          backgroundSize: "200% auto",
-        }}
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 1.4, ease: "easeOut", delay: 0.5 }}
-      >
-        A
-      </motion.span>
+            {/* Wordmark */}
+            <span className="chrome-text font-aura mt-8 text-sm font-extrabold uppercase tracking-[0.6em]">
+              ΛURΛ
+            </span>
 
-      {/* wordmark */}
-      <motion.span
-        className="chrome-text font-aura mt-6 text-sm font-semibold uppercase tracking-[0.55em]"
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, ease: "easeOut", delay: 1.4 }}
-      >
-        Aura
-      </motion.span>
-    </motion.div>
+            {/* Progress line */}
+            <div className="aura-loader-track" aria-hidden>
+              <motion.span
+                className="aura-loader-fill"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{
+                  duration: duration / 1000,
+                  ease: [0.4, 0, 0.2, 1],
+                }}
+              />
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

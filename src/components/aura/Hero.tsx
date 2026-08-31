@@ -1,6 +1,8 @@
+// src/components/aura/Hero.tsx
 import { useRef } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "motion/react";
 import ChromeButton from "./ChromeButton";
+import auraLogo from "@/assets/aura.JPG";
 
 export default function Hero() {
   const ref = useRef<HTMLElement>(null);
@@ -27,10 +29,10 @@ export default function Hero() {
   };
 
   return (
-    <section
+        <section
       id="top"
       ref={ref}
-      className="relative flex min-h-screen items-center justify-center overflow-hidden px-6"
+      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-6"
     >
       {/* subtle atmospheric layers */}
       <motion.div
@@ -39,14 +41,15 @@ export default function Hero() {
         className="aura-radial absolute inset-0"
       />
 
-      {/* giant chrome emblem behind text */}
-      <motion.span
-        aria-hidden
+      {/* giant brand image behind text (was the chrome "A") */}
+      <motion.img
+        src={auraLogo}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
         style={{ y: emblemY, opacity: fade }}
-        className="chrome-text font-aura pointer-events-none absolute select-none text-[46vw] font-extrabold leading-none opacity-[0.06] md:text-[30vw]"
-      >
-        A
-      </motion.span>
+        className="hero-watermark pointer-events-none absolute select-none"
+      />
 
       <motion.div
         style={{ y: headlineY }}

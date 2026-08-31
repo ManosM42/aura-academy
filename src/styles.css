@@ -337,3 +337,433 @@
   0% { transform: translateX(-160%); }
   100% { transform: translateX(160%); }
 }
+/* ================= AURA UI layer (append) ================= */
+
+/* --- Emblem: chrome disc + metallic "A" + slow light sweep --- */
+.aura-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.25rem;
+  height: 4.25rem;
+  font-size: 1.7rem; /* controls the letter size */
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.12), transparent 60%),
+    linear-gradient(160deg, #1c1c1c 0%, #050505 72%);
+  box-shadow:
+    0 0 26px -10px rgba(255, 255, 255, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+.aura-mark-sm {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.95rem;
+}
+.aura-mark-lg {
+  width: 7rem;
+  height: 7rem;
+  font-size: 2.9rem;
+}
+.aura-mark-letter {
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(
+    180deg,
+    #f2f2f2 0%,
+    #ffffff 22%,
+    #bfc0c2 52%,
+    #6e7073 78%,
+    #bfc0c2 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.aura-mark-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.38) 50%,
+    transparent 68%
+  );
+  transform: translateX(-120%);
+  animation: aura-mark-sweep 6.5s ease-in-out infinite;
+}
+@keyframes aura-mark-sweep {
+  0%,
+  100% {
+    transform: translateX(-120%);
+  }
+  55% {
+    transform: translateX(120%);
+  }
+}
+
+/* --- Soft chrome edge glow for premium cards --- */
+.chrome-field {
+  box-shadow:
+    0 20px 60px -30px rgba(0, 0, 0, 0.9),
+    0 0 40px -24px rgba(255, 255, 255, 0.18);
+}
+
+/* --- Subtle atmospheric background (black + light + chrome) --- */
+.hero-atmosphere {
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 0%, rgba(255, 255, 255, 0.06), transparent 70%),
+    radial-gradient(40% 40% at 82% 100%, rgba(191, 192, 194, 0.05), transparent 72%),
+    linear-gradient(180deg, #050505 0%, #0a0a0a 100%);
+}
+
+/* --- Navbar scrolled state --- */
+.nav-scrolled {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 5, 5, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* --- Nav links --- */
+.nav-link {
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  color: #a8a8a8;
+  transition: color 0.3s ease;
+}
+.nav-link:hover {
+  color: #ffffff;
+}
+
+/* --- Focus ring for inputs / interactive elements --- */
+.focus-ring:focus-visible {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+/* --- Certificate ID strip --- */
+.certificate-strip {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 10, 0.6);
+  padding: 0.85rem 1.25rem;
+}
+/* ================= AURA nav + logo layer (append) ================= */
+
+/* Brand image inside the chrome emblem (AuraMark) */
+.aura-mark-img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Navbar logo image (logo.jpg) */
+.nav-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 18px -6px rgba(255, 255, 255, 0.4);
+}
+
+/* --- Hamburger button --- */
+.hamburger {
+  position: relative;
+  z-index: 60;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0 0.6rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 10, 10, 0.4);
+  cursor: pointer;
+  transition: border-color 0.3s ease, background 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.hamburger:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(20, 20, 20, 0.5);
+}
+.hamburger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+.hamburger-line {
+  display: block;
+  height: 1.5px;
+  width: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #bfc0c2, #ffffff);
+  transform-origin: center;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease;
+}
+.hamburger.is-open .hamburger-line:nth-child(1) {
+  transform: translateY(6.5px) rotate(45deg);
+}
+.hamburger.is-open .hamburger-line:nth-child(2) {
+  opacity: 0;
+  transform: scaleX(0.4);
+}
+.hamburger.is-open .hamburger-line:nth-child(3) {
+  transform: translateY(-6.5px) rotate(-45deg);
+}
+
+/* --- Full-screen menu overlay --- */
+.menu-overlay {
+  background: rgba(5, 5, 5, 0.86);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* --- Big chrome menu links --- */
+.menu-link {
+  display: inline-block;
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(2rem, 7vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  color: #8f8f8f;
+  transition: color 0.35s ease, letter-spacing 0.35s ease;
+}
+.menu-link:hover,
+.menu-link:focus-visible,
+.menu-link.is-active {
+  outline: none;
+  letter-spacing: 0.02em;
+  color: transparent;
+  background: linear-gradient(
+    180deg,
+    #f2f2f2 0%,
+    #ffffff 25%,
+    #bfc0c2 55%,
+    #6e7073 80%,
+    #bfc0c2 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .hamburger-line,
+  .menu-link {
+    transition: none;
+  }
+}
+/* ================= AURA loader layer (append) ================= */
+
+.aura-loader-emblem {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 7.5rem;
+  height: 7.5rem;
+}
+
+/* Slow rotating chrome ring */
+.aura-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  padding: 2px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(191, 192, 194, 0.35) 90deg,
+    rgba(255, 255, 255, 0.95) 180deg,
+    rgba(191, 192, 194, 0.35) 270deg,
+    rgba(255, 255, 255, 0) 360deg
+  );
+  /* Mask so only the ring (not the fill) shows */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: aura-loader-spin 2.4s linear infinite;
+}
+@keyframes aura-loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Chrome disc holding the brand image */
+.aura-loader-disc {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 5.6rem;
+  height: 5.6rem;
+  border-radius: 9999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 30px -8px rgba(255, 255, 255, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.aura-loader-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+/* Progress line under the wordmark */
+.aura-loader-track {
+  position: relative;
+  margin-top: 1.75rem;
+  height: 2px;
+  width: 9rem;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.aura-loader-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgba(110, 112, 115, 0.6),
+    #bfc0c2 45%,
+    #ffffff 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-loader-ring {
+    animation: none;
+  }
+}
+/* ================= AURA hero watermark (append) ================= */
+
+/* ================= AURA hero watermark (append) ================= */
+
+/* ================= AURA hero watermark (append) ================= */
+
+/* ================= AURA hero watermark (append) ================= */
+
+.hero-watermark {
+  position: absolute;
+  inset: 0;
+  margin: auto;             /* centers on both axes, no transform needed */
+  z-index: 0;
+  width: min(46rem, 82vw);
+  height: min(46rem, 82vw);  /* explicit height so margin:auto can center */
+  object-fit: contain;
+
+  /* Long, gradual radial fade: fully opaque only in the core, then a wide
+     feather to transparency that ends BEFORE the photo's square edge.
+     The long transition band removes any visible seam on every side. */
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    #000 30%,
+    rgba(0, 0, 0, 0.85) 45%,
+    rgba(0, 0, 0, 0.5) 58%,
+    rgba(0, 0, 0, 0.2) 68%,
+    transparent 78%
+  );
+  mask-image: radial-gradient(
+    circle at center,
+    #000 30%,
+    rgba(0, 0, 0, 0.85) 45%,
+    rgba(0, 0, 0, 0.5) 58%,
+    rgba(0, 0, 0, 0.2) 68%,
+    transparent 78%
+  );
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+
+/* Smaller on phones */
+@media (max-width: 640px) {
+  .hero-watermark {
+    width: 88vw;
+    height: 88vw;
+  }
+}
+/* === AURA chrome silver === */
+.chrome-surface {
+  background: linear-gradient(145deg, #f4f4f5 0%, #d4d4d8 45%, #a1a1aa 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  transition: filter 0.25s ease, transform 0.15s ease;
+}
+.chrome-surface:hover {
+  filter: brightness(1.08);
+}
+.chrome-surface:active {
+  transform: translateY(1px);
+}
+
+.chrome-button {
+  background: linear-gradient(150deg, #fafafa 0%, #d4d4d8 40%, #9ca0a6 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: filter 0.25s ease, transform 0.15s ease;
+}
+.chrome-button:hover {
+  filter: brightness(1.1);
+}
+.chrome-button:active {
+  transform: translateY(1px);
+}
+
+.chrome-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  background: linear-gradient(150deg, #fafafa 0%, #d4d4d8 45%, #a1a1aa 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: filter 0.25s ease;
+}
+.chrome-chip:hover {
+  filter: brightness(1.08);
+}

@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import AuraLoader from "@/components/aura/AuraLoader";
 import ChromeCursor from "@/components/aura/ChromeCursor";
-import Navbar from "@/components/aura/Navbar";
 import Hero from "@/components/aura/Hero";
 import Method from "@/components/aura/Method";
 import SkillTree from "@/components/aura/SkillTree";
@@ -33,7 +32,7 @@ function Index() {
       <div className="aura-grain" aria-hidden />
       <ChromeCursor />
 
-      <Navbar />
+     
       <main>
         <Hero />
         <Method />
