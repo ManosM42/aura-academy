@@ -24,12 +24,17 @@ import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
+import { Route as CoursesIndexRouteImport } from './routes/courses.index'
+import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
 import { Route as LessonLessonIdRouteImport } from './routes/lesson.$lessonId'
 import { Route as PracticeAssignmentIdRouteImport } from './routes/practice.$assignmentId'
 import { Route as ReviewIndexRouteImport } from './routes/review.index'
 import { Route as ReviewSubmissionIdRouteImport } from './routes/review.$submissionId'
 import { Route as SkillsIndexRouteImport } from './routes/skills.index'
 import { Route as VerifyIdRouteImport } from './routes/verify.$id'
+import { Route as AdminCoursesIndexRouteImport } from './routes/admin.courses.index'
+import { Route as AdminCoursesCourseIdRouteImport } from './routes/admin.courses.$courseId'
+import { Route as AdminCoursesNewRouteImport } from './routes/admin.courses.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -106,6 +111,16 @@ const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
   path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CoursesIndexRoute = CoursesIndexRouteImport.update({
+  id: '/courses/',
+  path: '/courses/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoursesSlugRoute = CoursesSlugRouteImport.update({
+  id: '/courses/$slug',
+  path: '/courses/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LessonLessonIdRoute = LessonLessonIdRouteImport.update({
   id: '/lesson/$lessonId',
   path: '/lesson/$lessonId',
@@ -136,6 +151,21 @@ const VerifyIdRoute = VerifyIdRouteImport.update({
   path: '/verify/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCoursesIndexRoute = AdminCoursesIndexRouteImport.update({
+  id: '/admin/courses/',
+  path: '/admin/courses/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCoursesCourseIdRoute = AdminCoursesCourseIdRouteImport.update({
+  id: '/admin/courses/$courseId',
+  path: '/admin/courses/$courseId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCoursesNewRoute = AdminCoursesNewRouteImport.update({
+  id: '/admin/courses/new',
+  path: '/admin/courses/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -150,6 +180,7 @@ export interface FileRoutesByFullPath {
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/courses/$slug': typeof CoursesSlugRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
@@ -157,8 +188,12 @@ export interface FileRoutesByFullPath {
   '/academy/': typeof AcademyIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
+  '/courses/': typeof CoursesIndexRoute
   '/review/': typeof ReviewIndexRoute
   '/skills/': typeof SkillsIndexRoute
+  '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
+  '/admin/courses/new': typeof AdminCoursesNewRoute
+  '/admin/courses/': typeof AdminCoursesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -173,6 +208,7 @@ export interface FileRoutesByTo {
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/courses/$slug': typeof CoursesSlugRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
@@ -180,8 +216,12 @@ export interface FileRoutesByTo {
   '/academy': typeof AcademyIndexRoute
   '/admin': typeof AdminIndexRoute
   '/checkout': typeof CheckoutIndexRoute
+  '/courses': typeof CoursesIndexRoute
   '/review': typeof ReviewIndexRoute
   '/skills': typeof SkillsIndexRoute
+  '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
+  '/admin/courses/new': typeof AdminCoursesNewRoute
+  '/admin/courses': typeof AdminCoursesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -197,6 +237,7 @@ export interface FileRoutesById {
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
+  '/courses/$slug': typeof CoursesSlugRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
@@ -204,8 +245,12 @@ export interface FileRoutesById {
   '/academy/': typeof AcademyIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
+  '/courses/': typeof CoursesIndexRoute
   '/review/': typeof ReviewIndexRoute
   '/skills/': typeof SkillsIndexRoute
+  '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
+  '/admin/courses/new': typeof AdminCoursesNewRoute
+  '/admin/courses/': typeof AdminCoursesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -222,6 +267,7 @@ export interface FileRouteTypes {
     | '/admin/inbox'
     | '/auth/callback'
     | '/checkout/return'
+    | '/courses/$slug'
     | '/lesson/$lessonId'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
@@ -229,8 +275,12 @@ export interface FileRouteTypes {
     | '/academy/'
     | '/admin/'
     | '/checkout/'
+    | '/courses/'
     | '/review/'
     | '/skills/'
+    | '/admin/courses/$courseId'
+    | '/admin/courses/new'
+    | '/admin/courses/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -245,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/inbox'
     | '/auth/callback'
     | '/checkout/return'
+    | '/courses/$slug'
     | '/lesson/$lessonId'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
@@ -252,8 +303,12 @@ export interface FileRouteTypes {
     | '/academy'
     | '/admin'
     | '/checkout'
+    | '/courses'
     | '/review'
     | '/skills'
+    | '/admin/courses/$courseId'
+    | '/admin/courses/new'
+    | '/admin/courses'
   id:
     | '__root__'
     | '/'
@@ -268,6 +323,7 @@ export interface FileRouteTypes {
     | '/admin/inbox'
     | '/auth/callback'
     | '/checkout/return'
+    | '/courses/$slug'
     | '/lesson/$lessonId'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
@@ -275,8 +331,12 @@ export interface FileRouteTypes {
     | '/academy/'
     | '/admin/'
     | '/checkout/'
+    | '/courses/'
     | '/review/'
     | '/skills/'
+    | '/admin/courses/$courseId'
+    | '/admin/courses/new'
+    | '/admin/courses/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -292,6 +352,7 @@ export interface RootRouteChildren {
   AdminInboxRoute: typeof AdminInboxRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
+  CoursesSlugRoute: typeof CoursesSlugRoute
   LessonLessonIdRoute: typeof LessonLessonIdRoute
   PracticeAssignmentIdRoute: typeof PracticeAssignmentIdRoute
   ReviewSubmissionIdRoute: typeof ReviewSubmissionIdRoute
@@ -299,8 +360,12 @@ export interface RootRouteChildren {
   AcademyIndexRoute: typeof AcademyIndexRoute
   AdminIndexRoute: typeof AdminIndexRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
+  CoursesIndexRoute: typeof CoursesIndexRoute
   ReviewIndexRoute: typeof ReviewIndexRoute
   SkillsIndexRoute: typeof SkillsIndexRoute
+  AdminCoursesCourseIdRoute: typeof AdminCoursesCourseIdRoute
+  AdminCoursesNewRoute: typeof AdminCoursesNewRoute
+  AdminCoursesIndexRoute: typeof AdminCoursesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -410,6 +475,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/courses/': {
+      id: '/courses/'
+      path: '/courses'
+      fullPath: '/courses/'
+      preLoaderRoute: typeof CoursesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/courses/$slug': {
+      id: '/courses/$slug'
+      path: '/courses/$slug'
+      fullPath: '/courses/$slug'
+      preLoaderRoute: typeof CoursesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lesson/$lessonId': {
       id: '/lesson/$lessonId'
       path: '/lesson/$lessonId'
@@ -452,6 +531,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/courses/': {
+      id: '/admin/courses/'
+      path: '/admin/courses'
+      fullPath: '/admin/courses/'
+      preLoaderRoute: typeof AdminCoursesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/courses/$courseId': {
+      id: '/admin/courses/$courseId'
+      path: '/admin/courses/$courseId'
+      fullPath: '/admin/courses/$courseId'
+      preLoaderRoute: typeof AdminCoursesCourseIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/courses/new': {
+      id: '/admin/courses/new'
+      path: '/admin/courses/new'
+      fullPath: '/admin/courses/new'
+      preLoaderRoute: typeof AdminCoursesNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -468,6 +568,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminInboxRoute: AdminInboxRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
+  CoursesSlugRoute: CoursesSlugRoute,
   LessonLessonIdRoute: LessonLessonIdRoute,
   PracticeAssignmentIdRoute: PracticeAssignmentIdRoute,
   ReviewSubmissionIdRoute: ReviewSubmissionIdRoute,
@@ -475,8 +576,12 @@ const rootRouteChildren: RootRouteChildren = {
   AcademyIndexRoute: AcademyIndexRoute,
   AdminIndexRoute: AdminIndexRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
+  CoursesIndexRoute: CoursesIndexRoute,
   ReviewIndexRoute: ReviewIndexRoute,
   SkillsIndexRoute: SkillsIndexRoute,
+  AdminCoursesCourseIdRoute: AdminCoursesCourseIdRoute,
+  AdminCoursesNewRoute: AdminCoursesNewRoute,
+  AdminCoursesIndexRoute: AdminCoursesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

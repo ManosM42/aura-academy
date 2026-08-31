@@ -445,6 +445,7 @@ export async function saveCourseSteps(
 
   // Δύο πάσα ώστε το unique (course_id, position) να μη συγκρούεται σε reorder:
   // πρώτα προσωρινές αρνητικές θέσεις, μετά οι τελικές.
+  const TEMP_OFFSET = 1_000_000;
   const updates = drafts
     .map((draft, index) => ({ draft, index }))
     .filter((entry) => entry.draft.id !== null);
@@ -452,7 +453,7 @@ export async function saveCourseSteps(
   for (const { draft, index } of updates) {
     const { error } = await db
       .from("course_steps")
-      .update({ position: -(index + 1) })
+      .update({ position: TEMP_OFFSET + index + 1 })
       .eq("id", draft.id as string);
     if (error) throw error;
   }

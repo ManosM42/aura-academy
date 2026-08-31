@@ -70,8 +70,10 @@ export function Navbar() {
     if (!user) return PUBLIC_LINKS;
     return [
       { to: "/dashboard", labelKey: "nav.dashboard" },
+      { to: "/courses", labelKey: "nav.courses" },
       { to: "/academy", labelKey: "nav.academy" },
       { to: "/skills", labelKey: "nav.skills" },
+      
       // Educator/reviewer και πάνω: αξιολόγηση εργασιών.
       ...(staff ? [{ to: "/review", labelKey: "nav.reviewQueue" as TranslationKey }] : []),
       // Admin και πάνω: διαχείριση πλατφόρμας και inbox.

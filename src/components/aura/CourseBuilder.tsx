@@ -232,8 +232,8 @@ export default function CourseBuilder({
                 </option>
               ))}
             </select>
-            <p className="text-[11px] leading-relaxed text-neutral-500">
-              Ισχύει ιεραρχικά: starter < core < full. Ένα course «core»
+                        <p className="text-[11px] leading-relaxed text-neutral-500">
+              Ισχύει ιεραρχικά: starter &lt; core &lt; full. Ένα course «core»
               το βλέπουν core και full.
             </p>
           </div>

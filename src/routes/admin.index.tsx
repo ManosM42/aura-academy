@@ -89,7 +89,13 @@ function OverviewSection() {
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          to="/admin/courses"
+          className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        >
+          → Course Management
+        </Link>
         <Link
           to="/admin/inbox"
           className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"

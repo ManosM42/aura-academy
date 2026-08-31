@@ -5,6 +5,8 @@ import { updateMyProfile, uploadAvatar } from "@/lib/queries";
 import { useAuth } from "@/lib/useAuth";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import SubscriptionCard from "@/components/aura/SubscriptionCard";
+import CompletedCourses from "@/components/aura/CompletedCourses";
+
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -155,7 +157,13 @@ function ProfilePage() {
 
       {/* Το αγορασμένο πακέτο. Το session είναι ήδη narrowed από το
           `if (!session || !profile)` guard παραπάνω. */}
-      <SubscriptionCard userId={session.user.id} />
+            <SubscriptionCard userId={session.user.id} />
+
+      {/* Ποια courses έχει ολοκληρώσει ο μαθητής */}
+      <CompletedCourses />
+
+      {/* Editable fields */}
+
 
       {/* Editable fields */}
       <section className="mt-8 space-y-4">
