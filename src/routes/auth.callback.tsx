@@ -3,12 +3,24 @@ import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import ChromeButton from "@/components/aura/ChromeButton";
 import { useAuth } from "@/hooks/useAuth";
-import { consumeCheckoutIntent } from "@/lib/checkout-intent";
+import { clearCheckoutIntent, consumeCheckoutIntent } from "@/lib/checkout-intent";
+import { isPlanId, type PlanId } from "@/lib/plans";
 import { useI18n } from "@/lib/i18n";
 
 const TIMEOUT_MS = 12000;
 
+interface AuthCallbackSearch {
+  plan?: PlanId;
+  /** Το index signature είναι σκόπιμο: το validateSearch ΔΕΝ πρέπει να
+   *  πετάξει τα ?code / ?error του Supabase, αλλιώς χάνεται το PKCE code. */
+  [key: string]: unknown;
+}
+
 export const Route = createFileRoute("/auth/callback")({
+  validateSearch: (search: Record<string, unknown>): AuthCallbackSearch => ({
+    ...search,
+    plan: isPlanId(search["plan"]) ? search["plan"] : undefined,
+  }),
   head: () => ({ meta: [{ title: "AURA — Sign in" }] }),
   component: AuthCallbackPage,
 });
@@ -16,6 +28,7 @@ export const Route = createFileRoute("/auth/callback")({
 function AuthCallbackPage() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { plan: searchPlan } = Route.useSearch();
   const { t } = useI18n();
   const [failure, setFailure] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -33,16 +46,18 @@ function AuthCallbackPage() {
     if (description) setFailure(description.replace(/\+/g, " "));
   }, []);
 
-  // Επιτυχία: τιμάμε το checkout intent, αλλιώς dashboard.
+  // Επιτυχία: πρώτα το URL, μετά το αποθηκευμένο intent. Αυτό σταματά το
+  // σιωπηλό fall-through στο /dashboard όταν το storage είναι άδειο.
   useEffect(() => {
     if (failure || loading || !user) return;
-    const intent = consumeCheckoutIntent();
-    if (intent) {
-      navigate({ to: "/checkout", search: { plan: intent }, replace: true });
+    const plan = searchPlan ?? consumeCheckoutIntent();
+    if (searchPlan) clearCheckoutIntent(); // πέτα τυχόν παλιό leftover
+    if (plan) {
+      navigate({ to: "/checkout", search: { plan }, replace: true });
     } else {
       navigate({ to: "/dashboard", replace: true });
     }
-  }, [failure, loading, user, navigate]);
+  }, [failure, loading, user, searchPlan, navigate]);
 
   // Δικλείδα: αν το session δεν έρθει ποτέ, μην αφήνεις τον χρήστη σε loader.
   useEffect(() => {
@@ -54,27 +69,29 @@ function AuthCallbackPage() {
   const blocked = failure !== null || timedOut;
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col items-center justify-center px-5 py-24 text-center">
+    <main
+      className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40"
+      aria-busy={!blocked}
+    >
       {blocked ? (
         <>
           <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">
             {failure ? t("auth.errorKicker") : t("auth.timeoutKicker")}
           </p>
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
             {failure ? t("auth.errorTitle") : t("auth.timeoutTitle")}
           </h1>
-          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400" role="alert">
             {failure ?? t("auth.timeoutBody")}
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-            <Link to="/login">
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link to="/login" search={searchPlan ? { plan: searchPlan } : {}}>
               <ChromeButton type="button">{t("auth.backToLogin")}</ChromeButton>
             </Link>
-            <Link
-              to="/"
-              className="px-5 py-2 text-[11px] uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:text-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-            >
-              {t("auth.goHome")}
+            <Link to="/">
+              <ChromeButton type="button" variant="secondary">
+                {t("auth.goHome")}
+              </ChromeButton>
             </Link>
           </div>
         </>
@@ -83,16 +100,14 @@ function AuthCallbackPage() {
           <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">
             {t("auth.finishingKicker")}
           </p>
-          <h1 className="mt-5 text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
             {t("auth.finishingTitle")}
           </h1>
           <div
-            className="mt-10 h-px w-56 overflow-hidden bg-white/10"
-            role="progressbar"
+            className="mx-auto mt-8 h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
+            role="status"
             aria-label={t("auth.finishingTitle")}
-          >
-            <span className="block h-full w-1/3 animate-pulse bg-white/70" />
-          </div>
+          />
         </>
       )}
     </main>

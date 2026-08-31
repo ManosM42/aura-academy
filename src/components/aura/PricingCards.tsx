@@ -1,3 +1,4 @@
+// src/components/aura/PricingCards.tsx
 import { useNavigate } from "@tanstack/react-router";
 import ChromeButton from "@/components/aura/ChromeButton";
 import { useAuth } from "@/lib/useAuth";
@@ -12,8 +13,10 @@ export default function PricingCards() {
 
   function handleSelect(planId: PlanId) {
     if (!session) {
+      // Το intent μένει ως fallback (in-app browsers, ανανέωση σελίδας),
+      // αλλά ο κύριος φορέας είναι πλέον το ?plan= στο URL.
       setCheckoutIntent(planId);
-      navigate({ to: "/login" });
+      navigate({ to: "/login", search: { plan: planId } });
       return;
     }
     if (hasAccess) {

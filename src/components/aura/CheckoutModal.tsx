@@ -48,15 +48,33 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
     };
   }, [open, onClose]);
 
-  const fetchClientSecret = useCallback(async (): Promise<string> => {
+    const fetchClientSecret = useCallback(async (): Promise<string> => {
     setError(null);
+
     const { data, error: fnError } = await supabase.functions.invoke<{
       clientSecret?: string;
       error?: string;
     }>("create-checkout-session", { body: { planId: plan.id } });
 
-    if (fnError) throw new Error(fnError.message);
-    if (!data?.clientSecret) throw new Error(data?.error ?? "Δεν δημιουργήθηκε συνεδρία πληρωμής.");
+    if (fnError) {
+      // Το FunctionsHttpError κρατά το αρχικό Response στο `context`.
+      // Χωρίς αυτό το μήνυμα είναι πάντα "non-2xx status code".
+      const res = (fnError as { context?: Response }).context;
+      if (res && typeof res.json === "function") {
+        try {
+          const payload = (await res.json()) as { error?: string };
+          if (payload?.error) throw new Error(payload.error);
+        } catch (parseErr) {
+          if (parseErr instanceof Error && parseErr.message) throw parseErr;
+        }
+      }
+      throw new Error(fnError.message || "Η πληρωμή δεν μπόρεσε να ξεκινήσει.");
+    }
+
+    if (!data?.clientSecret) {
+      throw new Error(data?.error ?? "Δεν δημιουργήθηκε συνεδρία πληρωμής.");
+    }
+
     return data.clientSecret;
   }, [plan.id]);
 

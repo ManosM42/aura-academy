@@ -1,8 +1,10 @@
+// src/routes/profile.tsx
 import { useEffect, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { updateMyProfile, uploadAvatar } from "@/lib/queries";
 import { useAuth } from "@/lib/useAuth";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import SubscriptionCard from "@/components/aura/SubscriptionCard";
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
 
@@ -151,8 +153,12 @@ function ProfilePage() {
         </div>
       </section>
 
+      {/* Το αγορασμένο πακέτο. Το session είναι ήδη narrowed από το
+          `if (!session || !profile)` guard παραπάνω. */}
+      <SubscriptionCard userId={session.user.id} />
+
       {/* Editable fields */}
-      <section className="space-y-4">
+      <section className="mt-8 space-y-4">
         <Labeled label="Ονοματεπώνυμο">
           <input
             className={field}

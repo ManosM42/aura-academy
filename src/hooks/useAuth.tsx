@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
+import type { PlanId } from "@/lib/plans";
 
 interface AuthState {
   session: Session | null;
@@ -9,7 +10,9 @@ interface AuthState {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
-  signInWithGoogle: () => Promise<void>;
+  /** Το planId ταξιδεύει στο callback URL — προαιρετικό, ώστε οι
+   *  υπάρχοντες callers να δουλεύουν χωρίς αλλαγή. */
+  signInWithGoogle: (planId?: PlanId) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -38,7 +41,6 @@ export function useAuth(): AuthState {
       });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      // Ο έλεγχος mounted έλειπε εδώ: μετά το unmount γινόταν setState.
       if (!mounted) return;
       setSession(next);
       setUser(next?.user ?? null);
@@ -63,19 +65,23 @@ export function useAuth(): AuthState {
     return { needsConfirmation: !data.session };
   }, []);
 
-  const signInWithGoogle = useCallback(async () => {
-    // ΕΔΩ ήταν το bug: redirectTo `${origin}/dashboard`.
-    // Το /auth/callback είναι αυτό που αποφασίζει αν ο χρήστης πάει σε
-    // Stripe checkout (υπάρχει checkout intent) ή στο dashboard.
+  const signInWithGoogle = useCallback(async (planId?: PlanId) => {
     const origin =
       typeof window !== "undefined"
         ? window.location.origin
-        : ((import.meta.env["VITE_SITE_URL"] as string | undefined) ?? "");
+        : ((import.meta.env["VITE_SITE_URL"] as string | undefined) ??
+          "http://localhost:3000");
+
+    // Το Supabase διατηρεί τα query params του redirectTo, οπότε το
+    // /auth/callback ξέρει το πακέτο ακόμα κι όταν το localStorage είναι
+    // άδειο, έχει λήξει, ή γράφτηκε σε άλλο origin (preview iframe).
+    const callback = new URL("/auth/callback", origin);
+    if (planId) callback.searchParams.set("plan", planId);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${origin}/auth/callback`,
+        redirectTo: callback.toString(),
         queryParams: { prompt: "select_account" },
       },
     });

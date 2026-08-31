@@ -45,8 +45,7 @@ function CheckoutPage() {
     if (!plan) navigate({ to: "/pricing", replace: true });
   }, [plan, navigate]);
 
-  // Ενεργή συνδρομή → καμία νέα χρέωση. Ο έλεγχος του session είναι
-  // απαραίτητος: πριν φορτώσει το auth, το hasAccess είναι αναξιόπιστο.
+  // Ενεργή συνδρομή → καμία νέα χρέωση.
   useEffect(() => {
     if (waiting || !signedIn) return;
     if (hasAccess) {
@@ -55,14 +54,14 @@ function CheckoutPage() {
     }
   }, [waiting, signedIn, hasAccess, navigate]);
 
-  // Μη συνδεδεμένος επισκέπτης: κρατάμε το πακέτο ώστε το /auth/callback
-  // να τον γυρίσει εδώ μετά το Google. Σε effect, ΟΧΙ στο render body.
+  // Μη συνδεδεμένος επισκέπτης: fallback αν χαθεί το plan από το URL.
+  // Σε effect, ΟΧΙ στο render body.
   useEffect(() => {
     if (!plan || authLoading || signedIn) return;
     setCheckoutIntent(plan.id);
   }, [plan, authLoading, signedIn]);
 
-  // Έφτασε συνδεδεμένος στο checkout: το intent έκανε τη δουλειά του.
+  // Έφτασε συνδεδεμένος: το intent έκανε τη δουλειά του.
   useEffect(() => {
     if (waiting || !signedIn || hasAccess) return;
     clearCheckoutIntent();
@@ -103,7 +102,7 @@ function CheckoutPage() {
           Μετά τη σύνδεση επιστρέφεις αυτόματα εδώ για την πληρωμή.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-          <Link to="/login" search={{ redirect: "/checkout" }}>
+          <Link to="/login" search={{ plan: plan.id }}>
             <ChromeButton type="button">ΣΥΝΔΕΣΗ / ΕΓΓΡΑΦΗ</ChromeButton>
           </Link>
           <Link to="/pricing">

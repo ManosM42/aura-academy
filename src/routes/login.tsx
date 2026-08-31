@@ -6,9 +6,20 @@ import AuraMark from "@/components/aura/AuraMark";
 import ChromeButton from "@/components/aura/ChromeButton";
 import ChromeCursor from "@/components/aura/ChromeCursor";
 import { useAuth } from "@/hooks/useAuth";
-import { consumeCheckoutIntent } from "@/lib/checkout-intent";
+import { consumeCheckoutIntent, peekCheckoutIntent } from "@/lib/checkout-intent";
+import { isPlanId, type PlanId } from "@/lib/plans";
+
+interface LoginSearch {
+  plan?: PlanId;
+}
 
 export const Route = createFileRoute("/login")({
+  // Το ?plan= είναι ο ΠΡΩΤΕΥΩΝ φορέας του πακέτου. Χωρίς αυτό το
+  // validateSearch, τα search={{ plan }} links σε PricingCards.tsx,
+  // checkout.index.tsx και auth.callback.tsx δεν κάνουν typecheck.
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
+    plan: isPlanId(search["plan"]) ? search["plan"] : undefined,
+  }),
   component: LoginPage,
 });
 
@@ -16,6 +27,7 @@ type Mode = "signin" | "signup";
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { plan: searchPlan } = Route.useSearch();
   const { user, loading, signIn, signUp, signInWithGoogle } = useAuth();
 
   const [mode, setMode] = useState<Mode>("signin");
@@ -27,18 +39,19 @@ function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   /**
-   * Μετά από επιτυχή αυθεντικοποίηση: αν ο χρήστης είχε διαλέξει πακέτο
-   * στο /pricing πριν συνδεθεί, τον στέλνουμε κατευθείαν στο checkout του
-   * πακέτου. Αλλιώς στο dashboard, όπως πριν.
+   * Μετά από επιτυχή αυθεντικοποίηση: το πακέτο έρχεται πρώτα από το URL
+   * (?plan=) και μόνο ως fallback από το αποθηκευμένο intent. Το URL είναι
+   * αξιόπιστο· το localStorage χάνεται σε λήξη TTL, private mode, ή όταν
+   * το OAuth επιστρέψει σε άλλο origin. Αλλιώς → dashboard.
    */
   const goAfterAuth = useCallback(() => {
-    const intent = consumeCheckoutIntent();
-    if (intent) {
-      navigate({ to: "/checkout", search: { plan: intent } });
+    const plan = searchPlan ?? consumeCheckoutIntent();
+    if (plan) {
+      navigate({ to: "/checkout", search: { plan } });
     } else {
       navigate({ to: "/dashboard" });
     }
-  }, [navigate]);
+  }, [navigate, searchPlan]);
 
   // Already signed in -> honour a pending checkout intent, else dashboard.
   useEffect(() => {
@@ -88,8 +101,11 @@ function LoginPage() {
     setNotice(null);
     setGoogleLoading(true);
     try {
-      // Redirects to Google, then back into the app.
-      await signInWithGoogle();
+      // peek, ΟΧΙ consume: αν σβήσουμε το intent τώρα και το OAuth
+      // αποτύχει ή ο χρήστης γυρίσει πίσω, το πακέτο έχει χαθεί.
+      const plan = searchPlan ?? peekCheckoutIntent();
+      // Redirects to Google, then back to /auth/callback?plan=…
+      await signInWithGoogle(plan ?? undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
       setGoogleLoading(false);
