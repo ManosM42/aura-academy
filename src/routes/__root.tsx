@@ -12,8 +12,12 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/aura/Navbar";
+import { I18nProvider, DEFAULT_LANG } from "@/lib/i18n";
 
 function NotFoundComponent() {
+  // Προσοχή: το notFoundComponent/errorComponent του root route αντικαθιστά
+  // το RootComponent, άρα ΔΕΝ βρίσκεται μέσα στο <I18nProvider>.
+  // Μην χρησιμοποιήσεις useI18n() εδώ — τα κείμενα μένουν στατικά.
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -94,7 +98,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap",
+      },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
     ],
   }),
@@ -106,7 +113,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // Το lang ταιριάζει με το DEFAULT_LANG του i18n, ώστε να μην υπάρχει
+    // hydration mismatch. Ο I18nProvider το ενημερώνει στον client.
+    <html lang={DEFAULT_LANG}>
       <head>
         <HeadContent />
       </head>
@@ -123,9 +132,11 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Navbar />
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
+      <I18nProvider>
+        <Navbar />
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+      </I18nProvider>
     </QueryClientProvider>
   );
 }

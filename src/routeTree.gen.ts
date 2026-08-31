@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MethodRouteImport } from './routes/method'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as AcademyIndexRouteImport } from './routes/academy.index'
 import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
+import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as LessonLessonIdRouteImport } from './routes/lesson.$lessonId'
 import { Route as PracticeAssignmentIdRouteImport } from './routes/practice.$assignmentId'
 import { Route as ReviewIndexRouteImport } from './routes/review.index'
@@ -28,6 +36,16 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -36,6 +54,16 @@ const DashboardRoute = DashboardRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MethodRoute = MethodRouteImport.update({
+  id: '/method',
+  path: '/method',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProfileRoute = ProfileRouteImport.update({
@@ -56,6 +84,26 @@ const AcademySlugRoute = AcademySlugRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminInboxRoute = AdminInboxRouteImport.update({
+  id: '/admin/inbox',
+  path: '/admin/inbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutIndexRoute = CheckoutIndexRouteImport.update({
+  id: '/checkout/',
+  path: '/checkout/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutReturnRoute = CheckoutReturnRouteImport.update({
+  id: '/checkout/return',
+  path: '/checkout/return',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LessonLessonIdRoute = LessonLessonIdRouteImport.update({
@@ -91,47 +139,71 @@ const VerifyIdRoute = VerifyIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/method': typeof MethodRoute
+  '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
   '/academy/$slug': typeof AcademySlugRoute
+  '/admin/inbox': typeof AdminInboxRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
   '/verify/$id': typeof VerifyIdRoute
   '/academy/': typeof AcademyIndexRoute
   '/admin/': typeof AdminIndexRoute
+  '/checkout/': typeof CheckoutIndexRoute
   '/review/': typeof ReviewIndexRoute
   '/skills/': typeof SkillsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/method': typeof MethodRoute
+  '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
   '/academy/$slug': typeof AcademySlugRoute
+  '/admin/inbox': typeof AdminInboxRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
   '/verify/$id': typeof VerifyIdRoute
   '/academy': typeof AcademyIndexRoute
   '/admin': typeof AdminIndexRoute
+  '/checkout': typeof CheckoutIndexRoute
   '/review': typeof ReviewIndexRoute
   '/skills': typeof SkillsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/method': typeof MethodRoute
+  '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
   '/academy/$slug': typeof AcademySlugRoute
+  '/admin/inbox': typeof AdminInboxRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/checkout/return': typeof CheckoutReturnRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
   '/verify/$id': typeof VerifyIdRoute
   '/academy/': typeof AcademyIndexRoute
   '/admin/': typeof AdminIndexRoute
+  '/checkout/': typeof CheckoutIndexRoute
   '/review/': typeof ReviewIndexRoute
   '/skills/': typeof SkillsIndexRoute
 }
@@ -139,62 +211,94 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
+    | '/contact'
     | '/dashboard'
     | '/login'
+    | '/method'
+    | '/pricing'
     | '/profile'
     | '/academy/$slug'
+    | '/admin/inbox'
+    | '/auth/callback'
+    | '/checkout/return'
     | '/lesson/$lessonId'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
     | '/verify/$id'
     | '/academy/'
     | '/admin/'
+    | '/checkout/'
     | '/review/'
     | '/skills/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
+    | '/contact'
     | '/dashboard'
     | '/login'
+    | '/method'
+    | '/pricing'
     | '/profile'
     | '/academy/$slug'
+    | '/admin/inbox'
+    | '/auth/callback'
+    | '/checkout/return'
     | '/lesson/$lessonId'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
     | '/verify/$id'
     | '/academy'
     | '/admin'
+    | '/checkout'
     | '/review'
     | '/skills'
   id:
     | '__root__'
     | '/'
+    | '/about'
+    | '/contact'
     | '/dashboard'
     | '/login'
+    | '/method'
+    | '/pricing'
     | '/profile'
     | '/academy/$slug'
+    | '/admin/inbox'
+    | '/auth/callback'
+    | '/checkout/return'
     | '/lesson/$lessonId'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
     | '/verify/$id'
     | '/academy/'
     | '/admin/'
+    | '/checkout/'
     | '/review/'
     | '/skills/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  MethodRoute: typeof MethodRoute
+  PricingRoute: typeof PricingRoute
   ProfileRoute: typeof ProfileRoute
   AcademySlugRoute: typeof AcademySlugRoute
+  AdminInboxRoute: typeof AdminInboxRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  CheckoutReturnRoute: typeof CheckoutReturnRoute
   LessonLessonIdRoute: typeof LessonLessonIdRoute
   PracticeAssignmentIdRoute: typeof PracticeAssignmentIdRoute
   ReviewSubmissionIdRoute: typeof ReviewSubmissionIdRoute
   VerifyIdRoute: typeof VerifyIdRoute
   AcademyIndexRoute: typeof AcademyIndexRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  CheckoutIndexRoute: typeof CheckoutIndexRoute
   ReviewIndexRoute: typeof ReviewIndexRoute
   SkillsIndexRoute: typeof SkillsIndexRoute
 }
@@ -206,6 +310,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -220,6 +338,20 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/method': {
+      id: '/method'
+      path: '/method'
+      fullPath: '/method'
+      preLoaderRoute: typeof MethodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/profile': {
@@ -248,6 +380,34 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/inbox': {
+      id: '/admin/inbox'
+      path: '/admin/inbox'
+      fullPath: '/admin/inbox'
+      preLoaderRoute: typeof AdminInboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/': {
+      id: '/checkout/'
+      path: '/checkout'
+      fullPath: '/checkout/'
+      preLoaderRoute: typeof CheckoutIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/return': {
+      id: '/checkout/return'
+      path: '/checkout/return'
+      fullPath: '/checkout/return'
+      preLoaderRoute: typeof CheckoutReturnRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lesson/$lessonId': {
@@ -297,16 +457,24 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  MethodRoute: MethodRoute,
+  PricingRoute: PricingRoute,
   ProfileRoute: ProfileRoute,
   AcademySlugRoute: AcademySlugRoute,
+  AdminInboxRoute: AdminInboxRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  CheckoutReturnRoute: CheckoutReturnRoute,
   LessonLessonIdRoute: LessonLessonIdRoute,
   PracticeAssignmentIdRoute: PracticeAssignmentIdRoute,
   ReviewSubmissionIdRoute: ReviewSubmissionIdRoute,
   VerifyIdRoute: VerifyIdRoute,
   AcademyIndexRoute: AcademyIndexRoute,
   AdminIndexRoute: AdminIndexRoute,
+  CheckoutIndexRoute: CheckoutIndexRoute,
   ReviewIndexRoute: ReviewIndexRoute,
   SkillsIndexRoute: SkillsIndexRoute,
 }
