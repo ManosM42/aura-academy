@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { motion } from "motion/react";
 import { ImagePlus, Loader2, Send, Sparkles, X } from "lucide-react";
 import {
   createAcademyPost,
@@ -19,25 +20,22 @@ function AcademyPage() {
   const staff = profile.data ? isStaffRole(profile.data.role) : false;
 
   return (
-    <main
-      className="relative min-h-screen text-white"
-      style={{
-        background:
-          "radial-gradient(1200px 600px at 50% -10%, rgba(255,255,255,0.05), transparent 60%), #050505",
-      }}
-    >
-      <div className="mx-auto max-w-2xl px-6 py-16">
-        <header className="mb-10">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.35em] text-neutral-500">
-            <Sparkles size={12} className="text-neutral-400" />
-            Academy
+    <main className="w-full min-h-screen overflow-x-hidden bg-[#070707] px-4 sm:px-6 md:px-10 py-28 sm:py-36 text-white selection:bg-white selection:text-black">
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="mx-auto max-w-2xl space-y-10"
+      >
+        <header>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/50 mb-3">
+            <span className="h-px w-8 bg-gradient-to-r from-white/60 to-transparent" />
+            Academy Feed
           </div>
-          <h1
-            className="mt-3 bg-gradient-to-b from-white to-neutral-400 bg-clip-text text-4xl font-semibold tracking-tight text-transparent"
-          >
-            Ανακοινώσεις &amp; Feed
+          <h1 className="text-4xl font-extrabold uppercase tracking-tight sm:text-5xl text-white">
+            Ανακοινώσεις &amp; <span className="chrome-type font-semibold">Feed</span>
           </h1>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-neutral-500">
+          <p className="mt-4 text-sm leading-relaxed text-white/60 sm:text-base">
             Νέα, tips και ανακοινώσεις από την ομάδα της AURA. Κάνε like και
             σχολίασε.
           </p>
@@ -46,26 +44,38 @@ function AcademyPage() {
         {profile.error && <ErrorState message={profile.error} />}
 
         {staff && profile.data && (
-          <div className="mb-10">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
             <Composer
               authorAvatar={profile.data.avatar_url}
               authorName={profile.data.full_name}
               onPosted={() => feed.reload?.()}
             />
-          </div>
+          </motion.div>
         )}
 
         {feed.loading && <LoadingSkeleton rows={4} />}
         {feed.error && <ErrorState message={feed.error} />}
-         {feed.data && feed.data.length === 0 && (
-          <EmptyState
-            title="Δεν υπάρχουν αναρτήσεις ακόμη"
-            hint="Μόλις η ομάδα κάνει το πρώτο post, θα εμφανιστεί εδώ."
-          />
+        
+        {feed.data && feed.data.length === 0 && (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center backdrop-blur-xl">
+            <EmptyState
+              title="Δεν υπάρχουν αναρτήσεις ακόμη"
+              hint="Μόλις η ομάδα κάνει το πρώτο post, θα εμφανιστεί εδώ."
+            />
+          </div>
         )}
 
         {feed.data && feed.data.length > 0 && profile.data && (
-          <div className="space-y-5">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="space-y-6"
+          >
             {feed.data.map((post) => (
               <PostCardPro
                 key={post.id}
@@ -75,9 +85,9 @@ function AcademyPage() {
                 onChanged={() => feed.reload?.()}
               />
             ))}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </main>
   );
 }
@@ -120,24 +130,22 @@ function Composer({
   }
 
   return (
-    <div
-      className="relative overflow-hidden rounded-2xl border border-white/10 p-5"
-      style={{
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.015) 100%)",
-      }}
+    <motion.div
+      whileHover={{ border: "1px solid rgba(255,255,255,0.25)" }}
+      transition={{ duration: 0.2 }}
+      className="relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-6 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]"
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
-      <div className="flex items-start gap-3.5">
+      <div className="flex items-start gap-4">
         {authorAvatar ? (
           <img
             src={authorAvatar}
             alt=""
-            className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-amber-400/40"
+            className="h-11 w-11 shrink-0 rounded-full object-cover ring-2 ring-white/30 shadow-[0_0_15px_rgba(255,255,255,0.1)]"
           />
         ) : (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-neutral-700 to-neutral-900 text-xs font-semibold text-neutral-200 ring-2 ring-amber-400/40">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-white/20 to-white/5 text-xs font-semibold text-white ring-2 ring-white/30 shadow-[0_0_15px_rgba(255,255,255,0.1)]">
             {authorName?.[0]?.toUpperCase() ?? "A"}
           </div>
         )}
@@ -147,31 +155,35 @@ function Composer({
             onChange={(e) => setContent(e.target.value)}
             placeholder="Μοιράσου κάτι με τους μαθητές…"
             rows={3}
-            className="w-full resize-none rounded-xl border border-white/10 bg-black/40 p-3.5 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-white/30"
+            className="w-full resize-none rounded-xl border border-white/10 bg-black/50 p-4 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-white/40 focus:bg-black/80 focus:shadow-[0_0_20px_rgba(255,255,255,0.05)]"
           />
 
           {imagePreview && (
-            <div className="relative mt-3 inline-block">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="relative mt-3 inline-block"
+            >
               <img
                 src={imagePreview}
                 alt=""
-                className="max-h-56 rounded-xl object-cover ring-1 ring-white/10"
+                className="max-h-56 rounded-xl object-cover ring-1 ring-white/20 shadow-lg"
               />
               <button
                 onClick={() => handlePickImage(null)}
-                className="absolute -right-2 -top-2 rounded-full bg-black p-1 text-white/80 ring-1 ring-white/20 hover:text-white"
+                className="absolute -right-2 -top-2 rounded-full bg-black p-1.5 text-white ring-1 ring-white/30 hover:bg-white hover:text-black transition-all shadow-md"
               >
                 <X size={13} />
               </button>
-            </div>
+            </motion.div>
           )}
 
-          {err && <p className="mt-2 text-xs text-rose-300">{err}</p>}
+          {err && <p className="mt-2 text-xs text-rose-400">{err}</p>}
 
-          <div className="mt-3.5 flex items-center justify-between">
-            <label className="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/12 px-3.5 py-1.5 text-xs text-neutral-400 transition hover:border-white/25 hover:text-white">
+          <div className="mt-4 flex items-center justify-between">
+            <label className="flex cursor-pointer items-center gap-2 rounded-full border border-white/20 bg-white/[0.03] px-4 py-2 text-xs font-medium text-white/80 transition-all hover:border-white/40 hover:bg-white/[0.08] hover:text-white shadow-[0_0_15px_rgba(255,255,255,0.02)]">
               <ImagePlus size={14} />
-              Εικόνα
+              <span>Εικόνα</span>
               <input
                 type="file"
                 accept="image/*"
@@ -180,21 +192,23 @@ function Composer({
               />
             </label>
 
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={handleSubmit}
               disabled={busy || !content.trim()}
-              className="flex items-center gap-1.5 rounded-full bg-gradient-to-b from-neutral-100 to-neutral-300 px-5 py-2 text-xs font-semibold text-black shadow-[0_2px_10px_-2px_rgba(255,255,255,0.35)] transition hover:brightness-110 disabled:opacity-40"
+              className="flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_25px_rgba(255,255,255,0.2)] transition-all hover:bg-white/90 disabled:opacity-40 disabled:hover:scale-100"
             >
               {busy ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <Send size={14} />
               )}
-              Δημοσίευση
-            </button>
+              <span>Δημοσίευση</span>
+            </motion.button>
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

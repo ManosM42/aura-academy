@@ -96,69 +96,84 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
   const { nodes, edges, width, height } = layout(skills);
 
   return (
-    <section className="relative mx-auto max-w-6xl">
-      <div className="overflow-x-auto rounded-2xl border border-white/[0.06] bg-aura-bg2 p-4">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full min-w-[720px]">
-          {edges.map(([from, to], i) => {
-            const active = from.state !== "locked" && to.state !== "locked";
-            return (
-              <motion.line
-                key={`${from.skill.id}-${to.skill.id}`}
-                x1={from.x}
-                y1={from.y}
-                x2={to.x}
-                y2={to.y}
-                stroke={active ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.12)"}
-                strokeWidth="1.5"
-                initial={{ pathLength: 0, opacity: 0 }}
-                whileInView={{ pathLength: 1, opacity: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1.1, ease: "easeInOut", delay: i * 0.06 }}
-              />
-            );
-          })}
+    <section className="relative mx-auto max-w-6xl px-4 sm:px-0">
+      <div className="relative w-full rounded-2xl border border-white/[0.08] bg-[#070707] p-2 sm:p-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl">
+        <div className="absolute top-3 right-4 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-wider text-white/50 md:hidden">
+          <span>← Σύρετε για πλοήγηση →</span>
+        </div>
 
-          {nodes.map((n, i) => (
-            <motion.g
-              key={n.skill.id}
-              initial={{ opacity: 0, scale: 0.6 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, ease: "backOut", delay: 0.15 + i * 0.05 }}
-              style={{ transformBox: "fill-box", transformOrigin: "center" }}
-            >
-              {(n.state === "verified" || n.state === "mastered") && (
-                <circle cx={n.x} cy={n.y} r="30" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="6" />
-              )}
-              <circle cx={n.x} cy={n.y} r="22" strokeWidth="1.5" className={nodeStyles[n.state]} />
-              <text
-                x={n.x}
-                y={n.y + 46}
-                textAnchor="middle"
-                className="font-aura"
-                fill={textFill[n.state]}
-                fontSize="12"
+        <div className="overflow-x-auto scrollbar-none rounded-xl">
+          <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full min-w-[720px] select-none">
+            {edges.map(([from, to], i) => {
+              const active = from.state !== "locked" && to.state !== "locked";
+              return (
+                <motion.line
+                  key={`${from.skill.id}-${to.skill.id}`}
+                  x1={from.x}
+                  y1={from.y}
+                  x2={to.x}
+                  y2={to.y}
+                  stroke={active ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.15)"}
+                  strokeWidth="2"
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  whileInView={{ pathLength: 1, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1.1, ease: "easeInOut", delay: i * 0.06 }}
+                />
+              );
+            })}
+
+            {nodes.map((n, i) => (
+              <motion.g
+                key={n.skill.id}
+                initial={{ opacity: 0, scale: 0.6 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, ease: "backOut", delay: 0.15 + i * 0.05 }}
+                style={{ transformBox: "fill-box", transformOrigin: "center" }}
               >
-                {n.skill.name}
-              </text>
-              {(n.state === "verified" || n.state === "mastered") && (
-                <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#FFFFFF" fontSize="14">
-                  ✓
+                {(n.state === "verified" || n.state === "mastered") && (
+                  <circle 
+                    cx={n.x} 
+                    cy={n.y} 
+                    r="30" 
+                    fill="none" 
+                    stroke="rgba(255,255,255,0.2)" 
+                    strokeWidth="4" 
+                    className="animate-pulse"
+                  />
+                )}
+                <circle cx={n.x} cy={n.y} r="22" strokeWidth="2" className={nodeStyles[n.state]} />
+                <text
+                  x={n.x}
+                  y={n.y + 46}
+                  textAnchor="middle"
+                  className="font-aura"
+                  fill={textFill[n.state]}
+                  fontSize="12"
+                  fontWeight={n.state !== "locked" ? "600" : "400"}
+                >
+                  {n.skill.name}
                 </text>
-              )}
-              {n.skill.userSkill?.score != null && n.state !== "locked" && (
-                <text x={n.x} y={n.y - 32} textAnchor="middle" fill="#9CA3AF" fontSize="10">
-                  {n.skill.userSkill.score}
-                </text>
-              )}
-            </motion.g>
-          ))}
-        </svg>
+                {(n.state === "verified" || n.state === "mastered") && (
+                  <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#FFFFFF" fontSize="14" fontWeight="bold">
+                    ✓
+                  </text>
+                )}
+                {n.skill.userSkill?.score != null && n.state !== "locked" && (
+                  <text x={n.x} y={n.y - 32} textAnchor="middle" fill="#9CA3AF" fontSize="10">
+                    {n.skill.userSkill.score}
+                  </text>
+                )}
+              </motion.g>
+            ))}
+          </svg>
+        </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-6 text-xs text-aura-text-secondary font-aura">
+      <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 text-xs text-aura-text-secondary font-aura">
         <span className="flex items-center gap-2">
-          <i className="inline-block h-3 w-3 rounded-full border border-white bg-aura-elevated" />
+          <i className="inline-block h-3 w-3 rounded-full border border-white bg-aura-elevated shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
           Verified / Mastered
         </span>
         <span className="flex items-center gap-2">

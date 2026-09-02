@@ -12,12 +12,9 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/aura/Navbar";
-import { I18nProvider, DEFAULT_LANG } from "@/lib/i18n";
+import { I18nProvider } from "@/lib/i18n";
 
 function NotFoundComponent() {
-  // Προσοχή: το notFoundComponent/errorComponent του root route αντικαθιστά
-  // το RootComponent, άρα ΔΕΝ βρίσκεται μέσα στο <I18nProvider>.
-  // Μην χρησιμοποιήσεις useI18n() εδώ — τα κείμενα μένουν στατικά.
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -113,9 +110,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    // Το lang ταιριάζει με το DEFAULT_LANG του i18n, ώστε να μην υπάρχει
-    // hydration mismatch. Ο I18nProvider το ενημερώνει στον client.
-    <html lang={DEFAULT_LANG}>
+    // Set to "en" so Chrome knows the page is natively English and doesn't trigger its native translation bar
+    <html lang="en">
       <head>
         <HeadContent />
       </head>

@@ -24,7 +24,7 @@ function Index() {
   }, []);
 
   return (
-    <div className="relative min-h-screen bg-aura-bg text-aura-text antialiased">
+    <div className="relative min-h-screen w-full bg-aura-bg text-aura-text antialiased overflow-x-hidden">
       <AnimatePresence mode="wait">
         {loading && <AuraLoader key="loader" />}
       </AnimatePresence>
@@ -32,8 +32,7 @@ function Index() {
       <div className="aura-grain" aria-hidden />
       <ChromeCursor />
 
-     
-      <main>
+      <main className="w-full overflow-x-hidden">
         <Hero />
         <Method />
         <SkillTree />

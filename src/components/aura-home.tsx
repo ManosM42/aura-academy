@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent } from "react";
-import { ArrowDown, ArrowRight, Check, LockKeyhole, Menu, Scissors, X } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, Instagram, LockKeyhole, Menu, Scissors, X } from "lucide-react";
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 
 import heroImage from "@/assets/aura-hero.jpg";
@@ -37,11 +37,11 @@ function Intro({ onComplete }: { onComplete: () => void }) {
 
   return (
     <motion.div
-      className="intro fixed inset-0 z-[100] grid place-items-center bg-background"
+      className="intro fixed inset-0 z-[100] grid place-items-center bg-background overflow-hidden"
       exit={{ opacity: 0, transition: { duration: 0.7, ease: "easeInOut" } }}
     >
       <div className="intro-glow" />
-      <div className="relative flex flex-col items-center">
+      <div className="relative flex flex-col items-center px-4 text-center">
         <div className="intro-ring" />
         <motion.div
           initial={{ opacity: 0, scale: 0.92 }}
@@ -110,11 +110,11 @@ export function AuraHome() {
   }, []);
 
   return (
-    <main className="overflow-clip bg-background text-foreground selection:bg-foreground selection:text-background">
+    <main className="w-full overflow-x-hidden bg-background text-foreground selection:bg-foreground selection:text-background">
       {intro && <Intro onComplete={() => setIntro(false)} />}
 
       <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${scrolled ? "nav-scrolled" : ""}`}>
-        <nav className="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 md:px-10" aria-label="Main navigation">
+        <nav className="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-4 sm:px-6 md:px-10" aria-label="Main navigation">
           <a href="#top" className="focus-ring"><AuraMark compact /></a>
           <div className="hidden items-center gap-9 md:flex">
             <a href="#method" className="nav-link">Method</a>
@@ -145,11 +145,11 @@ export function AuraHome() {
           <div className="hero-image-fade absolute inset-0" />
         </motion.div>
         <div className="hero-atmosphere absolute inset-0" />
-        <motion.div className="relative z-10 mx-auto flex min-h-[92svh] max-w-[1440px] flex-col justify-end px-5 pb-16 pt-32 md:px-10 md:pb-20" style={{ y: textY }}>
+        <motion.div className="relative z-10 mx-auto flex min-h-[92svh] max-w-[1440px] flex-col justify-end px-4 sm:px-6 pb-16 pt-32 md:px-10 md:pb-20" style={{ y: textY }}>
           <p className="mb-6 flex items-center gap-4 text-[0.63rem] font-semibold uppercase tracking-[0.3em] text-secondary-foreground">
             <span className="h-px w-10 bg-chrome-mid" /> The modern barber's academy
           </p>
-          <h1 className="max-w-5xl text-[clamp(3.4rem,9vw,8.8rem)] font-semibold uppercase leading-[0.82]">
+          <h1 className="max-w-5xl text-[clamp(2.8rem,8vw,8.8rem)] font-semibold uppercase leading-[0.82]">
             Master<br /><span className="chrome-type">the craft.</span>
           </h1>
           <div className="mt-9 flex max-w-3xl flex-col gap-8 border-t border-border pt-7 md:flex-row md:items-center md:justify-between">
@@ -159,15 +159,19 @@ export function AuraHome() {
             <Button variant="chrome" size="xl" asChild><a href="#method">Enter the academy <ArrowDown /></a></Button>
           </div>
         </motion.div>
-        <div className="absolute bottom-0 right-8 hidden text-[0.58rem] uppercase tracking-[0.28em] text-muted-foreground md:block">AURA / 001</div>
+        <div className="absolute bottom-0 right-4 sm:right-8 hidden text-[0.58rem] uppercase tracking-[0.28em] text-muted-foreground md:block">AURA / 001</div>
       </section>
 
-      <section id="method" className="section-shell border-b border-subtle">
-        <div className="section-heading">
+      <section id="method" className="section-shell border-b border-subtle overflow-x-hidden">
+        <div className="section-heading px-4 sm:px-6 md:px-0">
           <p className="eyebrow">The AURA method</p>
-          <h2>LEARN.<br />PRACTICE.<br /><span className="chrome-type">PROVE.</span></h2>
+          <h2 className="text-[clamp(2.2rem,6vw,5.5rem)] uppercase leading-[1.18]">
+            <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">LEARN.</span><br />
+            <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">PRACTICE.</span><br />
+            <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">PROVE.</span>
+          </h2>
         </div>
-        <div className="mt-20 grid border-t border-border md:grid-cols-3">
+        <div className="mt-20 grid border-t border-border grid-cols-1 md:grid-cols-3">
           {steps.map((step) => (
             <ChromeField key={step.n} className="method-step group">
               <span className="font-mono text-[0.62rem] text-muted-foreground">/{step.n}</span>
@@ -179,7 +183,7 @@ export function AuraHome() {
         </div>
       </section>
 
-      <section id="skill-tree" className="section-shell grid items-center gap-16 border-b border-subtle lg:grid-cols-[0.8fr_1.2fr]">
+      <section id="skill-tree" className="section-shell grid items-center gap-16 border-b border-subtle grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] overflow-x-hidden">
         <div>
           <p className="eyebrow">Measured progression</p>
           <h2 className="section-title">YOUR CRAFT.<br /><span className="chrome-type">MAPPED.</span></h2>
@@ -187,7 +191,7 @@ export function AuraHome() {
             A professional competency system that makes every strength visible and every next step deliberate.
           </p>
         </div>
-        <ChromeField className="skill-map" aria-label="AURA professional skill progression">
+        <ChromeField className="skill-map w-full overflow-hidden" aria-label="AURA professional skill progression">
           <div className="skill-line" />
           {skillNodes.map((node) => (
             <div key={node.label} className={`skill-node skill-node-${node.state}`} style={{ left: node.x, top: node.y }}>
@@ -201,8 +205,8 @@ export function AuraHome() {
         </ChromeField>
       </section>
 
-      <section id="certification" className="section-shell border-b border-subtle">
-        <div className="grid items-center gap-14 lg:grid-cols-[1fr_1fr]">
+      <section id="certification" className="section-shell border-b border-subtle overflow-x-hidden">
+        <div className="grid items-center gap-14 grid-cols-1 lg:grid-cols-[1fr_1fr]">
           <div className="relative overflow-hidden">
             <img src={toolsImage} alt="Polished professional barber tools arranged on a black surface" width={1600} height={1072} loading="lazy" className="aspect-[4/3] w-full object-cover grayscale transition-transform duration-700 hover:scale-[1.025]" />
             <div className="image-vignette absolute inset-0" />
@@ -213,9 +217,9 @@ export function AuraHome() {
             <p className="mt-7 max-w-lg text-base leading-8 text-secondary-foreground">
               AURA certification is a precise record of demonstrated skill—not attendance. Built to be checked, trusted and carried forward.
             </p>
-            <div className="certificate-strip mt-10">
+            <div className="certificate-strip mt-10 flex flex-wrap items-center gap-4">
               <AuraMark compact />
-              <div className="h-10 w-px bg-border" />
+              <div className="h-10 w-px bg-border hidden sm:block" />
               <div><p className="text-[0.58rem] uppercase tracking-[0.22em] text-muted-foreground">Credential ID</p><p className="mt-1 font-mono text-xs text-foreground">AURA—MASTER—0001</p></div>
               <div className="ml-auto hidden size-8 items-center justify-center rounded-full border border-chrome-mid text-chrome-light sm:flex"><Check className="size-3" /></div>
             </div>
@@ -223,20 +227,32 @@ export function AuraHome() {
         </div>
       </section>
 
-      <section id="start" className="relative px-5 py-28 text-center md:px-10 md:py-44">
+      <section id="start" className="relative px-4 sm:px-6 py-28 text-center md:px-10 md:py-44 overflow-x-hidden">
         <div className="cta-light absolute inset-0" />
         <div className="relative mx-auto max-w-5xl">
           <p className="eyebrow justify-center">Begin with intent</p>
-          <h2 className="mt-8 text-[clamp(3rem,7vw,7rem)] font-semibold uppercase leading-[0.88]">Set a higher<br /><span className="chrome-type">standard.</span></h2>
+          <h2 className="mt-8 text-[clamp(2.6rem,7vw,7rem)] font-semibold uppercase leading-[0.88]">Set a higher<br /><span className="chrome-type">standard.</span></h2>
           <Button variant="chrome" size="xl" className="mt-12" asChild><a href="mailto:academy@aura.barber">Start learning <ArrowRight /></a></Button>
         </div>
       </section>
 
-      <footer className="border-t border-border px-5 py-8 md:px-10">
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-5 text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <AuraMark compact />
+      <footer className="border-t border-border px-4 sm:px-6 py-8 md:px-10 overflow-x-hidden">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-5 text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground sm:flex-row sm:items-center sm:justify-between text-center sm:text-left">
+          <div className="flex justify-center sm:justify-start"><AuraMark compact /></div>
           <p>Precision. Practice. Proof.</p>
-          <p>© 2026 AURA Academy</p>
+          <div className="flex items-center justify-center gap-6 sm:justify-end">
+            <a 
+              href="https://www.instagram.com/aura_.method/?__pwa=1" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Instagram"
+            >
+              <Instagram className="size-4" />
+              <span>Instagram</span>
+            </a>
+            <p>© 2026 AURA Academy</p>
+          </div>
         </div>
       </footer>
     </main>
