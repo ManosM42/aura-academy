@@ -3,6 +3,9 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import Footer from "@/components/aura/Footer";
 import logoImg from "@/assets/logo.jpg";
+import founderImg from "@/assets/founder.jpg";
+import cofounderImg from "@/assets/cofounder.jpg";
+import developerImg from "@/assets/developer.jpg";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -29,7 +32,7 @@ const teamProfiles: Profile[] = [
     id: "01",
     name: "ΘΕΟΠΙΣΤΟΣ",
     role: "FOUNDER • CREATOR • CREATIVE DIRECTOR • HEAD EDUCATOR",
-    image: "/src/assets/founder.jpg",
+    image: founderImg,
     paragraphs: [
       "Ο Θεόπιστος είναι ο δημιουργός και η δημιουργική δύναμη πίσω από την AURA.",
       "Με πολυετή εμπειρία στον χώρο της κομμωτικής, της επαγγελματικής εκπαίδευσης και της δημιουργίας, έχει αφιερώσει την πορεία του όχι μόνο στην εξέλιξη της τεχνικής, αλλά και στην κατανόηση του τι πραγματικά δημιουργεί έναν ολοκληρωμένο επαγγελματία.",
@@ -48,7 +51,7 @@ const teamProfiles: Profile[] = [
     id: "02",
     name: "ΑΓΓΕΛΟΣ",
     role: "PARTNER • STRATEGIC DEVELOPMENT • HEAD EDUCATOR",
-    image: "/src/assets/cofounder.jpg",
+    image: cofounderImg,
     paragraphs: [
       "Ο Άγγελος αποτελεί σημαντικό μέλος της AURA και ενεργό κομμάτι της εξέλιξης και της κατεύθυνσής της.",
       "Με κοινό όραμα, υψηλά standards και πάθος για την επαγγελματική εξέλιξη, συμμετέχει ενεργά τόσο στην ανάπτυξη της AURA όσο και στη δημιουργία μιας νέας εκπαιδευτικής κουλτούρας.",
@@ -66,7 +69,7 @@ const teamProfiles: Profile[] = [
     id: "03",
     name: "ΜΑΝΟΣ",
     role: "PROGRAMMER • DIGITAL CREATOR • ONLINE ACADEMY",
-    image: "/src/assets/developer.jpg",
+    image: developerImg,
     paragraphs: [
       "Ο Μάνος αποτελεί τη δύναμη πίσω από την ψηφιακή εξέλιξη της AURA.",
       "Παρότι μόλις 17 ετών, ξεκίνησε να ασχολείται με τον προγραμματισμό από τα 15 του και έχει ήδη αναπτύξει σημαντικές γνώσεις και εμπειρία στον χώρο της τεχνολογίας και της ψηφιακής δημιουργίας.",
