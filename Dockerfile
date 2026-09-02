@@ -1,6 +1,18 @@
 # Στάδιο 1: Χτίσιμο της εφαρμογής (TanStack / Vite)
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Ορισμός ARG & ENV για να περάσουν οι VITE_ μεταβλητές στο build time
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_SUPABASE_PUBLISHABLE_KEY
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=$VITE_SUPABASE_PUBLISHABLE_KEY
+ENV VITE_STRIPE_PUBLISHABLE_KEY=$VITE_STRIPE_PUBLISHABLE_KEY
+
 COPY package*.json ./
 RUN npm ci --no-audit --progress=false --force
 COPY . .
@@ -9,10 +21,10 @@ RUN npm run build
 # Στάδιο 2: Στήσιμο του Nginx με το σωστό Routing
 FROM nginx:alpine
 
-# Αν το TanStack Router βγάζει τα αρχεία στο dist
-COPY --from=builder /app/dist /usr/share/nginx/html
+# ΑΛΛΑΓΗ: Το Nitro/TanStack παράγει τα static αρχεία στο /app/.output/public αντί για το /app/dist
+COPY --from=builder /app/.output/public /usr/share/nginx/html
 
-# Δημιουργία του σωστού Nginx Config για να μην ξαναδείς 404
+# Δημιουργία του σωστού Nginx Config για να μην βγάζει 404 στα client routes
 RUN echo 'server { \
     listen 80; \
     location / { \
