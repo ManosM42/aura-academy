@@ -17,6 +17,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MethodRouteImport } from './routes/method'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AcademyIndexRouteImport } from './routes/academy.index'
 import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -74,6 +75,11 @@ const PricingRoute = PricingRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcademyIndexRoute = AcademyIndexRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
+  '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
+  '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -233,6 +241,7 @@ export interface FileRoutesById {
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
+  '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/method'
     | '/pricing'
     | '/profile'
+    | '/terms'
     | '/academy/$slug'
     | '/admin/inbox'
     | '/auth/callback'
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/method'
     | '/pricing'
     | '/profile'
+    | '/terms'
     | '/academy/$slug'
     | '/admin/inbox'
     | '/auth/callback'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/method'
     | '/pricing'
     | '/profile'
+    | '/terms'
     | '/academy/$slug'
     | '/admin/inbox'
     | '/auth/callback'
@@ -348,6 +360,7 @@ export interface RootRouteChildren {
   MethodRoute: typeof MethodRoute
   PricingRoute: typeof PricingRoute
   ProfileRoute: typeof ProfileRoute
+  TermsRoute: typeof TermsRoute
   AcademySlugRoute: typeof AcademySlugRoute
   AdminInboxRoute: typeof AdminInboxRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/academy/': {
@@ -564,6 +584,7 @@ const rootRouteChildren: RootRouteChildren = {
   MethodRoute: MethodRoute,
   PricingRoute: PricingRoute,
   ProfileRoute: ProfileRoute,
+  TermsRoute: TermsRoute,
   AcademySlugRoute: AcademySlugRoute,
   AdminInboxRoute: AdminInboxRoute,
   AuthCallbackRoute: AuthCallbackRoute,

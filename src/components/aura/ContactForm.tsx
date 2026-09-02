@@ -25,7 +25,7 @@ export default function ContactForm() {
 
   const [kind, setKind] = useState<Kind>("message");
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState(session?.user.email ?? "");
+  const [email, setEmail] = useState(session?.user?.email ?? "");
   const [phone, setPhone] = useState("");
   const [message, setMessage] = useState("");
   const [preferredAt, setPreferredAt] = useState("");
@@ -74,7 +74,7 @@ export default function ContactForm() {
       phone: phone.trim() || null,
       message: message.trim(),
       preferred_at: kind === "appointment" ? new Date(preferredAt).toISOString() : null,
-      user_id: session?.user.id ?? null,
+      user_id: session?.user?.id ?? null,
     });
 
     if (error) {

@@ -14,9 +14,6 @@ interface LoginSearch {
 }
 
 export const Route = createFileRoute("/login")({
-  // Το ?plan= είναι ο ΠΡΩΤΕΥΩΝ φορέας του πακέτου. Χωρίς αυτό το
-  // validateSearch, τα search={{ plan }} links σε PricingCards.tsx,
-  // checkout.index.tsx και auth.callback.tsx δεν κάνουν typecheck.
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     plan: isPlanId(search["plan"]) ? search["plan"] : undefined,
   }),
@@ -33,17 +30,12 @@ function LoginPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  /**
-   * Μετά από επιτυχή αυθεντικοποίηση: το πακέτο έρχεται πρώτα από το URL
-   * (?plan=) και μόνο ως fallback από το αποθηκευμένο intent. Το URL είναι
-   * αξιόπιστο· το localStorage χάνεται σε λήξη TTL, private mode, ή όταν
-   * το OAuth επιστρέψει σε άλλο origin. Αλλιώς → dashboard.
-   */
   const goAfterAuth = useCallback(() => {
     const plan = searchPlan ?? consumeCheckoutIntent();
     if (plan) {
@@ -53,7 +45,6 @@ function LoginPage() {
     }
   }, [navigate, searchPlan]);
 
-  // Already signed in -> honour a pending checkout intent, else dashboard.
   useEffect(() => {
     if (!loading && user) goAfterAuth();
   }, [loading, user, goAfterAuth]);
@@ -62,6 +53,11 @@ function LoginPage() {
     e.preventDefault();
     setError(null);
     setNotice(null);
+
+    if (!agreed) {
+      setError("You must agree to the Terms of Service & Privacy Policy to proceed.");
+      return;
+    }
 
     const cleanEmail = email.trim();
 
@@ -99,12 +95,15 @@ function LoginPage() {
   async function handleGoogle() {
     setError(null);
     setNotice(null);
+
+    if (!agreed) {
+      setError("You must agree to the Terms of Service & Privacy Policy to proceed.");
+      return;
+    }
+
     setGoogleLoading(true);
     try {
-      // peek, ΟΧΙ consume: αν σβήσουμε το intent τώρα και το OAuth
-      // αποτύχει ή ο χρήστης γυρίσει πίσω, το πακέτο έχει χαθεί.
       const plan = searchPlan ?? peekCheckoutIntent();
-      // Redirects to Google, then back to /auth/callback?plan=…
       await signInWithGoogle(plan ?? undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
@@ -143,13 +142,38 @@ function LoginPage() {
           </p>
         </div>
 
+        {/* Checkbox Συγκατάθεσης στους Όρους */}
+        <div className="mt-8 flex items-start gap-3 rounded-xl border border-white/10 bg-black/40 p-3.5 backdrop-blur-md">
+          <input
+            type="checkbox"
+            id="terms-checkbox"
+            checked={agreed}
+            onChange={(e) => {
+              setAgreed(e.target.checked);
+              if (e.target.checked) setError(null);
+            }}
+            disabled={busy}
+            className="mt-0.5 h-4 w-4 rounded border-white/20 bg-black/60 text-white accent-white focus:ring-0 cursor-pointer"
+          />
+          <label htmlFor="terms-checkbox" className="font-aura text-xs font-extralight leading-relaxed text-aura-text-secondary cursor-pointer select-none">
+            I agree to the{" "}
+            <Link to="/terms" className="text-white underline underline-offset-4 hover:text-neutral-300 transition-colors">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link to="/terms" className="text-white underline underline-offset-4 hover:text-neutral-300 transition-colors">
+              Privacy Policy
+            </Link>.
+          </label>
+        </div>
+
         {/* Google OAuth */}
         <ChromeButton
           type="button"
           variant="secondary"
           onClick={handleGoogle}
-          disabled={busy}
-          className="mt-8 w-full gap-3"
+          disabled={busy || !agreed}
+          className="mt-6 w-full gap-3 disabled:opacity-50"
         >
           <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
             <path
@@ -226,7 +250,7 @@ function LoginPage() {
             </p>
           )}
 
-          <ChromeButton type="submit" disabled={busy} className="mt-2 w-full">
+          <ChromeButton type="submit" disabled={busy || !agreed} className="mt-2 w-full disabled:opacity-50">
             {submitting ? "Please wait…" : mode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}
           </ChromeButton>
         </form>
