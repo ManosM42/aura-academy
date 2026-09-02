@@ -1,7 +1,14 @@
+import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { getDashboard, isStaffRole } from "@/lib/queries";
+import {
+  getDashboard,
+  getMySkills,
+  getSkillAssignments,
+  isStaffRole,
+} from "@/lib/queries";
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import type { SkillWithState } from "@/lib/database.types";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -10,6 +17,32 @@ export const Route = createFileRoute("/dashboard")({
 function DashboardPage() {
   const { data, error, loading } = useAsync(getDashboard, []);
   const staff = data ? isStaffRole(data.profile.role) : false;
+
+  const skills = useAsync(getMySkills, []);
+  const assignments = useAsync(getSkillAssignments, []);
+
+  function isAchieved(s: SkillWithState) {
+    const st = s.userSkill?.state ?? "locked";
+    return st === "verified" || st === "mastered";
+  }
+
+  function isUnlocked(s: SkillWithState, all: SkillWithState[]) {
+    if (!s.prerequisites || s.prerequisites.length === 0) return true;
+    return s.prerequisites.every((id) => {
+      const p = all.find((x) => x.id === id);
+      return p ? isAchieved(p) : false;
+    });
+  }
+
+  const nextSkill = useMemo(() => {
+    if (!skills.data) return null;
+    return (
+      skills.data.find((s) => !isAchieved(s) && isUnlocked(s, skills.data!)) ??
+      null
+    );
+  }, [skills.data]);
+
+  const nextAssignmentId = nextSkill ? assignments.data?.[nextSkill.id] : null;
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-6 py-12 text-white">
@@ -86,6 +119,37 @@ function DashboardPage() {
                 <p className="text-sm text-white/50">
                   Δεν υπάρχει feedback ακόμη.
                 </p>
+              )}
+            </Panel>
+          </div>
+
+          <div className="mt-4">
+            <Panel title="Επόμενη υποβολή">
+              {nextSkill ? (
+                nextAssignmentId ? (
+                  <Link
+                    to="/practice/$assignmentId"
+                    params={{ assignmentId: nextAssignmentId }}
+                    className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] p-4 transition hover:bg-white/[0.05]"
+                  >
+                    <span className="text-sm">
+                      Ανέβασε φωτογραφία για:{" "}
+                      <span className="font-medium">{nextSkill.name}</span>
+                    </span>
+                    <span className="text-white/40">→</span>
+                  </Link>
+                ) : (
+                  <p className="text-sm text-white/50">
+                    Το επόμενο skill ({nextSkill.name}) δεν έχει ακόμη
+                    assignment.
+                  </p>
+                )
+              ) : skills.data ? (
+                <p className="text-sm text-white/50">
+                  Έχεις ολοκληρώσει όλα τα διαθέσιμα skills προς το παρόν. 🎉
+                </p>
+              ) : (
+                <p className="text-sm text-white/40">Φόρτωση…</p>
               )}
             </Panel>
           </div>

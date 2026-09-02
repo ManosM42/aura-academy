@@ -108,28 +108,40 @@ export function Navbar() {
       >
         <nav
           aria-label={t("nav.mainNav")}
-          className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8"
+          className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8"
         >
-          <Link to="/" className="flex items-center gap-3" aria-label={t("nav.home")}>
-            <img
-              src={logo}
-              alt=""
-              aria-hidden
-              className="h-8 w-8 rounded-full border border-white/15 object-cover"
-            />
-            <span className="font-aura text-sm tracking-[0.4em] text-neutral-100">AURA</span>
+          {/* Μεγαλύτερο Logo με Κυκλικό Πλαίσιο + Title & Subtitle "Hair Method" */}
+          <Link to="/" className="flex items-center gap-3.5 group" aria-label={t("nav.home")}>
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-white/10 blur-sm opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <img
+                src={logo}
+                alt="AURA"
+                aria-hidden
+                className="relative h-11 w-11 rounded-full border border-white/20 object-cover shadow-[0_0_15px_rgba(255,255,255,0.08)] transition-transform duration-300 group-hover:scale-105"
+              />
+            </div>
+            
+            <div className="flex flex-col justify-center">
+              <span className="inline-block origin-left scale-x-125 text-base font-extralight tracking-[0.45em] text-neutral-100 leading-none">
+                ΛURΛ
+              </span>
+              <span className="inline-block origin-left scale-x-110 text-[9px] font-extralight tracking-[0.35em] text-neutral-400 uppercase mt-1 leading-none">
+                HAIR METHOD
+              </span>
+            </div>
           </Link>
 
-          {/* Desktop links */}
-          <ul className="hidden items-center gap-1 md:flex">
+          {/* Desktop links - Ultra Light & Stretched Text */}
+          <ul className="hidden items-center gap-2 md:flex">
             {links.map((item) => (
               <li key={item.to}>
                 <Link
                   to={item.to}
                   aria-current={isActive(item.to) ? "page" : undefined}
                   className={[
-                    "rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
-                    isActive(item.to) ? "text-white" : "text-neutral-400 hover:text-neutral-100",
+                    "inline-block rounded-full px-3.5 py-1.5 text-[10px] uppercase font-extralight tracking-[0.35em] scale-x-[1.12] origin-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+                    isActive(item.to) ? "text-white font-normal" : "text-neutral-400 hover:text-neutral-100",
                   ].join(" ")}
                 >
                   {t(item.labelKey)}
@@ -142,7 +154,7 @@ export function Navbar() {
             {!user && (
               <Link
                 to="/pricing"
-                className="hidden rounded-full border border-white/20 px-5 py-2 text-[11px] uppercase tracking-[0.2em] text-neutral-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-white/45 hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 sm:inline-flex"
+                className="hidden rounded-full border border-white/20 px-5 py-2 text-[10px] font-extralight uppercase tracking-[0.35em] text-neutral-100 transition-all duration-300 scale-x-105 hover:-translate-y-0.5 hover:border-white/45 hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 sm:inline-flex"
               >
                 {t("nav.start")}
               </Link>
@@ -204,7 +216,7 @@ export function Navbar() {
               className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-white/10 bg-[#050505] px-6 py-6"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-[0.4em] text-neutral-600">
+                <span className="inline-block scale-x-110 origin-left text-[10px] font-extralight uppercase tracking-[0.4em] text-neutral-500">
                   {t("nav.menu")}
                 </span>
                 <button
@@ -219,7 +231,7 @@ export function Navbar() {
 
               {/* Εναλλαγή γλώσσας — ΕΛΛΗΝΙΚΑ / ΑΓΓΛΙΚΑ */}
               <div className="mt-6 flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#0A0A0A] px-4 py-3">
-                <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">
+                <span className="inline-block scale-x-105 origin-left text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-500">
                   {t("nav.language")}
                 </span>
                 <LanguageToggle />
@@ -238,15 +250,15 @@ export function Navbar() {
                       className="h-11 w-11 rounded-full border border-white/15 object-cover"
                     />
                   ) : (
-                    <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#171717] text-xs text-neutral-300">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#171717] text-xs font-extralight text-neutral-300">
                       {initials || "?"}
                     </span>
                   )}
                   <span className="min-w-0">
-                    <span className="block truncate text-sm text-neutral-100">
+                    <span className="block truncate text-sm font-extralight text-neutral-100">
                       {profile?.full_name ?? t("nav.myProfile")}
                     </span>
-                    <span className="block text-[10px] uppercase tracking-[0.2em] text-neutral-600">
+                    <span className="block text-[10px] font-extralight uppercase tracking-[0.2em] text-neutral-500">
                       {t("nav.viewProfile")}
                     </span>
                   </span>
@@ -260,13 +272,15 @@ export function Navbar() {
                       to={item.to}
                       aria-current={isActive(item.to) ? "page" : undefined}
                       className={[
-                        "group flex items-center justify-between rounded-xl px-4 py-3.5 text-sm uppercase tracking-[0.2em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+                        "group flex items-center justify-between rounded-xl px-4 py-3.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
                         isActive(item.to)
-                          ? "bg-white/[0.06] text-white"
+                          ? "bg-white/[0.06] text-white font-normal"
                           : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-100",
                       ].join(" ")}
                     >
-                      <span>{t(item.labelKey)}</span>
+                      <span className="inline-block scale-x-110 origin-left text-xs font-extralight uppercase tracking-[0.3em]">
+                        {t(item.labelKey)}
+                      </span>
                       <span
                         aria-hidden
                         className="text-neutral-600 transition-transform duration-300 group-hover:translate-x-1"
@@ -283,7 +297,7 @@ export function Navbar() {
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="w-full rounded-full border border-white/15 px-5 py-3 text-[11px] uppercase tracking-[0.2em] text-neutral-300 transition-colors hover:border-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    className="w-full rounded-full border border-white/15 px-5 py-3 text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-300 transition-colors hover:border-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                   >
                     {t("nav.signOut")}
                   </button>
@@ -291,19 +305,19 @@ export function Navbar() {
                   <div className="space-y-3">
                     <Link
                       to="/pricing"
-                      className="block rounded-full border border-white/25 px-5 py-3 text-center text-[11px] uppercase tracking-[0.2em] text-neutral-100 transition-colors hover:border-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                      className="block rounded-full border border-white/25 px-5 py-3 text-center text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-100 transition-colors hover:border-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                     >
                       {t("nav.startNow")}
                     </Link>
                     <Link
                       to="/login"
-                      className="block px-5 py-2 text-center text-[11px] uppercase tracking-[0.2em] text-neutral-500 transition-colors hover:text-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                      className="block px-5 py-2 text-center text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-500 transition-colors hover:text-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                     >
                       {t("nav.signIn")}
                     </Link>
                   </div>
                 )}
-                <p className="mt-5 text-center text-[10px] uppercase tracking-[0.3em] text-neutral-700">
+                <p className="mt-5 text-center text-[9px] font-extralight uppercase tracking-[0.35em] text-neutral-600">
                   {t("nav.tagline")}
                 </p>
               </div>

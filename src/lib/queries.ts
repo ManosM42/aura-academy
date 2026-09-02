@@ -209,6 +209,19 @@ export async function getMySkills(): Promise<SkillWithState[]> {
   }));
 }
 
+export async function getSkillAssignments(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from("assignments")
+    .select("id, skill_id")
+    .not("skill_id", "is", null);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const row of (data ?? []) as { id: string; skill_id: string }[]) {
+    map[row.skill_id] = row.id;
+  }
+  return map;
+}
+
 // --- Educator review queue (screens 17–18) ------------------
 
 export type QueueRow = Submission & {
@@ -239,7 +252,7 @@ export async function getSubmissionForReview(
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "*, assignment:assignments(*), student:profiles!submissions_user_id_fkey(id,full_name,level)",
+      "*, assignment:assignments(*, skill:skills(id,name)), student:profiles!submissions_user_id_fkey(id,full_name,level)",
     )
     .eq("id", submissionId)
     .single();
@@ -483,4 +496,117 @@ export async function uploadAvatar(file: File): Promise<string> {
 
   const { data } = supabase.storage.from("avatars").getPublicUrl(path);
   return data.publicUrl;
+}
+// ============================================================
+// ACADEMY FEED (screen: /academy — posts / likes / comments)
+// Πρόσθεσε στο τέλος του υπάρχοντος queries.ts.
+// ============================================================
+
+export interface AcademyPostAuthor {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: UserRole;
+}
+
+export interface AcademyPostComment {
+  id: string;
+  content: string;
+  created_at: string;
+  author: AcademyPostAuthor | null;
+}
+
+export interface AcademyPost {
+  id: string;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  author: AcademyPostAuthor | null;
+  likes: { user_id: string }[];
+  comments: AcademyPostComment[];
+}
+
+export async function getAcademyFeed(): Promise<AcademyPost[]> {
+  const { data, error } = await supabase
+    .from("academy_posts")
+    .select(
+      `id, content, image_url, created_at,
+       author:profiles!academy_posts_author_id_fkey(id,full_name,avatar_url,role),
+       likes:academy_post_likes(user_id),
+       comments:academy_post_comments(
+         id, content, created_at,
+         author:profiles!academy_post_comments_author_id_fkey(id,full_name,avatar_url,role)
+       )`,
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as AcademyPost[];
+}
+
+export async function createAcademyPost(
+  content: string,
+  imageFile?: File,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+
+  let imageUrl: string | null = null;
+  if (imageFile) {
+    const ext = imageFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${uid}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("academy-posts")
+      .upload(path, imageFile, {
+        upsert: false,
+        contentType: imageFile.type,
+      });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage
+      .from("academy-posts")
+      .getPublicUrl(path);
+    imageUrl = data.publicUrl;
+  }
+
+  const { error } = await supabase
+    .from("academy_posts")
+    .insert({ author_id: uid, content, image_url: imageUrl });
+  if (error) throw error;
+}
+
+export async function toggleAcademyPostLike(
+  postId: string,
+  currentlyLiked: boolean,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from("academy_post_likes")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", uid);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("academy_post_likes")
+      .insert({ post_id: postId, user_id: uid });
+    if (error) throw error;
+  }
+}
+
+export async function addAcademyPostComment(
+  postId: string,
+  content: string,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+  const { error } = await supabase
+    .from("academy_post_comments")
+    .insert({ post_id: postId, author_id: uid, content });
+  if (error) throw error;
+}
+
+export async function deleteAcademyPost(postId: string): Promise<void> {
+  const { error } = await supabase
+    .from("academy_posts")
+    .delete()
+    .eq("id", postId);
+  if (error) throw error;
 }

@@ -84,6 +84,11 @@ function ReviewDetailPage() {
             <h1 className="mt-2 text-2xl font-semibold">
               {data.submission.assignment?.title ?? "Υποβολή"}
             </h1>
+            {(data.submission.assignment as any)?.skill?.name && (
+              <p className="mt-1 text-xs uppercase tracking-wide text-white/40">
+                Skill: {(data.submission.assignment as any).skill.name}
+              </p>
+            )}
             <p className="mt-1 text-sm text-white/50">
               {data.submission.student?.full_name ?? "Μαθητής"} · attempt{" "}
               {data.submission.attempt}
