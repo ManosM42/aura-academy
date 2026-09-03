@@ -8,24 +8,42 @@ declare global {
   }
 }
 
+/**
+ * Ψάχνει το πραγματικό <select class="goog-te-combo"> που φτιάχνει η
+ * Google μέσα στο #google_translate_element. Αυτό είναι το ΜΟΝΟ element
+ * που ελέγχει όντως τη μετάφραση — το δικό μας dropdown είναι απλά
+ * cosmetic, οπότε η αλλαγή γλώσσας πρέπει να γίνεται μέσω αυτού.
+ */
+function findGoogleCombo(): HTMLSelectElement | null {
+  return document.querySelector<HTMLSelectElement>(".goog-te-combo");
+}
+
+/**
+ * Ενεργοποιεί αλλαγή γλώσσας απευθείας στο google combo, χωρίς reload.
+ * lang === "en" -> επαναφορά στο πρωτότυπο (value "" είναι η σύμβαση
+ * που χρησιμοποιεί η Google για "restore original").
+ */
+function triggerGoogleTranslate(lang: string): boolean {
+  const combo = findGoogleCombo();
+  if (!combo) return false;
+  combo.value = lang === "en" ? "" : lang;
+  combo.dispatchEvent(new Event("change"));
+  return true;
+}
+
 export function GoogleTranslateWidget() {
   const [currentLang, setCurrentLang] = useState("en");
 
   useEffect(() => {
-    // Read current language from googtrans cookie
+    // Read current language from googtrans cookie (μόνο για το αρχικό UI state)
     const match = document.cookie.match(/(^|;) ?googtrans=([^;]*)(;|$)/);
     if (match) {
       const parts = match[2].split("/");
-      if (parts.length > 2 && parts[2]) {
-        setCurrentLang(parts[2]);
-      } else {
-        setCurrentLang("en");
-      }
+      setCurrentLang(parts.length > 2 && parts[2] ? parts[2] : "en");
     } else {
       setCurrentLang("en");
     }
 
-    // Initialize Google Translate globally if not already set
     if (!window.googleTranslateElementInit) {
       window.googleTranslateElementInit = () => {
         if (window.google && window.google.translate) {
@@ -42,7 +60,6 @@ export function GoogleTranslateWidget() {
       };
     }
 
-    // Load Google Translate script safely
     if (!document.getElementById("google-translate-script")) {
       const script = document.createElement("script");
       script.id = "google-translate-script";
@@ -64,49 +81,28 @@ export function GoogleTranslateWidget() {
   const changeLanguage = (lang: string) => {
     setCurrentLang(lang);
 
-    // Bulletproof cookie cleanup for all variations set by Google Translate or the app
-    const clearGoogleTranslateCookies = () => {
-      const hostname = window.location.hostname;
-      const domains = [hostname, `.${hostname}`, hostname.replace(/^www\./, "")];
+    // 1) Προσπάθησε ΑΜΕΣΑ μέσω του πραγματικού google select (χωρίς
+    // reload). Αυτό λύνει το πρόβλημα "κολλάει σε μία γλώσσα" γιατί
+    // δεν εξαρτάται καθόλου από cookie-parsing σε reload.
+    if (triggerGoogleTranslate(lang)) return;
 
-      // Clear by reading all cookies and matching 'googtrans' dynamically
-      document.cookie.split(";").forEach((cookie) => {
-        const eqPos = cookie.indexOf("=");
-        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
-        if (name === "googtrans") {
-          domains.forEach((dom) => {
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${dom};`;
-            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-          });
-        }
-      });
-
-      // Fallback explicit domain/path cleanup
-      domains.forEach((dom) => {
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${dom};`;
-        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      });
-    };
-
-    clearGoogleTranslateCookies();
-
-    // If switching to a non-default language, set the new cookie
-    if (lang !== "en") {
-      const hostname = window.location.hostname;
-      document.cookie = `googtrans=/en/${lang}; path=/; domain=${hostname}`;
-      document.cookie = `googtrans=/en/${lang}; path=/;`;
-    }
-
-    // Force page reload to clear Google Translate internal cache frames cleanly
-    window.location.reload();
+    // 2) Αν το combo δεν είναι ΑΚΟΜΑ έτοιμο (π.χ. το iframe της Google
+    // δεν έχει προλάβει να φορτώσει), δοκίμασε ξανά για ~2 δευτερόλεπτα.
+    let attempts = 0;
+    const retry = window.setInterval(() => {
+      attempts += 1;
+      if (triggerGoogleTranslate(lang) || attempts >= 10) {
+        window.clearInterval(retry);
+      }
+    }, 200);
   };
 
   return (
     <div className="relative inline-block">
       {/* Hidden Google Translate Element container */}
-      <div 
-        id="google_translate_element" 
-        className="absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden"
+      <div
+        id="google_translate_element"
+        className="absolute h-0 w-0 overflow-hidden opacity-0 pointer-events-none"
       />
 
       {/* Custom Silver Chrome & Dark Theme Dropdown */}
@@ -115,7 +111,7 @@ export function GoogleTranslateWidget() {
           value={currentLang}
           onChange={(e) => changeLanguage(e.target.value)}
           aria-label="Select Language"
-          className="appearance-none bg-[#050505] text-neutral-200 border border-white/20 px-3.5 py-1.5 rounded-full text-[10px] font-extralight uppercase tracking-[0.3em] cursor-pointer outline-none transition-all duration-300 hover:border-white/45 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] pr-7 touch-manipulation"
+          className="notranslate appearance-none cursor-pointer touch-manipulation rounded-full border border-white/20 bg-[#050505] px-3.5 py-1.5 pr-7 text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-200 outline-none transition-all duration-300 hover:border-white/45 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
         >
           <option value="en" className="bg-[#050505] text-neutral-200">EN</option>
           <option value="el" className="bg-[#050505] text-neutral-200">ΕΛ</option>
