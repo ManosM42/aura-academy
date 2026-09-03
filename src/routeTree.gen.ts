@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as MethodRouteImport } from './routes/method'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -60,6 +61,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesRoute = MessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MethodRoute = MethodRouteImport.update({
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/login'
+    | '/messages'
     | '/method'
     | '/pricing'
     | '/profile'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/login'
+    | '/messages'
     | '/method'
     | '/pricing'
     | '/profile'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/login'
+    | '/messages'
     | '/method'
     | '/pricing'
     | '/profile'
@@ -357,6 +369,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  MessagesRoute: typeof MessagesRoute
   MethodRoute: typeof MethodRoute
   PricingRoute: typeof PricingRoute
   ProfileRoute: typeof ProfileRoute
@@ -416,6 +429,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages': {
+      id: '/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/method': {
@@ -581,6 +601,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  MessagesRoute: MessagesRoute,
   MethodRoute: MethodRoute,
   PricingRoute: PricingRoute,
   ProfileRoute: ProfileRoute,

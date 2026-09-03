@@ -61,12 +61,13 @@ export function Navbar() {
     router.navigate({ to: "/" });
   }
 
-  const links: NavItem[] = useMemo(() => {
+    const links: NavItem[] = useMemo(() => {
     if (!user) return PUBLIC_LINKS;
     return [
       { to: "/dashboard", label: "Dashboard" },
       { to: "/courses", label: "Courses" },
       { to: "/academy", label: "Academy" },
+      { to: "/messages", label: "Messages" },
       { to: "/skills", label: "Skills" },
       ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),
       ...(admin

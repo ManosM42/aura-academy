@@ -11,6 +11,7 @@ import {
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton, EmptyState } from "@/components/aura/States";
 import PostCardPro from "@/components/aura/PostCardPro";
+import OnlineUsersPanel from "@/components/aura/OnlineUsersPanel";
 
 export const Route = createFileRoute("/academy/")({ component: AcademyPage });
 
@@ -20,13 +21,14 @@ function AcademyPage() {
   const staff = profile.data ? isStaffRole(profile.data.role) : false;
 
   return (
-    <main className="w-full min-h-screen overflow-x-hidden bg-[#070707] px-4 sm:px-6 md:px-10 py-28 sm:py-36 text-white selection:bg-white selection:text-black">
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="mx-auto max-w-2xl space-y-10"
-      >
+        <main className="w-full min-h-screen overflow-x-hidden bg-[#070707] px-4 sm:px-6 md:px-10 py-28 sm:py-36 text-white selection:bg-white selection:text-black">
+      <div className="mx-auto flex max-w-6xl items-start gap-8">
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="mx-auto max-w-2xl flex-1 space-y-10"
+        >
         <header>
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/50 mb-3">
             <span className="h-px w-8 bg-gradient-to-r from-white/60 to-transparent" />
@@ -87,10 +89,14 @@ function AcademyPage() {
             ))}
           </motion.div>
         )}
-      </motion.div>
+           </motion.div>
+
+        <OnlineUsersPanel />
+      </div>
     </main>
   );
 }
+
 
 function Composer({
   authorAvatar,
