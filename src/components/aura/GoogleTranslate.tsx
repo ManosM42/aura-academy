@@ -64,27 +64,46 @@ export function GoogleTranslateWidget() {
   const changeLanguage = (lang: string) => {
     setCurrentLang(lang);
 
-    // Thoroughly clear cookies across all domains and paths for Mobile/Desktop sync
-    const hostname = window.location.hostname;
-    const domains = [hostname, `.${hostname}`, hostname.replace(/^www\./, "")];
+    // Bulletproof cookie cleanup for all variations set by Google Translate or the app
+    const clearGoogleTranslateCookies = () => {
+      const hostname = window.location.hostname;
+      const domains = [hostname, `.${hostname}`, hostname.replace(/^www\./, "")];
 
-    domains.forEach((domain) => {
-      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${domain};`;
-      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-    });
+      // Clear by reading all cookies and matching 'googtrans' dynamically
+      document.cookie.split(";").forEach((cookie) => {
+        const eqPos = cookie.indexOf("=");
+        const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+        if (name === "googtrans") {
+          domains.forEach((dom) => {
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${dom};`;
+            document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+          });
+        }
+      });
 
+      // Fallback explicit domain/path cleanup
+      domains.forEach((dom) => {
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${dom};`;
+        document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      });
+    };
+
+    clearGoogleTranslateCookies();
+
+    // If switching to a non-default language, set the new cookie
     if (lang !== "en") {
+      const hostname = window.location.hostname;
       document.cookie = `googtrans=/en/${lang}; path=/; domain=${hostname}`;
       document.cookie = `googtrans=/en/${lang}; path=/;`;
     }
 
-    // Force reload to apply translation states correctly on mobile/desktop
+    // Force page reload to clear Google Translate internal cache frames cleanly
     window.location.reload();
   };
 
   return (
     <div className="relative inline-block">
-      {/* Hidden Google Translate Element container optimized for mobile/desktop rendering */}
+      {/* Hidden Google Translate Element container */}
       <div 
         id="google_translate_element" 
         className="absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden"
