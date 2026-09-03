@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { CheckCircle2, Lock, Clock, Sparkles } from "lucide-react";
 
 type State = "verified" | "active" | "locked";
 
@@ -54,14 +55,48 @@ export default function SkillTree() {
         </h2>
       </motion.div>
 
-      <div className="relative w-full rounded-2xl border border-white/[0.08] bg-[#070707] p-2 sm:p-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-        <div className="absolute top-3 right-4 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-wider text-white/50 md:hidden">
-          <span>← Σύρετε για πλοήγηση →</span>
-        </div>
+      {/* MOBILE VIEW: Καθαρή κατακόρυφη λίστα για κινητά */}
+      <div className="block md:hidden space-y-3">
+        {NODES.map((n, i) => (
+          <motion.div
+            key={n.id}
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: i * 0.05 }}
+            className={`flex items-center justify-between rounded-xl border p-4 backdrop-blur-xl ${
+              n.state === "verified"
+                ? "border-white/30 bg-white/[0.04]"
+                : n.state === "active"
+                ? "border-white/20 bg-white/[0.02]"
+                : "border-white/10 bg-black/40 opacity-60"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border ${
+                n.state === "verified" ? "border-white bg-white/10 text-white" :
+                n.state === "active" ? "border-aura-chrome-mid bg-white/5 text-aura-chrome-mid" :
+                "border-white/15 bg-black text-white/30"
+              }`}>
+                {n.state === "verified" ? <CheckCircle2 size={18} /> :
+                 n.state === "active" ? <Clock size={18} /> : <Lock size={16} />}
+              </div>
+              <div>
+                <h4 className="font-aura text-sm font-semibold text-white">{n.label}</h4>
+                <span className="text-[11px] uppercase tracking-wider text-white/50">
+                  {n.state}
+                </span>
+              </div>
+            </div>
+            <span className="text-xs font-mono text-white/40">0{i + 1}</span>
+          </motion.div>
+        ))}
+      </div>
 
+      {/* DESKTOP VIEW: SVG Γράφημα για υπολογιστές */}
+      <div className="hidden md:block relative w-full rounded-2xl border border-white/[0.08] bg-[#070707] p-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl">
         <div className="overflow-x-auto scrollbar-none rounded-xl">
           <svg viewBox="0 0 880 440" className="h-auto w-full min-w-[760px] select-none">
-            {/* connections */}
             {EDGES.map(([a, b], i) => {
               const from = byId(a);
               const to = byId(b);
@@ -75,7 +110,6 @@ export default function SkillTree() {
                   y2={to.y}
                   stroke={verified ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.15)"}
                   strokeWidth="2"
-                  strokeDasharray={to.state === "locked" ? "4 4" : undefined}
                   initial={{ pathLength: 0, opacity: 0 }}
                   whileInView={{ pathLength: 1, opacity: 1 }}
                   viewport={{ once: true }}
@@ -84,7 +118,6 @@ export default function SkillTree() {
               );
             })}
 
-            {/* nodes */}
             {NODES.map((n, i) => (
               <motion.g
                 key={n.id}
@@ -95,45 +128,14 @@ export default function SkillTree() {
                 style={{ transformBox: "fill-box", transformOrigin: "center" }}
               >
                 {n.state === "verified" && (
-                  <circle
-                    cx={n.x}
-                    cy={n.y}
-                    r="30"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.2)"
-                    strokeWidth="4"
-                    className="animate-pulse"
-                  />
+                  <circle cx={n.x} cy={n.y} r="30" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
                 )}
-                <circle
-                  cx={n.x}
-                  cy={n.y}
-                  r="22"
-                  strokeWidth="2"
-                  className={nodeStyles[n.state]}
-                />
-                <text
-                  x={n.x}
-                  y={n.y + 46}
-                  textAnchor="middle"
-                  className="font-aura"
-                  fill={n.state === "locked" ? "#6F6F6F" : "#F5F5F5"}
-                  fontSize="13"
-                  fontWeight={n.state === "active" ? "600" : "400"}
-                >
+                <circle cx={n.x} cy={n.y} r="22" strokeWidth="2" className={nodeStyles[n.state]} />
+                <text x={n.x} y={n.y + 46} textAnchor="middle" className="font-aura" fill={n.state === "locked" ? "#6F6F6F" : "#F5F5F5"} fontSize="13">
                   {n.label}
                 </text>
                 {n.state === "verified" && (
-                  <text
-                    x={n.x}
-                    y={n.y + 5}
-                    textAnchor="middle"
-                    fill="#FFFFFF"
-                    fontSize="14"
-                    fontWeight="bold"
-                  >
-                    ✓
-                  </text>
+                  <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#FFFFFF" fontSize="14" fontWeight="bold">✓</text>
                 )}
               </motion.g>
             ))}
@@ -143,7 +145,7 @@ export default function SkillTree() {
 
       <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 text-xs text-aura-text-secondary font-aura">
         <span className="flex items-center gap-2">
-          <i className="inline-block h-3 w-3 rounded-full border border-white bg-aura-elevated shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
+          <i className="inline-block h-3 w-3 rounded-full border border-white bg-aura-elevated" />
           Verified
         </span>
         <span className="flex items-center gap-2">

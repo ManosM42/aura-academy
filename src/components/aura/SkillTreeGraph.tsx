@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
+import { CheckCircle2, Lock, Clock, Sparkles, Award } from "lucide-react";
 import type { SkillCategory, SkillState, SkillWithState } from "@/lib/database.types";
 
-// Στήλες ανά category — σειρά "μαθησιακής προόδου"
 const CATEGORY_ORDER: SkillCategory[] = [
   "foundation",
   "technical",
@@ -97,11 +97,57 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
 
   return (
     <section className="relative mx-auto max-w-6xl px-4 sm:px-0">
-      <div className="relative w-full rounded-2xl border border-white/[0.08] bg-[#070707] p-2 sm:p-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-        <div className="absolute top-3 right-4 z-10 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-wider text-white/50 md:hidden">
-          <span>← Σύρετε για πλοήγηση →</span>
-        </div>
+      {/* MOBILE VIEW: Καθαρή ομαδοποιημένη λίστα για κινητά */}
+      <div className="block md:hidden space-y-6">
+        {CATEGORY_ORDER.map((cat) => {
+          const catSkills = nodes.filter((n) => n.skill.category === cat);
+          if (catSkills.length === 0) return null;
 
+          return (
+            <div key={cat} className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50 px-1">
+                {cat}
+              </h3>
+              <div className="space-y-2">
+                {catSkills.map((n) => (
+                  <div
+                    key={n.skill.id}
+                    className={`flex items-center justify-between rounded-xl border p-3.5 backdrop-blur-xl ${
+                      n.state === "verified" || n.state === "mastered"
+                        ? "border-white/30 bg-white/[0.04]"
+                        : n.state === "practicing"
+                        ? "border-amber-300/30 bg-amber-300/[0.02]"
+                        : n.state === "learning"
+                        ? "border-blue-300/30 bg-blue-300/[0.02]"
+                        : "border-white/10 bg-black/40 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/5 text-xs text-white">
+                        {n.state === "mastered" || n.state === "verified" ? <CheckCircle2 size={14} className="text-white" /> :
+                         n.state === "practicing" ? <Award size={14} className="text-amber-300" /> :
+                         n.state === "learning" ? <Sparkles size={14} className="text-blue-300" /> : <Lock size={14} className="text-white/40" />}
+                      </div>
+                      <div>
+                        <h4 className="font-aura text-xs font-medium text-white">{n.skill.name}</h4>
+                        <span className="text-[10px] uppercase tracking-wider text-white/40">{n.state}</span>
+                      </div>
+                    </div>
+                    {n.skill.userSkill?.score != null && (
+                      <span className="rounded bg-white/10 px-2 py-0.5 text-[10px] font-mono text-white">
+                        {n.skill.userSkill.score}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* DESKTOP VIEW: Δυναμικό SVG Γράφημα */}
+      <div className="hidden md:block relative w-full rounded-2xl border border-white/[0.08] bg-[#070707] p-4 shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl">
         <div className="overflow-x-auto scrollbar-none rounded-xl">
           <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full min-w-[720px] select-none">
             {edges.map(([from, to], i) => {
@@ -133,32 +179,14 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
                 style={{ transformBox: "fill-box", transformOrigin: "center" }}
               >
                 {(n.state === "verified" || n.state === "mastered") && (
-                  <circle 
-                    cx={n.x} 
-                    cy={n.y} 
-                    r="30" 
-                    fill="none" 
-                    stroke="rgba(255,255,255,0.2)" 
-                    strokeWidth="4" 
-                    className="animate-pulse"
-                  />
+                  <circle cx={n.x} cy={n.y} r="30" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="4" />
                 )}
                 <circle cx={n.x} cy={n.y} r="22" strokeWidth="2" className={nodeStyles[n.state]} />
-                <text
-                  x={n.x}
-                  y={n.y + 46}
-                  textAnchor="middle"
-                  className="font-aura"
-                  fill={textFill[n.state]}
-                  fontSize="12"
-                  fontWeight={n.state !== "locked" ? "600" : "400"}
-                >
+                <text x={n.x} y={n.y + 46} textAnchor="middle" className="font-aura" fill={textFill[n.state]} fontSize="12">
                   {n.skill.name}
                 </text>
                 {(n.state === "verified" || n.state === "mastered") && (
-                  <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#FFFFFF" fontSize="14" fontWeight="bold">
-                    ✓
-                  </text>
+                  <text x={n.x} y={n.y + 5} textAnchor="middle" fill="#FFFFFF" fontSize="14" fontWeight="bold">✓</text>
                 )}
                 {n.skill.userSkill?.score != null && n.state !== "locked" && (
                   <text x={n.x} y={n.y - 32} textAnchor="middle" fill="#9CA3AF" fontSize="10">
@@ -173,7 +201,7 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
 
       <div className="mt-6 flex flex-wrap gap-4 sm:gap-6 text-xs text-aura-text-secondary font-aura">
         <span className="flex items-center gap-2">
-          <i className="inline-block h-3 w-3 rounded-full border border-white bg-aura-elevated shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
+          <i className="inline-block h-3 w-3 rounded-full border border-white bg-aura-elevated" />
           Verified / Mastered
         </span>
         <span className="flex items-center gap-2">
