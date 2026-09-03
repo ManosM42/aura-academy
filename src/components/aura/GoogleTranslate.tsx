@@ -25,8 +25,8 @@ export function GoogleTranslateWidget() {
       setCurrentLang("en");
     }
 
-    // Initialize Google Translate
-    if (!document.getElementById("google-translate-script")) {
+    // Initialize Google Translate globally if not already set
+    if (!window.googleTranslateElementInit) {
       window.googleTranslateElementInit = () => {
         if (window.google && window.google.translate) {
           new window.google.translate.TranslateElement(
@@ -40,48 +40,54 @@ export function GoogleTranslateWidget() {
           );
         }
       };
+    }
 
+    // Load Google Translate script safely
+    if (!document.getElementById("google-translate-script")) {
       const script = document.createElement("script");
       script.id = "google-translate-script";
       script.type = "text/javascript";
       script.src = "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
       script.async = true;
       document.body.appendChild(script);
+    } else if (window.google && window.google.translate) {
+      try {
+        if (!document.getElementById("google_translate_element")?.hasChildNodes()) {
+          window.googleTranslateElementInit();
+        }
+      } catch (e) {
+        console.error("Google Translate Init Error:", e);
+      }
     }
   }, []);
 
   const changeLanguage = (lang: string) => {
-    // Clean up existing cookies safely
-    document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    document.cookie = "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=" + window.location.hostname;
+    setCurrentLang(lang);
+
+    // Thoroughly clear cookies across all domains and paths for Mobile/Desktop sync
+    const hostname = window.location.hostname;
+    const domains = [hostname, `.${hostname}`, hostname.replace(/^www\./, "")];
+
+    domains.forEach((domain) => {
+      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=${domain};`;
+      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    });
 
     if (lang !== "en") {
-      document.cookie = `googtrans=/en/${lang}; path=/`;
+      document.cookie = `googtrans=/en/${lang}; path=/; domain=${hostname}`;
+      document.cookie = `googtrans=/en/${lang}; path=/;`;
     }
 
+    // Force reload to apply translation states correctly on mobile/desktop
     window.location.reload();
   };
 
   return (
     <div className="relative inline-block">
-      {/* 
-        IMPORTANT: Do NOT use display: none or Tailwind hidden here. 
-        Google Translate requires the element to be rendered in the DOM to initialize properly.
-        We use an off-screen/sr-only style pattern instead.
-      */}
+      {/* Hidden Google Translate Element container optimized for mobile/desktop rendering */}
       <div 
         id="google_translate_element" 
-        style={{
-          position: "absolute",
-          width: "1px",
-          height: "1px",
-          padding: "0",
-          margin: "-1px",
-          overflow: "hidden",
-          clip: "rect(0, 0, 0, 0)",
-          whiteSpace: "nowrap",
-          border: "0"
-        }} 
+        className="absolute opacity-0 pointer-events-none w-0 h-0 overflow-hidden"
       />
 
       {/* Custom Silver Chrome & Dark Theme Dropdown */}
@@ -90,7 +96,7 @@ export function GoogleTranslateWidget() {
           value={currentLang}
           onChange={(e) => changeLanguage(e.target.value)}
           aria-label="Select Language"
-          className="appearance-none bg-[#050505] text-neutral-200 border border-white/20 px-3.5 py-1.5 rounded-full text-[10px] font-extralight uppercase tracking-[0.3em] cursor-pointer outline-none transition-all duration-300 hover:border-white/45 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] pr-7"
+          className="appearance-none bg-[#050505] text-neutral-200 border border-white/20 px-3.5 py-1.5 rounded-full text-[10px] font-extralight uppercase tracking-[0.3em] cursor-pointer outline-none transition-all duration-300 hover:border-white/45 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)] pr-7 touch-manipulation"
         >
           <option value="en" className="bg-[#050505] text-neutral-200">EN</option>
           <option value="el" className="bg-[#050505] text-neutral-200">ΕΛ</option>
