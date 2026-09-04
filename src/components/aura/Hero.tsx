@@ -2,7 +2,7 @@
 import { useRef } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "motion/react";
 import ChromeButton from "./ChromeButton";
-import auraLogo from "@/assets/aura.JPG";
+import auraLogo from "@/assets/aura.jpg";
 
 export default function Hero() {
   const ref = useRef<HTMLElement>(null);
@@ -41,34 +41,46 @@ export default function Hero() {
         className="aura-radial absolute inset-0 z-0 pointer-events-none"
       />
 
-      {/* Background watermark image cleanly centered */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+      {/* Background watermark image scaled slightly larger with full-quality vignette blending */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden px-4">
         <motion.img
           src={auraLogo}
           alt=""
           aria-hidden="true"
           draggable={false}
-          style={{ y: emblemY, opacity: fade }}
-          className="select-none w-[450px] sm:w-[600px] md:w-[750px] max-w-none object-contain opacity-20 blur-[1px]"
+          style={{
+            y: emblemY,
+            opacity: fade,
+            WebkitMaskImage: "radial-gradient(ellipse 65% 65% at 50% 50%, black 40%, transparent 100%)",
+            maskImage: "radial-gradient(ellipse 65% 65% at 50% 50%, black 40%, transparent 100%)",
+          }}
+          className="select-none w-[650px] sm:w-[980px] md:w-[1400px] max-h-[98vh] max-w-full object-contain opacity-25"
         />
       </div>
 
-      {/* Main perfectly aligned content stack */}
+      {/* Main content stack shifted higher up */}
       <motion.div
         style={{ y: headlineY }}
         variants={container}
         initial="hidden"
         animate="show"
-        className="relative z-10 flex flex-col items-center justify-center text-center w-full max-w-4xl mx-auto pt-16"
+        className="relative z-10 flex flex-col items-center justify-center text-center w-full max-w-4xl mx-auto -mt-14 sm:-mt-20"
       >
-        <motion.span
-          variants={item}
-          className="font-aura mb-4 text-xs sm:text-sm uppercase tracking-[0.5em] font-light text-neutral-300 drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
-        >
-          The Operating System for the Modern Barber
-        </motion.span>
+        {/* Liquid Glass Chrome Silver Board Badge */}
+        <motion.div variants={item} className="mb-4 sm:mb-6">
+          <div className="relative inline-flex items-center px-6 py-2.5 rounded-full overflow-hidden backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_-1px_1px_rgba(0,0,0,0.5)] bg-gradient-to-b from-white/15 via-white/5 to-black/20 border border-white/30">
+            {/* Top specular glass reflection */}
+            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none" />
+            {/* Bottom inner highlight */}
+            <div className="absolute inset-x-0 bottom-0 h-[1px] bg-white/10 pointer-events-none" />
 
-        <div className="relative flex flex-col items-center justify-center w-full my-4">
+            <span className="font-aura text-[11px] sm:text-xs uppercase tracking-[0.35em] font-medium text-neutral-100 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
+              The Operating System for the Modern Barber
+            </span>
+          </div>
+        </motion.div>
+
+        <div className="relative flex flex-col items-center justify-center w-full my-2 sm:my-4">
           <div className="absolute h-36 w-80 rounded-full bg-white/[0.07] blur-[60px] pointer-events-none" />
           
           <motion.h1 variants={item} className="w-full flex items-center justify-center">
@@ -88,21 +100,23 @@ export default function Hero() {
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
               }}
-              className="inline-block text-center text-6xl sm:text-7xl md:text-8xl font-thin tracking-[0.35em] drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_50px_rgba(255,255,255,0.6)] leading-none"
+              className="inline-block text-center text-6xl sm:text-7xl md:text-8xl font-thin tracking-[0.35em] pl-[0.35em] drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_50px_rgba(255,255,255,0.6)] leading-none"
             >
-              ΛURΛ
+              Λ U R Λ
             </motion.span>
           </motion.h1>
         </div>
 
+        {/* Hair Method */}
         <motion.p
           variants={item}
-          className="font-aura mt-4 text-sm sm:text-base md:text-lg font-extralight tracking-[0.4em] uppercase text-neutral-200 drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
+          className="font-aura mt-5 sm:mt-6 text-sm sm:text-base md:text-lg font-extralight tracking-[0.4em] pl-[0.4em] uppercase text-neutral-200 drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
         >
           — Hair Method —
         </motion.p>
 
-        <motion.div variants={item} className="mt-8 flex flex-wrap items-center justify-center gap-4">
+        {/* Action Buttons */}
+        <motion.div variants={item} className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4">
           <ChromeButton
             onClick={() =>
               document.querySelector("#method")?.scrollIntoView({ behavior: "smooth" })

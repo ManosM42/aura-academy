@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 text-center md:flex-row md:items-start md:justify-between md:text-left">
         <div>
           <span className="chrome-text font-aura text-lg font-extrabold uppercase tracking-[0.4em]">
-            Aura
+            Λ U R Λ
           </span>
           <p className="font-aura mt-3 max-w-xs text-sm text-aura-text-secondary">
             The operating system for the modern barber. Learn. Practice. Prove.
@@ -42,7 +42,7 @@ export default function Footer() {
 
       <div className="chrome-line mx-auto mt-12 h-px max-w-6xl" />
       <p className="font-aura mt-8 text-center text-xs text-aura-text-muted">
-        © {new Date().getFullYear()} AURA. HAIR METHOD.
+        © {new Date().getFullYear()} ΛURΛ. HAIR METHOD.
       </p>
     </footer>
   );

@@ -1,7 +1,7 @@
 // src/components/aura/AuraLoader.tsx
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import auraLogo from "@/assets/aura.JPG";
+import auraLogo from "@/assets/aura.jpg";
 
 interface AuraLoaderProps {
   /** Called once the intro finishes (after the fade-out). Optional. */

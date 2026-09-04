@@ -1,5 +1,5 @@
 // src/components/aura/AuraMark.tsx
-import auraLogo from "@/assets/aura.JPG";
+import auraLogo from "@/assets/aura.jpg";
 
 interface AuraMarkProps {
   size?: "sm" | "md" | "lg";

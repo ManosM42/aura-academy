@@ -164,7 +164,7 @@ export function AuraHome() {
 
       <section id="method" className="section-shell border-b border-subtle overflow-x-hidden">
         <div className="section-heading px-4 sm:px-6 md:px-0">
-          <p className="eyebrow">The AURA method</p>
+          <p className="eyebrow">The ΛURΛ method</p>
           <h2 className="text-[clamp(2.2rem,6vw,5.5rem)] uppercase leading-[1.18]">
             <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">LEARN.</span><br />
             <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">PRACTICE.</span><br />
@@ -215,12 +215,12 @@ export function AuraHome() {
             <p className="eyebrow">A standard recognized</p>
             <h2 className="section-title">PROOF HAS<br /><span className="chrome-type">A PRESENCE.</span></h2>
             <p className="mt-7 max-w-lg text-base leading-8 text-secondary-foreground">
-              AURA certification is a precise record of demonstrated skill—not attendance. Built to be checked, trusted and carried forward.
+              ΛURΛ certification is a precise record of demonstrated skill—not attendance. Built to be checked, trusted and carried forward.
             </p>
             <div className="certificate-strip mt-10 flex flex-wrap items-center gap-4">
               <AuraMark compact />
               <div className="h-10 w-px bg-border hidden sm:block" />
-              <div><p className="text-[0.58rem] uppercase tracking-[0.22em] text-muted-foreground">Credential ID</p><p className="mt-1 font-mono text-xs text-foreground">AURA—MASTER—0001</p></div>
+              <div><p className="text-[0.58rem] uppercase tracking-[0.22em] text-muted-foreground">Credential ID</p><p className="mt-1 font-mono text-xs text-foreground">ΛURΛ—MASTER—0001</p></div>
               <div className="ml-auto hidden size-8 items-center justify-center rounded-full border border-chrome-mid text-chrome-light sm:flex"><Check className="size-3" /></div>
             </div>
           </div>
@@ -251,7 +251,7 @@ export function AuraHome() {
               <Instagram className="size-4" />
               <span>Instagram</span>
             </a>
-            <p>© 2026 AURA Academy</p>
+            <p>© 2026 ΛURΛ Academy</p>
           </div>
         </div>
       </footer>
