@@ -21,88 +21,88 @@ export default function Hero() {
 
   const container = {
     hidden: {},
-    show: { transition: { staggerChildren: 0.18, delayChildren: 0.1 } },
+    show: { transition: { staggerChildren: 0.15, delayChildren: 0.1 } },
   };
   const item = {
-    hidden: { opacity: 0, y: 24 },
-    show: { opacity: 1, y: 0, transition: { duration: 1, ease: [0.22, 1, 0.36, 1] } },
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.9, ease: [0.22, 1, 0.36, 1] } },
   };
 
   return (
-        <section
+    <section
       id="top"
       ref={ref}
-      className="relative flex min-h-screen items-center justify-center overflow-hidden bg-black px-6"
+      className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black px-6"
     >
-      {/* subtle atmospheric layers */}
+      {/* Subtle atmospheric gradient background */}
       <motion.div
         aria-hidden
         style={{ y: atmoY }}
-        className="aura-radial absolute inset-0"
+        className="aura-radial absolute inset-0 z-0 pointer-events-none"
       />
 
-      {/* giant brand image behind text (was the chrome "A") */}
-      <motion.img
-        src={auraLogo}
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        style={{ y: emblemY, opacity: fade }}
-        className="hero-watermark pointer-events-none absolute select-none"
-      />
+      {/* Background watermark image cleanly centered */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden">
+        <motion.img
+          src={auraLogo}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          style={{ y: emblemY, opacity: fade }}
+          className="select-none w-[450px] sm:w-[600px] md:w-[750px] max-w-none object-contain opacity-20 blur-[1px]"
+        />
+      </div>
 
+      {/* Main perfectly aligned content stack */}
       <motion.div
         style={{ y: headlineY }}
         variants={container}
         initial="hidden"
         animate="show"
-        className="relative z-10 flex flex-col items-center text-center"
+        className="relative z-10 flex flex-col items-center justify-center text-center w-full max-w-4xl mx-auto pt-16"
       >
         <motion.span
-  variants={item}
-  className="font-aura mb-6 text-xs sm:text-sm uppercase tracking-[0.5em] font-light text-neutral-300 drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
->
-  The Operating System for the Modern Barber
-</motion.span>
-
-        <motion.h1
           variants={item}
-          className="font-aura max-w-4xl text-5xl font-extrabold leading-[0.95] tracking-tight text-aura-text sm:text-6xl md:text-7xl"
+          className="font-aura mb-4 text-xs sm:text-sm uppercase tracking-[0.5em] font-light text-neutral-300 drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
         >
-          <span className="chrome-text"></span>{" "}
-       <div className="flex h-full w-full items-center justify-center py-16">
-  <motion.span
-    initial={{ backgroundPosition: "0% 50%" }}
-    animate={{ backgroundPosition: "100% 50%" }}
-    transition={{
-      duration: 3.5,
-      repeat: Infinity,
-      repeatType: "reverse",
-      ease: "easeInOut",
-    }}
-    style={{
-      backgroundImage:
-        "linear-gradient(90deg, #737373 0%, #a3a3a3 30%, #ffffff 50%, #a3a3a3 70%, #737373 100%)",
-      backgroundSize: "250% auto",
-      WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "transparent",
-    }}
-    className="inline-block origin-center scale-x-125 text-6xl font-light tracking-[0.45em] drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)] drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)] drop-shadow-[0_0_40px_rgba(255,255,255,0.5)] leading-none"
-  >
-    ΛURΛ
-  </motion.span>
-</div>
-          <span className="chrome-text"></span>
-        </motion.h1>
+          The Operating System for the Modern Barber
+        </motion.span>
+
+        <div className="relative flex flex-col items-center justify-center w-full my-4">
+          <div className="absolute h-36 w-80 rounded-full bg-white/[0.07] blur-[60px] pointer-events-none" />
+          
+          <motion.h1 variants={item} className="w-full flex items-center justify-center">
+            <motion.span
+              initial={{ backgroundPosition: "0% 50%" }}
+              animate={{ backgroundPosition: "100% 50%" }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                repeatType: "reverse",
+                ease: "easeInOut",
+              }}
+              style={{
+                backgroundImage:
+                  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)",
+                backgroundSize: "300% auto",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+              className="inline-block text-center text-6xl sm:text-7xl md:text-8xl font-thin tracking-[0.35em] drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_50px_rgba(255,255,255,0.6)] leading-none"
+            >
+              ΛURΛ
+            </motion.span>
+          </motion.h1>
+        </div>
 
         <motion.p
-  variants={item}
-  className="font-aura mt-7 max-w-xl text-lg md:text-xl font-extralight tracking-[0.35em] uppercase text-neutral-200 drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
->
-  — Hair Method —
-</motion.p>
+          variants={item}
+          className="font-aura mt-4 text-sm sm:text-base md:text-lg font-extralight tracking-[0.4em] uppercase text-neutral-200 drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
+        >
+          — Hair Method —
+        </motion.p>
 
-        <motion.div variants={item} className="mt-10 flex flex-wrap items-center justify-center gap-4">
+        <motion.div variants={item} className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <ChromeButton
             onClick={() =>
               document.querySelector("#method")?.scrollIntoView({ behavior: "smooth" })
@@ -121,8 +121,8 @@ export default function Hero() {
         </motion.div>
       </motion.div>
 
-      {/* thin chrome divider line at bottom */}
-      <div className="chrome-line absolute bottom-0 left-1/2 h-px w-[70%] max-w-3xl -translate-x-1/2" />
+      {/* Thin chrome divider line at bottom */}
+      <div className="chrome-line absolute bottom-0 left-1/2 h-px w-[70%] max-w-3xl -translate-x-1/2 z-20" />
     </section>
   );
 }
