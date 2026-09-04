@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { Loader2, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Loader2, Send, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { isAdminRole } from "@/lib/roles";
@@ -196,11 +196,27 @@ function MessagesPage() {
   return (
     <main className="w-full min-h-screen overflow-hidden bg-[#070707] px-4 py-24 text-white sm:px-6 sm:py-28 md:px-10">
       <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-6xl gap-4">
-        {/* Chat area (αριστερά) */}
-        <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-xl">
+        {/* Chat area: Στο mobile φαίνεται ΜΟΝΟ αν υπάρχει ενεργή συνομιλία (!activeId hides it, activeId shows it) */}
+        <section
+          className={`flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.03] to-transparent backdrop-blur-xl ${
+            !activeId ? "hidden sm:flex" : "flex"
+          }`}
+        >
           {activeConversation ? (
             <>
-              <header className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
+              <header className="flex items-center gap-3 border-b border-white/10 px-4 sm:px-5 py-4">
+                {/* Κουμπί επιστροφής (Back Arrow) μόνο για mobile */}
+                <button
+                  onClick={() => {
+                    setActiveId(null);
+                    navigate({ to: "/messages", search: {} });
+                  }}
+                  aria-label="Επιστροφή στις συνομιλίες"
+                  className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 sm:hidden"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+
                 {activeConversation.otherUser?.avatar_url ? (
                   <img
                     src={activeConversation.otherUser.avatar_url}
@@ -302,14 +318,18 @@ function MessagesPage() {
             <div className="flex flex-1 items-center justify-center">
               <EmptyState
                 title="Διάλεξε μια συνομιλία"
-                hint="Επίλεξε χρήστη από τη λίστα δεξιά για να ξεκινήσεις."
+                hint="Επίλεξε χρήστη από τη λίστα για να ξεκινήσεις."
               />
             </div>
           )}
         </section>
 
-        {/* Λίστα συνομιλιών (δεξιά) */}
-        <aside className="hidden w-80 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl sm:flex">
+        {/* Λίστα συνομιλιών: Στο mobile φαίνεται πλήρης ΟΤΑΝ ΔΕΝ υπάρχει ενεργή συνομιλία (activeId is null), και γίνεται hidden όταν ανοίγει το chat */}
+        <aside
+          className={`w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl sm:flex sm:w-80 ${
+            activeId ? "hidden sm:flex" : "flex"
+          }`}
+        >
           <div className="border-b border-white/10 px-5 py-4">
             <p className="text-xs uppercase tracking-[0.25em] text-white/50">
               Μηνύματα
@@ -335,7 +355,7 @@ function MessagesPage() {
                       search: { with: c.conversationId },
                     });
                   }}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-left transition ${
                     active ? "bg-white/10" : "hover:bg-white/[0.06]"
                   }`}
                 >
@@ -343,21 +363,21 @@ function MessagesPage() {
                     <img
                       src={c.otherUser.avatar_url}
                       alt=""
-                      className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/15"
+                      className="h-11 w-11 sm:h-10 sm:w-10 shrink-0 rounded-full object-cover ring-1 ring-white/15"
                     />
                   ) : (
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white/70">
+                    <div className="flex h-11 w-11 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white/70">
                       {c.otherUser?.full_name?.charAt(0).toUpperCase() ?? "?"}
                     </div>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="flex items-center gap-1 truncate text-sm text-white/90">
+                    <p className="flex items-center gap-1 truncate text-sm font-medium text-white/90">
                       {c.otherUser?.full_name ?? "Χρήστης"}
                       {c.otherUser && isAdminRole(c.otherUser.role) && (
                         <ShieldCheck size={12} className="text-white/50" />
                       )}
                     </p>
-                    <p className="truncate text-xs text-white/40">
+                    <p className="truncate text-xs text-white/40 mt-0.5">
                       {c.lastMessage?.content ?? "Νέα συνομιλία"}
                     </p>
                   </div>
