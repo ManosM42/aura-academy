@@ -41,7 +41,7 @@ export default function Hero() {
         className="aura-radial absolute inset-0 z-0 pointer-events-none"
       />
 
-      {/* Background watermark image adjusted down by one click */}
+      {/* Background watermark image with a tiny zoom-out step */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden px-4">
         <motion.img
           src={auraLogo}
@@ -51,10 +51,10 @@ export default function Hero() {
           style={{
             y: emblemY,
             opacity: fade,
-            WebkitMaskImage: "radial-gradient(ellipse 68% 68% at 50% 50%, black 40%, transparent 100%)",
-            maskImage: "radial-gradient(ellipse 68% 68% at 50% 50%, black 40%, transparent 100%)",
+            WebkitMaskImage: "radial-gradient(ellipse 64% 64% at 50% 50%, black 37%, transparent 100%)",
+            maskImage: "radial-gradient(ellipse 64% 64% at 50% 50%, black 37%, transparent 100%)",
           }}
-          className="select-none w-[720px] sm:w-[1040px] md:w-[1450px] max-h-[105vh] max-w-none object-contain opacity-25"
+          className="select-none w-[710px] sm:w-[1000px] md:w-[1350px] max-h-[102vh] max-w-none object-contain opacity-25"
         />
       </div>
 
