@@ -76,10 +76,26 @@ function waitForCombo(timeoutMs = 8000): Promise<HTMLSelectElement | null> {
  */
 async function switchGoogleLanguage(lang: Lang): Promise<boolean> {
   const combo = await waitForCombo();
-  if (!combo) return false;
-  if (combo.value === lang) return true;
-  combo.value = lang; // selecting "en" (the source language) reverts to the original text
+  if (!combo) {
+    console.warn("[GoogleTranslate] .goog-te-combo not found — widget script likely blocked or never loaded.");
+    return false;
+  }
+  console.debug("[GoogleTranslate] combo found, current value:", combo.value, "-> setting:", lang);
+
+  // Use the native setter so React's value-tracking doesn't swallow the change
+  // (this is a known gotcha: directly setting .value on a DOM node that's also
+  // controlled by React elsewhere can get silently ignored by some listeners).
+  const nativeSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLSelectElement.prototype,
+    "value",
+  )?.set;
+  nativeSetter?.call(combo, lang);
+
   combo.dispatchEvent(new Event("change", { bubbles: true }));
+
+  // Verify it actually took
+  await new Promise((r) => setTimeout(r, 300));
+  console.debug("[GoogleTranslate] combo value after dispatch:", combo.value);
   return true;
 }
 
