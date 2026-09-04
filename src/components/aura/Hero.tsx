@@ -66,53 +66,14 @@ export default function Hero() {
         animate="show"
         className="relative z-10 flex flex-col items-center justify-center text-center w-full max-w-4xl mx-auto -mt-14 sm:-mt-20"
       >
-        {/* Liquid Glass Chrome Silver Board Badge */}
-        <motion.div variants={item} className="mb-4 sm:mb-6">
-          <div className="relative inline-flex items-center px-6 py-2.5 rounded-full overflow-hidden backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.4),inset_0_-1px_1px_rgba(0,0,0,0.5)] bg-gradient-to-b from-white/15 via-white/5 to-black/20 border border-white/30">
-            {/* Top specular glass reflection */}
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent pointer-events-none" />
-            {/* Bottom inner highlight */}
-            <div className="absolute inset-x-0 bottom-0 h-[1px] bg-white/10 pointer-events-none" />
-
-            <span className="font-aura text-[11px] sm:text-xs uppercase tracking-[0.35em] font-medium text-neutral-100 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]">
-              The Operating System for the Modern Barber
-            </span>
-          </div>
-        </motion.div>
-
-        <div className="relative flex flex-col items-center justify-center w-full my-2 sm:my-4">
-          <div className="absolute h-36 w-80 rounded-full bg-white/[0.07] blur-[60px] pointer-events-none" />
-          
-          <motion.h1 variants={item} className="w-full flex items-center justify-center">
-            <motion.span
-              initial={{ backgroundPosition: "0% 50%" }}
-              animate={{ backgroundPosition: "100% 50%" }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                repeatType: "reverse",
-                ease: "easeInOut",
-              }}
-              style={{
-                backgroundImage:
-                  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)",
-                backgroundSize: "300% auto",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-              className="inline-block text-center text-6xl sm:text-7xl md:text-8xl font-thin tracking-[0.35em] pl-[0.35em] drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_50px_rgba(255,255,255,0.6)] leading-none"
-            >
-              Λ U R Λ
-            </motion.span>
-          </motion.h1>
-        </div>
+       
 
         {/* Hair Method */}
         <motion.p
           variants={item}
           className="font-aura mt-5 sm:mt-6 text-sm sm:text-base md:text-lg font-extralight tracking-[0.4em] pl-[0.4em] uppercase text-neutral-200 drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
         >
-          — Hair Method —
+         
         </motion.p>
 
         {/* Action Buttons */}

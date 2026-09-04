@@ -1,89 +1,112 @@
 // src/components/aura/AuraLoader.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import auraLogo from "@/assets/aura.jpg";
 
 interface AuraLoaderProps {
-  /** Called once the intro finishes (after the fade-out). Optional. */
   onComplete?: () => void;
-  /** How long the loader stays on screen before fading out, in ms. */
-  duration?: number;
 }
 
-/**
- * The AURA intro loader: the brand image (aura.JPG) framed in a chrome disc,
- * a slow rotating chrome ring, a shimmering wordmark, and a progress line
- * that fills before handing off to the app. Monochrome / chrome only.
- */
-export default function AuraLoader({
-  onComplete,
-  duration = 2400,
-}: AuraLoaderProps) {
-  const [visible, setVisible] = useState(true);
+export default function AuraLoader({ onComplete }: AuraLoaderProps) {
+  // Step sequence:
+  // 1: "Welcome" (Fades in, holds, fades out)
+  // 2: "To" (Fades in, holds, fades out)
+  // 3: aura.jpg (Fades in, holds, fades out)
+  // 4: Solid black screen fades out to reveal the landing page
+  // "done": Unmounts component completely
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | "done">(1);
 
+  const onCompleteRef = useRef(onComplete);
   useEffect(() => {
-    const hide = window.setTimeout(() => setVisible(false), duration);
-    // Fire onComplete slightly after the exit animation (0.6s) has run.
-    const done = window.setTimeout(() => onComplete?.(), duration + 650);
-    return () => {
-      window.clearTimeout(hide);
-      window.clearTimeout(done);
-    };
-  }, [duration, onComplete]);
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  // Step-driven timeline: Each step controls its own duration cleanly
+  useEffect(() => {
+    let timer: number;
+
+    if (step === 1) {
+      // Step 1 ("Welcome") duration before transitioning to Step 2
+      timer = window.setTimeout(() => setStep(2), 2200);
+    } else if (step === 2) {
+      // Step 2 ("To") duration before transitioning to Step 3
+      timer = window.setTimeout(() => setStep(3), 2200);
+    } else if (step === 3) {
+      // Step 3 (aura.jpg) duration before fading out to black (Step 4)
+      timer = window.setTimeout(() => setStep(4), 3200);
+    } else if (step === 4) {
+      // Step 4 (Black screen fade out) before completion
+      timer = window.setTimeout(() => {
+        setStep("done");
+        onCompleteRef.current?.();
+      }, 1800);
+    }
+
+    return () => window.clearTimeout(timer);
+  }, [step]);
+
+  if (step === "done") return null;
+
+  const chromeTextStyle: React.CSSProperties = {
+    backgroundImage:
+      "linear-gradient(to bottom, #ffffff 0%, #e0e0e0 30%, #7a7a7a 49%, #292929 51%, #a3a3a3 60%, #ffffff 100%)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    filter:
+      "drop-shadow(0px 4px 12px rgba(255,255,255,0.15)) drop-shadow(0px 1px 2px rgba(255,255,255,0.3))",
+  };
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          key="aura-loader"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0, filter: "blur(8px)" }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-aura-bg"
-        >
-          <div className="aura-grain" aria-hidden />
-          <div className="hero-atmosphere absolute inset-0" aria-hidden />
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, filter: "blur(6px)" }}
-            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+    <motion.div
+      key="aura-loader-black-screen"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: step === 4 ? 0 : 1 }}
+      transition={{ duration: 1.8, ease: [0.22, 1, 0.36, 1] }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden pointer-events-none"
+    >
+      <AnimatePresence mode="wait">
+        {step === 1 && (
+          <motion.h1
+            key="text-welcome"
+            style={chromeTextStyle}
+            initial={{ opacity: 0, scale: 0.92, filter: "blur(16px)" }}
+            animate={{ opacity: 1, scale: 1.02, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.1, filter: "blur(16px)" }}
             transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 flex flex-col items-center"
+            className="text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
           >
-            {/* Emblem: rotating chrome ring around the brand image */}
-            <div className="aura-loader-emblem">
-              <span className="aura-loader-ring" aria-hidden />
-              <span className="aura-loader-disc">
-                <img
-                  src={auraLogo}
-                  alt="AURA"
-                  className="aura-loader-img"
-                  draggable={false}
-                />
-                <span className="aura-mark-sweep" aria-hidden />
-              </span>
-            </div>
+            Welcome
+          </motion.h1>
+        )}
 
-            {/* Wordmark */}
-            <span className="chrome-text font-aura mt-8 text-sm font-extrabold uppercase tracking-[0.6em]">
-              ΛURΛ
-            </span>
+        {step === 2 && (
+          <motion.h1
+            key="text-to"
+            style={chromeTextStyle}
+            initial={{ opacity: 0, scale: 0.92, filter: "blur(16px)" }}
+            animate={{ opacity: 1, scale: 1.02, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.1, filter: "blur(16px)" }}
+            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            className="text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
+          >
+            To
+          </motion.h1>
+        )}
 
-            {/* Progress line */}
-            <div className="aura-loader-track" aria-hidden>
-              <motion.span
-                className="aura-loader-fill"
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{
-                  duration: duration / 1000,
-                  ease: [0.4, 0, 0.2, 1],
-                }}
-              />
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        {step === 3 && (
+          <motion.img
+            key="image-aura"
+            src={auraLogo}
+            alt="AURA"
+            initial={{ opacity: 0, scale: 0.88, filter: "blur(24px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(24px)" }}
+            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            className="w-[310px] sm:w-[440px] md:w-[580px] h-auto object-contain select-none"
+            draggable={false}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
