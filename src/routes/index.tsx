@@ -6,6 +6,7 @@ import ChromeCursor from "@/components/aura/ChromeCursor";
 import Hero from "@/components/aura/Hero";
 import Method from "@/components/aura/Method";
 import SkillTree from "@/components/aura/SkillTree";
+import { RankPreviewSection } from "@/components/aura/RankPreviewSection";
 import Certification from "@/components/aura/Certification";
 import Footer from "@/components/aura/Footer";
 import OurTeam from "@/components/aura/OurTeam";
@@ -33,6 +34,7 @@ function Index() {
         <Method />
         <SkillTree />
         <OurTeam />
+        <RankPreviewSection />
         <Certification />
       </main>
       <Footer />
