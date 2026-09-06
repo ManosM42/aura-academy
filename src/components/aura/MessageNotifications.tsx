@@ -1,16 +1,15 @@
-// src/components/aura/MessageNotifications.tsx
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { MessageCircle, ShieldCheck, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/lib/useAuth"; // was: "@/hooks/useAuth"
 import { isAdminRole } from "@/lib/roles";
 import { getProfileById } from "@/lib/messagingQueries";
 import type { Message } from "@/lib/messaging.types";
 
 interface ToastItem {
-  id: string; // message id — χρησιμοποιείται για dedupe/dismiss
+  id: string;
   conversationId: string;
   senderName: string;
   senderAvatar: string | null;
@@ -21,10 +20,6 @@ interface ToastItem {
 const AUTO_DISMISS_MS = 5000;
 const MAX_STACK = 4;
 
-/**
- * Mount ΜΙΑ φορά, κάπου global (π.χ. μέσα στο Navbar.tsx ή στο root
- * layout), ώστε να δουλεύει σε ΟΛΕΣ τις σελίδες, όχι μόνο στο /messages.
- */
 export default function MessageNotifications() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -35,8 +30,6 @@ export default function MessageNotifications() {
     new Map<string, { full_name: string | null; avatar_url: string | null; role: string }>(),
   );
 
-  // Κρατάμε το routerState σε ref ώστε το realtime callback (που δεν
-  // ξανα-δημιουργείται σε κάθε render) να βλέπει πάντα την τρέχουσα σελίδα.
   const routerStateRef = useRef(routerState);
   useEffect(() => {
     routerStateRef.current = routerState;
@@ -49,6 +42,8 @@ export default function MessageNotifications() {
   useEffect(() => {
     if (!profile) return;
 
+    let cancelled = false;
+
     const channel = supabase
       .channel(`global-notifications:${profile.id}`)
       .on(
@@ -58,8 +53,6 @@ export default function MessageNotifications() {
           const row = payload.new as Message;
           if (row.sender_id === profile.id) return;
 
-          // Μην δείξεις toast αν είσαι ήδη ΜΕΣΑ σε αυτή την ακριβώς
-          // συνομιλία στο /messages.
           const loc = routerStateRef.current.location;
           const activeWith = (loc.search as { with?: string } | undefined)?.with;
           if (loc.pathname === "/messages" && activeWith === row.conversation_id) {
@@ -81,6 +74,8 @@ export default function MessageNotifications() {
             }
           }
 
+          if (cancelled) return;
+
           const toast: ToastItem = {
             id: row.id,
             conversationId: row.conversation_id,
@@ -94,9 +89,17 @@ export default function MessageNotifications() {
           setTimeout(() => dismiss(toast.id), AUTO_DISMISS_MS);
         },
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error("[MessageNotifications] realtime channel issue:", status, err);
+        }
+        if (status === "SUBSCRIBED") {
+          console.debug("[MessageNotifications] subscribed for", profile.id);
+        }
+      });
 
     return () => {
+      cancelled = true;
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
