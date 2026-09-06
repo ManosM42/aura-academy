@@ -35,7 +35,6 @@ import { Route as LessonLessonIdRouteImport } from './routes/lesson.$lessonId'
 import { Route as PracticeAssignmentIdRouteImport } from './routes/practice.$assignmentId'
 import { Route as ReviewIndexRouteImport } from './routes/review.index'
 import { Route as ReviewSubmissionIdRouteImport } from './routes/review.$submissionId'
-import { Route as SkillsIndexRouteImport } from './routes/skills.index'
 import { Route as VerifyIdRouteImport } from './routes/verify.$id'
 import { Route as AdminCoursesIndexRouteImport } from './routes/admin.courses.index'
 import { Route as AdminCoursesCourseIdRouteImport } from './routes/admin.courses.$courseId'
@@ -171,11 +170,6 @@ const ReviewSubmissionIdRoute = ReviewSubmissionIdRouteImport.update({
   path: '/review/$submissionId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SkillsIndexRoute = SkillsIndexRouteImport.update({
-  id: '/skills/',
-  path: '/skills/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const VerifyIdRoute = VerifyIdRouteImport.update({
   id: '/verify/$id',
   path: '/verify/$id',
@@ -225,7 +219,6 @@ export interface FileRoutesByFullPath {
   '/checkout/': typeof CheckoutIndexRoute
   '/courses/': typeof CoursesIndexRoute
   '/review/': typeof ReviewIndexRoute
-  '/skills/': typeof SkillsIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
   '/admin/courses/': typeof AdminCoursesIndexRoute
@@ -258,7 +251,6 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutIndexRoute
   '/courses': typeof CoursesIndexRoute
   '/review': typeof ReviewIndexRoute
-  '/skills': typeof SkillsIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
   '/admin/courses': typeof AdminCoursesIndexRoute
@@ -292,7 +284,6 @@ export interface FileRoutesById {
   '/checkout/': typeof CheckoutIndexRoute
   '/courses/': typeof CoursesIndexRoute
   '/review/': typeof ReviewIndexRoute
-  '/skills/': typeof SkillsIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
   '/admin/courses/': typeof AdminCoursesIndexRoute
@@ -327,7 +318,6 @@ export interface FileRouteTypes {
     | '/checkout/'
     | '/courses/'
     | '/review/'
-    | '/skills/'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
     | '/admin/courses/'
@@ -360,7 +350,6 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/courses'
     | '/review'
-    | '/skills'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
     | '/admin/courses'
@@ -393,7 +382,6 @@ export interface FileRouteTypes {
     | '/checkout/'
     | '/courses/'
     | '/review/'
-    | '/skills/'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
     | '/admin/courses/'
@@ -427,7 +415,6 @@ export interface RootRouteChildren {
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CoursesIndexRoute: typeof CoursesIndexRoute
   ReviewIndexRoute: typeof ReviewIndexRoute
-  SkillsIndexRoute: typeof SkillsIndexRoute
   AdminCoursesCourseIdRoute: typeof AdminCoursesCourseIdRoute
   AdminCoursesNewRoute: typeof AdminCoursesNewRoute
   AdminCoursesIndexRoute: typeof AdminCoursesIndexRoute
@@ -617,13 +604,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReviewSubmissionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/skills/': {
-      id: '/skills/'
-      path: '/skills'
-      fullPath: '/skills/'
-      preLoaderRoute: typeof SkillsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/verify/$id': {
       id: '/verify/$id'
       path: '/verify/$id'
@@ -683,7 +663,6 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutIndexRoute: CheckoutIndexRoute,
   CoursesIndexRoute: CoursesIndexRoute,
   ReviewIndexRoute: ReviewIndexRoute,
-  SkillsIndexRoute: SkillsIndexRoute,
   AdminCoursesCourseIdRoute: AdminCoursesCourseIdRoute,
   AdminCoursesNewRoute: AdminCoursesNewRoute,
   AdminCoursesIndexRoute: AdminCoursesIndexRoute,

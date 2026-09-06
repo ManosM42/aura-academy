@@ -82,7 +82,7 @@ export function RankPreviewSection() {
                 Aura Master of the Month Certification
               </h3>
               <p className="text-zinc-300 text-sm sm:text-base leading-relaxed max-w-3xl">
-                Όποιος διατηρηθεί στην κορυφή ως <span className="text-orange-400 font-semibold">Aura Master για έναν ολόκληρο μήνα</span>, κερδίζει αυτόματα την επίσημη φυσική πιστοποίηση "Aura Master of the Month", η οποία αποστέλλεται απευθείας στη διεύθυνσή του με δικά μας έξοδα!
+                Όποιος διατηρηθεί στην κορυφή ως <span className="text-orange-400 font-semibold">Aura Master για έναν ολόκληρο μήνα</span>, κερδίζει αυτόματα την επίσημη φυσική πιστοποίηση με τίτλο "Aura Master of the Month", η οποία αποστέλλεται απευθείας στη διεύθυνσή του με δικά μας έξοδα!
               </p>
             </div>
           </div>

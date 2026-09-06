@@ -10,14 +10,46 @@ import {
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import SubscriptionCard from "@/components/aura/SubscriptionCard";
+import SkillTreeGraph from "@/components/aura/SkillTreeGraph";
 import { RankIcon } from "@/components/aura/RankIcon";
 import { getRankForPoints } from "@/lib/ranks";
-import type { SkillWithState } from "@/lib/database.types";
+import type { SkillCategory, SkillState, SkillWithState } from "@/lib/database.types";
 import { ArrowRight, BookOpen, CheckCircle, ShieldCheck, Trophy, UserCheck } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
+
+const STATE_STYLE: Record<SkillState, string> = {
+  locked: "bg-white/5 text-white/40",
+  learning: "bg-blue-500/15 text-blue-300",
+  practicing: "bg-amber-500/15 text-amber-300",
+  verified: "bg-emerald-500/15 text-emerald-300",
+  mastered: "bg-violet-500/15 text-violet-300",
+};
+
+const CATEGORY_LABEL: Record<SkillCategory, string> = {
+  foundation: "Foundation",
+  technical: "Technical",
+  analysis: "Analysis",
+  design: "Design",
+  business: "Business",
+  educator: "Educator",
+};
+
+const ACHIEVED_STATES: SkillState[] = ["verified", "mastered"];
+
+function isAchieved(skill: SkillWithState): boolean {
+  return ACHIEVED_STATES.includes(skill.userSkill?.state ?? "locked");
+}
+
+function isUnlocked(skill: SkillWithState, all: SkillWithState[]): boolean {
+  if (!skill.prerequisites || skill.prerequisites.length === 0) return true;
+  return skill.prerequisites.every((prereqId) => {
+    const prereq = all.find((s) => s.id === prereqId);
+    return prereq ? isAchieved(prereq) : false;
+  });
+}
 
 function DashboardPage() {
   const { data, error, loading } = useAsync(getDashboard, []);
@@ -31,19 +63,6 @@ function DashboardPage() {
     return getRankForPoints(data.profile.points ?? 0);
   }, [data?.profile]);
 
-  function isAchieved(s: SkillWithState) {
-    const st = s.userSkill?.state ?? "locked";
-    return st === "verified" || st === "mastered";
-  }
-
-  function isUnlocked(s: SkillWithState, all: SkillWithState[]) {
-    if (!s.prerequisites || s.prerequisites.length === 0) return true;
-    return s.prerequisites.every((id) => {
-      const p = all.find((x) => x.id === id);
-      return p ? isAchieved(p) : false;
-    });
-  }
-
   const nextSkill = useMemo(() => {
     if (!skills.data) return null;
     return (
@@ -53,6 +72,17 @@ function DashboardPage() {
   }, [skills.data]);
 
   const nextAssignmentId = nextSkill ? assignments.data?.[nextSkill.id] : null;
+
+  const groupedSkills = useMemo(() => {
+    if (!skills.data) return {};
+    return skills.data.reduce<Record<string, SkillWithState[]>>(
+      (acc, s) => {
+        (acc[s.category] ??= []).push(s);
+        return acc;
+      },
+      {},
+    );
+  }, [skills.data]);
 
   return (
     <main className="w-full min-h-screen overflow-x-hidden bg-[#070707] px-4 sm:px-6 md:px-10 py-12 text-white selection:bg-white selection:text-black">
@@ -72,7 +102,7 @@ function DashboardPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="mx-auto max-w-5xl space-y-8"
+          className="mx-auto max-w-6xl space-y-8"
         >
           <header className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/10 pb-6 gap-4">
             <div>
@@ -121,7 +151,120 @@ function DashboardPage() {
             <SubscriptionCard userId={data.profile.id} />
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          {/* Skill Progression Tree Section */}
+          {skills.data && skills.data.length > 0 && (
+            <div className="w-full space-y-3">
+              <div className="px-1">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-white/60" />
+                  Skill Progression Tree
+                </h2>
+                <p className="mt-1 text-xs text-white/50">
+                  Locked → Learning → Practicing → Verified → Mastered. Για να ξεκλειδώσεις ένα skill πρέπει πρώτα να έχεις verified όλα τα προαπαιτούμενά του.
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-zinc-950/80 p-6 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+                <SkillTreeGraph skills={skills.data} />
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Categorized Skills Breakdown */}
+          {skills.data && skills.data.length > 0 && (
+            <div className="space-y-6 pt-4">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2 px-1">
+                <span className="size-1.5 rounded-full bg-white/60" />
+                Αναλυτική Λίστα Skills
+              </h2>
+              <div className="space-y-8">
+                {(Object.keys(groupedSkills) as SkillCategory[]).map((cat) => (
+                  <section key={cat} className="space-y-3">
+                    <h3 className="text-xs font-medium uppercase tracking-widest text-white/50 px-1">
+                      {CATEGORY_LABEL[cat] ?? cat}
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {groupedSkills[cat]!.map((s) => {
+                        const state = s.userSkill?.state ?? "locked";
+                        const achieved = isAchieved(s);
+                        const unlocked = isUnlocked(s, skills.data!);
+                        const assignmentId = assignments.data?.[s.id];
+                        const missingPrereqs = (s.prerequisites ?? [])
+                          .map((id) => skills.data!.find((sk) => sk.id === id))
+                          .filter((sk) => sk && !isAchieved(sk));
+
+                        return (
+                          <div
+                            key={s.id}
+                            className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4 backdrop-blur-xl transition-all duration-300 hover:border-white/25 shadow-[0_0_20px_-5px_rgba(0,0,0,0.8)]"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <h4 className="text-sm font-medium text-white">{s.name}</h4>
+                              <span
+                                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-wider ${STATE_STYLE[state]}`}
+                              >
+                                {state}
+                              </span>
+                            </div>
+                            {s.definition && (
+                              <p className="mt-2 line-clamp-2 text-xs text-white/50 leading-relaxed">
+                                {s.definition}
+                              </p>
+                            )}
+                            <div className="mt-3 flex items-center gap-3 text-xs text-white/40 font-mono">
+                              {s.userSkill?.score != null && (
+                                <span>Score {s.userSkill.score}</span>
+                              )}
+                              {s.userSkill?.verified_at && (
+                                <span>
+                                  Verified{" "}
+                                  {new Date(
+                                    s.userSkill.verified_at,
+                                  ).toLocaleDateString("el-GR")}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* CTA: upload μόνο αν unlocked & όχι ήδη achieved */}
+                            <div className="mt-4 pt-3 border-t border-white/5">
+                              {achieved ? (
+                                <span className="text-xs font-medium text-emerald-300 flex items-center gap-1.5">
+                                  ✓ Ολοκληρώθηκε
+                                </span>
+                              ) : unlocked ? (
+                                assignmentId ? (
+                                  <Link
+                                    to="/practice/$assignmentId"
+                                    params={{ assignmentId }}
+                                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-white/15 hover:border-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                  >
+                                    <span>Ανέβασε φωτογραφία κουρέματος</span>
+                                    <ArrowRight className="size-3.5" />
+                                  </Link>
+                                ) : (
+                                  <span className="text-xs text-white/30">
+                                    Δεν έχει οριστεί assignment ακόμη.
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-xs text-white/35 flex items-center gap-1">
+                                  🔒 Χρειάζεται πρώτα:{" "}
+                                  {missingPrereqs
+                                    .map((p) => p!.name)
+                                    .join(", ")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-6 md:grid-cols-2 pt-4">
             <Panel title="Continue learning">
               {data.continueLesson ? (
                 <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
@@ -216,7 +359,6 @@ function DashboardPage() {
 
           <nav className="mt-12 flex flex-wrap gap-4 pt-6 border-t border-white/10">
             <NavLink to="/academy" label="Academy" />
-            <NavLink to="/skills" label="Τα Skills μου" />
             {staff && <NavLink to="/review" label="Review Queue" icon={<UserCheck className="size-4" />} />}
           </nav>
         </motion.div>
