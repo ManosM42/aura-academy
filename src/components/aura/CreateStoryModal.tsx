@@ -5,6 +5,17 @@ import {
 } from "lucide-react";
 import { createStory } from "@/lib/queries";
 
+function makeId(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // falls through to the manual fallback below
+    }
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 type Tool = null | "text" | "draw" | "music" | "filters";
 
 interface TextLayer {
@@ -29,6 +40,7 @@ const FILTERS: { name: string; css: string }[] = [
   { name: "Noir", css: "grayscale(1) contrast(1.15)" },
   { name: "Ξεθωριασμένο", css: "contrast(0.9) brightness(1.1) saturate(0.75)" },
 ];
+
 
 const TEXT_COLORS = ["#ffffff", "#000000", "#ef4444", "#eab308", "#22c55e", "#3b82f6", "#ec4899"];
 const DRAW_COLORS = ["#ffffff", "#000000", "#ef4444", "#eab308", "#22c55e", "#3b82f6", "#ec4899"];
@@ -212,7 +224,7 @@ export default function CreateStoryModal({
     setTextLayers((l) => [
       ...l,
       {
-        id: crypto.randomUUID(),
+        id: makeId(),
         text: draftText.trim(),
         xPct: 0.5,
         yPct: 0.5,
