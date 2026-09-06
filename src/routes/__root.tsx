@@ -15,6 +15,8 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/aura/Navbar";
 import MessageNotifications from "@/components/aura/MessageNotifications";
 import { I18nProvider } from "@/lib/i18n";
+import { CookieConsentProvider } from "@/lib/cookieConsent";
+import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
 
 function NotFoundComponent() {
   return (
@@ -131,10 +133,12 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <Navbar />
-        <MessageNotifications />
-        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-        <Outlet />
+        <CookieConsentProvider>
+          <Navbar />
+          <MessageNotifications />
+          <Outlet />
+          <CookieConsentBanner />
+        </CookieConsentProvider>
       </I18nProvider>
     </QueryClientProvider>
   );

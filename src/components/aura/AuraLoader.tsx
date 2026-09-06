@@ -9,9 +9,9 @@ interface AuraLoaderProps {
 
 export default function AuraLoader({ onComplete }: AuraLoaderProps) {
   // Step sequence:
-  // 1: "Welcome" (Fades in, holds, fades out)
-  // 2: "To" (Fades in, holds, fades out)
-  // 3: aura.jpg (Fades in, holds, fades out)
+  // 1: "Welcome" (1 sec)
+  // 2: "To" (1 sec)
+  // 3: aura.jpg (2 sec)
   // 4: Solid black screen fades out to reveal the landing page
   // "done": Unmounts component completely
   const [step, setStep] = useState<1 | 2 | 3 | 4 | "done">(1);
@@ -21,25 +21,24 @@ export default function AuraLoader({ onComplete }: AuraLoaderProps) {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
-  // Step-driven timeline: Each step controls its own duration cleanly
   useEffect(() => {
     let timer: number;
 
     if (step === 1) {
-      // Step 1 ("Welcome") duration before transitioning to Step 2
-      timer = window.setTimeout(() => setStep(2), 2200);
+      // Step 1 ("Welcome"): 1 second
+      timer = window.setTimeout(() => setStep(2), 1000);
     } else if (step === 2) {
-      // Step 2 ("To") duration before transitioning to Step 3
-      timer = window.setTimeout(() => setStep(3), 2200);
+      // Step 2 ("To"): 1 second
+      timer = window.setTimeout(() => setStep(3), 1000);
     } else if (step === 3) {
-      // Step 3 (aura.jpg) duration before fading out to black (Step 4)
-      timer = window.setTimeout(() => setStep(4), 3200);
+      // Step 3 (aura.jpg): 2 seconds
+      timer = window.setTimeout(() => setStep(4), 2000);
     } else if (step === 4) {
-      // Step 4 (Black screen fade out) before completion
+      // Step 4 (Black screen fade out to main site): 1.2 seconds
       timer = window.setTimeout(() => {
         setStep("done");
         onCompleteRef.current?.();
-      }, 1800);
+      }, 1200);
     }
 
     return () => window.clearTimeout(timer);
@@ -61,7 +60,7 @@ export default function AuraLoader({ onComplete }: AuraLoaderProps) {
       key="aura-loader-black-screen"
       initial={{ opacity: 1 }}
       animate={{ opacity: step === 4 ? 0 : 1 }}
-      transition={{ duration: 1.8, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden pointer-events-none"
     >
       <AnimatePresence mode="wait">
@@ -71,9 +70,9 @@ export default function AuraLoader({ onComplete }: AuraLoaderProps) {
             style={chromeTextStyle}
             initial={{ opacity: 0, scale: 0.92, filter: "blur(16px)" }}
             animate={{ opacity: 1, scale: 1.02, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 1.1, filter: "blur(16px)" }}
-            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            className="text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(16px)" }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="notranslate text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
           >
             Welcome
           </motion.h1>
@@ -85,9 +84,9 @@ export default function AuraLoader({ onComplete }: AuraLoaderProps) {
             style={chromeTextStyle}
             initial={{ opacity: 0, scale: 0.92, filter: "blur(16px)" }}
             animate={{ opacity: 1, scale: 1.02, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 1.1, filter: "blur(16px)" }}
-            transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            className="text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(16px)" }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="notranslate text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
           >
             To
           </motion.h1>
@@ -100,8 +99,8 @@ export default function AuraLoader({ onComplete }: AuraLoaderProps) {
             alt="AURA"
             initial={{ opacity: 0, scale: 0.88, filter: "blur(24px)" }}
             animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, scale: 1.08, filter: "blur(24px)" }}
-            transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+            exit={{ opacity: 0, scale: 1.06, filter: "blur(24px)" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
             className="w-[310px] sm:w-[440px] md:w-[580px] h-auto object-contain select-none"
             draggable={false}
           />

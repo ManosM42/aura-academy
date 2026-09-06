@@ -8,6 +8,7 @@ import Method from "@/components/aura/Method";
 import SkillTree from "@/components/aura/SkillTree";
 import Certification from "@/components/aura/Certification";
 import Footer from "@/components/aura/Footer";
+import OurTeam from "@/components/aura/OurTeam";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -31,6 +32,7 @@ function Index() {
         <Hero />
         <Method />
         <SkillTree />
+        <OurTeam />
         <Certification />
       </main>
       <Footer />
