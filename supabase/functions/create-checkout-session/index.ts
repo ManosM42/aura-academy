@@ -16,16 +16,28 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type PlanId = "full" | "core" | "starter";
+type PlanId = "low" | "mid" | "high" | "limited" | "full" | "core" | "starter";
 
 const PLAN_PRICE_ENV: Record<PlanId, string> = {
+  low: "STRIPE_PRICE_LOW",
+  mid: "STRIPE_PRICE_MID",
+  high: "STRIPE_PRICE_HIGH",
+  limited: "STRIPE_PRICE_LIMITED",
   full: "STRIPE_PRICE_FULL",
   core: "STRIPE_PRICE_CORE",
   starter: "STRIPE_PRICE_STARTER",
 };
 
 function isPlanId(value: unknown): value is PlanId {
-  return value === "full" || value === "core" || value === "starter";
+  return (
+    value === "low" ||
+    value === "mid" ||
+    value === "high" ||
+    value === "limited" ||
+    value === "full" ||
+    value === "core" ||
+    value === "starter"
+  );
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -49,9 +61,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Server misconfigured" }, 500);
   }
 
-  // 1. Πακέτο ΠΡΩΤΑ: έτσι ένα χαλασμένο body φαίνεται πάντα στα logs.
-  //    Διαβάζουμε text και μετά JSON.parse, ώστε να μη σκάει όταν
-  //    λείπει ή είναι λάθος το Content-Type.
   let rawBody = "";
   try {
     rawBody = await req.text();
@@ -78,13 +87,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Unknown plan" }, 400);
   }
 
-  const priceId = Deno.env.get(PLAN_PRICE_ENV[planId]);
+  const envVarName = PLAN_PRICE_ENV[planId];
+  const priceId = Deno.env.get(envVarName);
   if (!priceId) {
-    console.error(`Missing price env var for plan ${planId}`);
+    console.error(`Missing price env var ${envVarName} for plan ${planId}`);
     return json({ error: "Plan not available" }, 500);
   }
 
-  // 2. Ταυτοποίηση χρήστη από το Authorization header.
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
     console.error("Missing bearer token");
@@ -109,7 +118,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const stripe = new Stripe(stripeKey);
 
   try {
-    // 3. Μπλοκάρουμε διπλή συνδρομή.
     const { data: existing } = await admin
       .from("subscriptions")
       .select("id")
@@ -119,7 +127,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (existing) return json({ error: "Υπάρχει ήδη ενεργή συνδρομή." }, 409);
 
-    // 4. Stripe customer (reuse ή δημιουργία).
     const { data: mapping } = await admin
       .from("stripe_customers")
       .select("stripe_customer_id")
@@ -144,7 +151,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // 5. Embedded Checkout Session.
     const origin =
       Deno.env.get("PUBLIC_SITE_URL") ??
       req.headers.get("origin") ??

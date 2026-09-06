@@ -16,9 +16,13 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type PlanId = "full" | "core" | "starter";
+type PlanId = "low" | "mid" | "high" | "limited" | "full" | "core" | "starter";
 
 const PLAN_PRICE_ENV: Record<PlanId, string> = {
+  low: "STRIPE_PRICE_LOW",
+  mid: "STRIPE_PRICE_MID",
+  high: "STRIPE_PRICE_HIGH",
+  limited: "STRIPE_PRICE_LIMITED",
   full: "STRIPE_PRICE_FULL",
   core: "STRIPE_PRICE_CORE",
   starter: "STRIPE_PRICE_STARTER",
@@ -27,7 +31,15 @@ const PLAN_PRICE_ENV: Record<PlanId, string> = {
 const ACCESS_STATUSES = new Set(["active", "trialing"]);
 
 function isPlanId(value: unknown): value is PlanId {
-  return value === "full" || value === "core" || value === "starter";
+  return (
+    value === "low" ||
+    value === "mid" ||
+    value === "high" ||
+    value === "limited" ||
+    value === "full" ||
+    value === "core" ||
+    value === "starter"
+  );
 }
 
 /** Αντίστροφη αντιστοίχιση price -> plan, για session χωρίς metadata. */
@@ -42,10 +54,6 @@ function planFromPrice(priceId: string | null): PlanId | null {
   return null;
 }
 
-/**
- * Στα νεότερα Stripe API versions το current_period_end έφυγε από το
- * Subscription και ζει στα subscription items. Δοκιμάζουμε και τα δύο.
- */
 type PeriodBearing = { current_period_end?: number | null };
 
 function resolvePeriodEnd(sub: Stripe.Subscription): string | null {
@@ -90,7 +98,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Server misconfigured" }, 500);
   }
 
-  // 1. Body πρώτα, ώστε ένα χαλασμένο request να φαίνεται πάντα στα logs.
   let rawBody = "";
   try {
     rawBody = await req.text();
@@ -116,7 +123,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Μη έγκυρο session πληρωμής." }, 400);
   }
 
-  // 2. Ταυτοποίηση χρήστη.
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
     console.error("Missing bearer token");
@@ -141,12 +147,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const stripe = new Stripe(stripeKey);
 
   try {
-    // 3. Το Stripe είναι η πηγή αλήθειας.
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ["subscription", "subscription.items.data.price"],
     });
 
-    // 4. Ο καλών πρέπει να είναι ο κάτοχος του session.
     const ownerId =
       checkoutSession.client_reference_id ??
       checkoutSession.metadata?.supabase_user_id ??
@@ -161,7 +165,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return json({ error: "Το session δεν ανήκει σε αυτόν τον χρήστη." }, 403);
     }
 
-    // 5. Ακόμα σε εξέλιξη: δεν γράφουμε τίποτα.
     if (checkoutSession.status !== "complete") {
       return json({
         state: "pending",
@@ -204,7 +207,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? subscription.customer
         : (subscription.customer?.id ?? null);
 
-    // 6. stripe_customers: idempotent.
     if (customerId) {
       const { error: customerError } = await admin
         .from("stripe_customers")
@@ -217,8 +219,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
     }
 
-    // 7. subscriptions: ίδιο upsert με το webhook, άρα όποιο τρέξει
-    //    δεύτερο απλώς ξαναγράφει τα ίδια δεδομένα.
     const row = {
       user_id: user.id,
       plan_id: planId,

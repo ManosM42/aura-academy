@@ -10,6 +10,8 @@ import {
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import SubscriptionCard from "@/components/aura/SubscriptionCard";
+import { RankIcon } from "@/components/aura/RankIcon";
+import { getRankForPoints } from "@/lib/ranks";
 import type { SkillWithState } from "@/lib/database.types";
 import { ArrowRight, BookOpen, CheckCircle, ShieldCheck, Trophy, UserCheck } from "lucide-react";
 
@@ -23,6 +25,11 @@ function DashboardPage() {
 
   const skills = useAsync(getMySkills, []);
   const assignments = useAsync(getSkillAssignments, []);
+
+  const rank = useMemo(() => {
+    if (!data?.profile) return getRankForPoints(0);
+    return getRankForPoints(data.profile.points ?? 0);
+  }, [data?.profile]);
 
   function isAchieved(s: SkillWithState) {
     const st = s.userSkill?.state ?? "locked";
@@ -78,10 +85,12 @@ function DashboardPage() {
                 {data.profile.full_name ? <span className="chrome-type font-semibold">, {data.profile.full_name}</span> : ""}.
               </h1>
             </div>
-            <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/[0.03] px-5 py-2.5 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.03)] self-start md:self-auto">
-              <Trophy className="size-4 text-white/80" />
-              <span className="text-xs uppercase tracking-wider text-white/60">AURA Level:</span>
-              <span className="font-mono font-bold text-white">{data.profile.level}</span>
+            <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/[0.03] px-4 py-2 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.03)] self-start md:self-auto">
+              <RankIcon rank={rank.key} size={24} />
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs uppercase tracking-wider text-white/60">Aura Rank:</span>
+                <span className="font-bold text-white">{rank.label}</span>
+              </div>
             </div>
           </header>
 

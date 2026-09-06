@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/useAuth";
 import { isAdminRole, isStaffRole } from "@/lib/roles";
-import { GoogleTranslateWidget } from "@/components/aura/GoogleTranslate";
 import logo from "@/assets/logo.jpg";
 
 interface NavItem {
@@ -179,7 +178,7 @@ export function Navbar() {
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-3">
-            <GoogleTranslateWidget />
+            
 
             {user ? (
               <Link

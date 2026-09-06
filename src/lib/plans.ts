@@ -1,77 +1,96 @@
-export type PlanId = "full" | "core" | "starter";
+// src/lib/ranks.ts
+
+export type PlanId = "low" | "mid" | "high" | "limited";
 
 export interface AuraPlan {
   id: PlanId;
-  /** Τίτλος καρτέλας */
   name: string;
-  /** Μικρή περιγραφή κάτω από τον τίτλο */
   tagline: string;
-  /** Ετικέτα πάνω από τον τίτλο (μόνο στο highlighted) */
   badge?: string;
   priceLabel: string;
-  /** Σε cents — μόνο για εμφάνιση/έλεγχο, η αλήθεια είναι το Stripe Price */
   amountCents: number;
   currency: "usd";
   interval: "month";
-  haircuts: number;
+  stripePriceId: string; // Connected Stripe price key
   features: string[];
   highlight: boolean;
 }
 
 export const AURA_PLANS: AuraPlan[] = [
   {
-    id: "full",
-    name: "ΠΛΗΡΗΣ ΜΕΘΟΔΟΣ",
-    tagline: "Όλη η μέθοδος, όλα τα εργαλεία, χωρίς περιορισμούς.",
-    badge: "ΠΛΗΡΗΣ ΕΜΠΕΙΡΙΑ",
-    priceLabel: "79.99$",
-    amountCents: 7999,
+    id: "low",
+    name: "LOW METHOD",
+    tagline: "Η βασική είσοδος στην ακαδημία και την κοινότητα.",
+    priceLabel: "24,99$",
+    amountCents: 2499,
     currency: "usd",
     interval: "month",
-    haircuts: 20,
+    stripePriceId: "price_1UCnzNLnBpuAzyZY2gfMNHHf", // Replace with actual Stripe Price ID
     features: [
-      "20 ΚΟΥΡΕΜΑΤΑ",
-      "MINIMAIA VIDEO",
+      "ΠΡΟΣΒΑΣΗ ΣΤΗΝ ACADEMY",
+      "ΜΗΝΙΑΙΑ VIDEOS",
+      "ΑΥΡΑ SOCIAL ACCESS",
       "ΑΚΥΡΩΣΗ ΑΝΑ ΠΑΣΑ ΣΤΙΓΜΗ",
-      "ΜΑΘΕ ΟΣΟ ΠΑΡΑΚΟΛΟΥΘΕΙΣ",
-      "ΠΙΣΤΟΠΟΙΗΤΙΚΟ ΟΛΟΚΛΗΡΩΣΗΣ",
-      "ΠΡΟΣΒΑΣΗ ΣΕ ΝΕΑ ΒΙΝΤΕΟ",
-    ],
-    highlight: true,
-  },
-  {
-    id: "core",
-    name: "ΒΑΣΙΚΗ ΜΕΘΟΔΟΣ",
-    tagline: "Η μέθοδος στην ουσία της.",
-    priceLabel: "59.99$",
-    amountCents: 5999,
-    currency: "usd",
-    interval: "month",
-    haircuts: 12,
-    features: [
-      "12 ΚΟΥΡΕΜΑΤΑ",
-      "MINIMAIA VIDEO",
-      "ΑΚΥΡΩΣΗ ΑΝΑ ΠΑΣΑ ΣΤΙΓΜΗ",
-      "ΜΑΘΕ ΟΣΟ ΠΑΡΑΚΟΛΟΥΘΕΙΣ",
     ],
     highlight: false,
   },
   {
-    id: "starter",
-    name: "ΑΡΧΙΚΗ ΜΕΘΟΔΟΣ",
-    tagline: "Η πρώτη γνωριμία με τη μέθοδο.",
-    priceLabel: "39.99$",
-    amountCents: 3999,
+    id: "mid",
+    name: "MID METHOD",
+    tagline: "Προχώρησε επίπεδο με ενεργό Aura Rank και αξιολογήσεις.",
+    badge: "ΔΗΜΟΦΙΛΕΣ",
+    priceLabel: "45,99$",
+    amountCents: 4599,
     currency: "usd",
     interval: "month",
-    haircuts: 6,
-    features: ["6 ΚΟΥΡΕΜΑΤΑ", "MINIMAIA VIDEO", "ΑΚΥΡΩΣΗ ΑΝΑ ΠΑΣΑ ΣΤΙΓΜΗ"],
+    stripePriceId: "price_1UCo03LnBpuAzyZYR1QsDcNZ", // Replace with actual Stripe Price ID
+    features: [
+      "ΠΡΟΣΒΑΣΗ ΣΤΟ AURA RANK",
+      "ΠΡΟΣΒΑΣΗ ΣΤΟ REVIEW SYSTEM",
+      "AURA CERTIFICATION",
+      "+ ΟΛΑ ΑΠΟ ΤΟ LOW METHOD",
+    ],
+    highlight: true,
+  },
+  {
+    id: "high",
+    name: "HIGH METHOD",
+    tagline: "Ολική εμβάθυνση με αποκλειστικό E-book και πλήρη εργαλεία.",
+    priceLabel: "65,99$",
+    amountCents: 6599,
+    currency: "usd",
+    interval: "month",
+    stripePriceId: "price_1UCo0PLnBpuAzyZYajqu8c5Q", // Replace with actual Stripe Price ID
+    features: [
+      "ΨΗΦΙΑΚΟ E-BOOK",
+      "+ ΟΛΑ ΑΠΟ MID & LOW METHOD",
+      "ΠΡΟΧΩΡΗΜΕΝΑ VIDEOS ΚΟΥΡΕΜΑΤΩΝ",
+      "ΠΡΟΤΕΡΑΙΟΤΗΤΑ ΣΤΟ SUPPORT",
+    ],
+    highlight: false,
+  },
+  {
+    id: "limited",
+    name: "LIMITED EDITION PHYSICAL BOOK",
+    tagline: "Η απόλυτη εμπειρία: Φυσικό βιβλίο + QR codes για αποκλειστικά videos.",
+    badge: "ΣΥΛΛΕΚΤΙΚΟ",
+    priceLabel: "149.99$",
+    amountCents: 14999,
+    currency: "usd",
+    interval: "month",
+    stripePriceId: "price_1UCo0qLnBpuAzyZYABo0Prch", // Replace with actual Stripe Price ID
+    features: [
+      "ΦΥΣΙΚΟ ΑΥΘΕΝΤΙΚΟ AURA PROFESSIONAL HAIR METHOD BOOK",
+      "ΠΡΟΣΒΑΣΗ ΣΕ LIMITED VIDEOS ΜΕΣΩ QR CODES ΤΟΥ ΒΙΒΛΙΟΥ",
+      "+ ΟΛΑ ΑΠΟ ΤΟ HIGH METHOD",
+      "VIP STATUS ΣΤΗΝ ΚΟΙΝΟΤΗΤΑ",
+    ],
     highlight: false,
   },
 ];
 
 export function isPlanId(value: unknown): value is PlanId {
-  return value === "full" || value === "core" || value === "starter";
+  return value === "low" || value === "mid" || value === "high" || value === "limited";
 }
 
 export function getPlan(id: string | undefined | null): AuraPlan | undefined {

@@ -20,6 +20,7 @@ import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as MethodRouteImport } from './routes/method'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as StopPlanRouteImport } from './routes/stop-plan'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AcademyIndexRouteImport } from './routes/academy.index'
 import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
@@ -93,6 +94,11 @@ const PricingRoute = PricingRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StopPlanRoute = StopPlanRouteImport.update({
+  id: '/stop-plan',
+  path: '/stop-plan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermsRoute = TermsRouteImport.update({
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
+  '/stop-plan': typeof StopPlanRoute
   '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/inbox': typeof AdminInboxRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
+  '/stop-plan': typeof StopPlanRoute
   '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/inbox': typeof AdminInboxRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/method': typeof MethodRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
+  '/stop-plan': typeof StopPlanRoute
   '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/inbox': typeof AdminInboxRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/method'
     | '/pricing'
     | '/profile'
+    | '/stop-plan'
     | '/terms'
     | '/academy/$slug'
     | '/admin/inbox'
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/method'
     | '/pricing'
     | '/profile'
+    | '/stop-plan'
     | '/terms'
     | '/academy/$slug'
     | '/admin/inbox'
@@ -366,6 +377,7 @@ export interface FileRouteTypes {
     | '/method'
     | '/pricing'
     | '/profile'
+    | '/stop-plan'
     | '/terms'
     | '/academy/$slug'
     | '/admin/inbox'
@@ -399,6 +411,7 @@ export interface RootRouteChildren {
   MethodRoute: typeof MethodRoute
   PricingRoute: typeof PricingRoute
   ProfileRoute: typeof ProfileRoute
+  StopPlanRoute: typeof StopPlanRoute
   TermsRoute: typeof TermsRoute
   AcademySlugRoute: typeof AcademySlugRoute
   AdminInboxRoute: typeof AdminInboxRoute
@@ -497,6 +510,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stop-plan': {
+      id: '/stop-plan'
+      path: '/stop-plan'
+      fullPath: '/stop-plan'
+      preLoaderRoute: typeof StopPlanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/terms': {
@@ -647,6 +667,7 @@ const rootRouteChildren: RootRouteChildren = {
   MethodRoute: MethodRoute,
   PricingRoute: PricingRoute,
   ProfileRoute: ProfileRoute,
+  StopPlanRoute: StopPlanRoute,
   TermsRoute: TermsRoute,
   AcademySlugRoute: AcademySlugRoute,
   AdminInboxRoute: AdminInboxRoute,

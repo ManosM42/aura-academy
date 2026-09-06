@@ -1,7 +1,7 @@
 // src/components/aura/SubscriptionCard.tsx
 import { Link } from "@tanstack/react-router";
 import { getPlan } from "@/lib/plans";
-import { isActiveStatus, useSubscription } from "@/lib/useSubscription";
+import { isActiveStatus, isCancellableStatus, useSubscription } from "@/lib/useSubscription";
 
 /** Stripe status -> ελληνική ετικέτα. */
 const STATUS_LABELS: Record<string, string> = {
@@ -149,6 +149,15 @@ export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
       {!active && (
         <Link to="/pricing" className={cta}>
           ΕΠΑΝΕΝΕΡΓΟΠΟΙΗΣΗ
+        </Link>
+      )}
+
+      {isCancellableStatus(subscription.status) && !subscription.cancel_at_period_end && (
+        <Link
+          to="/stop-plan"
+          className="mt-4 inline-flex rounded-lg border border-red-500/25 px-4 py-2 text-sm text-red-300/80 transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
+        >
+          Stop Plan
         </Link>
       )}
     </section>
