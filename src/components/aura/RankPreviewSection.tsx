@@ -1,10 +1,11 @@
 // src/components/aura/RankPreviewSection.tsx
-import { Sparkles, Award, ShieldCheck, Zap } from "lucide-react";
+import { Sparkles, Award, ShieldCheck, Zap, PackageCheck } from "lucide-react";
 import { RankIcon } from "@/components/aura/RankIcon";
 import type { RankKey } from "@/lib/ranks";
 
 const PREVIEW_RANKS: { key: RankKey; title: string; points: string; desc: string }[] = [
-  { key: "bronze", title: "Bronze Tier", points: "0 - 250 XP", desc: "Τα πρώτα βήματα στην τέχνη του κουρέματος." },
+  { key: "unranked", title: "Unranked", points: "0 - 100 XP", desc: "Το σημείο εκκίνησης. Ετοιμαστείτε για το πρώτο σας κούρεμα." },
+  { key: "bronze", title: "Bronze Tier", points: "101 - 250 XP", desc: "Τα πρώτα βήματα στην τέχνη του κουρέματος." },
   { key: "silver", title: "Silver Tier", points: "251 - 600 XP", desc: "Σταθερό χέρι, καθαρές γραμμές και τεχνική." },
   { key: "gold", title: "Gold Tier", points: "601 - 1200 XP", desc: "Αναγνώριση λεπτομέρειας και επαγγελματισμός." },
   { key: "platinum", title: "Platinum Tier", points: "1201 - 2000 XP", desc: "Προχωρημένα fades και απόλυτη συμμετρία." },
@@ -19,6 +20,7 @@ export function RankPreviewSection() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
+        {/* Section Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-4 shadow-inner">
             <Sparkles className="w-3.5 h-3.5 animate-pulse" />
@@ -32,7 +34,8 @@ export function RankPreviewSection() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        {/* How it works mini-cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <div className="p-6 rounded-2xl bg-zinc-900/60 border border-white/10 backdrop-blur-md flex items-start gap-4">
             <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 shrink-0">
               <ShieldCheck className="w-6 h-6" />
@@ -64,7 +67,29 @@ export function RankPreviewSection() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Special Aura Master of the Month Banner */}
+        <div className="relative mb-16 p-8 rounded-3xl bg-gradient-to-r from-orange-950/60 via-zinc-900/80 to-amber-950/60 border border-orange-500/30 overflow-hidden shadow-[0_0_40px_-10px_rgba(255,90,20,0.2)]">
+          <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-600 to-amber-500 text-white shadow-lg shrink-0">
+              <PackageCheck className="w-8 h-8" />
+            </div>
+            <div className="flex-1">
+              <span className="inline-block text-xs font-bold text-orange-400 tracking-widest uppercase mb-1">
+                VIP Master Reward
+              </span>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-white mb-2">
+                Aura Master of the Month Certification
+              </h3>
+              <p className="text-zinc-300 text-sm sm:text-base leading-relaxed max-w-3xl">
+                Όποιος διατηρηθεί στην κορυφή ως <span className="text-orange-400 font-semibold">Aura Master για έναν ολόκληρο μήνα</span>, κερδίζει αυτόματα την επίσημη φυσική πιστοποίηση "Aura Master of the Month", η οποία αποστέλλεται απευθείας στη διεύθυνσή του με δικά μας έξοδα!
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Ranks Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {PREVIEW_RANKS.map((r) => (
             <div
               key={r.key}
