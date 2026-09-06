@@ -42,10 +42,10 @@ function DraggableOnlineUsersPanel() {
       animate={isMobile ? { x: isOpen ? 0 : "calc(100% - 36px)" } : { x: 0 }}
       transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
       className={
-        isMobile
-          ? "fixed bottom-0 right-0 top-28 z-50 flex w-[85vw] max-w-sm flex-row"
-          : "sticky top-36 hidden w-80 shrink-0 lg:block"
-      }
+  isMobile
+    ? "fixed bottom-0 right-0 top-28 z-50 flex w-[85vw] max-w-sm flex-row"
+    : "sticky top-36 hidden w-80 shrink-0 lg:flex"   // was "lg:block" — needs lg:flex so h-full flows through to the panel
+}
     >
       {/* Mobile Handle / Grip */}
       {isMobile && (

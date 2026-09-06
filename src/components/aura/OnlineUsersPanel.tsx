@@ -28,7 +28,9 @@ export default function OnlineUsersPanel() {
 
   return (
     <>
-      <aside className="hidden lg:sticky lg:top-28 lg:flex lg:h-[calc(100vh-8rem)] w-72 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl">
+      {/* Visibility/positioning is now owned by the parent (desktop sticky sidebar vs.
+          mobile drag panel) — this component just fills whatever box it's placed in. */}
+      <aside className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl">
         <div className="border-b border-white/10 px-5 py-4">
           <p className="text-xs uppercase tracking-[0.25em] text-white/50">
             Online τώρα
