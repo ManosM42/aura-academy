@@ -610,3 +610,196 @@ export async function deleteAcademyPost(postId: string): Promise<void> {
     .eq("id", postId);
   if (error) throw error;
 }
+
+// --- Leaderboard ----------------------------------------------
+
+export interface LeaderboardEntry {
+  userId: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+  totalPoints: number;
+}
+
+// Calls the get_leaderboard() SQL function (see
+// supabase/migrations/20260906130000_get_leaderboard_rpc.sql). It's
+// SECURITY DEFINER so it can read every student's aggregate points even
+// though `profiles` RLS only allows reading your own row — it only ever
+// returns name / avatar / total points, nothing sensitive.
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const { data, error } = await supabase.rpc("get_leaderboard");
+  if (error) throw error;
+  return (
+    (data as
+      | {
+          user_id: string;
+          full_name: string | null;
+          avatar_url: string | null;
+          total_points: number;
+        }[]
+      | null) ?? []
+  ).map((row) => ({
+    userId: row.user_id,
+    fullName: row.full_name,
+    avatarUrl: row.avatar_url,
+        totalPoints: Number(row.total_points),
+  }));
+}
+// ============================================================
+// STORIES (screen: /academy — 24h ephemeral stories)
+// ============================================================
+
+export interface StoryAuthor {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface Story {
+  id: string;
+  author_id: string;
+  media_url: string;
+  media_type: "image" | "video";
+  audio_url: string | null;
+  audio_title: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface StoryGroup {
+  author: StoryAuthor;
+  stories: Story[];
+  allViewed: boolean;
+}
+
+interface RawStoryRow {
+  id: string;
+  author_id: string;
+  media_url: string;
+  media_type: "image" | "video";
+  audio_url: string | null;
+  audio_title: string | null;
+  created_at: string;
+  expires_at: string;
+  author: StoryAuthor | null;
+}
+
+export async function getActiveStories(): Promise<StoryGroup[]> {
+  const uid = await getCurrentUserId();
+  const nowIso = new Date().toISOString();
+
+  const [{ data: rows, error: sErr }, { data: myViews, error: vErr }] =
+    await Promise.all([
+      supabase
+        .from("stories")
+        .select(
+          `id, author_id, media_url, media_type, audio_url, audio_title, created_at, expires_at,
+           author:profiles!stories_author_id_fkey(id, full_name, avatar_url)`,
+        )
+        .gt("expires_at", nowIso)
+        .order("created_at", { ascending: true }),
+      supabase.from("story_views").select("story_id").eq("viewer_id", uid),
+    ]);
+  if (sErr) throw sErr;
+  if (vErr) throw vErr;
+
+  const viewedIds = new Set((myViews ?? []).map((v) => v.story_id as string));
+  const groups = new Map<string, StoryGroup>();
+
+  for (const row of (rows ?? []) as unknown as RawStoryRow[]) {
+    if (!row.author) continue;
+    if (!groups.has(row.author.id)) {
+      groups.set(row.author.id, { author: row.author, stories: [], allViewed: true });
+    }
+    groups.get(row.author.id)!.stories.push({
+      id: row.id,
+      author_id: row.author_id,
+      media_url: row.media_url,
+      media_type: row.media_type,
+      audio_url: row.audio_url,
+      audio_title: row.audio_title,
+      created_at: row.created_at,
+      expires_at: row.expires_at,
+    });
+  }
+
+  for (const group of groups.values()) {
+    group.allViewed = group.stories.every((s) => viewedIds.has(s.id));
+  }
+
+  const list = Array.from(groups.values());
+  list.sort((a, b) => {
+    if (a.author.id === uid) return -1;
+    if (b.author.id === uid) return 1;
+    if (a.allViewed !== b.allViewed) return a.allViewed ? 1 : -1;
+    const aLatest = a.stories.at(-1)?.created_at ?? "";
+    const bLatest = b.stories.at(-1)?.created_at ?? "";
+    return bLatest.localeCompare(aLatest);
+  });
+
+  return list;
+}
+
+export async function createStory(
+  file: File,
+  audio?: { file: File; title: string } | null,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  if (!isImage && !isVideo) {
+    throw new Error("Επίτρεψε μόνο εικόνες ή βίντεο για το story.");
+  }
+  const maxBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new Error(
+      isVideo ? "Το βίντεο ξεπερνά τα 50MB." : "Η εικόνα ξεπερνά τα 10MB.",
+    );
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
+  const path = `${uid}/${Date.now()}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("stories")
+    .upload(path, file, { upsert: false, contentType: file.type });
+  if (upErr) throw upErr;
+  const { data: mediaData } = supabase.storage.from("stories").getPublicUrl(path);
+
+  let audioUrl: string | null = null;
+  if (audio) {
+    if (audio.file.size > 10 * 1024 * 1024) {
+      throw new Error("Το αρχείο ήχου ξεπερνά τα 10MB.");
+    }
+    const audioExt = audio.file.name.split(".").pop()?.toLowerCase() || "mp3";
+    const audioPath = `${uid}/audio-${Date.now()}.${audioExt}`;
+    const { error: audioErr } = await supabase.storage
+      .from("stories")
+      .upload(audioPath, audio.file, { upsert: false, contentType: audio.file.type });
+    if (audioErr) throw audioErr;
+    const { data: audioData } = supabase.storage.from("stories").getPublicUrl(audioPath);
+    audioUrl = audioData.publicUrl;
+  }
+
+  const { error } = await supabase.from("stories").insert({
+    author_id: uid,
+    media_url: mediaData.publicUrl,
+    media_type: isVideo ? "video" : "image",
+    audio_url: audioUrl,
+    audio_title: audio?.title ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function markStoryViewed(storyId: string): Promise<void> {
+  const uid = await getCurrentUserId();
+  const { error } = await supabase
+    .from("story_views")
+    .upsert({ story_id: storyId, viewer_id: uid }, { onConflict: "story_id,viewer_id" });
+  if (error) throw error;
+}
+
+export async function deleteStory(storyId: string): Promise<void> {
+  const { error } = await supabase.from("stories").delete().eq("id", storyId);
+  if (error) throw error;
+}

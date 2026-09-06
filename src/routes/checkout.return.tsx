@@ -202,7 +202,7 @@ function CheckoutReturnPage() {
         <>
           <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΕΠΙΒΕΒΑΙΩΣΗ</p>
           <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
-            Ενεργοποιούμε την πρόσβασή σου…
+            Ενεργοποιούμε την πρόσβασή σου… Κάνε refresh για είσοδο στην ακαδημία.
           </h1>
           <div
             className="mx-auto mt-10 h-px w-56 overflow-hidden bg-white/10"

@@ -12,6 +12,7 @@ import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton, EmptyState } from "@/components/aura/States";
 import PostCardPro from "@/components/aura/PostCardPro";
 import OnlineUsersPanel from "@/components/aura/OnlineUsersPanel";
+import StoriesBar from "@/components/aura/StoriesBar";
 
 export const Route = createFileRoute("/academy/")({ component: AcademyPage });
 
@@ -88,19 +89,13 @@ function AcademyPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="mx-auto w-full min-w-0 max-w-2xl flex-1 space-y-10"
         >
-          <header>
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/50 mb-3">
-              <span className="h-px w-8 bg-gradient-to-r from-white/60 to-transparent" />
-              Academy Feed
-            </div>
-            <h1 className="text-4xl font-extrabold uppercase tracking-tight sm:text-5xl text-white">
-              Ανακοινώσεις &amp; <span className="chrome-type font-semibold">Feed</span>
-            </h1>
-            <p className="mt-4 text-sm leading-relaxed text-white/60 sm:text-base">
-              Νέα, tips και ανακοινώσεις από την ομάδα της AURA. Κάνε like και
-              σχολίασε.
-            </p>
-          </header>
+          {profile.data && (
+  <StoriesBar
+    currentUserId={profile.data.id}
+    currentUserAvatar={profile.data.avatar_url}
+    currentUserName={profile.data.full_name}
+  />
+)}
 
           {profile.error && <ErrorState message={profile.error} />}
 
