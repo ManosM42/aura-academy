@@ -62,7 +62,7 @@ export const AURA_PLANS: AuraPlan[] = [
     interval: "month",
     stripePriceId: "price_1UCo0PLnBpuAzyZYajqu8c5Q", // Replace with actual Stripe Price ID
     features: [
-      "ΨΗΦΙΑΚΟ E-BOOK",
+      "E-BOOK of AURA PROFESSIONAL HAIR METHOD",
       "+ ΟΛΑ ΑΠΟ MID & LOW METHOD",
       "ΠΡΟΧΩΡΗΜΕΝΑ VIDEOS ΚΟΥΡΕΜΑΤΩΝ",
       "ΠΡΟΤΕΡΑΙΟΤΗΤΑ ΣΤΟ SUPPORT",
@@ -80,10 +80,11 @@ export const AURA_PLANS: AuraPlan[] = [
     interval: "month",
     stripePriceId: "price_1UCo0qLnBpuAzyZYABo0Prch", // Replace with actual Stripe Price ID
     features: [
-      "ΦΥΣΙΚΟ ΑΥΘΕΝΤΙΚΟ AURA PROFESSIONAL HAIR METHOD BOOK",
+      "PREMIUM ΦΥΣΙΚΟ ΑΥΘΕΝΤΙΚΟ AURA PROFESSIONAL HAIR METHOD BOOK ΜΕ QR CODES",
       "ΠΡΟΣΒΑΣΗ ΣΕ LIMITED VIDEOS ΜΕΣΩ QR CODES ΤΟΥ ΒΙΒΛΙΟΥ",
-      "+ ΟΛΑ ΑΠΟ ΤΟ HIGH METHOD",
       "VIP STATUS ΣΤΗΝ ΚΟΙΝΟΤΗΤΑ",
+      "ΔΗΜΙΟΥΡΓΙΑ ΠΟΣΤ ΣΤΟ ACADEMY FEED",
+      "+ ΟΛΑ ΑΠΟ ΤΟ HIGH METHOD",
     ],
     highlight: false,
   },
