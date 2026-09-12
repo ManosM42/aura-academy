@@ -5,3 +5,18 @@ verify_jwt = false
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.course-file-init-upload]
+verify_jwt = false
+
+[functions.course-file-complete-upload]
+verify_jwt = false
+
+[functions.course-file-abort-upload]
+verify_jwt = false
+
+[functions.course-file-delete]
+verify_jwt = false
+
+[functions.course-file-url]
+verify_jwt = false

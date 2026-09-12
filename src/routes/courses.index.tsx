@@ -1,8 +1,10 @@
+// src/routes/courses.index.tsx
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import CourseCard from "@/components/aura/CourseCard";
 import ChromeButton from "@/components/aura/ChromeButton";
 import { getCoursesPageData } from "@/lib/courses";
+import { COURSE_CATEGORIES } from "@/lib/courses.types";
 import { useAsync } from "@/lib/useAsync";
 import { BookOpen, Sparkles, AlertCircle } from "lucide-react";
 
@@ -31,16 +33,16 @@ function CoursesPage() {
             AURA Curriculum
           </div>
           <h1 className="text-4xl font-extrabold uppercase tracking-tight sm:text-5xl text-white">
-            Η μέθοδος, <span className="chrome-type font-semibold">βήμα βήμα.</span>
+            Η μέθοδος, <span className="chrome-type font-semibold">βίντεο βίντεο.</span>
           </h1>
           <p className="mt-5 text-sm leading-relaxed text-white/60 sm:text-base">
-            Κάθε course είναι μια σειρά βημάτων: βίντεο, περιγραφή, εκτέλεση. Προχωράς
-            όταν είσαι έτοιμος — η πρόοδος αποθηκεύεται αυτόματα.
+            Τέσσερις κατηγορίες, ένα βίντεο τη φορά. Βρες την τεχνική που ψάχνεις και
+            δες τη ολόκληρη, στην οθόνη σου.
           </p>
         </header>
 
         {data && !data.signedIn ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -51,17 +53,19 @@ function CoursesPage() {
                 <Sparkles className="size-5" />
               </div>
               <p className="text-sm text-white/90">
-                Συνδέσου για να δεις τα courses του πλάνου σου.
+                Συνδέσου για να δεις τα βίντεο του πλάνου σου.
               </p>
             </div>
             <Link to="/login" className="w-full sm:w-auto">
-              <ChromeButton type="button" className="w-full sm:w-auto justify-center">ΣΥΝΔΕΣΗ</ChromeButton>
+              <ChromeButton type="button" className="w-full sm:w-auto justify-center">
+                ΣΥΝΔΕΣΗ
+              </ChromeButton>
             </Link>
           </motion.div>
         ) : null}
 
         {data?.signedIn && items.length > 0 && unlocked === 0 ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -72,11 +76,13 @@ function CoursesPage() {
                 <AlertCircle className="size-5" />
               </div>
               <p className="text-sm text-white/90">
-                Δεν έχεις ενεργό πλάνο που ξεκλειδώνει αυτά τα courses.
+                Δεν έχεις ενεργό πλάνο που ξεκλειδώνει αυτά τα βίντεο.
               </p>
             </div>
             <Link to="/pricing" className="w-full sm:w-auto">
-              <ChromeButton type="button" className="w-full sm:w-auto justify-center">ΔΕΣ ΤΑ ΠΛΑΝΑ</ChromeButton>
+              <ChromeButton type="button" className="w-full sm:w-auto justify-center">
+                ΔΕΣ ΤΑ ΠΛΑΝΑ
+              </ChromeButton>
             </Link>
           </motion.div>
         ) : null}
@@ -93,10 +99,10 @@ function CoursesPage() {
         ) : null}
 
         {error ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-14 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-400" 
+            className="mt-14 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-400"
             role="alert"
           >
             {error instanceof Error ? error.message : String(error)}
@@ -106,21 +112,46 @@ function CoursesPage() {
         {data && items.length === 0 && !loading ? (
           <div className="mt-14 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-sm text-white/50">
             <BookOpen className="size-5 text-white/40" />
-            <span>Δεν υπάρχουν δημοσιευμένα courses ακόμη.</span>
+            <span>Δεν υπάρχουν δημοσιευμένα βίντεο ακόμη.</span>
           </div>
         ) : null}
 
         {items.length > 0 ? (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3"
-          >
-            {items.map((item, index) => (
-              <CourseCard key={item.course.id} item={item} index={index} />
-            ))}
-          </motion.div>
+          <div className="mt-14 space-y-16">
+            {COURSE_CATEGORIES.map((cat, catIndex) => {
+              const catItems = items.filter((item) => item.course.category === cat.key);
+              return (
+                <motion.section
+                  key={cat.key}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ duration: 0.5, delay: Math.min(catIndex * 0.05, 0.2) }}
+                >
+                  <div className="flex items-baseline gap-4 border-b border-white/10 pb-4">
+                    <h2 className="text-2xl font-bold uppercase tracking-tight text-white">
+                      {cat.label}
+                    </h2>
+                    <span className="text-xs uppercase tracking-[0.3em] text-white/40">
+                      {catItems.length} {catItems.length === 1 ? "video" : "videos"}
+                    </span>
+                  </div>
+
+                  {catItems.length === 0 ? (
+                    <p className="mt-6 text-sm text-white/40">
+                      Δεν υπάρχουν ακόμη βίντεο στην κατηγορία {cat.label}.
+                    </p>
+                  ) : (
+                    <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                      {catItems.map((item, index) => (
+                        <CourseCard key={item.course.id} item={item} index={index} />
+                      ))}
+                    </div>
+                  )}
+                </motion.section>
+              );
+            })}
+          </div>
         ) : null}
       </motion.div>
     </main>

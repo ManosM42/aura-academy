@@ -2,29 +2,50 @@
 import { db } from "@/lib/db";
 import { isPlanId, type PlanId } from "@/lib/plans";
 import { isContentRole } from "@/lib/roles";
+import { deleteCourseFile, getCourseFileUrl, uploadCourseFile } from "@/lib/course-files";
+import type { AuraLevel } from "@/lib/database.types";
 import type {
   AuraCourse,
+  CourseCategory,
   CourseListItem,
   CourseProgress,
   CourseStep,
-  CourseWithSteps,
+  CourseWithVideo,
   CoursesPageData,
   StepDraft,
 } from "@/lib/courses.types";
 import { planUnlocks } from "@/lib/courses.types";
 
-export const COURSE_VIDEO_BUCKET = "course-videos";
+export const COURSE_VIDEO_BUCKET = "course-videos"; // legacy Supabase Storage bucket — reads only, no new writes
 export const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
-export const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024; // 2GB
+// 60-minute 4K masters can comfortably exceed 20GB; this is a safety
+// ceiling with real headroom, not a soft target. Server-side, the
+// course-file-init-upload Edge Function enforces its own (kind-specific)
+// maximum independently — this constant must not exceed that one.
+export const MAX_VIDEO_BYTES = 50 * 1024 * 1024 * 1024; // 50GB
+export const MAX_VIDEO_DURATION_SECONDS = 3600; // 60 minutes
 const SIGNED_URL_TTL_SECONDS = 4 * 60 * 60;
+
+/** New uploads always go to B2; every B2 key starts with "courses/" by
+ *  construction (see supabase/functions/_shared/b2.ts:buildObjectKey).
+ *  Legacy Supabase Storage paths are "<courseId>/<uuid>.<ext>" and never
+ *  match this prefix, so this is an unambiguous, cheap way to tell old
+ *  and new videos apart without a DB round-trip. */
+function isB2ObjectKey(path: string): boolean {
+  return path.startsWith("courses/");
+}
 
 const COURSE_COLUMNS =
   "id, title, slug, summary, outcome, audience, level, status, required_plan, " +
   "estimated_hours, cover_url, sort_order, step_count, created_by, published_at, " +
-  "created_at, updated_at";
+  "created_at, updated_at, category, video_path, video_duration_seconds, " +
+  "video_storage_provider, video_status, video_size_bytes, video_mime_type, " +
+  "video_original_filename, video_uploaded_at";
 
 const STEP_COLUMNS =
-  "id, course_id, position, title, description, video_path, video_duration_seconds";
+  "id, course_id, position, title, description, video_path, video_duration_seconds, " +
+  "video_storage_provider, video_status, video_size_bytes, video_mime_type, " +
+  "video_original_filename, video_uploaded_at";
 
 // ── helpers ─────────────────────────────────────────────────────────
 
@@ -32,6 +53,30 @@ async function currentUserId(): Promise<string | null> {
   const { data, error } = await db.auth.getUser();
   if (error) return null;
   return data.user?.id ?? null;
+}
+
+/**
+ * Surfaces the real Postgres/PostgREST error detail during development
+ * instead of a generic message, without leaking internals to end users
+ * in production. Supabase error objects carry message/details/hint/code —
+ * these map directly to Postgres error fields and are the fastest way to
+ * pinpoint a constraint violation (NOT NULL, CHECK, FK, etc.).
+ */
+function logSupabaseError(context: string, error: {
+  message?: string;
+  details?: string | null;
+  hint?: string | null;
+  code?: string | null;
+}): void {
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.error(`[courses] ${context} failed:`, {
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      code: error.code,
+    });
+  }
 }
 
 function randomId(): string {
@@ -79,7 +124,7 @@ function asCourse(row: unknown): AuraCourse {
   const c = row as AuraCourse;
   return {
     ...c,
-    required_plan: (isPlanId(c.required_plan) ? c.required_plan : "starter") as PlanId,
+    required_plan: (isPlanId(c.required_plan) ? c.required_plan : "low") as PlanId,
     step_count: c.step_count ?? 0,
     sort_order: c.sort_order ?? 0,
   };
@@ -158,7 +203,7 @@ export async function getCoursesPageData(): Promise<CoursesPageData> {
 
 // ── viewer: /courses/$slug ──────────────────────────────────────────
 
-export async function getCourseForPlay(slug: string): Promise<CourseWithSteps> {
+export async function getCourseForPlay(slug: string): Promise<CourseWithVideo> {
   const uid = await currentUserId();
 
   const { data: courseRow, error: courseError } = await db
@@ -168,51 +213,44 @@ export async function getCourseForPlay(slug: string): Promise<CourseWithSteps> {
     .maybeSingle();
 
   if (courseError) throw courseError;
-  if (!courseRow) throw new Error("Το course δεν βρέθηκε.");
+  if (!courseRow) throw new Error("Το video δεν βρέθηκε.");
 
   const course = asCourse(courseRow);
 
   if (!uid) {
-    return { course, steps: [], progress: null, locked: true, isContent: false };
+    return { course, locked: true, isContent: false };
   }
 
-  const [steps, progress, profile] = await Promise.all([
-    db
-      .from("course_steps")
-      .select(STEP_COLUMNS)
-      .eq("course_id", course.id)
-      .order("position", { ascending: true }),
-    db
-      .from("course_progress")
-      .select("*")
-      .eq("user_id", uid)
-      .eq("course_id", course.id)
-      .maybeSingle(),
+  const [profile, subscription] = await Promise.all([
     db.from("profiles").select("role").eq("id", uid).maybeSingle(),
+    db
+      .from("subscriptions")
+      .select("plan_id, status, created_at")
+      .eq("user_id", uid)
+      .in("status", ["active", "trialing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
-  if (steps.error) throw steps.error;
-  if (progress.error) throw progress.error;
+  const isContent = isContentRole((profile.data as { role?: string } | null)?.role ?? null);
+  const rawPlan = (subscription.data as { plan_id?: string } | null)?.plan_id;
+  const planId = isPlanId(rawPlan) ? rawPlan : null;
+  const locked = !isContent && !planUnlocks(planId, course.required_plan);
 
-  const stepRows = (steps.data ?? []) as CourseStep[];
-  const isContent = isContentRole(
-    (profile.data as { role?: string } | null)?.role ?? null,
-  );
-
-  // Το RLS κρύβει τα βήματα όταν λείπει το πλάνο: 0 βήματα με step_count > 0
-  // σημαίνει κλειδωμένο, όχι κενό course.
-  const locked = !isContent && stepRows.length === 0 && course.step_count > 0;
-
-  return {
-    course,
-    steps: stepRows,
-    progress: (progress.data as CourseProgress | null) ?? null,
-    locked,
-    isContent,
-  };
+  return { course, locked, isContent };
 }
 
-export async function getStepVideoUrl(path: string): Promise<string> {
+/**
+ * Signed preview URL for a lesson video. Requires courseId because B2
+ * access is authorized per-course (enrolled + plan check) — see
+ * course-file-url Edge Function / public.user_can_access_course.
+ */
+export async function getStepVideoUrl(path: string, courseId: string): Promise<string> {
+  if (isB2ObjectKey(path)) {
+    return getCourseFileUrl({ objectKey: path, courseId });
+  }
+  // Legacy Supabase Storage video — unchanged behaviour.
   const { data, error } = await db.storage
     .from(COURSE_VIDEO_BUCKET)
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
@@ -291,36 +329,32 @@ export async function listAllCourses(): Promise<AuraCourse[]> {
   return (data ?? []).map(asCourse);
 }
 
-export async function getCourseForEdit(
-  courseId: string,
-): Promise<{ course: AuraCourse; steps: CourseStep[] }> {
-  const [course, steps] = await Promise.all([
-    db.from("courses").select(COURSE_COLUMNS).eq("id", courseId).maybeSingle(),
-    db
-      .from("course_steps")
-      .select(STEP_COLUMNS)
-      .eq("course_id", courseId)
-      .order("position", { ascending: true }),
-  ]);
-  if (course.error) throw course.error;
-  if (steps.error) throw steps.error;
-  if (!course.data) throw new Error("Το course δεν βρέθηκε.");
-  return { course: asCourse(course.data), steps: (steps.data ?? []) as CourseStep[] };
+export async function getCourseForEdit(courseId: string): Promise<{ course: AuraCourse }> {
+  const { data, error } = await db
+    .from("courses")
+    .select(COURSE_COLUMNS)
+    .eq("id", courseId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("Το video δεν βρέθηκε.");
+  return { course: asCourse(data) };
 }
 
 export interface CourseInput {
   title: string;
   summary: string;
-  outcome: string;
-  level: AuraCourse["level"];
+  category: CourseCategory;
+  level: AuraLevel;
   requiredPlan: PlanId;
   status: "draft" | "published" | "archived";
-  sortOrder: number;
-  estimatedHours: number | null;
 }
 
 export async function createCourse(input: CourseInput): Promise<AuraCourse> {
   const uid = await currentUserId();
+  if (!uid) {
+    throw new Error("Δεν υπάρχει συνδεδεμένος χρήστης.");
+  }
+
   const slug = await uniqueSlug(slugify(input.title));
 
   const { data, error } = await db
@@ -329,19 +363,21 @@ export async function createCourse(input: CourseInput): Promise<AuraCourse> {
       title: input.title.trim(),
       slug,
       summary: input.summary.trim() || null,
-      outcome: input.outcome.trim() || null,
+      category: input.category,
       level: input.level,
       required_plan: input.requiredPlan,
       status: input.status,
-      sort_order: input.sortOrder,
-      estimated_hours: input.estimatedHours,
+      sort_order: 0,
       created_by: uid,
       published_at: input.status === "published" ? new Date().toISOString() : null,
     })
     .select(COURSE_COLUMNS)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    logSupabaseError("createCourse", error);
+    throw error;
+  }
   return asCourse(data);
 }
 
@@ -361,14 +397,12 @@ export async function updateCourse(
     title: input.title.trim(),
     slug,
     summary: input.summary.trim() || null,
-    outcome: input.outcome.trim() || null,
+    category: input.category,
     level: input.level,
     required_plan: input.requiredPlan,
     status: input.status,
-    sort_order: input.sortOrder,
-    estimated_hours: input.estimatedHours,
   };
-  if (publishing) patch.published_at = new Date().toISOString();
+  if (publishing) patch["published_at"] = new Date().toISOString();
 
   const { data, error } = await db
     .from("courses")
@@ -377,13 +411,71 @@ export async function updateCourse(
     .select(COURSE_COLUMNS)
     .single();
 
+  if (error) {
+    logSupabaseError("updateCourse", error);
+    throw error;
+  }
+  return asCourse(data);
+}
+
+/** Persists the result of a completed VideoDropzone upload onto the course row. */
+export async function setCourseVideo(
+  courseId: string,
+  video: {
+    path: string;
+    durationSeconds: number | null;
+    storageProvider: "backblaze_b2";
+    sizeBytes: number | null;
+    mimeType: string | null;
+    originalFilename: string | null;
+    uploadedAt: string | null;
+  },
+): Promise<AuraCourse> {
+  const { data, error } = await db
+    .from("courses")
+    .update({
+      video_path: video.path,
+      video_duration_seconds: video.durationSeconds,
+      video_storage_provider: video.storageProvider,
+      video_status: "ready",
+      video_size_bytes: video.sizeBytes,
+      video_mime_type: video.mimeType,
+      video_original_filename: video.originalFilename,
+      video_uploaded_at: video.uploadedAt,
+    })
+    .eq("id", courseId)
+    .select(COURSE_COLUMNS)
+    .single();
+  if (error) {
+    logSupabaseError("setCourseVideo", error);
+    throw error;
+  }
+  return asCourse(data);
+}
+
+export async function clearCourseVideo(courseId: string): Promise<AuraCourse> {
+  const { data, error } = await db
+    .from("courses")
+    .update({
+      video_path: null,
+      video_duration_seconds: null,
+      video_storage_provider: null,
+      video_status: null,
+      video_size_bytes: null,
+      video_mime_type: null,
+      video_original_filename: null,
+      video_uploaded_at: null,
+    })
+    .eq("id", courseId)
+    .select(COURSE_COLUMNS)
+    .single();
   if (error) throw error;
   return asCourse(data);
 }
 
 export async function deleteCourse(courseId: string): Promise<void> {
   // Τα βίντεο του course φεύγουν πρώτα: το on delete cascade σβήνει μόνο
-  // τις γραμμές, όχι τα objects στο storage.
+  // τις γραμμές, όχι τα objects στο storage (ούτε B2 ούτε legacy Supabase).
   const { data: steps, error: readError } = await db
     .from("course_steps")
     .select("video_path")
@@ -394,111 +486,35 @@ export async function deleteCourse(courseId: string): Promise<void> {
     .map((s) => s.video_path)
     .filter((p): p is string => Boolean(p));
 
-  if (paths.length > 0) {
+  const legacyPaths = paths.filter((p) => !isB2ObjectKey(p));
+  const b2Paths = paths.filter(isB2ObjectKey);
+
+  if (legacyPaths.length > 0) {
     const { error: removeError } = await db.storage
       .from(COURSE_VIDEO_BUCKET)
-      .remove(paths);
+      .remove(legacyPaths);
     if (removeError) console.error("Αποτυχία διαγραφής βίντεο:", removeError.message);
+  }
+  for (const path of b2Paths) {
+    try {
+      await deleteCourseFile({ objectKey: path, courseId });
+    } catch (err) {
+      console.error("Αποτυχία διαγραφής βίντεο (B2):", err);
+    }
   }
 
   const { error } = await db.from("courses").delete().eq("id", courseId);
   if (error) throw error;
 }
 
-/**
- * Συγχρονίζει τα βήματα: σβήνει όσα αφαιρέθηκαν, ενημερώνει τα υπάρχοντα,
- * εισάγει τα νέα. Οι θέσεις γράφονται 1..n με τη σειρά του builder.
- */
-export async function saveCourseSteps(
-  courseId: string,
-  drafts: StepDraft[],
-): Promise<CourseStep[]> {
-  const { data: existing, error: readError } = await db
-    .from("course_steps")
-    .select("id, video_path")
-    .eq("course_id", courseId);
-  if (readError) throw readError;
-
-  const existingRows = (existing ?? []) as { id: string; video_path: string | null }[];
-  const keptIds = new Set(drafts.map((d) => d.id).filter((id): id is string => Boolean(id)));
-  const removed = existingRows.filter((row) => !keptIds.has(row.id));
-
-  if (removed.length > 0) {
-    const orphanPaths = removed
-      .map((row) => row.video_path)
-      .filter((p): p is string => Boolean(p));
-    if (orphanPaths.length > 0) {
-      const { error: removeError } = await db.storage
-        .from(COURSE_VIDEO_BUCKET)
-        .remove(orphanPaths);
-      if (removeError) console.error("Αποτυχία διαγραφής βίντεο:", removeError.message);
-    }
-    const { error: deleteError } = await db
-      .from("course_steps")
-      .delete()
-      .in(
-        "id",
-        removed.map((row) => row.id),
-      );
-    if (deleteError) throw deleteError;
-  }
-
-  // Δύο πάσα ώστε το unique (course_id, position) να μη συγκρούεται σε reorder:
-  // πρώτα προσωρινές αρνητικές θέσεις, μετά οι τελικές.
-  const TEMP_OFFSET = 1_000_000;
-  const updates = drafts
-    .map((draft, index) => ({ draft, index }))
-    .filter((entry) => entry.draft.id !== null);
-
-  for (const { draft, index } of updates) {
-    const { error } = await db
-      .from("course_steps")
-      .update({ position: TEMP_OFFSET + index + 1 })
-      .eq("id", draft.id as string);
-    if (error) throw error;
-  }
-
-  const results: CourseStep[] = [];
-
-  for (let index = 0; index < drafts.length; index += 1) {
-    const draft = drafts[index];
-    const payload = {
-      course_id: courseId,
-      position: index + 1,
-      title: draft.title.trim(),
-      description: draft.description.trim() || null,
-      video_path: draft.videoPath,
-      video_duration_seconds: draft.videoDurationSeconds,
-    };
-
-    if (draft.id) {
-      const { data, error } = await db
-        .from("course_steps")
-        .update(payload)
-        .eq("id", draft.id)
-        .select(STEP_COLUMNS)
-        .single();
-      if (error) throw error;
-      results.push(data as CourseStep);
-    } else {
-      const { data, error } = await db
-        .from("course_steps")
-        .insert(payload)
-        .select(STEP_COLUMNS)
-        .single();
-      if (error) throw error;
-      results.push(data as CourseStep);
-    }
-  }
-
-  return results;
-}
-
-// ── upload ──────────────────────────────────────────────────────────
-
 export interface UploadResult {
   path: string;
   durationSeconds: number | null;
+  storageProvider: "backblaze_b2";
+  sizeBytes: number | null;
+  mimeType: string | null;
+  originalFilename: string | null;
+  uploadedAt: string | null;
 }
 
 /** Διαβάζει τη διάρκεια τοπικά, χωρίς να ανεβάσει τίποτα. */
@@ -526,71 +542,60 @@ export function readVideoDuration(file: File): Promise<number | null> {
   });
 }
 
+/**
+ * Uploads a lesson video to Backblaze B2 (all new uploads go there — see
+ * MAX_VIDEO_BYTES / ALLOWED_VIDEO_TYPES above). `lessonId` is optional: a
+ * brand-new step in the course builder has no persisted id yet, and the
+ * Edge Function mints a namespacing id for the B2 key in that case.
+ */
 export async function uploadCourseVideo(
   courseId: string,
   file: File,
   onProgress?: (ratio: number) => void,
+  lessonId?: string | null,
 ): Promise<UploadResult> {
   if (!ALLOWED_VIDEO_TYPES.includes(file.type)) {
     throw new Error("Δεκτά μόνο αρχεία mp4, mov ή webm.");
   }
   if (file.size > MAX_VIDEO_BYTES) {
-    throw new Error("Το βίντεο ξεπερνά τα 2GB.");
+    throw new Error(
+      `Το βίντεο ξεπερνά το όριο των ${Math.round(MAX_VIDEO_BYTES / (1024 * 1024 * 1024))}GB.`,
+    );
   }
 
   const duration = await readVideoDuration(file);
-  const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
-  const path = `${courseId}/${randomId()}.${ext}`;
-
-  const { data, error } = await db.storage
-    .from(COURSE_VIDEO_BUCKET)
-    .createSignedUploadUrl(path);
-
-  if (error || !data) {
-    throw new Error(error?.message ?? "Δεν δημιουργήθηκε signed upload URL.");
+  if (duration !== null && duration > MAX_VIDEO_DURATION_SECONDS) {
+    throw new Error(
+      `Το βίντεο διαρκεί ${Math.round(duration / 60)} λεπτά — το όριο είναι ${
+        MAX_VIDEO_DURATION_SECONDS / 60
+      } λεπτά.`,
+    );
   }
 
-  const absolute = data.signedUrl.startsWith("http") ? data.signedUrl : null;
+  const record = await uploadCourseFile(
+    { courseId, lessonId: lessonId ?? null, kind: "video", file },
+    onProgress,
+  );
 
-  // Χωρίς XHR (ή με relative signedUrl) πέφτουμε στο SDK: χάνουμε το
-  // progress, όχι το upload.
-  if (!absolute || typeof XMLHttpRequest === "undefined") {
-    const { error: uploadError } = await db.storage
-      .from(COURSE_VIDEO_BUCKET)
-      .uploadToSignedUrl(path, data.token, file, { contentType: file.type });
-    if (uploadError) throw uploadError;
-    onProgress?.(1);
-    return { path, durationSeconds: duration };
-  }
-
-  await new Promise<void>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", absolute, true);
-    xhr.setRequestHeader("content-type", file.type);
-    xhr.setRequestHeader("x-upsert", "false");
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable && event.total > 0) {
-        onProgress?.(Math.min(0.99, event.loaded / event.total));
-      }
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        onProgress?.(1);
-        resolve();
-        return;
-      }
-      reject(new Error(`Το upload απέτυχε (HTTP ${xhr.status}). ${xhr.responseText}`));
-    };
-    xhr.onerror = () => reject(new Error("Το upload απέτυχε λόγω δικτύου."));
-    xhr.onabort = () => reject(new Error("Το upload ακυρώθηκε."));
-    xhr.send(file);
-  });
-
-  return { path, durationSeconds: duration };
+  return {
+    path: record.objectKey,
+    durationSeconds: duration,
+    storageProvider: "backblaze_b2",
+    sizeBytes: record.sizeBytes,
+    mimeType: record.mimeType,
+    originalFilename: record.originalFilename,
+    uploadedAt: record.updatedAt,
+  };
 }
 
-export async function removeCourseVideo(path: string): Promise<void> {
+/** Deletes a lesson video. Branches on legacy Supabase Storage vs B2 —
+ *  see isB2ObjectKey. Does not touch any DB row; callers clear
+ *  video_path etc. themselves (VideoDropzone's onCleared / saveCourseSteps). */
+export async function removeCourseVideo(path: string, courseId: string): Promise<void> {
+  if (isB2ObjectKey(path)) {
+    await deleteCourseFile({ objectKey: path, courseId });
+    return;
+  }
   const { error } = await db.storage.from(COURSE_VIDEO_BUCKET).remove([path]);
   if (error) throw error;
 }

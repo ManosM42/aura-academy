@@ -4,15 +4,29 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ALLOWED_VIDEO_TYPES,
   MAX_VIDEO_BYTES,
+  MAX_VIDEO_DURATION_SECONDS,
   getStepVideoUrl,
+  readVideoDuration,
   removeCourseVideo,
   uploadCourseVideo,
 } from "@/lib/courses";
 
+export interface VideoUploadMeta {
+  sizeBytes: number | null;
+  mimeType: string | null;
+  originalFilename: string | null;
+  uploadedAt: string | null;
+  storageProvider: "backblaze_b2";
+}
+
 interface VideoDropzoneProps {
   courseId: string;
+  /** Real course_steps.id if this step is already saved; omit for a new,
+   *  not-yet-saved step — the upload still works, B2 just namespaces it
+   *  under a server-minted id until the step itself gets saved. */
+  lessonId?: string | null;
   videoPath: string | null;
-  onUploaded: (path: string, durationSeconds: number | null) => void;
+  onUploaded: (path: string, durationSeconds: number | null, meta: VideoUploadMeta) => void;
   onCleared: () => void;
   disabled?: boolean;
   label?: string;
@@ -26,6 +40,7 @@ function formatBytes(bytes: number): string {
 
 export default function VideoDropzone({
   courseId,
+  lessonId = null,
   videoPath,
   onUploaded,
   onCleared,
@@ -46,7 +61,7 @@ export default function VideoDropzone({
       setPreviewUrl(null);
       return;
     }
-    void getStepVideoUrl(videoPath)
+    void getStepVideoUrl(videoPath, courseId)
       .then((url) => {
         if (!cancelled) setPreviewUrl(url);
       })
@@ -56,7 +71,7 @@ export default function VideoDropzone({
     return () => {
       cancelled = true;
     };
-  }, [videoPath]);
+  }, [videoPath, courseId]);
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -67,35 +82,54 @@ export default function VideoDropzone({
         return;
       }
       if (file.size > MAX_VIDEO_BYTES) {
-        setError(`Το αρχείο είναι ${formatBytes(file.size)} — το όριο είναι 2GB.`);
+        setError(
+          `Το αρχείο είναι ${formatBytes(file.size)} — το όριο είναι ${Math.round(
+            MAX_VIDEO_BYTES / (1024 * 1024 * 1024),
+          )}GB.`,
+        );
+        return;
+      }
+      const duration = await readVideoDuration(file);
+      if (duration !== null && duration > MAX_VIDEO_DURATION_SECONDS) {
+        setError(
+          `Το βίντεο διαρκεί ${Math.round(duration / 60)} λεπτά — το όριο είναι ${
+            MAX_VIDEO_DURATION_SECONDS / 60
+          } λεπτά.`,
+        );
         return;
       }
 
       setUploading(true);
       setRatio(0);
       try {
-        const result = await uploadCourseVideo(courseId, file, setRatio);
-        onUploaded(result.path, result.durationSeconds);
+        const result = await uploadCourseVideo(courseId, file, setRatio, lessonId);
+        onUploaded(result.path, result.durationSeconds, {
+          sizeBytes: result.sizeBytes,
+          mimeType: result.mimeType,
+          originalFilename: result.originalFilename,
+          uploadedAt: result.uploadedAt,
+          storageProvider: result.storageProvider,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Το upload απέτυχε.");
       } finally {
         setUploading(false);
       }
     },
-    [courseId, onUploaded],
+    [courseId, lessonId, onUploaded],
   );
 
   const handleRemove = useCallback(async () => {
     if (!videoPath) return;
     setError(null);
     try {
-      await removeCourseVideo(videoPath);
+      await removeCourseVideo(videoPath, courseId);
     } catch (err) {
       // Αν το object έχει ήδη χαθεί, δεν κρατάμε τον χρήστη όμηρο.
       console.error("Αποτυχία διαγραφής βίντεο:", err);
     }
     onCleared();
-  }, [videoPath, onCleared]);
+  }, [videoPath, courseId, onCleared]);
 
   const busy = uploading || disabled;
 
@@ -174,7 +208,9 @@ export default function VideoDropzone({
                 {uploading ? "ΑΝΕΒΑΙΝΕΙ…" : "DROP MP4 ΕΔΩ"}
               </span>
               <span className="text-[11px] text-neutral-500">
-                ή κάνε κλικ για επιλογή — mp4 / mov / webm, έως 2GB
+                ή κάνε κλικ για επιλογή — mp4 / mov / webm, έως{" "}
+                {Math.round(MAX_VIDEO_BYTES / (1024 * 1024 * 1024))}GB, έως{" "}
+                {MAX_VIDEO_DURATION_SECONDS / 60}′
               </span>
 
               {uploading ? (

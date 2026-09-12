@@ -41,6 +41,11 @@ function emptyStep(): StepDraft {
     description: "",
     videoPath: null,
     videoDurationSeconds: null,
+    videoStorageProvider: null,
+    videoSizeBytes: null,
+    videoMimeType: null,
+    videoOriginalFilename: null,
+    videoUploadedAt: null,
   };
 }
 
@@ -89,6 +94,11 @@ export default function CourseBuilder({
           description: step.description ?? "",
           videoPath: step.video_path,
           videoDurationSeconds: step.video_duration_seconds,
+          videoStorageProvider: step.video_storage_provider,
+          videoSizeBytes: step.video_size_bytes,
+          videoMimeType: step.video_mime_type,
+          videoOriginalFilename: step.video_original_filename,
+          videoUploadedAt: step.video_uploaded_at,
         }))
       : [emptyStep()],
   );
@@ -456,4 +466,4 @@ export default function CourseBuilder({
       </div>
     </div>
   );
-}
+}s

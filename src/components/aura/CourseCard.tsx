@@ -9,22 +9,19 @@ interface CourseCardProps {
   index: number;
 }
 
+function formatDuration(seconds: number | null): string | null {
+  if (!seconds) return null;
+  const mins = Math.round(seconds / 60);
+  return `${mins}′`;
+}
+
 export default function CourseCard({ item, index }: CourseCardProps) {
-  const { course, progress, locked } = item;
+  const { course, locked } = item;
   const plan = getPlan(course.required_plan);
+  const duration = formatDuration(course.video_duration_seconds);
+  const hasVideo = course.video_status === "ready" || course.video_status === "uploaded";
 
-  const total = Math.max(course.step_count, 0);
-  const done = progress ? progress.completed_step_ids.length : 0;
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  const finished = Boolean(progress?.completed_at);
-
-  const cta = locked
-    ? "ΚΛΕΙΔΩΜΕΝΟ"
-    : finished
-      ? "ΞΑΝΑ ΑΠΟ ΤΗΝ ΑΡΧΗ"
-      : done > 0
-        ? "ΣΥΝΕΧΕΙΑ"
-        : "ΕΝΑΡΞΗ COURSE";
+  const cta = locked ? "ΚΛΕΙΔΩΜΕΝΟ" : "ΔΕΣ ΤΟ VIDEO";
 
   return (
     <motion.article
@@ -34,7 +31,6 @@ export default function CourseCard({ item, index }: CourseCardProps) {
       transition={{ duration: 0.5, delay: Math.min(index * 0.07, 0.35) }}
       className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.07] via-white/[0.02] to-transparent p-6 transition-colors duration-500 hover:border-white/25"
     >
-      {/* chrome sheen */}
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 -top-1/2 h-full translate-y-[-30%] bg-[radial-gradient(60%_80%_at_50%_100%,rgba(255,255,255,0.16),transparent_70%)] opacity-0 transition-opacity duration-700 group-hover:opacity-100"
@@ -42,14 +38,12 @@ export default function CourseCard({ item, index }: CourseCardProps) {
 
       <div className="relative flex items-center justify-between gap-3">
         <span className="text-[10px] uppercase tracking-[0.4em] text-neutral-500">
-          {course.level}
+          {duration ?? "—"}
         </span>
         <span
           className={[
             "rounded-full border px-3 py-1 text-[9px] uppercase tracking-[0.3em]",
-            locked
-              ? "border-white/10 text-neutral-500"
-              : "border-white/25 text-neutral-200",
+            locked ? "border-white/10 text-neutral-500" : "border-white/25 text-neutral-200",
           ].join(" ")}
         >
           {plan?.name ?? course.required_plan}
@@ -66,26 +60,10 @@ export default function CourseCard({ item, index }: CourseCardProps) {
         </p>
       ) : null}
 
-      <div className="relative mt-6 flex items-center gap-4 text-[11px] uppercase tracking-[0.3em] text-neutral-500">
-        <span>{total} ΒΗΜΑΤΑ</span>
-        {course.estimated_hours != null ? <span>{course.estimated_hours}h</span> : null}
-        {finished ? <span className="text-neutral-300">ΟΛΟΚΛΗΡΩΜΕΝΟ</span> : null}
-      </div>
-
-      {!locked && total > 0 ? (
-        <div
-          className="relative mt-4 h-px w-full overflow-hidden bg-white/10"
-          role="progressbar"
-          aria-label={`Πρόοδος: ${pct}%`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={pct}
-        >
-          <span
-            className="block h-full bg-gradient-to-r from-neutral-500 via-white to-neutral-500 transition-all duration-700"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
+      {!hasVideo && !locked ? (
+        <p className="relative mt-4 text-[10px] uppercase tracking-[0.3em] text-neutral-600">
+          Έρχεται σύντομα
+        </p>
       ) : null}
 
       <div className="relative mt-7">

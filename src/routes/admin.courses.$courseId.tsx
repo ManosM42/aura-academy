@@ -1,21 +1,22 @@
 // src/routes/admin.courses.$courseId.tsx
 import { useCallback, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import CourseBuilder from "@/components/aura/CourseBuilder";
+import VideoEntryForm from "@/components/aura/VideoEntryForm";
+import type { VideoUploadMeta } from "@/components/aura/VideoDropzone";
 import {
+  clearCourseVideo,
   deleteCourse,
   getCourseForEdit,
-  saveCourseSteps,
+  setCourseVideo,
   updateCourse,
   type CourseInput,
 } from "@/lib/courses";
 import { getMyProfile } from "@/lib/queries";
 import { isContentRole } from "@/lib/roles";
 import { useAsync } from "@/lib/useAsync";
-import type { StepDraft } from "@/lib/courses.types";
 
 export const Route = createFileRoute("/admin/courses/$courseId")({
-  head: () => ({ meta: [{ title: "AURA — Επεξεργασία Course" }] }),
+  head: () => ({ meta: [{ title: "AURA — Επεξεργασία Video" }] }),
   component: EditCoursePage,
 });
 
@@ -27,7 +28,7 @@ function EditCoursePage() {
   const load = useCallback(async () => {
     const profile = await getMyProfile();
     if (!isContentRole(profile.role)) {
-      throw new Error("Η επεξεργασία courses απαιτεί ρόλο content manager και πάνω.");
+      throw new Error("Η επεξεργασία video απαιτεί ρόλο content manager και πάνω.");
     }
     return getCourseForEdit(courseId);
   }, [courseId]);
@@ -39,14 +40,13 @@ function EditCoursePage() {
   const [notice, setNotice] = useState<string | null>(null);
 
   const handleSave = useCallback(
-    async (input: CourseInput, steps: StepDraft[]) => {
+    async (input: CourseInput) => {
       if (!data) return;
       setSaving(true);
       setSaveError(null);
       setNotice(null);
       try {
         await updateCourse(courseId, input, data.course.slug, data.course.status);
-        await saveCourseSteps(courseId, steps);
         setNotice("Αποθηκεύτηκε.");
         setReloadToken((n) => n + 1);
       } catch (err) {
@@ -58,11 +58,41 @@ function EditCoursePage() {
     [courseId, data],
   );
 
+  const handleVideoUploaded = useCallback(
+    async (path: string, durationSeconds: number | null, meta: VideoUploadMeta) => {
+      setSaveError(null);
+      try {
+        await setCourseVideo(courseId, {
+          path,
+          durationSeconds,
+          storageProvider: meta.storageProvider,
+          sizeBytes: meta.sizeBytes,
+          mimeType: meta.mimeType,
+          originalFilename: meta.originalFilename,
+          uploadedAt: meta.uploadedAt,
+        });
+        setNotice("Το βίντεο αποθηκεύτηκε.");
+        setReloadToken((n) => n + 1);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Η αποθήκευση του βίντεο απέτυχε.");
+      }
+    },
+    [courseId],
+  );
+
+  const handleVideoCleared = useCallback(async () => {
+    setSaveError(null);
+    try {
+      await clearCourseVideo(courseId);
+      setReloadToken((n) => n + 1);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Η διαγραφή του βίντεο απέτυχε.");
+    }
+  }, [courseId]);
+
   const handleDelete = useCallback(async () => {
     if (typeof window !== "undefined") {
-      const ok = window.confirm(
-        "Το course, τα βήματα και τα βίντεό του θα διαγραφούν οριστικά. Συνέχεια;",
-      );
+      const ok = window.confirm("Το video θα διαγραφεί οριστικά. Συνέχεια;");
       if (!ok) return;
     }
     setSaving(true);
@@ -96,7 +126,7 @@ function EditCoursePage() {
           to="/admin/courses"
           className="mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200"
         >
-          ← COURSES
+          ← VIDEOS
         </Link>
       </main>
     );
@@ -108,7 +138,7 @@ function EditCoursePage() {
         to="/admin/courses"
         className="text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200"
       >
-        ← COURSES
+        ← VIDEOS
       </Link>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100">
         {data.course.title}
@@ -118,15 +148,18 @@ function EditCoursePage() {
       </p>
 
       <div className="mt-12">
-        <CourseBuilder
+        <VideoEntryForm
           key={`${data.course.id}-${reloadToken}`}
           course={data.course}
-          initialSteps={data.steps}
           saving={saving}
           error={saveError}
           notice={notice}
           onSave={handleSave}
           onDelete={handleDelete}
+          onVideoUploaded={handleVideoUploaded}
+          onVideoCleared={handleVideoCleared}
+          videoPath={data.course.video_path}
+          courseId={data.course.id}
         />
       </div>
     </main>
