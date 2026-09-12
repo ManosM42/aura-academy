@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import ChromeButton from "@/components/aura/ChromeButton";
 import VideoDropzone from "@/components/aura/VideoDropzone";
-import { AURA_PLANS, type PlanId } from "@/lib/plans";
+import type { PlanId } from "@/lib/plans";
 import type { AuraLevel } from "@/lib/database.types";
 import type { AuraCourse, CourseStep, StepDraft } from "@/lib/courses.types";
 import type { CourseInput } from "@/lib/courses";
@@ -14,6 +14,15 @@ const LEVELS: { value: AuraLevel; label: string }[] = [
   { value: "advanced", label: "Advanced" },
   { value: "master", label: "Master" },
   { value: "educator", label: "Educator" },
+];
+
+// Simplified to 2 real-world choices instead of listing all 4 AURA_PLANS:
+// "low" gates a course to every paying subscriber (low/mid/high all rank
+// >= low, per planUnlocks in courses.types.ts), while "limited" gates a
+// course exclusively to Limited Edition Physical Book buyers.
+const PLAN_CHOICES: { value: PlanId; label: string }[] = [
+  { value: "low", label: "ALL" },
+  { value: "limited", label: "LIMITED" },
 ];
 
 const STATUSES: { value: CourseInput["status"]; label: string }[] = [
@@ -74,7 +83,7 @@ export default function CourseBuilder({
   const [outcome, setOutcome] = useState(course?.outcome ?? "");
   const [level, setLevel] = useState<AuraLevel>(course?.level ?? "foundation");
   const [requiredPlan, setRequiredPlan] = useState<PlanId>(
-    course?.required_plan ?? "starter",
+    course?.required_plan ?? "low",
   );
   const [status, setStatus] = useState<CourseInput["status"]>(() => {
     const current = course?.status;
@@ -236,15 +245,15 @@ export default function CourseBuilder({
               value={requiredPlan}
               onChange={(event) => setRequiredPlan(event.target.value as PlanId)}
             >
-              {AURA_PLANS.map((plan) => (
-                <option key={plan.id} value={plan.id} className="bg-black">
-                  {plan.name} — {plan.priceLabel}
+              {PLAN_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value} className="bg-black">
+                  {choice.label}
                 </option>
               ))}
             </select>
-                        <p className="text-[11px] leading-relaxed text-neutral-500">
-              Ισχύει ιεραρχικά: starter &lt; core &lt; full. Ένα course «core»
-              το βλέπουν core και full.
+            <p className="text-[11px] leading-relaxed text-neutral-500">
+              «Κανονικό πλάνο» το βλέπουν όλοι οι ενεργοί συνδρομητές (low/mid/high).
+              «Limited Edition» το βλέπουν αποκλειστικά όσοι έχουν το φυσικό βιβλίο.
             </p>
           </div>
 
@@ -466,4 +475,4 @@ export default function CourseBuilder({
       </div>
     </div>
   );
-}s
+}

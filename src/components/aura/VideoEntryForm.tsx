@@ -4,7 +4,6 @@ import { motion } from "motion/react";
 import VideoDropzone, { type VideoUploadMeta } from "@/components/aura/VideoDropzone";
 import ChromeButton from "@/components/aura/ChromeButton";
 import { COURSE_CATEGORIES, type CourseCategory, type AuraCourse } from "@/lib/courses.types";
-import { AURA_PLANS } from "@/lib/plans";
 import type { AuraLevel } from "@/lib/database.types";
 import type { CourseInput } from "@/lib/courses";
 import type { PlanId } from "@/lib/plans";
@@ -38,6 +37,16 @@ const LEVELS: { key: AuraLevel; label: string }[] = [
   { key: "educator", label: "Educator" },
 ];
 
+// Simplified to 2 real-world choices instead of listing all 4 AURA_PLANS:
+// "low" makes a course visible to every paying subscriber (low/mid/high/
+// limited all rank >= low, per planUnlocks in courses.types.ts). "limited"
+// gates a course exclusively to Limited Edition Physical Book buyers —
+// who, thanks to the same hierarchy, still see every "ALL" course too.
+const PLAN_CHOICES: { key: PlanId; label: string }[] = [
+  { key: "low", label: "ALL" },
+  { key: "limited", label: "LIMITED" },
+];
+
 export default function VideoEntryForm({
   course,
   saving,
@@ -59,16 +68,13 @@ export default function VideoEntryForm({
     (course?.status as "draft" | "published" | "archived") ?? "draft",
   );
 
-  const plans = AURA_PLANS;
-
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
       e.preventDefault();
       onSave({ title, summary, category, level, requiredPlan, status });
     },
     [title, summary, category, level, requiredPlan, status, onSave],
-  );"new row for relation \"courses\" violates check constraint \"courses_required_plan_check\""
-
+  );
 
   return (
     <motion.form
@@ -153,18 +159,18 @@ export default function VideoEntryForm({
           Πλάνο πρόσβασης
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
-          {plans.map((p) => (
+          {PLAN_CHOICES.map((choice) => (
             <button
-              key={p.id}
+              key={choice.key}
               type="button"
-              onClick={() => setRequiredPlan(p.id)}
+              onClick={() => setRequiredPlan(choice.key)}
               className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${
-                requiredPlan === p.id
+                requiredPlan === choice.key
                   ? "border-white/60 bg-white/10 text-white"
                   : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"
               }`}
             >
-              {p.name}
+              {choice.label}
             </button>
           ))}
         </div>
