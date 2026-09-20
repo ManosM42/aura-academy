@@ -180,3 +180,23 @@ export type CourseWithTree = Course & {
 };
 
 export type SkillWithState = Skill & { userSkill: UserSkill | null };
+
+export type HaircutReviewStatus = "pending" | "reviewed";
+
+export interface HaircutReview {
+  id: string;
+  user_id: string;
+  method_description: string;
+  technique: string | null;
+  tools: string | null;
+  notes: string | null;
+  before_media: string[] | null;
+  process_media: string[] | null;
+  after_media: string[] | null;
+  status: string;
+  score: number | null;
+  feedback: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}

@@ -5,6 +5,7 @@ import {
   getDashboard,
   getMySkills,
   getSkillAssignments,
+  getMyHaircutReviews,
   isStaffRole,
 } from "@/lib/queries";
 import { useAsync } from "@/lib/useAsync";
@@ -14,7 +15,16 @@ import SkillTreeGraph from "@/components/aura/SkillTreeGraph";
 import { RankIcon } from "@/components/aura/RankIcon";
 import { getRankForPoints } from "@/lib/ranks";
 import type { SkillCategory, SkillState, SkillWithState } from "@/lib/database.types";
-import { ArrowRight, BookOpen, CheckCircle, ShieldCheck, Trophy, UserCheck } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle,
+  Clock,
+  Scissors,
+  ShieldCheck,
+  Trophy,
+  UserCheck,
+} from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
@@ -57,6 +67,7 @@ function DashboardPage() {
 
   const skills = useAsync(getMySkills, []);
   const assignments = useAsync(getSkillAssignments, []);
+  const haircuts = useAsync(getMyHaircutReviews, []);
 
   const rank = useMemo(() => {
     if (!data?.profile) return getRankForPoints(0);
@@ -98,7 +109,7 @@ function DashboardPage() {
       )}
 
       {data && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -357,6 +368,69 @@ function DashboardPage() {
             </Panel>
           </div>
 
+          {/* Haircut reviews submitted by the user */}
+          <Panel title="Τα Haircut Reviews μου">
+            {haircuts.loading && <LoadingSkeleton rows={2} />}
+            {haircuts.error && <ErrorState message={haircuts.error} />}
+
+            {haircuts.data && haircuts.data.length === 0 && (
+              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">
+                Δεν έχεις υποβάλει haircut review ακόμη.
+              </div>
+            )}
+
+            {haircuts.data && haircuts.data.length > 0 && (
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {haircuts.data.map((row) => {
+                  const reviewed = row.status === "graded" || row.score != null;
+                  return (
+                    <li
+                      key={row.id}
+                      className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4 backdrop-blur-xl transition-all duration-300 hover:border-white/25 shadow-[0_0_20px_-5px_rgba(0,0,0,0.8)]"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80">
+                            <Scissors className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-white">
+                              {row.method_description.slice(0, 60)}
+                              {row.method_description.length > 60 ? "…" : ""}
+                            </p>
+                            <p className="mt-1 text-xs text-white/40 font-mono">
+                              {new Date(row.created_at).toLocaleDateString("el-GR")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {reviewed ? (
+                          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-emerald-300">
+                            <CheckCircle className="size-3" />
+                            Reviewed
+                          </span>
+                        ) : (
+                          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-amber-300">
+                            <Clock className="size-3" />
+                            Pending
+                          </span>
+                        )}
+                      </div>
+
+                      {reviewed && row.score != null && (
+                        <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3 text-xs text-white/50">
+                          <Trophy className="size-3.5 text-white/60" />
+                          <span>Score</span>
+                          <span className="font-mono text-sm font-bold text-white">{row.score}</span>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
+
           <nav className="mt-12 flex flex-wrap gap-4 pt-6 border-t border-white/10">
             <NavLink to="/academy" label="Academy" />
             {staff && <NavLink to="/review" label="Review Queue" icon={<UserCheck className="size-4" />} />}
@@ -369,7 +443,7 @@ function DashboardPage() {
 
 function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
   return (
-    <motion.div 
+    <motion.div
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2 }}
       className="group relative overflow-hidden rounded-xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-6 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)] transition-all hover:border-white/40 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)]"

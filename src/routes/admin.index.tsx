@@ -13,7 +13,18 @@ import { hasAtLeastRole, isAdminRole } from "@/lib/roles";
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton, LockedState } from "@/components/aura/States";
 import type { AccountStatus, Profile, UserRole } from "@/lib/database.types";
-import { ShieldAlert, Users as UsersIcon, Activity, BookOpen, Inbox, CheckSquare, GraduationCap, RefreshCw, AlertCircle, Shield } from "lucide-react";
+import {
+  Users as UsersIcon,
+  Activity,
+  BookOpen,
+  Inbox,
+  CheckSquare,
+  GraduationCap,
+  RefreshCw,
+  AlertCircle,
+  Shield,
+  Scissors,
+} from "lucide-react";
 
 export const Route = createFileRoute("/admin/")({ component: AdminPage });
 
@@ -41,7 +52,7 @@ function AdminPage() {
       {/* Ambient background blur */}
       <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-white/[0.03] blur-[140px] pointer-events-none rounded-full" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -108,6 +119,7 @@ function OverviewSection() {
         <QuickLink to="/admin/inbox" label="Inbox" icon={<Inbox className="size-4" />} />
         <QuickLink to="/review" label="Review Queue" icon={<CheckSquare className="size-4" />} />
         <QuickLink to="/academy" label="Academy" icon={<GraduationCap className="size-4" />} />
+        <QuickLink to="/review/haircuts" label="Haircut Review" icon={<Scissors className="size-4" />} />
       </div>
     </section>
   );
@@ -115,7 +127,7 @@ function OverviewSection() {
 
 function Stat({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
   return (
-    <motion.div 
+    <motion.div
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2 }}
       className="group relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-6 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)] transition-all hover:border-white/40 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)]"

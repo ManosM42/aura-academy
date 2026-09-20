@@ -803,3 +803,136 @@ export async function deleteStory(storyId: string): Promise<void> {
   const { error } = await supabase.from("stories").delete().eq("id", storyId);
   if (error) throw error;
 }
+
+// ============================================================
+// HAIRCUT REVIEW (2nd points path)
+// ============================================================
+import type { HaircutReview } from "@/lib/database.types";
+
+export async function uploadHaircutMedia(
+  haircutReviewId: string,
+  kind: "before" | "process" | "after",
+  file: File,
+): Promise<string> {
+  const uid = await getCurrentUserId();
+  const safe = file.name.replace(/[^\w.\-]/g, "_");
+  const path = `${uid}/${haircutReviewId}/${kind}-${Date.now()}-${safe}`;
+  const { error } = await supabase.storage
+    .from("haircut-media")
+    .upload(path, file, { upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function signedHaircutMediaUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("haircut-media")
+    .createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function submitHaircutReview(input: {
+  before: File[];
+  process: File[];
+  after: File[];
+  methodDescription: string;
+  technique?: string;
+  tools?: string;
+  notes?: string;
+}): Promise<string> {
+  const uid = await getCurrentUserId();
+
+  const { data: row, error: insErr } = await supabase
+    .from("haircut_reviews")
+    .insert({
+      user_id: uid,
+      method_description: input.methodDescription,
+      technique: input.technique || null,
+      tools: input.tools || null,
+      notes: input.notes || null,
+    })
+    .select("id")
+    .single();
+  if (insErr) throw insErr;
+  const id = (row as { id: string }).id;
+
+  const [beforePaths, processPaths, afterPaths] = await Promise.all([
+    Promise.all(input.before.map((f) => uploadHaircutMedia(id, "before", f))),
+    Promise.all(input.process.map((f) => uploadHaircutMedia(id, "process", f))),
+    Promise.all(input.after.map((f) => uploadHaircutMedia(id, "after", f))),
+  ]);
+
+  const { error: updErr } = await supabase
+    .from("haircut_reviews")
+    .update({
+      before_media: beforePaths,
+      process_media: processPaths,
+      after_media: afterPaths,
+    })
+    .eq("id", id);
+  if (updErr) throw updErr;
+
+  return id;
+}
+
+export type HaircutQueueRow = HaircutReview & {
+  student: Pick<Profile, "id" | "full_name"> | null;
+};
+
+export async function getHaircutReviewQueue(): Promise<HaircutQueueRow[]> {
+  const { data, error } = await supabase
+    .from("haircut_reviews")
+    .select("*, student:profiles!haircut_reviews_user_id_fkey(id,full_name)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as HaircutQueueRow[];
+}
+
+export type HaircutReviewDetail = HaircutReview & {
+  student: Pick<Profile, "id" | "full_name" | "level"> | null;
+};
+
+export async function getHaircutReviewForGrading(
+  haircutReviewId: string,
+): Promise<HaircutReviewDetail> {
+  const { data, error } = await supabase
+    .from("haircut_reviews")
+    .select("*, student:profiles!haircut_reviews_user_id_fkey(id,full_name,level)")
+    .eq("id", haircutReviewId)
+    .single();
+  if (error) throw error;
+  return data as unknown as HaircutReviewDetail;
+}
+
+export async function gradeHaircutReview(input: {
+  haircutReviewId: string;
+  score: number;
+  feedback: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("submit_haircut_review", {
+    p_haircut_review_id: input.haircutReviewId,
+    p_score: input.score,
+    p_feedback: input.feedback,
+  });
+  if (error) throw error;
+}
+export type MyHaircutReviewRow = {
+  id: string;
+  method_description: string;
+  status: string;
+  score: number | null;
+  created_at: string;
+};
+
+export async function getMyHaircutReviews(): Promise<MyHaircutReviewRow[]> {
+  const uid = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("haircut_reviews")
+    .select("id, method_description, status, score, created_at")
+    .eq("user_id", uid)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as MyHaircutReviewRow[];
+}

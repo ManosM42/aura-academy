@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as HaircutReviewRouteImport } from './routes/haircut-review'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
@@ -39,6 +40,9 @@ import { Route as VerifyIdRouteImport } from './routes/verify.$id'
 import { Route as AdminCoursesIndexRouteImport } from './routes/admin.courses.index'
 import { Route as AdminCoursesCourseIdRouteImport } from './routes/admin.courses.$courseId'
 import { Route as AdminCoursesNewRouteImport } from './routes/admin.courses.new'
+import { Route as ReviewHaircutsIndexRouteImport } from './routes/review/haircuts/index'
+import { Route as ReviewHaircutsHaircutIdRouteImport } from './routes/review/haircuts/$haircutId'
+import { Route as ReviewHaircutsHaircutRouteImport } from './routes/review/haircuts/haircut'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -63,6 +67,11 @@ const CookiePolicyRoute = CookiePolicyRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HaircutReviewRoute = HaircutReviewRouteImport.update({
+  id: '/haircut-review',
+  path: '/haircut-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeaderboardRoute = LeaderboardRouteImport.update({
@@ -190,6 +199,21 @@ const AdminCoursesNewRoute = AdminCoursesNewRouteImport.update({
   path: '/admin/courses/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReviewHaircutsIndexRoute = ReviewHaircutsIndexRouteImport.update({
+  id: '/review/haircuts/',
+  path: '/review/haircuts/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewHaircutsHaircutIdRoute = ReviewHaircutsHaircutIdRouteImport.update({
+  id: '/review/haircuts/$haircutId',
+  path: '/review/haircuts/$haircutId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewHaircutsHaircutRoute = ReviewHaircutsHaircutRouteImport.update({
+  id: '/review/haircuts/haircut',
+  path: '/review/haircuts/haircut',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -197,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
+  '/haircut-review': typeof HaircutReviewRoute
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -221,7 +246,10 @@ export interface FileRoutesByFullPath {
   '/review/': typeof ReviewIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
+  '/review/haircuts/$haircutId': typeof ReviewHaircutsHaircutIdRoute
+  '/review/haircuts/haircut': typeof ReviewHaircutsHaircutRoute
   '/admin/courses/': typeof AdminCoursesIndexRoute
+  '/review/haircuts/': typeof ReviewHaircutsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -229,6 +257,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
+  '/haircut-review': typeof HaircutReviewRoute
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -253,7 +282,10 @@ export interface FileRoutesByTo {
   '/review': typeof ReviewIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
+  '/review/haircuts/$haircutId': typeof ReviewHaircutsHaircutIdRoute
+  '/review/haircuts/haircut': typeof ReviewHaircutsHaircutRoute
   '/admin/courses': typeof AdminCoursesIndexRoute
+  '/review/haircuts': typeof ReviewHaircutsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -262,6 +294,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
+  '/haircut-review': typeof HaircutReviewRoute
   '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -286,7 +319,10 @@ export interface FileRoutesById {
   '/review/': typeof ReviewIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
+  '/review/haircuts/$haircutId': typeof ReviewHaircutsHaircutIdRoute
+  '/review/haircuts/haircut': typeof ReviewHaircutsHaircutRoute
   '/admin/courses/': typeof AdminCoursesIndexRoute
+  '/review/haircuts/': typeof ReviewHaircutsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -296,6 +332,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
+    | '/haircut-review'
     | '/leaderboard'
     | '/login'
     | '/messages'
@@ -320,7 +357,10 @@ export interface FileRouteTypes {
     | '/review/'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
+    | '/review/haircuts/$haircutId'
+    | '/review/haircuts/haircut'
     | '/admin/courses/'
+    | '/review/haircuts/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -328,6 +368,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
+    | '/haircut-review'
     | '/leaderboard'
     | '/login'
     | '/messages'
@@ -352,7 +393,10 @@ export interface FileRouteTypes {
     | '/review'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
+    | '/review/haircuts/$haircutId'
+    | '/review/haircuts/haircut'
     | '/admin/courses'
+    | '/review/haircuts'
   id:
     | '__root__'
     | '/'
@@ -360,6 +404,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
+    | '/haircut-review'
     | '/leaderboard'
     | '/login'
     | '/messages'
@@ -384,7 +429,10 @@ export interface FileRouteTypes {
     | '/review/'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
+    | '/review/haircuts/$haircutId'
+    | '/review/haircuts/haircut'
     | '/admin/courses/'
+    | '/review/haircuts/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -393,6 +441,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   CookiePolicyRoute: typeof CookiePolicyRoute
   DashboardRoute: typeof DashboardRoute
+  HaircutReviewRoute: typeof HaircutReviewRoute
   LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
@@ -417,7 +466,10 @@ export interface RootRouteChildren {
   ReviewIndexRoute: typeof ReviewIndexRoute
   AdminCoursesCourseIdRoute: typeof AdminCoursesCourseIdRoute
   AdminCoursesNewRoute: typeof AdminCoursesNewRoute
+  ReviewHaircutsHaircutIdRoute: typeof ReviewHaircutsHaircutIdRoute
+  ReviewHaircutsHaircutRoute: typeof ReviewHaircutsHaircutRoute
   AdminCoursesIndexRoute: typeof AdminCoursesIndexRoute
+  ReviewHaircutsIndexRoute: typeof ReviewHaircutsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -455,6 +507,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/haircut-review': {
+      id: '/haircut-review'
+      path: '/haircut-review'
+      fullPath: '/haircut-review'
+      preLoaderRoute: typeof HaircutReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leaderboard': {
@@ -632,6 +691,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCoursesNewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/review/haircuts/': {
+      id: '/review/haircuts/'
+      path: '/review/haircuts'
+      fullPath: '/review/haircuts/'
+      preLoaderRoute: typeof ReviewHaircutsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review/haircuts/$haircutId': {
+      id: '/review/haircuts/$haircutId'
+      path: '/review/haircuts/$haircutId'
+      fullPath: '/review/haircuts/$haircutId'
+      preLoaderRoute: typeof ReviewHaircutsHaircutIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review/haircuts/haircut': {
+      id: '/review/haircuts/haircut'
+      path: '/review/haircuts/haircut'
+      fullPath: '/review/haircuts/haircut'
+      preLoaderRoute: typeof ReviewHaircutsHaircutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -641,6 +721,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   CookiePolicyRoute: CookiePolicyRoute,
   DashboardRoute: DashboardRoute,
+  HaircutReviewRoute: HaircutReviewRoute,
   LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
@@ -665,7 +746,10 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewIndexRoute: ReviewIndexRoute,
   AdminCoursesCourseIdRoute: AdminCoursesCourseIdRoute,
   AdminCoursesNewRoute: AdminCoursesNewRoute,
+  ReviewHaircutsHaircutIdRoute: ReviewHaircutsHaircutIdRoute,
+  ReviewHaircutsHaircutRoute: ReviewHaircutsHaircutRoute,
   AdminCoursesIndexRoute: AdminCoursesIndexRoute,
+  ReviewHaircutsIndexRoute: ReviewHaircutsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
