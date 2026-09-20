@@ -30,6 +30,10 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
 
+// Route of the page where a student submits a haircut review.
+// Open that page's file and copy the exact path from its createFileRoute("...") line.
+const HAIRCUT_SUBMIT_PATH = "/haircut-review";
+
 const STATE_STYLE: Record<SkillState, string> = {
   locked: "bg-white/5 text-white/40",
   learning: "bg-blue-500/15 text-blue-300",
@@ -370,6 +374,15 @@ function DashboardPage() {
 
           {/* Haircut reviews submitted by the user */}
           <Panel title="Τα Haircut Reviews μου">
+            {/* Always visible: unlimited submissions */}
+            <div>
+              <NavLink
+                to={HAIRCUT_SUBMIT_PATH}
+                label="Νέο Haircut Review"
+                icon={<Scissors className="size-4" />}
+              />
+            </div>
+
             {haircuts.loading && <LoadingSkeleton rows={2} />}
             {haircuts.error && <ErrorState message={haircuts.error} />}
 

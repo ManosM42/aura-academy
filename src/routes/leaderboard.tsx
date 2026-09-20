@@ -49,7 +49,7 @@ function LeaderboardPage() {
             AURA Rankings
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold uppercase tracking-tight chrome-type">
-            Leaderboard
+            ΛURΛ RANK
           </h1>
           <p className="mt-3 max-w-2xl text-sm text-white/60">
             Οι πόντοι Aura συγκεντρώνονται κάθε φορά που ένα review σου
