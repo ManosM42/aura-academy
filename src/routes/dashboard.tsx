@@ -10,7 +10,6 @@ import {
 } from "@/lib/queries";
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
-import SubscriptionCard from "@/components/aura/SubscriptionCard";
 import SkillTreeGraph from "@/components/aura/SkillTreeGraph";
 import { RankIcon } from "@/components/aura/RankIcon";
 import { getRankForPoints } from "@/lib/ranks";
@@ -161,10 +160,6 @@ function DashboardPage() {
             />
           </div>
 
-          {/* Active Subscription / Plan Section */}
-          <div className="w-full">
-            <SubscriptionCard userId={data.profile.id} />
-          </div>
 
           {/* Skill Progression Tree Section */}
           {skills.data && skills.data.length > 0 && (

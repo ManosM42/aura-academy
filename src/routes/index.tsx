@@ -7,6 +7,8 @@ import Hero from "@/components/aura/Hero";
 import Method from "@/components/aura/Method";
 import SkillTree from "@/components/aura/SkillTree";
 import { RankPreviewSection } from "@/components/aura/RankPreviewSection";
+import PhysicalBook from "@/components/aura/PhysicalBook";
+import Seminars from "@/components/aura/Seminars";
 import Certification from "@/components/aura/Certification";
 import Footer from "@/components/aura/Footer";
 import OurTeam from "@/components/aura/OurTeam";
@@ -35,6 +37,8 @@ function Index() {
         <SkillTree />
         <OurTeam />
         <RankPreviewSection />
+        <PhysicalBook />
+        <Seminars />
         <Certification />
       </main>
       <Footer />
