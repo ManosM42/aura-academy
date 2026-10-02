@@ -19,6 +19,9 @@ import {
   Scissors,
 } from "lucide-react";
 
+// Front cover artwork (adjust the path/alias if your project differs)
+import bookCover from "@/assets/book.png";
+
 /* ------------------------------------------------------------------ */
 /* Content (edit freely)                                              */
 /* ------------------------------------------------------------------ */
@@ -69,14 +72,29 @@ const TOPICS = [
 
 /* ------------------------------------------------------------------ */
 /* Book geometry                                                      */
+/*                                                                    */
+/* Local coordinate system of the book (CSS 3D, y points down):       */
+/*   x: 0 (spine) .. W (fore-edge)                                    */
+/*   y: 0 (top)   .. H (bottom)                                       */
+/*   z: -T/2 (back) .. +T/2 (front)                                   */
+/*                                                                    */
+/* Every element is a flat plane whose transform-origin is its own    */
+/* centre, so each one is placed by: centre position (left/top),      */
+/* then rotated to face outwards, then pushed along z.                */
+/*                                                                    */
+/* The two hard covers are real boards of thickness B. The page block */
+/* sits between them, inset from the cover edges (the "squares").     */
 /* ------------------------------------------------------------------ */
 
 const W = 260; // width
 const H = 360; // height
-const T = 52; // thickness
-const PAGE_INSET_Y = 5;
-const PAGE_INSET_R = 6;
-const PAGE_DEPTH = T - 6;
+const T = 52; // total thickness
+const B = 3; // cover board thickness
+const PAGE_INSET_Y = 5; // cover overhang top/bottom
+const PAGE_INSET_R = 6; // cover overhang at the fore-edge
+const PAGE_DEPTH = T - B * 2; // page block thickness (46)
+const PAGE_W = W - PAGE_INSET_R;
+const PAGE_H = H - PAGE_INSET_Y * 2;
 
 const face: CSSProperties = {
   position: "absolute",
@@ -85,6 +103,18 @@ const face: CSSProperties = {
   backfaceVisibility: "hidden",
   WebkitBackfaceVisibility: "hidden",
 };
+
+// Black paper with fine grey page lines
+const pagesV =
+  "repeating-linear-gradient(90deg, #0a0a0b 0px, #0a0a0b 1px, #2b2b2f 1px, #1c1c1f 2px, #0a0a0b 3px)";
+const pagesH =
+  "repeating-linear-gradient(0deg, #0a0a0b 0px, #0a0a0b 1px, #2b2b2f 1px, #1c1c1f 2px, #0a0a0b 3px)";
+
+// Cover board edges (black leather with a soft grey highlight)
+const boardEdgeTop =
+  "linear-gradient(180deg, #34343a 0%, #16161a 45%, #050506 100%)";
+const boardEdgeSide =
+  "linear-gradient(90deg, #34343a 0%, #16161a 45%, #050506 100%)";
 
 const chromeText =
   "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
@@ -157,7 +187,7 @@ export default function PhysicalBook() {
   // Light glare that follows the pointer across the cover
   const gx = useTransform(sx, (v) => 50 + v * 90);
   const gy = useTransform(sy, (v) => 50 + v * 90);
-  const glare = useMotionTemplate`radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,0.3), rgba(255,255,255,0.05) 35%, transparent 62%)`;
+  const glare = useMotionTemplate`radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,0.22), rgba(255,255,255,0.04) 35%, transparent 62%)`;
 
   function handleMove(e: PointerEvent<HTMLDivElement>) {
     const r = e.currentTarget.getBoundingClientRect();
@@ -325,20 +355,55 @@ export default function PhysicalBook() {
                   rotateY: rotY,
                 }}
               >
-                {/* Back cover */}
+                {/* ============ BACK BOARD ============ */}
+                {/* Outer face */}
                 <div
-                  className="rounded-sm bg-zinc-950"
+                  className="overflow-hidden rounded-sm bg-[linear-gradient(215deg,#1d1d21,#070708_55%,#0d0d0f)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
                   style={{
                     ...face,
                     width: W,
                     height: H,
                     transform: `translateZ(${-T / 2}px) rotateY(180deg)`,
                   }}
+                >
+                  <div className="absolute inset-5 rounded-sm border border-zinc-500/25" />
+                  <div className="absolute inset-[26px] rounded-sm border border-zinc-600/15" />
+                </div>
+                {/* Board edges: top, bottom, fore-edge */}
+                <div
+                  style={{
+                    ...face,
+                    width: W,
+                    height: B,
+                    top: -B / 2,
+                    background: boardEdgeTop,
+                    transform: `translateZ(${-T / 2 + B / 2}px) rotateX(90deg)`,
+                  }}
+                />
+                <div
+                  style={{
+                    ...face,
+                    width: W,
+                    height: B,
+                    top: H - B / 2,
+                    background: boardEdgeTop,
+                    transform: `translateZ(${-T / 2 + B / 2}px) rotateX(-90deg)`,
+                  }}
+                />
+                <div
+                  style={{
+                    ...face,
+                    width: B,
+                    height: H,
+                    left: W - B / 2,
+                    background: boardEdgeSide,
+                    transform: `translateZ(${-T / 2 + B / 2}px) rotateY(90deg)`,
+                  }}
                 />
 
-                {/* Spine */}
+                {/* ============ SPINE ============ */}
                 <div
-                  className="flex items-center justify-center overflow-hidden border-y border-white/10 bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-950"
+                  className="flex items-center justify-center overflow-hidden border-y border-white/10 bg-gradient-to-r from-[#1b1b1f] via-[#0e0e10] to-[#050506]"
                   style={{
                     ...face,
                     width: T,
@@ -347,10 +412,19 @@ export default function PhysicalBook() {
                     transform: "rotateY(-90deg)",
                   }}
                 >
-                  <div className="absolute inset-x-0 top-6 h-px bg-gradient-to-r from-transparent via-zinc-300/70 to-transparent" />
-                  <div className="absolute inset-x-0 top-8 h-px bg-gradient-to-r from-transparent via-zinc-400/40 to-transparent" />
+                  {/* soft cylindrical highlight */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(255,255,255,0.10), transparent 30%, transparent 70%, rgba(255,255,255,0.05))",
+                    }}
+                  />
+                  <div className="absolute inset-x-0 top-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" />
+                  <div className="absolute inset-x-0 top-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" />
                   <span
-                    className="bg-gradient-to-b from-white to-zinc-500 bg-clip-text font-serif text-sm font-semibold tracking-[0.5em] text-transparent"
+                    className="bg-gradient-to-b from-zinc-100 to-zinc-500 bg-clip-text font-serif text-sm font-semibold tracking-[0.5em] text-transparent"
                     style={{
                       writingMode: "vertical-rl",
                       transform: "rotate(180deg)",
@@ -358,47 +432,43 @@ export default function PhysicalBook() {
                   >
                     AURA THE BARBERING BOOK
                   </span>
-                  <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-zinc-400/40 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-zinc-300/70 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" />
                 </div>
 
-                {/* Page edge, right (silver gilded) */}
+                {/* ============ PAGE BLOCK ============ */}
+                {/* Fore-edge (right) */}
                 <div
                   style={{
                     ...face,
                     width: PAGE_DEPTH,
-                    height: H - PAGE_INSET_Y * 2,
+                    height: PAGE_H,
                     top: PAGE_INSET_Y,
-                    left: W - PAGE_INSET_R - PAGE_DEPTH / 2,
+                    left: PAGE_W - PAGE_DEPTH / 2,
                     transform: "rotateY(90deg)",
-                    backgroundImage:
-                      "linear-gradient(180deg, rgba(0,0,0,.4), transparent 18%, transparent 82%, rgba(0,0,0,.5)), repeating-linear-gradient(90deg, #e4e4e7 0px, #e4e4e7 1px, #71717a 1px, #52525b 3px)",
+                    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.55), transparent 16%, transparent 84%, rgba(0,0,0,.65)), ${pagesV}`,
                   }}
                 />
-
-                {/* Page edge, top */}
+                {/* Top edge */}
                 <div
                   style={{
                     ...face,
-                    width: W - PAGE_INSET_R,
+                    width: PAGE_W,
                     height: PAGE_DEPTH,
                     top: PAGE_INSET_Y - PAGE_DEPTH / 2,
                     transform: "rotateX(90deg)",
-                    backgroundImage:
-                      "linear-gradient(90deg, rgba(0,0,0,.35), transparent 20%), repeating-linear-gradient(0deg, #e4e4e7 0px, #e4e4e7 1px, #71717a 1px, #52525b 3px)",
+                    backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%), ${pagesH}`,
                   }}
                 />
-
-                {/* Page edge, bottom */}
+                {/* Bottom edge */}
                 <div
                   style={{
                     ...face,
-                    width: W - PAGE_INSET_R,
+                    width: PAGE_W,
                     height: PAGE_DEPTH,
                     top: H - PAGE_INSET_Y - PAGE_DEPTH / 2,
                     transform: "rotateX(-90deg)",
-                    backgroundImage:
-                      "linear-gradient(90deg, rgba(0,0,0,.35), transparent 20%), repeating-linear-gradient(0deg, #e4e4e7 0px, #e4e4e7 1px, #71717a 1px, #52525b 3px)",
+                    backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%), ${pagesH}`,
                   }}
                 />
 
@@ -408,9 +478,9 @@ export default function PhysicalBook() {
                   style={{
                     ...face,
                     top: PAGE_INSET_Y,
-                    width: W - PAGE_INSET_R,
-                    height: H - PAGE_INSET_Y * 2,
-                    transform: `translateZ(${T / 2 - 3}px)`,
+                    width: PAGE_W,
+                    height: PAGE_H,
+                    transform: `translateZ(${T / 2 - B - 0.5}px)`,
                   }}
                 >
                   <p className="font-serif text-lg text-zinc-100">Inside</p>
@@ -431,7 +501,8 @@ export default function PhysicalBook() {
                   <Scissors className="absolute bottom-6 right-6 size-4 text-zinc-600" />
                 </div>
 
-                {/* Front cover (hinged on the spine) */}
+                {/* ============ FRONT BOARD (hinged on the spine) ============ */}
+                {/* Local z = 0 is the outer surface; the board extends to z = -B */}
                 <div
                   style={{
                     position: "absolute",
@@ -447,48 +518,43 @@ export default function PhysicalBook() {
                       : "transform 1.2s cubic-bezier(0.22, 0.8, 0.24, 1)",
                   }}
                 >
-                  {/* Outside */}
+                  {/* Outside: the book.png cover */}
                   <div
-                    className="overflow-hidden rounded-l-sm rounded-r-md bg-[linear-gradient(145deg,#26262a_0%,#0a0a0b_45%,#161618_100%)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                    className="overflow-hidden rounded-l-sm rounded-r-md bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
                     style={{ ...face, width: W, height: H }}
                   >
-                    {/* Leather grain */}
+                    <img
+                      src={bookCover}
+                      alt="AURA The Barbering Book cover"
+                      draggable={false}
+                      className="absolute inset-0 h-full w-full select-none object-cover"
+                    />
+                    {/* Edge vignette for depth */}
                     <div
                       aria-hidden
-                      className="absolute inset-0 opacity-30 mix-blend-overlay"
+                      className="pointer-events-none absolute inset-0"
                       style={{
-                        backgroundImage:
-                          "radial-gradient(rgba(255,255,255,0.55) 0.5px, transparent 0.7px)",
-                        backgroundSize: "3px 3px",
+                        background:
+                          "radial-gradient(120% 100% at 50% 40%, transparent 60%, rgba(0,0,0,0.35) 100%)",
                       }}
                     />
                     {/* Hinge groove */}
-                    <div className="absolute inset-y-0 left-3 w-px bg-black/70 shadow-[1px_0_0_rgba(255,255,255,0.14)]" />
-                    {/* Foil frame */}
-                    <div className="absolute inset-5 rounded-sm border border-zinc-300/40" />
-                    <div className="absolute inset-[26px] rounded-sm border border-zinc-500/20" />
-
-                    <div className="relative flex h-full flex-col items-center justify-between px-9 py-11 text-center">
-                      <div className="flex size-16 items-center justify-center rounded-full border border-zinc-300/60 bg-black/70 shadow-[0_0_34px_rgba(255,255,255,0.28)]">
-                        <Scissors className="size-7 text-zinc-100" />
-                      </div>
-
-                      <div>
-                        <h3
-                          className={`font-serif text-5xl font-bold tracking-[0.28em] [filter:drop-shadow(0_0_14px_rgba(255,255,255,0.35))] ${chromeText}`}
-                        >
-                          AURA
-                        </h3>
-                        <div className="mx-auto mt-4 h-px w-24 bg-gradient-to-r from-transparent via-zinc-300/70 to-transparent" />
-                        <p className="mt-4 font-serif text-sm italic text-zinc-300">
-                          The Barbering Book
-                        </p>
-                      </div>
-
-                      <p className="text-[9px] uppercase tracking-[0.35em] text-zinc-500">
-                        Physical edition
-                      </p>
-                    </div>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-3 w-[3px]"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, rgba(0,0,0,0.75), rgba(0,0,0,0.25) 55%, rgba(255,255,255,0.14))",
+                      }}
+                    />
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-0 w-3"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, rgba(0,0,0,0.5), transparent)",
+                      }}
+                    />
 
                     {/* Idle sheen */}
                     {!reduce && (
@@ -497,7 +563,7 @@ export default function PhysicalBook() {
                         className="pointer-events-none absolute inset-0"
                         style={{
                           background:
-                            "linear-gradient(105deg, transparent 42%, rgba(255,255,255,0.16) 50%, transparent 58%)",
+                            "linear-gradient(105deg, transparent 42%, rgba(255,255,255,0.14) 50%, transparent 58%)",
                         }}
                         animate={{ x: ["-120%", "120%"] }}
                         transition={{
@@ -517,14 +583,14 @@ export default function PhysicalBook() {
                     />
                   </div>
 
-                  {/* Inside of the cover */}
+                  {/* Inside of the cover (board back face, at z = -B) */}
                   <div
                     className="flex flex-col items-center justify-center gap-4 overflow-hidden rounded-l-md bg-[linear-gradient(200deg,#1c1c1f,#08080a)] px-9 text-center"
                     style={{
                       ...face,
                       width: W,
                       height: H,
-                      transform: "rotateY(180deg)",
+                      transform: `translateZ(${-B}px) rotateY(180deg)`,
                     }}
                   >
                     <Scissors className="size-6 text-zinc-300" />
@@ -536,6 +602,38 @@ export default function PhysicalBook() {
                       AURA
                     </p>
                   </div>
+
+                  {/* Board edges: top, bottom, fore-edge */}
+                  <div
+                    style={{
+                      ...face,
+                      width: W,
+                      height: B,
+                      top: -B / 2,
+                      background: boardEdgeTop,
+                      transform: `translateZ(${-B / 2}px) rotateX(90deg)`,
+                    }}
+                  />
+                  <div
+                    style={{
+                      ...face,
+                      width: W,
+                      height: B,
+                      top: H - B / 2,
+                      background: boardEdgeTop,
+                      transform: `translateZ(${-B / 2}px) rotateX(-90deg)`,
+                    }}
+                  />
+                  <div
+                    style={{
+                      ...face,
+                      width: B,
+                      height: H,
+                      left: W - B / 2,
+                      background: boardEdgeSide,
+                      transform: `translateZ(${-B / 2}px) rotateY(90deg)`,
+                    }}
+                  />
                 </div>
               </motion.div>
             </motion.div>
