@@ -9,11 +9,15 @@ export type SeminarFormat = "group" | "private";
 export type BookingStatus = "new" | "read" | "verified" | "cancelled";
 export type Experience = "beginner" | "intermediate" | "professional";
 
-export const SLOTS = ["10:00", "14:00", "18:00"] as const;
-export type Slot = (typeof SLOTS)[number];
-
 export const GROUP_CAPACITY = 8;
 export const MIN_GROUP = 2;
+
+/**
+ * Δεν υπάρχει πια επιλογή ώρας. Η στήλη `slot` στη βάση είναι ακόμα NOT NULL,
+ * οπότε κάθε νέα κράτηση γράφεται με αυτή τη σταθερή τιμή και δεν εμφανίζεται
+ * πουθενά στο UI. Έτσι η χωρητικότητα (8 άτομα) ελέγχεται ανά ημέρα και από τον server.
+ */
+const BOOKING_SLOT = "10:00";
 
 export interface AvailabilityRow {
   seminar_date: string;
@@ -29,6 +33,7 @@ export interface SeminarBooking {
   user_id: string | null;
   format: SeminarFormat;
   seminar_date: string;
+  /** Παλιό πεδίο της βάσης. Δεν εμφανίζεται στο UI. */
   slot: string;
   participants: number;
   full_name: string;
@@ -62,7 +67,6 @@ export interface BlockedDate {
 export interface NewBooking {
   format: SeminarFormat;
   date: string;
-  slot: string;
   participants: number;
   fullName: string;
   email: string;
@@ -99,30 +103,23 @@ export function startOfMonth(d: Date): Date {
 /* Availability logic (κοινή για το public page και το admin)          */
 /* ------------------------------------------------------------------ */
 
-export interface SlotInfo {
-  people: number;
-  priv: boolean;
-  blocked: boolean;
-}
 export interface DayInfo {
+  /** Η μέρα είναι μπλοκαρισμένη (και τα παλιά μπλοκ ανά ώρα μετράνε ως όλη μέρα). */
   dayBlocked: boolean;
-  slots: Record<string, SlotInfo>;
+  /** Σύνολο ατόμων σε group κρατήσεις της ημέρας. */
+  people: number;
+  /** Υπάρχει private κράτηση. */
+  priv: boolean;
 }
 export type AvailabilityIndex = Map<string, DayInfo>;
 
 export function indexAvailability(rows: AvailabilityRow[]): AvailabilityIndex {
   const map: AvailabilityIndex = new Map();
   for (const r of rows) {
-    const day = map.get(r.seminar_date) ?? { dayBlocked: false, slots: {} };
-    if (r.blocked && r.slot === null) {
-      day.dayBlocked = true;
-    } else if (r.slot) {
-      const s = day.slots[r.slot] ?? { people: 0, priv: false, blocked: false };
-      s.people += r.group_people;
-      s.priv = s.priv || r.has_private;
-      s.blocked = s.blocked || r.blocked;
-      day.slots[r.slot] = s;
-    }
+    const day = map.get(r.seminar_date) ?? { dayBlocked: false, people: 0, priv: false };
+    if (r.blocked) day.dayBlocked = true;
+    day.people += r.group_people;
+    day.priv = day.priv || r.has_private;
     map.set(r.seminar_date, day);
   }
   return map;
@@ -156,19 +153,16 @@ export function rowsFromBookings(
   return rows;
 }
 
-export type SlotStatus = "open" | "few" | "full" | "blocked";
+export type DayAvailability = "open" | "few" | "full" | "blocked";
 
-export function getSlotStatus(
+export function getDayAvailability(
   day: DayInfo | undefined,
-  slot: string,
   format: SeminarFormat,
   participants: number,
-): { status: SlotStatus; remaining: number } {
+): { status: DayAvailability; remaining: number } {
   if (day?.dayBlocked) return { status: "blocked", remaining: 0 };
-  const s = day?.slots[slot];
-  if (s?.blocked) return { status: "blocked", remaining: 0 };
 
-  const taken = s?.priv ? GROUP_CAPACITY : (s?.people ?? 0);
+  const taken = day?.priv ? GROUP_CAPACITY : (day?.people ?? 0);
   const remaining = Math.max(0, GROUP_CAPACITY - taken);
 
   if (format === "private") {
@@ -182,17 +176,14 @@ export function getSlotStatus(
 
 export type DayStatus = "open" | "full" | "blocked";
 
-/** Η μέρα κλείνει αυτόματα όταν δεν έχει κανένα διαθέσιμο slot. */
+/** Η μέρα κλείνει αυτόματα όταν δεν χωράνε άλλοι. Ίδια υπογραφή με πριν. */
 export function getDayStatus(
   day: DayInfo | undefined,
   format: SeminarFormat,
   participants: number,
 ): DayStatus {
-  if (day?.dayBlocked) return "blocked";
-  const states = SLOTS.map((s) => getSlotStatus(day, s, format, participants).status);
-  if (states.every((s) => s === "blocked")) return "blocked";
-  if (states.every((s) => s === "full" || s === "blocked")) return "full";
-  return "open";
+  const { status } = getDayAvailability(day, format, participants);
+  return status === "few" ? "open" : status;
 }
 
 /* ------------------------------------------------------------------ */
@@ -212,7 +203,7 @@ export async function createSeminarBooking(b: NewBooking): Promise<string> {
   const { data, error } = await supabase.rpc("create_seminar_booking", {
     p_format: b.format,
     p_date: b.date,
-    p_slot: b.slot,
+    p_slot: BOOKING_SLOT,
     p_participants: b.participants,
     p_full_name: b.fullName,
     p_email: b.email,
@@ -256,15 +247,15 @@ export async function adminSetBookingStatus(id: string, status: BookingStatus): 
   if (error) throw new Error(error.message);
 }
 
+/** Μπλοκάρει ολόκληρη την ημέρα. */
 export async function adminBlockDate(
   date: string,
-  slot: string | null,
   reason: string,
   adminId: string,
 ): Promise<void> {
   const { error } = await supabase.from("seminar_blocked_dates").insert({
     blocked_date: date,
-    slot,
+    slot: null,
     reason: reason.trim() || null,
     created_by: adminId,
   });

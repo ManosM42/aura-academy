@@ -114,6 +114,8 @@ export function Navbar() {
       { to: "/academy", label: "Academy" },
       { to: "/messages", label: "Messages" },
       { to: "/leaderboard", label: "Leaderboard" },
+      { to: "/seminars", label: "Book your Seminar" },
+
       ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),
       ...(admin
         ? [

@@ -17,7 +17,6 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Loader2,
   Mail,
   MapPin,
@@ -30,15 +29,14 @@ import {
 import {
   GROUP_CAPACITY,
   MIN_GROUP,
-  SLOTS,
   type AvailabilityIndex,
   type Experience,
   type SeminarFormat,
   createSeminarBooking,
   fromISO,
   getAvailability,
+  getDayAvailability,
   getDayStatus,
-  getSlotStatus,
   indexAvailability,
   startOfMonth,
   toISO,
@@ -85,7 +83,6 @@ function SeminarsBookingRoute() {
   const [step, setStep] = useState<Step>("format");
   const [format, setFormat] = useState<SeminarFormat | null>(null);
   const [date, setDate] = useState<string | null>(null);
-  const [slot, setSlot] = useState<string | null>(null);
   const [participants, setParticipants] = useState(2);
   const [reference, setReference] = useState<string | null>(null);
 
@@ -116,13 +113,11 @@ function SeminarsBookingRoute() {
     setFormat(f);
     setParticipants(f === "private" ? 1 : MIN_GROUP);
     setDate(null);
-    setSlot(null);
     setStep("date");
   }
 
-  function pickSlot(d: string, s: string) {
+  function pickDate(d: string) {
     setDate(d);
-    setSlot(s);
     setStep("details");
   }
 
@@ -136,7 +131,6 @@ function SeminarsBookingRoute() {
     setStep("format");
     setFormat(null);
     setDate(null);
-    setSlot(null);
     setReference(null);
   }
 
@@ -182,8 +176,8 @@ function SeminarsBookingRoute() {
             Κλείσε τη θέση σου στο AURA.
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
-            Επίλεξε group ή private, μια διαθέσιμη ημερομηνία και ώρα, και άφησε
-            τα στοιχεία σου. Θα επικοινωνήσουμε μαζί σου για επιβεβαίωση.
+            Επίλεξε group ή private, μια διαθέσιμη ημερομηνία, και άφησε τα
+            στοιχεία σου. Θα επικοινωνήσουμε μαζί σου για επιβεβαίωση.
           </p>
         </motion.div>
 
@@ -213,18 +207,17 @@ function SeminarsBookingRoute() {
                   setMonth={setMonth}
                   avail={avail}
                   loading={loadingAvail}
-                  onPickSlot={pickSlot}
+                  onPickDate={pickDate}
                   onBack={() => setStep("format")}
                 />
               </StepWrap>
             )}
 
-            {step === "details" && format && date && slot && (
+            {step === "details" && format && date && (
               <StepWrap key="details">
                 <DetailsStep
                   format={format}
                   date={date}
-                  slot={slot}
                   participants={participants}
                   onBack={() => setStep("date")}
                   onBooked={onBooked}
@@ -232,13 +225,12 @@ function SeminarsBookingRoute() {
               </StepWrap>
             )}
 
-            {step === "done" && reference && format && date && slot && (
+            {step === "done" && reference && format && date && (
               <StepWrap key="done">
                 <DoneStep
                   reference={reference}
                   format={format}
                   date={date}
-                  slot={slot}
                   participants={participants}
                   onRestart={restart}
                 />
@@ -439,7 +431,7 @@ function FormatCard({
 }
 
 /* ------------------------------------------------------------------ */
-/* Step 2: Date + slot calendar                                       */
+/* Step 2: Date calendar                                              */
 /* ------------------------------------------------------------------ */
 
 function DateStep({
@@ -450,7 +442,7 @@ function DateStep({
   setMonth,
   avail,
   loading,
-  onPickSlot,
+  onPickDate,
   onBack,
 }: {
   format: SeminarFormat;
@@ -460,7 +452,7 @@ function DateStep({
   setMonth: (d: Date) => void;
   avail: AvailabilityIndex;
   loading: boolean;
-  onPickSlot: (date: string, slot: string) => void;
+  onPickDate: (date: string) => void;
   onBack: () => void;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -474,7 +466,11 @@ function DateStep({
   const isPastMonth =
     month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth();
 
-  const selectedDay = selected ? avail.get(selected) : undefined;
+  const selectedAvail = selected
+    ? getDayAvailability(avail.get(selected), format, participants)
+    : null;
+  const selectedUnavailable =
+    selectedAvail?.status === "blocked" || selectedAvail?.status === "full";
 
   return (
     <div>
@@ -488,7 +484,7 @@ function DateStep({
             <ArrowLeft className="size-3.5" /> Αλλαγή format
           </button>
           <h2 className="mt-2 text-xl font-semibold text-white sm:text-2xl">
-            Επίλεξε ημερομηνία & ώρα
+            Επίλεξε ημερομηνία
           </h2>
           <p className="mt-1 text-sm text-zinc-400">
             {format === "group" ? "Group seminar" : "Private seminar"} ·{" "}
@@ -557,9 +553,10 @@ function DateStep({
               if (!cell) return <div key={i} />;
               const iso = toISO(cell);
               const isPast = cell < today;
-              const status = isPast
-                ? "blocked"
-                : getDayStatus(avail.get(iso), format, participants);
+              const dayAvail = isPast
+                ? { status: "blocked" as const, remaining: 0 }
+                : getDayAvailability(avail.get(iso), format, participants);
+              const status = dayAvail.status;
               const isSelected = selected === iso;
 
               return (
@@ -606,69 +603,54 @@ function DateStep({
           </div>
         </div>
 
-        {/* Time slots */}
-        <div className="rounded-2xl border border-white/10 bg-black/50 p-5">
+        {/* Selected date */}
+        <div className="h-fit rounded-2xl border border-white/10 bg-black/50 p-5">
           <h4 className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Clock className="size-4 text-zinc-400" />
-            Διαθέσιμες ώρες
+            <CalendarIcon className="size-4 text-zinc-400" />
+            Επιλεγμένη ημερομηνία
           </h4>
 
-          {!selected && (
+          {!selected || !selectedAvail ? (
             <p className="mt-4 text-sm text-zinc-500">
-              Επίλεξε μια ημερομηνία στο ημερολόγιο για να δεις τις ώρες.
+              Επίλεξε μια ημερομηνία στο ημερολόγιο για να συνεχίσεις.
             </p>
-          )}
-
-          {selected && (
-            <div className="mt-4 space-y-2.5">
-              <p className="text-xs text-zinc-500">
+          ) : (
+            <div className="mt-4 space-y-4">
+              <p className="text-base font-medium text-white">
                 {fromISO(selected).toLocaleDateString("el-GR", {
                   weekday: "long",
                   day: "numeric",
                   month: "long",
                 })}
               </p>
-              {SLOTS.map((s) => {
-                const { status, remaining } = getSlotStatus(
-                  selectedDay,
-                  s,
-                  format,
-                  participants,
-                );
-                const disabled = status === "blocked" || status === "full";
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => onPickSlot(selected, s)}
-                    className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm transition-all duration-200 ${
-                      disabled
-                        ? "cursor-not-allowed border-white/5 text-zinc-700"
-                        : "border-white/10 bg-white/[0.02] text-zinc-200 hover:border-white/40 hover:bg-white/[0.07] hover:shadow-[0_0_20px_-6px_rgba(255,255,255,0.3)]"
-                    }`}
-                  >
-                    <span className="font-medium">{s}</span>
-                    <span
-                      className={`text-[11px] uppercase tracking-wider ${
-                        disabled
-                          ? "text-zinc-700"
-                          : status === "few"
-                            ? "text-amber-400"
-                            : "text-emerald-400"
-                      }`}
-                    >
-                      {status === "blocked"
-                        ? "Μη διαθέσιμο"
-                        : status === "full"
-                          ? "Γεμάτο"
-                          : format === "group"
-                            ? `${remaining} θέσεις`
-                            : "Διαθέσιμο"}
-                    </span>
-                  </button>
-                );
-              })}
+
+              <p
+                className={`text-[11px] uppercase tracking-wider ${
+                  selectedUnavailable
+                    ? "text-zinc-600"
+                    : selectedAvail.status === "few"
+                      ? "text-amber-400"
+                      : "text-emerald-400"
+                }`}
+              >
+                {selectedAvail.status === "blocked"
+                  ? "Μη διαθέσιμη"
+                  : selectedAvail.status === "full"
+                    ? "Γεμάτη"
+                    : format === "group"
+                      ? `${selectedAvail.remaining} θέσεις διαθέσιμες`
+                      : "Διαθέσιμη"}
+              </p>
+
+              <button
+                type="button"
+                disabled={selectedUnavailable}
+                onClick={() => onPickDate(selected)}
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-6 py-3 text-sm font-semibold text-black shadow-[0_0_24px_rgba(255,255,255,0.2)] transition-all duration-300 enabled:hover:shadow-[0_0_40px_rgba(255,255,255,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Συνέχεια
+                <ArrowRight className="size-4 transition-transform duration-300 group-enabled:group-hover:translate-x-1" />
+              </button>
             </div>
           )}
         </div>
@@ -717,14 +699,12 @@ function buildMonthGrid(month: Date): (Date | null)[] {
 function DetailsStep({
   format,
   date,
-  slot,
   participants,
   onBack,
   onBooked,
 }: {
   format: SeminarFormat;
   date: string;
-  slot: string;
   participants: number;
   onBack: () => void;
   onBooked: (ref: string) => void;
@@ -758,7 +738,6 @@ function DetailsStep({
       const ref = await createSeminarBooking({
         format,
         date,
-        slot,
         participants,
         fullName,
         email,
@@ -776,7 +755,7 @@ function DetailsStep({
       const msg = e instanceof Error ? e.message : "unknown";
       setError(
         msg.includes("slot_unavailable")
-          ? "Δυστυχώς αυτή η ώρα μόλις έγινε μη διαθέσιμη. Διάλεξε άλλη ώρα."
+          ? "Δυστυχώς αυτή η ημερομηνία μόλις έγινε μη διαθέσιμη. Διάλεξε άλλη ημερομηνία."
           : "Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.",
       );
     } finally {
@@ -796,7 +775,7 @@ function DetailsStep({
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-xl font-semibold text-white sm:text-2xl">Τα στοιχεία σου</h2>
-        <SummaryPill format={format} date={date} slot={slot} participants={participants} />
+        <SummaryPill format={format} date={date} participants={participants} />
       </div>
 
       <div className="mt-8 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
@@ -953,7 +932,6 @@ function DetailsStep({
         <BookingSummaryCard
           format={format}
           date={date}
-          slot={slot}
           participants={participants}
           fullName={fullName}
           city={city}
@@ -966,18 +944,16 @@ function DetailsStep({
 function SummaryPill({
   format,
   date,
-  slot,
   participants,
 }: {
   format: SeminarFormat;
   date: string;
-  slot: string;
   participants: number;
 }) {
   return (
     <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-4 py-1.5 text-xs text-zinc-300">
       <CalendarIcon className="size-3.5 text-zinc-500" />
-      {fromISO(date).toLocaleDateString("el-GR", { day: "numeric", month: "short" })} · {slot}
+      {fromISO(date).toLocaleDateString("el-GR", { day: "numeric", month: "short" })}
       <span className="h-3 w-px bg-white/15" />
       {format === "group" ? `Group · ${participants}` : "Private"}
     </div>
@@ -987,14 +963,12 @@ function SummaryPill({
 function BookingSummaryCard({
   format,
   date,
-  slot,
   participants,
   fullName,
   city,
 }: {
   format: SeminarFormat;
   date: string;
-  slot: string;
   participants: number;
   fullName: string;
   city: string;
@@ -1021,7 +995,6 @@ function BookingSummaryCard({
             month: "long",
           })}
         />
-        <SummaryRow icon={Clock} label="Ώρα" value={slot} />
         <SummaryRow
           icon={format === "group" ? Users : User}
           label="Συμμετέχοντες"
@@ -1162,14 +1135,12 @@ function DoneStep({
   reference,
   format,
   date,
-  slot,
   participants,
   onRestart,
 }: {
   reference: string;
   format: SeminarFormat;
   date: string;
-  slot: string;
   participants: number;
   onRestart: () => void;
 }) {
@@ -1206,7 +1177,6 @@ function DoneStep({
             month: "long",
           })}
         />
-        <SummaryRow icon={Clock} label="Ώρα" value={slot} />
         <SummaryRow
           icon={format === "group" ? Users : User}
           label="Format"

@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
-  Clock,
   Eye,
   Lock,
   Mail,
@@ -24,7 +23,6 @@ import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import { useAsync } from "@/lib/useAsync";
 import {
   GROUP_CAPACITY,
-  SLOTS,
   type BlockedDate,
   type BookingStatus,
   type SeminarBooking,
@@ -34,8 +32,8 @@ import {
   adminSetBookingStatus,
   adminUnblock,
   fromISO,
+  getDayAvailability,
   getDayStatus,
-  getSlotStatus,
   indexAvailability,
   rowsFromBookings,
   startOfMonth,
@@ -298,8 +296,7 @@ function BookingsTable({
                   {fromISO(b.seminar_date).toLocaleDateString("el-GR", {
                     day: "numeric",
                     month: "short",
-                  })}{" "}
-                  <span className="text-zinc-500">· {b.slot}</span>
+                  })}
                 </td>
                 <td className="p-4">
                   <p className="text-zinc-300">{b.email}</p>
@@ -419,9 +416,6 @@ function BookingDrawer({
               month: "long",
             })}
           </DetailRow>
-          <DetailRow icon={Clock} label="Ώρα">
-            {booking.slot}
-          </DetailRow>
         </div>
 
         <div className="mt-4 space-y-1 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
@@ -462,14 +456,11 @@ function BookingDrawer({
           </div>
         )}
 
-        {booking.goals && (
-          <Note label="Στόχοι">{booking.goals}</Note>
-        )}
+        {booking.goals && <Note label="Στόχοι">{booking.goals}</Note>}
         {booking.notes && <Note label="Σημειώσεις">{booking.notes}</Note>}
 
         <p className="mt-4 text-xs text-zinc-600">
-          Αποδοχή όρων:{" "}
-          {new Date(booking.terms_accepted_at).toLocaleString("el-GR")}
+          Αποδοχή όρων: {new Date(booking.terms_accepted_at).toLocaleString("el-GR")}
         </p>
 
         <div className="mt-auto flex flex-col gap-2 pt-6">
@@ -552,7 +543,7 @@ function ActionBtn({
 }
 
 /* ------------------------------------------------------------------ */
-/* Calendar with blocking                                              */
+/* Calendar with day blocking                                          */
 /* ------------------------------------------------------------------ */
 
 function AdminCalendar({
@@ -578,19 +569,19 @@ function AdminCalendar({
     [bookings, blocked],
   );
   const cells = useMemo(() => buildMonthGrid(month), [month]);
+
   const selectedDay = selected ? avail.get(selected) : undefined;
-  const selectedBlocked = selected
-    ? blocked.filter((b) => b.blocked_date === selected)
-    : [];
+  const dayInfo = getDayAvailability(selectedDay, "group", 1);
+  const selectedBlocked = selected ? blocked.filter((b) => b.blocked_date === selected) : [];
   const selectedBookings = selected
     ? bookings.filter((b) => b.seminar_date === selected && b.status !== "cancelled")
     : [];
 
-  async function blockWhole() {
+  async function blockDay() {
     if (!selected) return;
     setBusy(true);
     try {
-      await adminBlockDate(selected, null, reason, adminId);
+      await adminBlockDate(selected, reason, adminId);
       setMsg("Η ημερομηνία μπλοκαρίστηκε.");
       setReason("");
       onChanged();
@@ -601,24 +592,10 @@ function AdminCalendar({
     }
   }
 
-  async function blockSlot(slot: string) {
-    if (!selected) return;
+  async function unblockDay() {
     setBusy(true);
     try {
-      await adminBlockDate(selected, slot, reason, adminId);
-      setMsg(`Η ώρα ${slot} μπλοκαρίστηκε.`);
-      onChanged();
-    } catch (e) {
-      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function unblock(id: string) {
-    setBusy(true);
-    try {
-      await adminUnblock(id);
+      await Promise.all(selectedBlocked.map((b) => adminUnblock(b.id)));
       setMsg("Το μπλοκάρισμα αφαιρέθηκε.");
       onChanged();
     } catch (e) {
@@ -690,7 +667,9 @@ function AdminCalendar({
                   />
                 )}
                 {status === "blocked" && (
-                  <Lock className={`absolute bottom-1 right-1 size-2.5 ${isSelected ? "text-black" : "text-red-400"}`} />
+                  <Lock
+                    className={`absolute bottom-1 right-1 size-2.5 ${isSelected ? "text-black" : "text-red-400"}`}
+                  />
                 )}
               </button>
             );
@@ -708,8 +687,7 @@ function AdminCalendar({
       <div className="rounded-2xl border border-white/10 bg-black/50 p-5">
         {!selected ? (
           <p className="text-sm text-zinc-500">
-            Επίλεξε μια ημερομηνία για να δεις κρατήσεις και να διαχειριστείς
-            μπλοκαρίσματα.
+            Επίλεξε μια ημερομηνία για να δεις κρατήσεις και να διαχειριστείς μπλοκαρίσματα.
           </p>
         ) : (
           <div className="space-y-5">
@@ -724,60 +702,25 @@ function AdminCalendar({
               </h4>
             </div>
 
-            {/* Slot states + per-slot block buttons */}
-            <div className="space-y-2">
-              {SLOTS.map((s) => {
-                const info = getSlotStatus(selectedDay, s, "group", 1);
-                const slotBlock = selectedBlocked.find((b) => b.slot === s);
-                return (
-                  <div
-                    key={s}
-                    className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5"
-                  >
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">{s}</p>
-                      <p className="text-[11px] uppercase tracking-wider text-zinc-500">
-                        {info.status === "blocked"
-                          ? "Μπλοκαρισμένο"
-                          : info.status === "full"
-                            ? "Γεμάτο"
-                            : `${info.remaining}/${GROUP_CAPACITY} διαθέσιμα`}
-                      </p>
-                    </div>
-                    {slotBlock ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => unblock(slotBlock.id)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-white/30"
-                      >
-                        <Unlock className="size-3.5" /> Ξεμπλόκαρε
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busy || info.status === "blocked"}
-                        onClick={() => blockSlot(s)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs text-zinc-300 transition hover:border-white/30 disabled:opacity-40"
-                      >
-                        <Lock className="size-3.5" /> Μπλόκαρε
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+            {/* Day availability */}
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5">
+              <p className="text-[11px] uppercase tracking-wider text-zinc-500">
+                {dayInfo.status === "blocked"
+                  ? "Μπλοκαρισμένη"
+                  : dayInfo.status === "full"
+                    ? "Γεμάτη"
+                    : `${dayInfo.remaining}/${GROUP_CAPACITY} διαθέσιμα`}
+              </p>
             </div>
 
             {/* Whole-day block */}
             <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3.5">
-              {selectedBlocked.some((b) => b.slot === null) ? (
+              {selectedBlocked.length > 0 ? (
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() =>
-                    unblock(selectedBlocked.find((b) => b.slot === null)!.id)
-                  }
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/30"
+                  onClick={unblockDay}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/30 disabled:opacity-50"
                 >
                   <Unlock className="size-3.5" /> Ξεμπλόκαρε όλη τη μέρα
                 </button>
@@ -792,7 +735,7 @@ function AdminCalendar({
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={blockWhole}
+                    onClick={blockDay}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
                   >
                     <Lock className="size-3.5" /> Μπλόκαρε όλη τη μέρα
@@ -813,9 +756,7 @@ function AdminCalendar({
                       key={b.id}
                       className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-xs"
                     >
-                      <span className="text-zinc-300">
-                        {b.full_name} · {b.slot}
-                      </span>
+                      <span className="text-zinc-300">{b.full_name}</span>
                       <span className="text-zinc-500">
                         {b.format === "group" ? `${b.participants}p` : "1-1"}
                       </span>
