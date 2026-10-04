@@ -24,6 +24,9 @@ import {
   User,
   Users,
 } from "lucide-react";
+<section id="seminars">
+  <Seminars />
+</section>
 
 /* ------------------------------------------------------------------ */
 /* Content (edit freely)                                              */
