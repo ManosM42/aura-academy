@@ -80,6 +80,14 @@ export async function getOnlineBookings(): Promise<OnlineBooking[]> {
   return (data ?? []) as unknown as OnlineBooking[];
 }
 
+export async function setOnlineBookingStatus(id: string, status: OnlineBooking["status"]) {
+  const { error } = await supabase
+    .from("online_seminar_bookings")
+    .update({ status, paid_at: status === "paid" ? new Date().toISOString() : null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function startOnlineCheckout(p: {
   seminarId: string;
   fullName: string;

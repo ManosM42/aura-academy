@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Globe, Mail, Pencil, Phone, Plus, Trash2, Eye, EyeOff, X, Users } from "lucide-react";
+import { BadgeCheck, Globe, Mail, Pencil, Phone, Plus, Trash2, Eye, EyeOff, X, Users } from "lucide-react";
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import {
@@ -9,6 +9,7 @@ import {
   getAdminOnlineSeminars,
   getOnlineBookings,
   saveOnlineSeminar,
+  setOnlineBookingStatus,
   setOnlineSeminarPublished,
   type OnlineBooking,
   type OnlineSeminar,
@@ -113,6 +114,21 @@ export function AdminOnlineSeminars() {
   async function togglePublish(s: OnlineSeminar) {
     try {
       await setOnlineSeminarPublished(s.id, !s.published);
+      refresh();
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    }
+  }
+
+  async function changeBooking(b: OnlineBooking, status: OnlineBooking["status"]) {
+    const text =
+      status === "paid"
+        ? `Μαρκάρισμα του ${b.full_name} ως πληρωμένου;`
+        : `Αναίρεση πληρωμής για τον ${b.full_name};`;
+    if (!window.confirm(text)) return;
+    try {
+      await setOnlineBookingStatus(b.id, status);
+      setMsg(status === "paid" ? `Ο ${b.full_name} μαρκαρίστηκε ως πληρωμένος.` : "Η πληρωμή αναιρέθηκε.");
       refresh();
     } catch (e) {
       setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
@@ -279,6 +295,24 @@ export function AdminOnlineSeminars() {
                       </span>
                     </td>
                     <td className="p-4 text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                      {b.status === "paid" ? (
+                        <button
+                          type="button"
+                          onClick={() => changeBooking(b, "pending")}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 transition hover:border-white/40 hover:text-white"
+                        >
+                          Αναίρεση
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => changeBooking(b, "paid")}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-400 hover:text-black"
+                        >
+                          <BadgeCheck className="size-3.5" /> Πληρώθηκε
+                        </button>
+                      )}
                       <a
                         href={`mailto:${b.email}?subject=${encodeURIComponent(
                           `AURA online σεμινάριο: ${b.online_seminars?.title ?? ""}`,
@@ -287,6 +321,7 @@ export function AdminOnlineSeminars() {
                       >
                         <Mail className="size-3.5" /> Επικοινωνία
                       </a>
+                      </div>
                     </td>
                   </tr>
                 ))}
