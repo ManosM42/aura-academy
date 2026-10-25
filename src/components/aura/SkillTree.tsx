@@ -167,8 +167,7 @@ export default function SkillTree() {
                       strokeLinecap="round"
                       filter="url(#softGlow)"
                       initial={{ pathLength: 0, opacity: 0 }}
-                      whileInView={{ pathLength: 1, opacity: 1 }}
-                      viewport={{ once: true }}
+                      animate={{ pathLength: 1, opacity: 1 }}
                       transition={{ duration: 1.2, ease: "easeInOut", delay: i * 0.12 }}
                     />
                     {!reduce && (
@@ -201,12 +200,14 @@ export default function SkillTree() {
                     onClick={() => setActive(i)}
                     onFocus={() => setActive(i)}
                     onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setActive(i)}
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.7, ease: "backOut", delay: 0.25 + i * 0.09 }}
-                    style={{ transformBox: "fill-box", transformOrigin: "center", cursor: "pointer", outline: "none" }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.7, ease: EASE, delay: 0.3 + i * 0.09 }}
+                    style={{ cursor: "pointer", outline: "none" }}
                   >
+                    {/* larger tap target */}
+                    <circle cx={s.x} cy={s.y} r="44" fill="rgba(0,0,0,0.001)" />
+
                     {/* selection ring */}
                     {on && <circle cx={s.x} cy={s.y} r="40" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" strokeDasharray="2 6" />}
 
