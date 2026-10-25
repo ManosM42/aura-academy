@@ -25,8 +25,11 @@ import {
   Shield,
   Scissors,
   CalendarIcon,
+  Globe,
 } from "lucide-react";
 import { AdminSeminars } from "@/components/aura/AdminSeminars";
+import { AdminOnlineSeminars } from "@/components/aura/AdminOnlineSeminars";
+
 
 export const Route = createFileRoute("/admin/")({ component: AdminPage });
 
@@ -83,6 +86,7 @@ function AdminPage() {
   <div className="space-y-12">
     <OverviewSection />
     <AdminSeminars adminId={profile.data.id} />
+    <AdminOnlineSeminars />  
     <UsersSection selfId={profile.data.id} canEditAdmins={superAdmin} />
     <AuditSection />
   </div>
@@ -124,6 +128,7 @@ function OverviewSection() {
         <QuickLink to="/academy" label="Academy" icon={<GraduationCap className="size-4" />} />
         <QuickLink to="/review/haircuts" label="Haircut Review" icon={<Scissors className="size-4" />} />
         <QuickLink to="/seminars" label="Booking Page" icon={<CalendarIcon className="size-4" />} />
+        <QuickLink to="/online-seminars" label="Online Seminars" icon={<Globe className="size-4" />} />
       </div>
     </section>
   );

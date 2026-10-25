@@ -25,6 +25,7 @@ import {
   Sparkles,
   User,
   Users,
+  Video,
 } from "lucide-react";
 import {
   GROUP_CAPACITY,
@@ -180,6 +181,12 @@ function SeminarsBookingRoute() {
             στοιχεία σου. Θα επικοινωνήσουμε μαζί σου για επιβεβαίωση.
           </p>
         </motion.div>
+        <Link
+  to="/online-seminars"
+  className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-white/50 hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+>
+  <Video className="size-4" /> Online σεμινάρια <ArrowRight className="size-4" />
+</Link>
 
         {/* Progress rail */}
         <StepRail step={step} format={format} />

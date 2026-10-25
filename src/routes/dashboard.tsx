@@ -273,23 +273,7 @@ function DashboardPage() {
               </h1>
             </div>
 
-            <motion.div
-              whileHover={{ scale: 1.04 }}
-              className="relative inline-flex items-center gap-3 self-start overflow-hidden rounded-full border border-white/25 bg-white/[0.04] py-2 pl-2 pr-5 backdrop-blur-md md:self-auto"
-              style={{ boxShadow: "0 0 30px rgba(255,255,255,0.08)" }}
-            >
-              <Sheen />
-              <span
-                className="relative flex size-10 items-center justify-center rounded-full text-neutral-950"
-                style={{ backgroundImage: CHROME_FILL, boxShadow: "0 0 18px rgba(255,255,255,0.5), inset 0 1px 0 rgba(255,255,255,0.9)" }}
-              >
-                <rank.Icon className="size-5" />
-              </span>
-              <span className="relative leading-tight">
-                <span className="block text-[10px] uppercase tracking-[0.25em] text-white/50">Aura Rank</span>
-                <span className="block text-sm font-bold text-white">{rank.label}</span>
-              </span>
-            </motion.div>
+           
           </motion.header>
 
           {/* stats */}

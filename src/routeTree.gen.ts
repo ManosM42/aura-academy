@@ -18,6 +18,7 @@ import { Route as HaircutReviewRouteImport } from './routes/haircut-review'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as MethodRouteImport } from './routes/method'
+import { Route as OnlineSeminarsRouteImport } from './routes/online-seminars'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as SeminarsRouteImport } from './routes/seminars'
@@ -87,6 +88,11 @@ const MessagesRoute = MessagesRouteImport.update({
 const MethodRoute = MethodRouteImport.update({
   id: '/method',
   path: '/method',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnlineSeminarsRoute = OnlineSeminarsRouteImport.update({
+  id: '/online-seminars',
+  path: '/online-seminars',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PricingRoute = PricingRouteImport.update({
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
+  '/online-seminars': typeof OnlineSeminarsRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
   '/seminars': typeof SeminarsRoute
@@ -261,6 +268,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
+  '/online-seminars': typeof OnlineSeminarsRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
   '/seminars': typeof SeminarsRoute
@@ -298,6 +306,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
+  '/online-seminars': typeof OnlineSeminarsRoute
   '/pricing': typeof PricingRoute
   '/profile': typeof ProfileRoute
   '/seminars': typeof SeminarsRoute
@@ -336,6 +345,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/method'
+    | '/online-seminars'
     | '/pricing'
     | '/profile'
     | '/seminars'
@@ -372,6 +382,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/method'
+    | '/online-seminars'
     | '/pricing'
     | '/profile'
     | '/seminars'
@@ -408,6 +419,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/messages'
     | '/method'
+    | '/online-seminars'
     | '/pricing'
     | '/profile'
     | '/seminars'
@@ -445,6 +457,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   MethodRoute: typeof MethodRoute
+  OnlineSeminarsRoute: typeof OnlineSeminarsRoute
   PricingRoute: typeof PricingRoute
   ProfileRoute: typeof ProfileRoute
   SeminarsRoute: typeof SeminarsRoute
@@ -535,6 +548,13 @@ declare module '@tanstack/react-router' {
       path: '/method'
       fullPath: '/method'
       preLoaderRoute: typeof MethodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/online-seminars': {
+      id: '/online-seminars'
+      path: '/online-seminars'
+      fullPath: '/online-seminars'
+      preLoaderRoute: typeof OnlineSeminarsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pricing': {
@@ -725,6 +745,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   MethodRoute: MethodRoute,
+  OnlineSeminarsRoute: OnlineSeminarsRoute,
   PricingRoute: PricingRoute,
   ProfileRoute: ProfileRoute,
   SeminarsRoute: SeminarsRoute,
