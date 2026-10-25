@@ -86,16 +86,25 @@ export async function startOnlineCheckout(p: {
   email: string;
   phone: string;
 }): Promise<{ clientSecret: string; sessionId: string }> {
-  const { data, error } = await supabase.functions.invoke("create-online-checkout", { body: p });
-  if (error || !data?.clientSecret) {
-    let code = "server_error";
-    try {
-      const body = await (error as any)?.context?.json?.();
-      if (body?.error) code = body.error;
-    } catch {
-      /* ignore */
-    }
-    throw new Error(code);
+  // Plain fetch to the edge function so the real error code is never hidden.
+  const url = (supabase as any).supabaseUrl as string;
+  const key = (supabase as any).supabaseKey as string;
+
+  let res: Response;
+  try {
+    res = await fetch(`${url}/functions/v1/create-online-checkout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+      body: JSON.stringify(p),
+    });
+  } catch {
+    throw new Error("network_error");
+  }
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.clientSecret) {
+    console.error("create-online-checkout:", res.status, data);
+    throw new Error(data?.error ?? "server_error");
   }
   return data;
 }
