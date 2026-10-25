@@ -30,17 +30,19 @@ const STATE_LABEL: Record<SkillState, string> = {
   locked: "Locked",
 };
 
-/* Layout: one row per category (top -> bottom = progression), skills centred
-   across the row. A single SVG scales to any screen, so mobile and desktop
-   show exactly the same graph. */
-const COL_W = 150;
-const PAD_X = 70;
-const ROW_H = 168;
-const PAD_TOP = 20;
-const PAD_BOTTOM = 24;
-const NODE_OFFSET_Y = 76; // node centre below the row top
-const R = 25;
-const MIN_WIDTH = 440;
+/* Compact layout. One SVG scales to any screen, so mobile and desktop show
+   exactly the same graph. Rows hold at most MAX_COLS skills so text stays
+   readable on a phone. */
+const MAX_COLS = 4;
+const COL_W = 118;
+const PAD_X = 56;
+const PAD_TOP = 14;
+const PAD_BOTTOM = 14;
+const LABEL_BAND = 34; // category title above its first row
+const ROW_H = 96;
+const NODE_Y = 28; // node centre below the row top
+const R = 20;
+const MIN_WIDTH = 340;
 
 interface LaidOutNode {
   skill: SkillWithState;
@@ -60,31 +62,37 @@ function layout(skills: SkillWithState[]) {
   }
   for (const list of byCategory.values()) list.sort((a, b) => a.sort_order - b.sort_order);
 
-  const rows = CATEGORY_ORDER.filter((c) => (byCategory.get(c) ?? []).length > 0);
-  const maxCols = Math.max(1, ...rows.map((c) => byCategory.get(c)!.length));
+  const cats = CATEGORY_ORDER.filter((c) => (byCategory.get(c) ?? []).length > 0);
+  const maxCols = Math.min(MAX_COLS, Math.max(1, ...cats.map((c) => byCategory.get(c)!.length)));
   const width = Math.max(MIN_WIDTH, PAD_X * 2 + (maxCols - 1) * COL_W);
-  const height = PAD_TOP + rows.length * ROW_H + PAD_BOTTOM;
 
   const nodes: LaidOutNode[] = [];
   const byId = new Map<string, LaidOutNode>();
-  const rowTops: { cat: SkillCategory; top: number }[] = [];
+  const titles: { cat: SkillCategory; y: number }[] = [];
 
-  rows.forEach((cat, rowIndex) => {
+  let cursor = PAD_TOP;
+  for (const cat of cats) {
+    titles.push({ cat, y: cursor });
+    cursor += LABEL_BAND;
     const list = byCategory.get(cat)!;
-    const top = PAD_TOP + rowIndex * ROW_H;
-    rowTops.push({ cat, top });
-    const startX = width / 2 - ((list.length - 1) * COL_W) / 2;
-    list.forEach((skill, i) => {
-      const node: LaidOutNode = {
-        skill,
-        state: skill.userSkill?.state ?? "locked",
-        x: startX + i * COL_W,
-        y: top + NODE_OFFSET_Y,
-      };
-      nodes.push(node);
-      byId.set(skill.id, node);
-    });
-  });
+    for (let start = 0; start < list.length; start += MAX_COLS) {
+      const chunk = list.slice(start, start + MAX_COLS);
+      const startX = width / 2 - ((chunk.length - 1) * COL_W) / 2;
+      chunk.forEach((skill, i) => {
+        const node: LaidOutNode = {
+          skill,
+          state: skill.userSkill?.state ?? "locked",
+          x: startX + i * COL_W,
+          y: cursor + NODE_Y,
+        };
+        nodes.push(node);
+        byId.set(skill.id, node);
+      });
+      cursor += ROW_H;
+    }
+    cursor += 6;
+  }
+  const height = cursor + PAD_BOTTOM;
 
   const edges: [LaidOutNode, LaidOutNode][] = [];
   for (const node of nodes) {
@@ -93,11 +101,10 @@ function layout(skills: SkillWithState[]) {
       if (from) edges.push([from, node]);
     }
   }
-
-  return { nodes, edges, rowTops, width, height };
+  return { nodes, edges, titles, width, height };
 }
 
-function wrap(name: string, max = 14): string[] {
+function wrap(name: string, max = 13): string[] {
   const words = name.split(/\s+/);
   let lines: string[] = [];
   let cur = "";
@@ -133,7 +140,7 @@ function edgePath(a: LaidOutNode, b: LaidOutNode) {
 
 export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] }) {
   const reduce = useReducedMotion();
-  const { nodes, edges, rowTops, width, height } = useMemo(() => layout(skills), [skills]);
+  const { nodes, edges, titles, width, height } = useMemo(() => layout(skills), [skills]);
 
   const defaultId = useMemo(() => {
     const pick =
@@ -145,7 +152,7 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
   }, [nodes]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  if (skills.length === 0) return null;
+  if (skills.length === 0 || nodes.length === 0) return null;
 
   const sel = nodes.find((n) => n.skill.id === (selectedId ?? defaultId)) ?? nodes[0]!;
   const prereqNames = (sel.skill.prerequisites ?? [])
@@ -153,17 +160,16 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
     .filter(Boolean) as string[];
 
   return (
-    <section className="relative mx-auto w-full max-w-4xl">
-      <div className="relative w-full overflow-hidden rounded-2xl">
-        {/* dotted grid */}
+    <section className="relative mx-auto w-full max-w-md">
+      <div className="relative w-full overflow-hidden rounded-xl">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-[0.35]"
+          className="pointer-events-none absolute inset-0 opacity-30"
           style={{
             backgroundImage: "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)",
-            backgroundSize: "26px 26px",
-            maskImage: "radial-gradient(ellipse at center, black 30%, transparent 78%)",
-            WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 78%)",
+            backgroundSize: "22px 22px",
+            maskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
+            WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
           }}
         />
 
@@ -171,11 +177,11 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
           <defs>
             <linearGradient id="stg-edge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={width} y2={height}>
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-              <stop offset="50%" stopColor="#9aa0a8" stopOpacity="0.55" />
+              <stop offset="50%" stopColor="#9aa0a8" stopOpacity="0.6" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
             </linearGradient>
             <linearGradient id="stg-rule" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.28" />
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </linearGradient>
             <radialGradient id="stg-chrome" cx="35%" cy="30%" r="80%">
@@ -188,7 +194,7 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
               <stop offset="100%" stopColor="#0c0d0e" />
             </radialGradient>
             <filter id="stg-glow" x="-100%" y="-100%" width="300%" height="300%">
-              <feGaussianBlur stdDeviation="4" result="b" />
+              <feGaussianBlur stdDeviation="3" result="b" />
               <feMerge>
                 <feMergeNode in="b" />
                 <feMergeNode in="SourceGraphic" />
@@ -196,20 +202,14 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
             </filter>
           </defs>
 
-          {/* category bands */}
-          {rowTops.map(({ cat, top }, i) => (
-            <motion.g
-              key={cat}
-              initial={{ opacity: 0, x: -10 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, ease: EASE, delay: i * 0.08 }}
-            >
-              <text x={22} y={top + 20} className="font-aura" fill="rgba(255,255,255,0.6)" fontSize="15" fontWeight="600" letterSpacing="3">
+          {/* category titles */}
+          {titles.map(({ cat, y }) => (
+            <g key={cat}>
+              <text x={16} y={y + 14} className="font-aura" fill="rgba(255,255,255,0.65)" fontSize="11" fontWeight="600" letterSpacing="2.5">
                 {CATEGORY_LABEL[cat].toUpperCase()}
               </text>
-              <line x1={22} y1={top + 32} x2={width - 22} y2={top + 32} stroke="url(#stg-rule)" strokeWidth="1" />
-            </motion.g>
+              <line x1={16} y1={y + 22} x2={width - 16} y2={y + 22} stroke="url(#stg-rule)" strokeWidth="1" />
+            </g>
           ))}
 
           {/* edges */}
@@ -222,34 +222,33 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
                 <motion.path
                   d={d}
                   fill="none"
-                  stroke={lit ? "url(#stg-edge)" : soft ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.1)"}
-                  strokeWidth={lit ? 2.6 : 1.6}
+                  stroke={lit ? "url(#stg-edge)" : soft ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)"}
+                  strokeWidth={lit ? 2 : 1.3}
                   strokeLinecap="round"
-                  strokeDasharray={!lit && !soft ? "3 9" : undefined}
+                  strokeDasharray={!lit && !soft ? "2 6" : undefined}
                   filter={lit ? "url(#stg-glow)" : undefined}
                   initial={{ pathLength: 0, opacity: 0 }}
-                  whileInView={{ pathLength: 1, opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 1.1, ease: "easeInOut", delay: 0.1 + i * 0.05 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 1, ease: "easeInOut", delay: 0.1 + i * 0.04 }}
                 />
                 {lit && !reduce && (
                   <motion.path
                     d={d}
                     fill="none"
                     stroke="#ffffff"
-                    strokeWidth="2.6"
+                    strokeWidth="2"
                     strokeLinecap="round"
-                    strokeDasharray="6 46"
-                    animate={{ strokeDashoffset: [0, -52] }}
-                    transition={{ duration: 1.9, repeat: Infinity, ease: "linear" }}
-                    style={{ filter: "drop-shadow(0 0 6px #fff)" }}
+                    strokeDasharray="5 40"
+                    animate={{ strokeDashoffset: [0, -45] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                    style={{ filter: "drop-shadow(0 0 4px #fff)" }}
                   />
                 )}
               </g>
             );
           })}
 
-          {/* nodes */}
+          {/* nodes (plain fade-in on mount, always visible) */}
           {nodes.map((n, i) => {
             const isSel = n.skill.id === sel.skill.id;
             const lines = wrap(n.skill.name);
@@ -264,85 +263,77 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
                 aria-pressed={isSel}
                 onClick={() => setSelectedId(n.skill.id)}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setSelectedId(n.skill.id)}
-                initial={{ opacity: 0, scale: 0.5 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                whileHover={{ scale: 1.08 }}
-                transition={{ duration: 0.65, ease: "backOut", delay: 0.2 + i * 0.05 }}
-                style={{ transformBox: "fill-box", transformOrigin: "center", cursor: "pointer", outline: "none" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, ease: EASE, delay: 0.25 + i * 0.05 }}
+                style={{ cursor: "pointer", outline: "none" }}
               >
-                {/* transparent hit area (bigger tap target on phones) */}
-                <circle cx={n.x} cy={n.y} r={R + 16} fill="transparent" />
+                {/* larger tap target */}
+                <circle cx={n.x} cy={n.y} r={R + 14} fill="rgba(0,0,0,0.001)" />
 
-                {isSel && <circle cx={n.x} cy={n.y} r={R + 14} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.3" strokeDasharray="2 6" />}
+                {isSel && <circle cx={n.x} cy={n.y} r={R + 10} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1" strokeDasharray="2 5" />}
 
-                {/* mastered: extra outer halo */}
                 {n.state === "mastered" && (
-                  <circle cx={n.x} cy={n.y} r={R + 8} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" style={{ filter: "drop-shadow(0 0 8px #fff)" }} />
+                  <circle cx={n.x} cy={n.y} r={R + 5} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" style={{ filter: "drop-shadow(0 0 6px #fff)" }} />
                 )}
 
-                {/* pulse: verified / mastered / practicing */}
                 {(achieved || n.state === "practicing") && !reduce && (
                   <motion.circle
-                    cx={n.x} cy={n.y} r={R} fill="none" stroke="#ffffff" strokeWidth="1.6"
+                    cx={n.x} cy={n.y} r={R} fill="none" stroke="#ffffff" strokeWidth="1.3"
                     style={{ transformBox: "fill-box", transformOrigin: "center" }}
                     animate={{ scale: [1, 1.8], opacity: [achieved ? 0.4 : 0.7, 0] }}
                     transition={{ duration: achieved ? 3.2 : 2, repeat: Infinity, ease: "easeOut", delay: (i % 5) * 0.35 }}
                   />
                 )}
 
-                {/* orbiting ring: practicing (fast), learning (slow, dashed) */}
                 {(n.state === "practicing" || n.state === "learning") && !reduce && (
                   <motion.circle
-                    cx={n.x} cy={n.y} r={R + 7} fill="none"
-                    stroke={n.state === "practicing" ? "#d4d8dd" : "rgba(212,216,221,0.6)"}
-                    strokeWidth="2" strokeLinecap="round"
-                    strokeDasharray={n.state === "practicing" ? "34 126" : "3 11"}
-                    style={{ transformBox: "fill-box", transformOrigin: "center", filter: "drop-shadow(0 0 4px rgba(255,255,255,0.8))" }}
+                    cx={n.x} cy={n.y} r={R + 5} fill="none"
+                    stroke={n.state === "practicing" ? "#d4d8dd" : "rgba(212,216,221,0.65)"}
+                    strokeWidth="1.6" strokeLinecap="round"
+                    strokeDasharray={n.state === "practicing" ? "26 98" : "2.5 8.5"}
+                    style={{ transformBox: "fill-box", transformOrigin: "center", filter: "drop-shadow(0 0 3px rgba(255,255,255,0.8))" }}
                     animate={{ rotate: 360 }}
                     transition={{ duration: n.state === "practicing" ? 3.2 : 12, repeat: Infinity, ease: "linear" }}
                   />
                 )}
 
-                {/* disc */}
                 <circle
                   cx={n.x} cy={n.y} r={R}
                   fill={achieved ? "url(#stg-chrome)" : "url(#stg-dark)"}
-                  stroke={achieved ? "#ffffff" : locked ? "rgba(255,255,255,0.14)" : "#BFC0C2"}
-                  strokeWidth="2"
-                  style={achieved ? { filter: "drop-shadow(0 0 14px rgba(255,255,255,0.65))" } : undefined}
+                  stroke={achieved ? "#ffffff" : locked ? "rgba(255,255,255,0.16)" : "#BFC0C2"}
+                  strokeWidth="1.6"
+                  style={achieved ? { filter: "drop-shadow(0 0 10px rgba(255,255,255,0.65))" } : undefined}
                 />
 
-                {/* glyphs */}
                 {n.state === "verified" && (
-                  <path d={`M${n.x - 8} ${n.y} L${n.x - 2} ${n.y + 6} L${n.x + 9} ${n.y - 7}`} fill="none" stroke="#0a0a0a" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d={`M${n.x - 6.5} ${n.y} L${n.x - 1.5} ${n.y + 5} L${n.x + 7} ${n.y - 5.5}`} fill="none" stroke="#0a0a0a" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
                 )}
-                {n.state === "mastered" && <polygon points={starPoints(n.x, n.y + 1, 12, 5)} fill="#0a0a0a" />}
+                {n.state === "mastered" && <polygon points={starPoints(n.x, n.y + 1, 10, 4)} fill="#0a0a0a" />}
                 {n.state === "practicing" && (
-                  <g stroke="#d4d8dd" strokeWidth="2" strokeLinecap="round" fill="none">
-                    <circle cx={n.x} cy={n.y} r="9" />
-                    <path d={`M${n.x} ${n.y - 5} V${n.y} L${n.x + 4} ${n.y + 3}`} />
+                  <g stroke="#d4d8dd" strokeWidth="1.7" strokeLinecap="round" fill="none">
+                    <circle cx={n.x} cy={n.y} r="7.5" />
+                    <path d={`M${n.x} ${n.y - 4} V${n.y} L${n.x + 3} ${n.y + 2.5}`} />
                   </g>
                 )}
                 {n.state === "learning" && (
-                  <path d={`M${n.x} ${n.y - 9} L${n.x + 7} ${n.y} L${n.x} ${n.y + 9} L${n.x - 7} ${n.y} Z`} fill="none" stroke="#d4d8dd" strokeWidth="2" strokeLinejoin="round" />
+                  <path d={`M${n.x} ${n.y - 7.5} L${n.x + 6} ${n.y} L${n.x} ${n.y + 7.5} L${n.x - 6} ${n.y} Z`} fill="none" stroke="#d4d8dd" strokeWidth="1.7" strokeLinejoin="round" />
                 )}
                 {locked && (
-                  <g stroke="rgba(255,255,255,0.35)" strokeWidth="2" fill="none" strokeLinecap="round">
-                    <rect x={n.x - 7} y={n.y - 2} width="14" height="10" rx="2" />
-                    <path d={`M${n.x - 4} ${n.y - 2} V${n.y - 6} a4 4 0 0 1 8 0 V${n.y - 2}`} />
+                  <g stroke="rgba(255,255,255,0.38)" strokeWidth="1.7" fill="none" strokeLinecap="round">
+                    <rect x={n.x - 6} y={n.y - 2} width="12" height="8.5" rx="1.8" />
+                    <path d={`M${n.x - 3.5} ${n.y - 2} V${n.y - 5} a3.5 3.5 0 0 1 7 0 V${n.y - 2}`} />
                   </g>
                 )}
 
-                {/* label */}
                 <text
-                  x={n.x} y={n.y + R + 22} textAnchor="middle" className="font-aura"
+                  x={n.x} y={n.y + R + 15} textAnchor="middle" className="font-aura"
                   fill={locked ? "#6F6F6F" : isSel ? "#ffffff" : "#E4E4E4"}
-                  fontSize="15" fontWeight={isSel ? 700 : 500}
-                  style={isSel ? { filter: "drop-shadow(0 0 8px rgba(255,255,255,0.6))" } : undefined}
+                  fontSize="12" fontWeight={isSel ? 700 : 500}
+                  style={isSel ? { filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))" } : undefined}
                 >
                   {lines.map((l, li) => (
-                    <tspan key={li} x={n.x} dy={li === 0 ? 0 : 18}>
+                    <tspan key={li} x={n.x} dy={li === 0 ? 0 : 14}>
                       {l}
                     </tspan>
                   ))}
@@ -354,32 +345,32 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
       </div>
 
       {/* detail bar */}
-      <div className="mt-3 flex min-h-[72px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-4 sm:px-6">
+      <div className="mt-3 flex min-h-[64px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3">
         <AnimatePresence mode="wait">
           <motion.div
             key={sel.skill.id}
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.3, ease: EASE }}
-            className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex w-full min-w-0 items-center justify-between gap-3"
           >
             <div className="min-w-0">
-              <h4 className="font-aura text-base font-bold text-white">{sel.skill.name}</h4>
+              <h4 className="font-aura truncate text-sm font-bold text-white">{sel.skill.name}</h4>
               {sel.skill.definition && (
-                <p className="font-aura mt-1 line-clamp-2 text-sm leading-relaxed text-white/55">{sel.skill.definition}</p>
+                <p className="font-aura mt-0.5 line-clamp-2 text-xs leading-relaxed text-white/55">{sel.skill.definition}</p>
               )}
               {sel.state === "locked" && prereqNames.length > 0 && (
-                <p className="font-aura mt-1 text-xs text-white/40">Χρειάζεται πρώτα: {prereqNames.join(", ")}</p>
+                <p className="font-aura mt-0.5 text-[11px] text-white/40">Χρειάζεται πρώτα: {prereqNames.join(", ")}</p>
               )}
             </div>
             <span
-              className="font-aura inline-flex shrink-0 items-center self-start rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider sm:self-auto"
+              className="font-aura shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
               style={{
                 borderColor: sel.state === "locked" ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.6)",
                 color: sel.state === "mastered" ? "#0a0a0a" : sel.state === "locked" ? "rgba(255,255,255,0.4)" : "#fff",
                 background: sel.state === "mastered" ? "#fff" : "transparent",
-                boxShadow: sel.state === "locked" ? "none" : "0 0 18px rgba(255,255,255,0.25)",
+                boxShadow: sel.state === "locked" ? "none" : "0 0 14px rgba(255,255,255,0.25)",
               }}
             >
               {STATE_LABEL[sel.state]}
@@ -389,21 +380,21 @@ export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] })
       </div>
 
       {/* legend */}
-      <div className="font-aura mt-5 flex flex-wrap gap-x-6 gap-y-3 text-xs text-white/60">
-        <span className="flex items-center gap-2">
-          <i className="inline-block size-3 rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #fff, #8a9098)", boxShadow: "0 0 8px rgba(255,255,255,0.7)" }} />
+      <div className="font-aura mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-white/55">
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #fff, #8a9098)", boxShadow: "0 0 6px rgba(255,255,255,0.7)" }} />
           Verified / Mastered
         </span>
-        <span className="flex items-center gap-2">
-          <i className="inline-block size-3 rounded-full border border-[#d4d8dd] bg-[#161718] shadow-[0_0_6px_rgba(255,255,255,0.5)]" />
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full border border-[#d4d8dd] bg-[#161718]" />
           Practicing
         </span>
-        <span className="flex items-center gap-2">
-          <i className="inline-block size-3 rounded-full border border-dashed border-[#d4d8dd]/70 bg-[#161718]" />
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full border border-dashed border-[#d4d8dd]/70 bg-[#161718]" />
           Learning
         </span>
-        <span className="flex items-center gap-2">
-          <i className="inline-block size-3 rounded-full border border-white/15 bg-[#0a0a0a]" />
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full border border-white/15 bg-[#0a0a0a]" />
           Locked
         </span>
       </div>
