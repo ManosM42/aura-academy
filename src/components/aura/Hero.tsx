@@ -102,33 +102,7 @@ export default function Hero() {
             </span>
           </motion.button>
 
-          {/* Button 2: EXPLORE THE METHOD -> Redirects to /method */}
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => navigate({ to: "/method" })}
-            className="group relative w-full overflow-hidden rounded-full py-2.5 px-4 backdrop-blur-md bg-black/20 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/20 hover:border-white/40 font-aura text-[10px] sm:text-xs font-semibold uppercase tracking-[0.25em] transition-all duration-300 cursor-pointer"
-          >
-            <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
-            <span className="relative z-10 flex items-center justify-center gap-2">
-              Explore the Method
-            </span>
-          </motion.button>
-          <motion.button
-  whileHover={{ scale: 1.03 }}
-  whileTap={{ scale: 0.97 }}
-  onClick={() =>
-    document
-      .getElementById("seminars")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-  className="group relative w-full overflow-hidden rounded-full py-2.5 px-4 backdrop-blur-md bg-black/20 hover:bg-white/10 text-neutral-300 hover:text-white border border-white/20 hover:border-white/40 font-aura text-[10px] sm:text-xs font-semibold uppercase tracking-[0.25em] transition-all duration-300 cursor-pointer"
->
-  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none" />
-  <span className="relative z-10 flex items-center justify-center gap-2">
-    Book your Seminar
-  </span>
-</motion.button>
+
         </motion.div>
       </motion.div>
       

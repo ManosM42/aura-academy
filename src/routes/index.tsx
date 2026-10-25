@@ -33,10 +33,8 @@ function Index() {
 
       <main className="w-full overflow-x-hidden">
         <Hero />
-        <Method />
         <SkillTree />
         <OurTeam />
-        <RankPreviewSection />
         <PhysicalBook />
         <Seminars />
         <Certification />

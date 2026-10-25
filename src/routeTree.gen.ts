@@ -15,7 +15,6 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as HaircutReviewRouteImport } from './routes/haircut-review'
-import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as MethodRouteImport } from './routes/method'
@@ -73,11 +72,6 @@ const DashboardRoute = DashboardRouteImport.update({
 const HaircutReviewRoute = HaircutReviewRouteImport.update({
   id: '/haircut-review',
   path: '/haircut-review',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeaderboardRoute = LeaderboardRouteImport.update({
-  id: '/leaderboard',
-  path: '/leaderboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -228,7 +222,6 @@ export interface FileRoutesByFullPath {
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
   '/haircut-review': typeof HaircutReviewRoute
-  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
@@ -265,7 +258,6 @@ export interface FileRoutesByTo {
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
   '/haircut-review': typeof HaircutReviewRoute
-  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
@@ -303,7 +295,6 @@ export interface FileRoutesById {
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
   '/haircut-review': typeof HaircutReviewRoute
-  '/leaderboard': typeof LeaderboardRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
   '/method': typeof MethodRoute
@@ -342,7 +333,6 @@ export interface FileRouteTypes {
     | '/cookie-policy'
     | '/dashboard'
     | '/haircut-review'
-    | '/leaderboard'
     | '/login'
     | '/messages'
     | '/method'
@@ -379,7 +369,6 @@ export interface FileRouteTypes {
     | '/cookie-policy'
     | '/dashboard'
     | '/haircut-review'
-    | '/leaderboard'
     | '/login'
     | '/messages'
     | '/method'
@@ -416,7 +405,6 @@ export interface FileRouteTypes {
     | '/cookie-policy'
     | '/dashboard'
     | '/haircut-review'
-    | '/leaderboard'
     | '/login'
     | '/messages'
     | '/method'
@@ -454,7 +442,6 @@ export interface RootRouteChildren {
   CookiePolicyRoute: typeof CookiePolicyRoute
   DashboardRoute: typeof DashboardRoute
   HaircutReviewRoute: typeof HaircutReviewRoute
-  LeaderboardRoute: typeof LeaderboardRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
   MethodRoute: typeof MethodRoute
@@ -527,13 +514,6 @@ declare module '@tanstack/react-router' {
       path: '/haircut-review'
       fullPath: '/haircut-review'
       preLoaderRoute: typeof HaircutReviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leaderboard': {
-      id: '/leaderboard'
-      path: '/leaderboard'
-      fullPath: '/leaderboard'
-      preLoaderRoute: typeof LeaderboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -742,7 +722,6 @@ const rootRouteChildren: RootRouteChildren = {
   CookiePolicyRoute: CookiePolicyRoute,
   DashboardRoute: DashboardRoute,
   HaircutReviewRoute: HaircutReviewRoute,
-  LeaderboardRoute: LeaderboardRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
   MethodRoute: MethodRoute,
