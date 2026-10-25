@@ -1,27 +1,27 @@
 import { useMemo } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   getDashboard,
   getMySkills,
   getSkillAssignments,
-  getMyHaircutReviews,
   isStaffRole,
 } from "@/lib/queries";
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import SkillTreeGraph from "@/components/aura/SkillTreeGraph";
-import { RankIcon } from "@/components/aura/RankIcon";
-import { getRankForPoints } from "@/lib/ranks";
 import type { SkillCategory, SkillState, SkillWithState } from "@/lib/database.types";
 import {
   ArrowRight,
   BookOpen,
   CheckCircle,
-  Clock,
-  Scissors,
+  Crown,
+  Gem,
+  Lock,
+  Shield,
   ShieldCheck,
-  Trophy,
+  Sparkles,
+  Star,
   UserCheck,
 } from "lucide-react";
 
@@ -29,17 +29,120 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
 
-// Route of the page where a student submits a haircut review.
-// Open that page's file and copy the exact path from its createFileRoute("...") line.
-const HAIRCUT_SUBMIT_PATH = "/haircut-review";
+/* -------------------------------------------------------------------------- */
+/*  Shared chrome helpers                                                     */
+/* -------------------------------------------------------------------------- */
 
-const STATE_STYLE: Record<SkillState, string> = {
-  locked: "bg-white/5 text-white/40",
-  learning: "bg-blue-500/15 text-blue-300",
-  practicing: "bg-amber-500/15 text-amber-300",
-  verified: "bg-emerald-500/15 text-emerald-300",
-  mastered: "bg-violet-500/15 text-violet-300",
-};
+const EASE = [0.22, 1, 0.36, 1] as const;
+const CHROME_TEXT =
+  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+const CHROME_FILL =
+  "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)";
+const FRAME_BORDER =
+  "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))";
+
+function ChromeText({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      initial={{ backgroundPosition: "0% 50%" }}
+      animate={reduce ? undefined : { backgroundPosition: "100% 50%" }}
+      transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+      style={{
+        backgroundImage: CHROME_TEXT,
+        backgroundSize: "300% auto",
+        WebkitBackgroundClip: "text",
+        backgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+      }}
+      className={`inline-block drop-shadow-[0_0_28px_rgba(255,255,255,0.45)] ${className}`}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+/** 1px chrome gradient border around a dark surface. */
+function Frame({ children, className = "", inner = "p-5 sm:p-6" }: { children: React.ReactNode; className?: string; inner?: string }) {
+  return (
+    <div
+      className={`relative rounded-2xl p-px ${className}`}
+      style={{ background: FRAME_BORDER, boxShadow: "0 0 50px rgba(0,0,0,0.85)" }}
+    >
+      <div className={`relative h-full overflow-hidden rounded-[15px] bg-[#0a0a0b] ${inner}`}>
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-20" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }} />
+        <div className="relative">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Sheen() {
+  const reduce = useReducedMotion();
+  if (reduce) return null;
+  return (
+    <motion.span
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent"
+      animate={{ x: ["-160%", "420%"] }}
+      transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 3.2, ease: "easeInOut" }}
+      style={{ skewX: -18 }}
+    />
+  );
+}
+
+/** Animated chrome link-button. `solid` = filled chrome, otherwise glass outline. */
+function ChromeLink({
+  to,
+  params,
+  label,
+  icon,
+  solid = false,
+}: {
+  to: string;
+  params?: Record<string, string>;
+  label: string;
+  icon?: React.ReactNode;
+  solid?: boolean;
+}) {
+  return (
+    <motion.div whileHover={{ y: -2, scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-block">
+      <Link
+        to={to as never}
+        params={params as never}
+        className={`group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold outline-none transition-shadow duration-300 focus-visible:ring-2 focus-visible:ring-white/70 ${
+          solid
+            ? "text-neutral-950 shadow-[0_0_30px_rgba(255,255,255,0.18)] hover:shadow-[0_0_46px_rgba(255,255,255,0.4)]"
+            : "border border-white/25 bg-white/[0.04] text-white hover:border-white/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.14)]"
+        }`}
+        style={solid ? { backgroundImage: CHROME_FILL, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4)" } : undefined}
+      >
+        {solid && <Sheen />}
+        {icon}
+        <span className="relative">{label}</span>
+        <ArrowRight className="relative size-4 transition-transform duration-300 group-hover:translate-x-1" />
+      </Link>
+    </motion.div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Rank + skill helpers                                                      */
+/* -------------------------------------------------------------------------- */
+
+const RANKS = [
+  { key: "initiate", label: "Initiate", min: 0, Icon: Shield },
+  { key: "apprentice", label: "Apprentice", min: 100, Icon: Star },
+  { key: "artisan", label: "Artisan", min: 300, Icon: Gem },
+  { key: "master", label: "Master", min: 700, Icon: Crown },
+  { key: "legend", label: "Legend", min: 1500, Icon: Sparkles },
+] as const;
+
+function getRankForPoints(points: number) {
+  let rank: (typeof RANKS)[number] = RANKS[0];
+  for (const r of RANKS) if (points >= r.min) rank = r;
+  return rank;
+}
 
 const CATEGORY_LABEL: Record<SkillCategory, string> = {
   foundation: "Foundation",
@@ -48,6 +151,14 @@ const CATEGORY_LABEL: Record<SkillCategory, string> = {
   design: "Design",
   business: "Business",
   educator: "Educator",
+};
+
+const STATE_CLASS: Record<SkillState, string> = {
+  locked: "border-white/10 bg-white/[0.03] text-white/35",
+  learning: "border-white/20 bg-white/[0.07] text-white/65",
+  practicing: "border-white/35 bg-white/[0.12] text-white/85",
+  verified: "border-white/70 bg-white/[0.18] text-white shadow-[0_0_16px_rgba(255,255,255,0.35)]",
+  mastered: "border-white bg-white text-neutral-950 shadow-[0_0_22px_rgba(255,255,255,0.6)]",
 };
 
 const ACHIEVED_STATES: SkillState[] = ["verified", "mastered"];
@@ -64,136 +175,179 @@ function isUnlocked(skill: SkillWithState, all: SkillWithState[]): boolean {
   });
 }
 
+/** Maps a review decision to the label students see (no numeric scores). */
+function decisionLabel(decision: string | null | undefined): { text: string; ok: boolean } | null {
+  if (!decision) return null;
+  if (decision === "passed") return { text: "Verified", ok: true };
+  if (decision === "needs_revision") return { text: "Needs revision", ok: false };
+  return { text: "Not passed", ok: false };
+}
+
+function DecisionBadge({ decision }: { decision: string | null | undefined }) {
+  const d = decisionLabel(decision);
+  if (!d) return <span className="text-white/40">—</span>;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+        d.ok
+          ? "border-white bg-white text-neutral-950 shadow-[0_0_24px_rgba(255,255,255,0.55)]"
+          : "border-white/25 bg-white/[0.06] text-white/75"
+      }`}
+    >
+      {d.ok && <ShieldCheck className="size-3.5" />}
+      {d.text}
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page                                                                      */
+/* -------------------------------------------------------------------------- */
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.09 } } };
+const item = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+
 function DashboardPage() {
+  const reduce = useReducedMotion();
   const { data, error, loading } = useAsync(getDashboard, []);
   const staff = data ? isStaffRole(data.profile.role) : false;
 
   const skills = useAsync(getMySkills, []);
   const assignments = useAsync(getSkillAssignments, []);
-  const haircuts = useAsync(getMyHaircutReviews, []);
 
-  const rank = useMemo(() => {
-    if (!data?.profile) return getRankForPoints(0);
-    return getRankForPoints(data.profile.points ?? 0);
-  }, [data?.profile]);
+  const rank = useMemo(() => getRankForPoints(data?.profile?.points ?? 0), [data?.profile]);
 
   const nextSkill = useMemo(() => {
     if (!skills.data) return null;
-    return (
-      skills.data.find((s) => !isAchieved(s) && isUnlocked(s, skills.data!)) ??
-      null
-    );
+    return skills.data.find((s) => !isAchieved(s) && isUnlocked(s, skills.data!)) ?? null;
   }, [skills.data]);
 
   const nextAssignmentId = nextSkill ? assignments.data?.[nextSkill.id] : null;
 
   const groupedSkills = useMemo(() => {
     if (!skills.data) return {};
-    return skills.data.reduce<Record<string, SkillWithState[]>>(
-      (acc, s) => {
-        (acc[s.category] ??= []).push(s);
-        return acc;
-      },
-      {},
-    );
+    return skills.data.reduce<Record<string, SkillWithState[]>>((acc, s) => {
+      (acc[s.category] ??= []).push(s);
+      return acc;
+    }, {});
   }, [skills.data]);
 
   return (
-    <main className="w-full min-h-screen overflow-x-hidden bg-[#070707] px-4 sm:px-6 md:px-10 py-12 text-white selection:bg-white selection:text-black">
+    <main className="relative min-h-screen w-full overflow-x-hidden bg-[#070707] px-4 py-12 text-white selection:bg-white selection:text-black sm:px-6 md:px-10">
+      {/* ambient chrome glow */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+
       {loading && (
-        <div className="mx-auto max-w-5xl">
+        <div className="relative mx-auto max-w-5xl">
           <LoadingSkeleton rows={3} />
         </div>
       )}
       {error && (
-        <div className="mx-auto max-w-5xl">
+        <div className="relative mx-auto max-w-5xl">
           <ErrorState message={error} />
         </div>
       )}
 
       {data && (
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="mx-auto max-w-6xl space-y-8"
-        >
-          <header className="flex flex-col md:flex-row md:items-center md:justify-between border-b border-white/10 pb-6 gap-4">
+        <motion.div variants={container} initial="hidden" animate="show" className="relative mx-auto max-w-6xl space-y-10">
+          {/* header */}
+          <motion.header variants={item} className="flex flex-col gap-5 border-b border-white/10 pb-8 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/50 mb-2">
-                <span className="h-px w-8 bg-gradient-to-r from-white/60 to-transparent" />
+              <div className="mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50">
+                <span className="h-px w-10 bg-gradient-to-r from-white/70 to-transparent" />
                 AURA Command Center
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">
-                Καλωσήρθες
-                {data.profile.full_name ? <span className="chrome-type font-semibold">, {data.profile.full_name}</span> : ""}.
+              <h1 className="text-3xl font-extrabold uppercase tracking-tight sm:text-5xl">
+                <ChromeText>
+                  Καλωσήρθες{data.profile.full_name ? `, ${data.profile.full_name}` : ""}.
+                </ChromeText>
               </h1>
             </div>
-            <div className="inline-flex items-center gap-3 rounded-full border border-white/15 bg-white/[0.03] px-4 py-2 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.03)] self-start md:self-auto">
-              <RankIcon rank={rank.key} size={24} />
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs uppercase tracking-wider text-white/60">Aura Rank:</span>
-                <span className="font-bold text-white">{rank.label}</span>
-              </div>
-            </div>
-          </header>
 
-          <div className="grid gap-5 sm:grid-cols-3">
+            <motion.div
+              whileHover={{ scale: 1.04 }}
+              className="relative inline-flex items-center gap-3 self-start overflow-hidden rounded-full border border-white/25 bg-white/[0.04] py-2 pl-2 pr-5 backdrop-blur-md md:self-auto"
+              style={{ boxShadow: "0 0 30px rgba(255,255,255,0.08)" }}
+            >
+              <Sheen />
+              <span
+                className="relative flex size-10 items-center justify-center rounded-full text-neutral-950"
+                style={{ backgroundImage: CHROME_FILL, boxShadow: "0 0 18px rgba(255,255,255,0.5), inset 0 1px 0 rgba(255,255,255,0.9)" }}
+              >
+                <rank.Icon className="size-5" />
+              </span>
+              <span className="relative leading-tight">
+                <span className="block text-[10px] uppercase tracking-[0.25em] text-white/50">Aura Rank</span>
+                <span className="block text-sm font-bold text-white">{rank.label}</span>
+              </span>
+            </motion.div>
+          </motion.header>
+
+          {/* stats */}
+          <motion.div variants={item} className="grid gap-5 sm:grid-cols-3">
             <StatCard
               label="Verified skills"
-              value={`${data.verifiedSkills} / ${data.totalSkills}`}
-              icon={<ShieldCheck className="size-5 text-white/70" />}
+              icon={<ShieldCheck className="size-5" />}
+              value={
+                <span className="text-4xl font-extrabold tracking-tight text-white">
+                  {data.verifiedSkills}
+                  <span className="text-white/35"> / {data.totalSkills}</span>
+                </span>
+              }
             />
             <StatCard
               label="Ανοιχτές υποβολές"
-              value={String(data.openSubmissions)}
-              icon={<CheckCircle className="size-5 text-white/70" />}
+              icon={<CheckCircle className="size-5" />}
+              value={<span className="text-4xl font-extrabold tracking-tight text-white">{data.openSubmissions}</span>}
             />
             <StatCard
-              label="Τελευταίο score"
+              label="Τελευταίο αποτέλεσμα"
+              icon={<Sparkles className="size-5" />}
               value={
-                data.latestReview?.score != null
-                  ? String(data.latestReview.score)
-                  : "—"
+                data.latestReview ? (
+                  <DecisionBadge decision={data.latestReview.decision} />
+                ) : (
+                  <span className="text-4xl font-extrabold text-white/40">—</span>
+                )
               }
-              icon={<Trophy className="size-5 text-white/70" />}
             />
-          </div>
+          </motion.div>
 
-
-          {/* Skill Progression Tree Section */}
+          {/* skill tree */}
           {skills.data && skills.data.length > 0 && (
-            <div className="w-full space-y-3">
-              <div className="px-1">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2">
-                  <span className="size-1.5 rounded-full bg-white/60" />
-                  Skill Progression Tree
-                </h2>
-                <p className="mt-1 text-xs text-white/50">
-                  Locked → Learning → Practicing → Verified → Mastered. Για να ξεκλειδώσεις ένα skill πρέπει πρώτα να έχεις verified όλα τα προαπαιτούμενά του.
-                </p>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-zinc-950/80 p-6 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+            <motion.div variants={item} className="space-y-4">
+              <SectionTitle>Skill Progression Tree</SectionTitle>
+              <p className="-mt-2 px-1 text-xs leading-relaxed text-white/50">
+                Locked → Learning → Practicing → Verified → Mastered. Για να ξεκλειδώσεις ένα skill πρέπει πρώτα να έχεις verified όλα τα προαπαιτούμενά του.
+              </p>
+              <Frame className="w-full" inner="p-4 sm:p-6">
                 <SkillTreeGraph skills={skills.data} />
-              </div>
-            </div>
+              </Frame>
+            </motion.div>
           )}
 
-          {/* Detailed Categorized Skills Breakdown */}
+          {/* categorized skills */}
           {skills.data && skills.data.length > 0 && (
-            <div className="space-y-6 pt-4">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2 px-1">
-                <span className="size-1.5 rounded-full bg-white/60" />
-                Αναλυτική Λίστα Skills
-              </h2>
-              <div className="space-y-8">
+            <motion.div variants={item} className="space-y-6">
+              <SectionTitle>Αναλυτική Λίστα Skills</SectionTitle>
+              <div className="space-y-9">
                 {(Object.keys(groupedSkills) as SkillCategory[]).map((cat) => (
                   <section key={cat} className="space-y-3">
-                    <h3 className="text-xs font-medium uppercase tracking-widest text-white/50 px-1">
+                    <h3 className="flex items-center gap-3 px-1 text-xs font-medium uppercase tracking-[0.3em] text-white/45">
                       {CATEGORY_LABEL[cat] ?? cat}
+                      <span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
                     </h3>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {groupedSkills[cat]!.map((s) => {
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {groupedSkills[cat]!.map((s, i) => {
                         const state = s.userSkill?.state ?? "locked";
                         const achieved = isAchieved(s);
                         const unlocked = isUnlocked(s, skills.data!);
@@ -203,298 +357,202 @@ function DashboardPage() {
                           .filter((sk) => sk && !isAchieved(sk));
 
                         return (
-                          <div
+                          <motion.div
                             key={s.id}
-                            className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4 backdrop-blur-xl transition-all duration-300 hover:border-white/25 shadow-[0_0_20px_-5px_rgba(0,0,0,0.8)]"
+                            initial={{ opacity: 0, y: 16 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-40px" }}
+                            transition={{ duration: 0.6, ease: EASE, delay: (i % 4) * 0.06 }}
+                            whileHover={{ y: -4 }}
+                            className="group relative"
                           >
-                            <div className="flex items-start justify-between gap-3">
-                              <h4 className="text-sm font-medium text-white">{s.name}</h4>
-                              <span
-                                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-wider ${STATE_STYLE[state]}`}
-                              >
-                                {state}
-                              </span>
-                            </div>
-                            {s.definition && (
-                              <p className="mt-2 line-clamp-2 text-xs text-white/50 leading-relaxed">
-                                {s.definition}
-                              </p>
-                            )}
-                            <div className="mt-3 flex items-center gap-3 text-xs text-white/40 font-mono">
-                              {s.userSkill?.score != null && (
-                                <span>Score {s.userSkill.score}</span>
+                            <Frame inner="p-5">
+                              <div className="flex items-start justify-between gap-3">
+                                <h4 className="text-sm font-semibold text-white">{s.name}</h4>
+                                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${STATE_CLASS[state]}`}>
+                                  {state}
+                                </span>
+                              </div>
+                              {s.definition && (
+                                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/50">{s.definition}</p>
                               )}
                               {s.userSkill?.verified_at && (
-                                <span>
-                                  Verified{" "}
-                                  {new Date(
-                                    s.userSkill.verified_at,
-                                  ).toLocaleDateString("el-GR")}
-                                </span>
+                                <p className="mt-3 text-xs text-white/40">
+                                  Verified {new Date(s.userSkill.verified_at).toLocaleDateString("el-GR")}
+                                </p>
                               )}
-                            </div>
 
-                            {/* CTA: upload μόνο αν unlocked & όχι ήδη achieved */}
-                            <div className="mt-4 pt-3 border-t border-white/5">
-                              {achieved ? (
-                                <span className="text-xs font-medium text-emerald-300 flex items-center gap-1.5">
-                                  ✓ Ολοκληρώθηκε
-                                </span>
-                              ) : unlocked ? (
-                                assignmentId ? (
-                                  <Link
-                                    to="/practice/$assignmentId"
-                                    params={{ assignmentId }}
-                                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white transition hover:bg-white/15 hover:border-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                                  >
-                                    <span>Ανέβασε φωτογραφία κουρέματος</span>
-                                    <ArrowRight className="size-3.5" />
-                                  </Link>
-                                ) : (
-                                  <span className="text-xs text-white/30">
-                                    Δεν έχει οριστεί assignment ακόμη.
+                              <div className="mt-4 border-t border-white/[0.07] pt-4">
+                                {achieved ? (
+                                  <span className="flex items-center gap-2 text-xs font-semibold text-white">
+                                    <ShieldCheck className="size-4" /> Ολοκληρώθηκε
                                   </span>
-                                )
-                              ) : (
-                                <span className="text-xs text-white/35 flex items-center gap-1">
-                                  🔒 Χρειάζεται πρώτα:{" "}
-                                  {missingPrereqs
-                                    .map((p) => p!.name)
-                                    .join(", ")}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                                ) : unlocked ? (
+                                  assignmentId ? (
+                                    <ChromeLink
+                                      to="/practice/$assignmentId"
+                                      params={{ assignmentId }}
+                                      label="Ανέβασε φωτογραφία κουρέματος"
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-white/35">Δεν έχει οριστεί assignment ακόμη.</span>
+                                  )
+                                ) : (
+                                  <span className="flex items-center gap-2 text-xs text-white/40">
+                                    <Lock className="size-3.5 shrink-0" />
+                                    Χρειάζεται πρώτα: {missingPrereqs.map((p) => p!.name).join(", ")}
+                                  </span>
+                                )}
+                              </div>
+                            </Frame>
+                          </motion.div>
                         );
                       })}
                     </div>
                   </section>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          <div className="grid gap-6 md:grid-cols-2 pt-4">
+          {/* continue + feedback */}
+          <motion.div variants={item} className="grid gap-8 md:grid-cols-2">
             <Panel title="Continue learning">
               {data.continueLesson ? (
-                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                  <Link
-                    to="/lesson/$lessonId"
-                    params={{ lessonId: data.continueLesson.id }}
-                    className="group flex items-center justify-between rounded-xl border border-white/15 bg-gradient-to-r from-white/[0.04] to-white/[0.01] p-5 transition-all duration-300 hover:border-white/40 hover:bg-white/[0.07] hover:shadow-[0_0_25px_rgba(255,255,255,0.06)]"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div className="flex size-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white">
-                        <BookOpen className="size-4" />
+                <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.99 }}>
+                  <Link to="/lesson/$lessonId" params={{ lessonId: data.continueLesson.id }} className="group block outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-2xl">
+                    <Frame inner="p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/[0.06] text-white transition-shadow duration-300 group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+                            <BookOpen className="size-5" />
+                          </span>
+                          <span className="truncate text-sm font-semibold text-white">{data.continueLesson.title}</span>
+                        </div>
+                        <span
+                          className="flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-950 transition-transform duration-300 group-hover:translate-x-1"
+                          style={{ backgroundImage: CHROME_FILL }}
+                        >
+                          <ArrowRight className="size-4" />
+                        </span>
                       </div>
-                      <span className="text-sm font-medium text-white/90 group-hover:text-white">{data.continueLesson.title}</span>
-                    </div>
-                    <div className="flex size-8 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white/70 transition-transform duration-300 group-hover:translate-x-1 group-hover:bg-white group-hover:text-black">
-                      <ArrowRight className="size-4" />
-                    </div>
+                    </Frame>
                   </Link>
                 </motion.div>
               ) : (
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/60">
-                  Δεν υπάρχει μάθημα σε εξέλιξη.{" "}
-                  <Link to="/academy" className="text-white underline underline-offset-4 hover:text-white/80">
-                    Πήγαινε στην Academy
-                  </Link>
-                  .
-                </div>
+                <Frame inner="p-5">
+                  <p className="text-sm text-white/60">
+                    Δεν υπάρχει μάθημα σε εξέλιξη.{" "}
+                    <Link to="/academy" className="text-white underline underline-offset-4 hover:text-white/80">
+                      Πήγαινε στην Academy
+                    </Link>
+                    .
+                  </p>
+                </Frame>
               )}
             </Panel>
 
             <Panel title="Recent feedback">
-              {data.latestReview ? (
-                <div className="rounded-xl border border-white/15 bg-gradient-to-r from-white/[0.04] to-white/[0.01] p-5 text-sm space-y-2 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.02)]">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-wider text-white/50 font-mono">Evaluation</span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-0.5 text-xs font-semibold text-white">
-                      {data.latestReview.decision}
-                    </span>
+              <Frame inner="p-5">
+                {data.latestReview ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase tracking-[0.25em] text-white/45">Evaluation</span>
+                      <DecisionBadge decision={data.latestReview.decision} />
+                    </div>
+                    {data.latestReview.next_actions && (
+                      <p className="border-t border-white/10 pt-3 text-sm leading-relaxed text-white/75">
+                        {data.latestReview.next_actions}
+                      </p>
+                    )}
                   </div>
-                  {data.latestReview.next_actions && (
-                    <p className="text-sm text-white/80 pt-2 border-t border-white/10">
-                      {data.latestReview.next_actions}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">
-                  Δεν υπάρχει feedback ακόμη.
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-white/45">Δεν υπάρχει feedback ακόμη.</p>
+                )}
+              </Frame>
             </Panel>
-          </div>
+          </motion.div>
 
-          <div>
+          {/* next submission */}
+          <motion.div variants={item}>
             <Panel title="Επόμενη υποβολή">
               {nextSkill ? (
                 nextAssignmentId ? (
-                  <motion.div whileHover={{ scale: 1.005 }} whileTap={{ scale: 0.995 }}>
-                    <Link
-                      to="/practice/$assignmentId"
-                      params={{ assignmentId: nextAssignmentId }}
-                      className="group flex items-center justify-between rounded-xl border border-white/20 bg-gradient-to-r from-white/[0.06] to-white/[0.02] p-5 transition-all duration-300 hover:border-white/50 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.08)]"
-                    >
-                      <span className="text-sm text-white/90">
+                  <Frame inner="p-5 sm:p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm text-white/85">
                         Ανέβασε φωτογραφία για:{" "}
                         <span className="font-semibold text-white underline decoration-white/40 underline-offset-4">{nextSkill.name}</span>
                       </span>
-                      <div className="flex items-center gap-2 rounded-full border border-white/30 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wider text-black transition-transform duration-300 group-hover:scale-105">
-                        <span>Υποβολή</span>
-                        <ArrowRight className="size-3.5" />
-                      </div>
-                    </Link>
-                  </motion.div>
+                      <ChromeLink to="/practice/$assignmentId" params={{ assignmentId: nextAssignmentId }} label="Υποβολή" solid />
+                    </div>
+                  </Frame>
                 ) : (
-                  <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/60">
-                    Το επόμενο skill (<span className="text-white font-medium">{nextSkill.name}</span>) δεν έχει ακόμη
-                    assignment.
-                  </div>
+                  <Frame inner="p-5">
+                    <p className="text-sm text-white/60">
+                      Το επόμενο skill (<span className="font-medium text-white">{nextSkill.name}</span>) δεν έχει ακόμη assignment.
+                    </p>
+                  </Frame>
                 )
               ) : skills.data ? (
-                <div className="rounded-xl border border-white/15 bg-white/[0.03] p-5 text-sm text-white/80 flex items-center gap-3">
-                  <Trophy className="size-5 text-white" />
-                  <span>Έχεις ολοκληρώσει όλα τα διαθέσιμα skills προς το παρόν. 🎉</span>
-                </div>
+                <Frame inner="p-5">
+                  <p className="flex items-center gap-3 text-sm text-white/85">
+                    <ShieldCheck className="size-5 text-white" />
+                    Έχεις ολοκληρώσει όλα τα διαθέσιμα skills προς το παρόν.
+                  </p>
+                </Frame>
               ) : (
-                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/40">
-                  Φόρτωση…
-                </div>
+                <Frame inner="p-5">
+                  <p className="text-sm text-white/40">Φόρτωση…</p>
+                </Frame>
               )}
             </Panel>
-          </div>
+          </motion.div>
 
-          {/* Haircut reviews submitted by the user */}
-          <Panel title="Τα Haircut Reviews μου">
-            {/* Always visible: unlimited submissions */}
-            <div>
-              <NavLink
-                to={HAIRCUT_SUBMIT_PATH}
-                label="Νέο Haircut Review"
-                icon={<Scissors className="size-4" />}
-              />
-            </div>
-
-            {haircuts.loading && <LoadingSkeleton rows={2} />}
-            {haircuts.error && <ErrorState message={haircuts.error} />}
-
-            {haircuts.data && haircuts.data.length === 0 && (
-              <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5 text-sm text-white/50">
-                Δεν έχεις υποβάλει haircut review ακόμη.
-              </div>
-            )}
-
-            {haircuts.data && haircuts.data.length > 0 && (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {haircuts.data.map((row) => {
-                  const reviewed = row.status === "graded" || row.score != null;
-                  return (
-                    <li
-                      key={row.id}
-                      className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4 backdrop-blur-xl transition-all duration-300 hover:border-white/25 shadow-[0_0_20px_-5px_rgba(0,0,0,0.8)]"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80">
-                            <Scissors className="size-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white">
-                              {row.method_description.slice(0, 60)}
-                              {row.method_description.length > 60 ? "…" : ""}
-                            </p>
-                            <p className="mt-1 text-xs text-white/40 font-mono">
-                              {new Date(row.created_at).toLocaleDateString("el-GR")}
-                            </p>
-                          </div>
-                        </div>
-
-                        {reviewed ? (
-                          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-emerald-300">
-                            <CheckCircle className="size-3" />
-                            Reviewed
-                          </span>
-                        ) : (
-                          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-xs font-medium uppercase tracking-wider text-amber-300">
-                            <Clock className="size-3" />
-                            Pending
-                          </span>
-                        )}
-                      </div>
-
-                      {reviewed && row.score != null && (
-                        <div className="mt-3 flex items-center gap-2 border-t border-white/5 pt-3 text-xs text-white/50">
-                          <Trophy className="size-3.5 text-white/60" />
-                          <span>Score</span>
-                          <span className="font-mono text-sm font-bold text-white">{row.score}</span>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Panel>
-
-          <nav className="mt-12 flex flex-wrap gap-4 pt-6 border-t border-white/10">
-            <NavLink to="/academy" label="Academy" />
-            {staff && <NavLink to="/review" label="Review Queue" icon={<UserCheck className="size-4" />} />}
-          </nav>
+          {/* nav */}
+          <motion.nav variants={item} className="flex flex-wrap gap-4 border-t border-white/10 pt-8">
+            <ChromeLink to="/academy" label="Academy" />
+            {staff && <ChromeLink to="/review" label="Review Queue" icon={<UserCheck className="size-4" />} solid />}
+          </motion.nav>
         </motion.div>
       )}
     </main>
   );
 }
 
-function StatCard({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+/* -------------------------------------------------------------------------- */
+/*  Small components                                                          */
+/* -------------------------------------------------------------------------- */
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <motion.div
-      whileHover={{ y: -3 }}
-      transition={{ duration: 0.2 }}
-      className="group relative overflow-hidden rounded-xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-6 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)] transition-all hover:border-white/40 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)]"
-    >
-      <div className="absolute top-0 right-0 p-6 opacity-40 transition-opacity group-hover:opacity-80">
-        {icon}
-      </div>
-      <p className="text-xs uppercase tracking-[0.2em] text-white/50">{label}</p>
-      <p className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</p>
-      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-    </motion.div>
+    <h2 className="flex items-center gap-3 px-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/65">
+      <span className="size-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+      {children}
+    </h2>
   );
 }
 
-function Panel({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-3">
-      <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2">
-        <span className="size-1.5 rounded-full bg-white/60" />
-        {title}
-      </h2>
+    <section className="space-y-4">
+      <SectionTitle>{title}</SectionTitle>
       {children}
     </section>
   );
 }
 
-function NavLink({ to, label, icon }: { to: string; label: string; icon?: React.ReactNode }) {
+function StatCard({ label, value, icon }: { label: string; value: React.ReactNode; icon: React.ReactNode }) {
   return (
-    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-      <Link
-        to={to}
-        className="group flex items-center gap-2.5 rounded-xl border border-white/20 bg-white/[0.04] px-6 py-3 text-sm font-medium text-white transition-all duration-300 hover:border-white/60 hover:bg-white hover:text-black hover:shadow-[0_0_25px_rgba(255,255,255,0.15)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-      >
-        {icon}
-        <span>{label}</span>
-        <ArrowRight className="size-4 opacity-50 transition-transform duration-300 group-hover:translate-x-1 group-hover:opacity-100" />
-      </Link>
+    <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.25 }} className="group relative">
+      <Frame inner="p-6">
+        <div className="absolute right-0 top-0 text-white/35 transition-all duration-300 group-hover:text-white group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+          {icon}
+        </div>
+        <p className="text-xs uppercase tracking-[0.25em] text-white/50">{label}</p>
+        <div className="mt-4 flex min-h-[2.5rem] items-center">{value}</div>
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      </Frame>
     </motion.div>
   );
 }
