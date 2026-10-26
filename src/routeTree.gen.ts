@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as HaircutReviewRouteImport } from './routes/haircut-review'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as MessagesRouteImport } from './routes/messages'
@@ -68,6 +69,11 @@ const CookiePolicyRoute = CookiePolicyRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GalleryRoute = GalleryRouteImport.update({
+  id: '/gallery',
+  path: '/gallery',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HaircutReviewRoute = HaircutReviewRouteImport.update({
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
+  '/gallery': typeof GalleryRoute
   '/haircut-review': typeof HaircutReviewRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
+  '/gallery': typeof GalleryRoute
   '/haircut-review': typeof HaircutReviewRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
+  '/gallery': typeof GalleryRoute
   '/haircut-review': typeof HaircutReviewRoute
   '/login': typeof LoginRoute
   '/messages': typeof MessagesRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
+    | '/gallery'
     | '/haircut-review'
     | '/login'
     | '/messages'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
+    | '/gallery'
     | '/haircut-review'
     | '/login'
     | '/messages'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
+    | '/gallery'
     | '/haircut-review'
     | '/login'
     | '/messages'
@@ -453,6 +465,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   CookiePolicyRoute: typeof CookiePolicyRoute
   DashboardRoute: typeof DashboardRoute
+  GalleryRoute: typeof GalleryRoute
   HaircutReviewRoute: typeof HaircutReviewRoute
   LoginRoute: typeof LoginRoute
   MessagesRoute: typeof MessagesRoute
@@ -520,6 +533,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gallery': {
+      id: '/gallery'
+      path: '/gallery'
+      fullPath: '/gallery'
+      preLoaderRoute: typeof GalleryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/haircut-review': {
@@ -741,6 +761,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   CookiePolicyRoute: CookiePolicyRoute,
   DashboardRoute: DashboardRoute,
+  GalleryRoute: GalleryRoute,
   HaircutReviewRoute: HaircutReviewRoute,
   LoginRoute: LoginRoute,
   MessagesRoute: MessagesRoute,
