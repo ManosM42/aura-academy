@@ -132,6 +132,7 @@ function OverviewSection() {
         <QuickLink to="/seminars" label="Booking Page" icon={<CalendarIcon className="size-4" />} />
         <QuickLink to="/online-seminars" label="Online Seminars" icon={<Globe className="size-4" />} />
         <ChromeCTALink to="/admin/book">Book &amp; Orders</ChromeCTALink>
+        <ChromeCTALink to="/admin/notifications">Notifications</ChromeCTALink>
       </div>
     </section>
   );
