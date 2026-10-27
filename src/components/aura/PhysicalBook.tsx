@@ -220,7 +220,7 @@ export default function PhysicalBook() {
         style={{ y: watermarkY }}
         className="pointer-events-none absolute inset-x-0 top-8 -z-10 select-none text-center font-serif text-[24vw] font-bold leading-none tracking-[0.12em] text-white/[0.025]"
       >
-        AURA
+        ΛURΛ
       </motion.div>
       <motion.div
         aria-hidden
@@ -243,7 +243,7 @@ export default function PhysicalBook() {
           >
             <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50">
               <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
-              The AURA book
+              The ΛURΛ book
             </div>
             <h2
               className={`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText}`}
@@ -430,7 +430,7 @@ export default function PhysicalBook() {
                       transform: "rotate(180deg)",
                     }}
                   >
-                    AURA THE BARBERING BOOK
+                    ΛURΛ THE BARBERING BOOK
                   </span>
                   <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" />
                   <div className="absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" />

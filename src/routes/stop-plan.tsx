@@ -14,7 +14,7 @@ export const Route = createFileRoute("/stop-plan")({
   component: StopPlanPage,
 });
 
-const CONFIRM_PHRASE = "Stop my plan";
+const CONFIRM_PHRASE = "STOP MY PLAN";
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";

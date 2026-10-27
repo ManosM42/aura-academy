@@ -17,6 +17,9 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/contact", label: "Contact" },
   { to: "/method", label: "Method" },
   { to: "/pricing", label: "Pricing" },
+  { to: "/seminars", label: "Book Your Seminars" },
+  { to: "/online-seminars", label: "Online Seminars" },
+  { to: "/gallery", label: "Gallery" },
 ];
 
 function UserAvatar({
@@ -113,9 +116,9 @@ export function Navbar() {
       { to: "/courses", label: "Courses" },
       { to: "/academy", label: "Academy" },
       { to: "/messages", label: "Messages" },
-      { to: "/seminars", label: "Book your Seminar" },
+      { to: "/seminars", label: "Book Your Seminars" },
       { to: "/online-seminars", label: "Online Seminars" },
-
+      { to: "/gallery", label: "Gallery" },
 
       ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),
       ...(admin
