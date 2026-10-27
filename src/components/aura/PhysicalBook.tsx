@@ -21,6 +21,8 @@ import {
 
 // Front cover artwork (adjust the path/alias if your project differs)
 import bookCover from "@/assets/book.png";
+import { ChromeCTALink } from "@/components/aura/chrome";
+
 
 /* ------------------------------------------------------------------ */
 /* Content (edit freely)                                              */
@@ -257,6 +259,9 @@ export default function PhysicalBook() {
               chair full.
             </p>
           </motion.div>
+     <div className="mt-8">
+  <ChromeCTALink to="/book">Order the book</ChromeCTALink>
+</div>     
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2">
             {TOPICS.map((t) => (

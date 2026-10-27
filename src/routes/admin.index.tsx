@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { AdminSeminars } from "@/components/aura/AdminSeminars";
 import { AdminOnlineSeminars } from "@/components/aura/AdminOnlineSeminars";
+import { ChromeCTALink } from "@/components/aura/chrome";
+
 
 
 export const Route = createFileRoute("/admin/")({ component: AdminPage });
@@ -129,6 +131,7 @@ function OverviewSection() {
         <QuickLink to="/review/haircuts" label="Haircut Review" icon={<Scissors className="size-4" />} />
         <QuickLink to="/seminars" label="Booking Page" icon={<CalendarIcon className="size-4" />} />
         <QuickLink to="/online-seminars" label="Online Seminars" icon={<Globe className="size-4" />} />
+        <ChromeCTALink to="/admin/book">Book &amp; Orders</ChromeCTALink>
       </div>
     </section>
   );

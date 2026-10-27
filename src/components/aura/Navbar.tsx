@@ -20,6 +20,7 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/seminars", label: "Book Your Seminars" },
   { to: "/online-seminars", label: "Online Seminars" },
   { to: "/gallery", label: "Gallery" },
+  { to: "/book", label: "Order Book" },
 ];
 
 function UserAvatar({
@@ -119,6 +120,8 @@ export function Navbar() {
       { to: "/seminars", label: "Book Your Seminars" },
       { to: "/online-seminars", label: "Online Seminars" },
       { to: "/gallery", label: "Gallery" },
+      { to: "/book", label: "Order Book" },
+
 
       ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),
       ...(admin

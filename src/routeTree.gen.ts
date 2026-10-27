@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as BookRouteImport } from './routes/book'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -28,6 +29,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as AcademyIndexRouteImport } from './routes/academy.index'
 import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminBookRouteImport } from './routes/admin.book'
 import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
@@ -54,6 +56,11 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BookRoute = BookRouteImport.update({
+  id: '/book',
+  path: '/book',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContactRoute = ContactRouteImport.update({
@@ -139,6 +146,11 @@ const AcademySlugRoute = AcademySlugRouteImport.update({
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminBookRoute = AdminBookRouteImport.update({
+  id: '/admin/book',
+  path: '/admin/book',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminInboxRoute = AdminInboxRouteImport.update({
@@ -230,6 +242,7 @@ const ReviewHaircutsHaircutRoute = ReviewHaircutsHaircutRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/book': typeof BookRoute
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
@@ -245,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/stop-plan': typeof StopPlanRoute
   '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
+  '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -268,6 +282,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/book': typeof BookRoute
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
@@ -283,6 +298,7 @@ export interface FileRoutesByTo {
   '/stop-plan': typeof StopPlanRoute
   '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
+  '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -307,6 +323,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/book': typeof BookRoute
   '/contact': typeof ContactRoute
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
@@ -322,6 +339,7 @@ export interface FileRoutesById {
   '/stop-plan': typeof StopPlanRoute
   '/terms': typeof TermsRoute
   '/academy/$slug': typeof AcademySlugRoute
+  '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
@@ -347,6 +365,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/book'
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
@@ -362,6 +381,7 @@ export interface FileRouteTypes {
     | '/stop-plan'
     | '/terms'
     | '/academy/$slug'
+    | '/admin/book'
     | '/admin/inbox'
     | '/auth/callback'
     | '/checkout/return'
@@ -385,6 +405,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/book'
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
@@ -400,6 +421,7 @@ export interface FileRouteTypes {
     | '/stop-plan'
     | '/terms'
     | '/academy/$slug'
+    | '/admin/book'
     | '/admin/inbox'
     | '/auth/callback'
     | '/checkout/return'
@@ -423,6 +445,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/book'
     | '/contact'
     | '/cookie-policy'
     | '/dashboard'
@@ -438,6 +461,7 @@ export interface FileRouteTypes {
     | '/stop-plan'
     | '/terms'
     | '/academy/$slug'
+    | '/admin/book'
     | '/admin/inbox'
     | '/auth/callback'
     | '/checkout/return'
@@ -462,6 +486,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  BookRoute: typeof BookRoute
   ContactRoute: typeof ContactRoute
   CookiePolicyRoute: typeof CookiePolicyRoute
   DashboardRoute: typeof DashboardRoute
@@ -477,6 +502,7 @@ export interface RootRouteChildren {
   StopPlanRoute: typeof StopPlanRoute
   TermsRoute: typeof TermsRoute
   AcademySlugRoute: typeof AcademySlugRoute
+  AdminBookRoute: typeof AdminBookRoute
   AdminInboxRoute: typeof AdminInboxRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
@@ -512,6 +538,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/book': {
+      id: '/book'
+      path: '/book'
+      fullPath: '/book'
+      preLoaderRoute: typeof BookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contact': {
@@ -631,6 +664,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/book': {
+      id: '/admin/book'
+      path: '/admin/book'
+      fullPath: '/admin/book'
+      preLoaderRoute: typeof AdminBookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/inbox': {
@@ -758,6 +798,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  BookRoute: BookRoute,
   ContactRoute: ContactRoute,
   CookiePolicyRoute: CookiePolicyRoute,
   DashboardRoute: DashboardRoute,
@@ -773,6 +814,7 @@ const rootRouteChildren: RootRouteChildren = {
   StopPlanRoute: StopPlanRoute,
   TermsRoute: TermsRoute,
   AcademySlugRoute: AcademySlugRoute,
+  AdminBookRoute: AdminBookRoute,
   AdminInboxRoute: AdminInboxRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
