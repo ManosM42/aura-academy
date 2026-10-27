@@ -120,6 +120,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const pendingIce = useRef<RTCIceCandidateInit[]>([]);
   const ringTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readyTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offeringRef = useRef(false);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -138,6 +141,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const cleanup = useCallback(() => {
     if (ringTimer.current) clearTimeout(ringTimer.current);
     ringTimer.current = null;
+    if (readyTimer.current) clearInterval(readyTimer.current);
+    readyTimer.current = null;
+    if (connTimer.current) clearTimeout(connTimer.current);
+    connTimer.current = null;
+    offeringRef.current = false;
     localRef.current?.getTracks().forEach((t) => t.stop());
     localRef.current = null;
     pcRef.current?.close();
@@ -251,8 +259,29 @@ export function CallProvider({ children }: { children: ReactNode }) {
         });
         setRemoteStream(new MediaStream(remote.getTracks()));
       };
+      const markConnected = () => {
+        if (connTimer.current) clearTimeout(connTimer.current);
+        connTimer.current = null;
+        setPhaseBoth("connected");
+      };
+      const startConnTimer = () => {
+        if (connTimer.current) return;
+        connTimer.current = setTimeout(() => {
+          if (phaseRef.current !== "connected") {
+            showNotice("Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.");
+            void endCall("ended");
+          }
+        }, 25_000);
+      };
+      pc.oniceconnectionstatechange = () => {
+        console.log("[call] ice:", pc.iceConnectionState);
+        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+          markConnected();
+        }
+      };
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") setPhaseBoth("connected");
+        console.log("[call] pc:", pc.connectionState);
+        if (pc.connectionState === "connected") markConnected();
         if (pc.connectionState === "failed") {
           showNotice("Η σύνδεση απέτυχε.");
           void endCall("ended");
@@ -275,11 +304,27 @@ export function CallProvider({ children }: { children: ReactNode }) {
         room
           .on("broadcast", { event: "ready" }, async () => {
             if (!isCaller) return;
+            console.log("[call] got ready");
+            if (ringTimer.current) clearTimeout(ringTimer.current);
+            ringTimer.current = null;
+            if (phaseRef.current === "ringing") setPhaseBoth("connecting");
+            startConnTimer();
+            if (pc.remoteDescription) return; // already answered
+            if (pc.localDescription) {
+              void send("offer", { sdp: pc.localDescription }); // callee asked again
+              return;
+            }
+            if (offeringRef.current) return;
+            offeringRef.current = true;
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             void send("offer", { sdp: offer });
           })
           .on("broadcast", { event: "offer" }, async ({ payload }) => {
+            if (pc.remoteDescription) return; // duplicate offer
+            console.log("[call] got offer");
+            if (readyTimer.current) clearInterval(readyTimer.current);
+            readyTimer.current = null;
             await pc.setRemoteDescription(payload.sdp);
             await flushIce();
             const answer = await pc.createAnswer();
@@ -287,6 +332,8 @@ export function CallProvider({ children }: { children: ReactNode }) {
             void send("answer", { sdp: answer });
           })
           .on("broadcast", { event: "answer" }, async ({ payload }) => {
+            if (pc.remoteDescription) return;
+            console.log("[call] got answer");
             await pc.setRemoteDescription(payload.sdp);
             await flushIce();
           })
@@ -322,10 +369,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       setPhaseBoth("ringing");
 
       try {
-        // 1) camera/mic + signaling room first, so we're ready when they answer
-        await joinRoom(info, true);
-
-        // 2) the INSERT is what makes the other phone ring
+        // 1) the INSERT makes the other phone ring (and lets us join the private room)
         const { error } = await supabase.from("call_logs").insert({
           id,
           conversation_id: conversationId,
@@ -334,6 +378,9 @@ export function CallProvider({ children }: { children: ReactNode }) {
           kind,
         });
         if (error) throw error;
+
+        // 2) camera/mic + signaling room (callee keeps asking "ready" until we answer)
+        await joinRoom(info, true);
 
         ringTimer.current = setTimeout(() => {
           if (phaseRef.current === "ringing") void endCall("missed");
@@ -449,7 +496,26 @@ export function CallProvider({ children }: { children: ReactNode }) {
         .from("call_logs")
         .update({ status: "answered", answered_at: new Date().toISOString() })
         .eq("id", info.id);
-      await send("ready");
+      let tries = 0;
+      const sendReady = () => {
+        console.log("[call] send ready");
+        void send("ready");
+      };
+      sendReady();
+      readyTimer.current = setInterval(() => {
+        if (pcRef.current?.remoteDescription || ++tries > 25) {
+          if (readyTimer.current) clearInterval(readyTimer.current);
+          readyTimer.current = null;
+          return;
+        }
+        sendReady();
+      }, 1000);
+      connTimer.current = setTimeout(() => {
+        if (phaseRef.current !== "connected") {
+          showNotice("Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.");
+          void endCall("ended");
+        }
+      }, 25_000);
     } catch (e) {
       console.error("accept failed", e);
       showNotice(mediaErrorText(e));
