@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Navbar } from "@/components/aura/Navbar";
 import MessageNotifications from "@/components/aura/MessageNotifications";
+import { CallProvider } from "@/components/aura/CallProvider";
 import { I18nProvider } from "@/lib/i18n";
 import { CookieConsentProvider } from "@/lib/cookieConsent";
 import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
@@ -82,7 +83,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
       { title: "AURA" },
       { name: "description", content: "AURA professional barber academy." },
       { name: "author", content: "AURA" },
@@ -134,10 +138,12 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <CookieConsentProvider>
-          <Navbar />
-          <MessageNotifications />
-          <Outlet />
-          <CookieConsentBanner />
+          <CallProvider>
+            <Navbar />
+            <MessageNotifications />
+            <Outlet />
+            <CookieConsentBanner />
+          </CallProvider>
         </CookieConsentProvider>
       </I18nProvider>
     </QueryClientProvider>
