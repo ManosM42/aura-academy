@@ -31,6 +31,7 @@ import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBookRouteImport } from './routes/admin.book'
 import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
+import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -158,6 +159,11 @@ const AdminInboxRoute = AdminInboxRouteImport.update({
   path: '/admin/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
+  id: '/admin/notifications',
+  path: '/admin/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -260,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
@@ -300,6 +307,7 @@ export interface FileRoutesByTo {
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
@@ -341,6 +349,7 @@ export interface FileRoutesById {
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
+  '/admin/notifications': typeof AdminNotificationsRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
@@ -383,6 +392,7 @@ export interface FileRouteTypes {
     | '/academy/$slug'
     | '/admin/book'
     | '/admin/inbox'
+    | '/admin/notifications'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
@@ -423,6 +433,7 @@ export interface FileRouteTypes {
     | '/academy/$slug'
     | '/admin/book'
     | '/admin/inbox'
+    | '/admin/notifications'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
@@ -463,6 +474,7 @@ export interface FileRouteTypes {
     | '/academy/$slug'
     | '/admin/book'
     | '/admin/inbox'
+    | '/admin/notifications'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
@@ -504,6 +516,7 @@ export interface RootRouteChildren {
   AcademySlugRoute: typeof AcademySlugRoute
   AdminBookRoute: typeof AdminBookRoute
   AdminInboxRoute: typeof AdminInboxRoute
+  AdminNotificationsRoute: typeof AdminNotificationsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CoursesSlugRoute: typeof CoursesSlugRoute
@@ -680,6 +693,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminInboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/notifications': {
+      id: '/admin/notifications'
+      path: '/admin/notifications'
+      fullPath: '/admin/notifications'
+      preLoaderRoute: typeof AdminNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/auth/callback'
@@ -816,6 +836,7 @@ const rootRouteChildren: RootRouteChildren = {
   AcademySlugRoute: AcademySlugRoute,
   AdminBookRoute: AdminBookRoute,
   AdminInboxRoute: AdminInboxRoute,
+  AdminNotificationsRoute: AdminNotificationsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   CoursesSlugRoute: CoursesSlugRoute,
