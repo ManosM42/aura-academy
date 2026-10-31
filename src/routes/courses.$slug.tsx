@@ -1,68 +1,72 @@
 // src/routes/courses.$slug.tsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "motion/react";
-import { ArrowLeft, Lock, Maximize2, ShieldAlert } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowLeft, Lock, Play, Sparkles } from "lucide-react";
 import ChromeButton from "@/components/aura/ChromeButton";
-import { useAuth } from "@/hooks/useAuth";
+import ChromeCursor from "@/components/aura/ChromeCursor";
 import { getCourseForPlay, getStepVideoUrl } from "@/lib/courses";
 import { COURSE_CATEGORIES } from "@/lib/courses.types";
 import { getPlan } from "@/lib/plans";
 import { useAsync } from "@/lib/useAsync";
-import { useContentProtection } from "@/lib/useContentProtection";
 
 export const Route = createFileRoute("/courses/$slug")({
-  head: () => ({
-    meta: [
-      { title: "AURA — Video" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
-  }),
+  head: () => ({ meta: [{ title: "AURA — Video" }] }),
   component: CourseVideoPage,
 });
 
-/** Viewer-specific watermark: discourages leaks and makes them traceable. */
-function Watermark({ label }: { label: string }) {
-  const [pos, setPos] = useState({ x: 8, y: 12 });
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-  useEffect(() => {
-    const id = window.setInterval(
-      () => setPos({ x: 4 + Math.random() * 55, y: 6 + Math.random() * 80 }),
-      6000,
-    );
-    return () => window.clearInterval(id);
-  }, []);
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } } };
+const rise = {
+  hidden: { opacity: 0, y: 22, filter: "blur(6px)" },
+  show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.9, ease: EASE } },
+};
 
+/* ------------------------------------------------------------------ */
+/* Shared background: grain, atmosphere, grid, floating chrome orbs    */
+/* ------------------------------------------------------------------ */
+
+function Backdrop() {
+  const reduce = useReducedMotion();
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-10 select-none overflow-hidden">
-      <span
-        style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-        className="absolute whitespace-nowrap text-[11px] font-medium tracking-wide text-white/30 transition-all duration-[2500ms] ease-in-out"
-      >
-        {label}
-      </span>
-      <span className="absolute bottom-3 right-4 whitespace-nowrap text-[10px] tracking-wider text-white/20">
-        {label}
-      </span>
-    </div>
+    <>
+      <div className="aura-grain" aria-hidden />
+      <div className="hero-atmosphere absolute inset-0" aria-hidden />
+      <div className="cv-grid absolute inset-0" aria-hidden />
+      {!reduce && (
+        <>
+          <motion.div
+            className="cv-orb left-[6%] top-[10%] h-80 w-80"
+            animate={{ y: [0, -34, 0], x: [0, 18, 0] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+          />
+          <motion.div
+            className="cv-orb bottom-[6%] right-[4%] h-[26rem] w-[26rem]"
+            animate={{ y: [0, 28, 0], x: [0, -22, 0] }}
+            transition={{ duration: 19, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+          />
+        </>
+      )}
+    </>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
 function CourseVideoPage() {
   const { slug } = Route.useParams();
-  const { user } = useAuth();
   const { data, error, loading } = useAsync(() => getCourseForPlay(slug), [slug]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
-
-  const playerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const infoRef = useRef<HTMLDivElement>(null);
 
   const course = data?.course ?? null;
   const locked = data?.locked ?? false;
-
-  const shielded = useContentProtection(Boolean(course) && !locked);
-  const watermark = `${user?.email ?? "AURA"} · ${user?.id?.slice(0, 8) ?? ""}`;
 
   useEffect(() => {
     let cancelled = false;
@@ -86,39 +90,58 @@ function CourseVideoPage() {
     };
   }, [course, locked]);
 
-  // Pause whenever the shield goes up.
-  useEffect(() => {
-    if (shielded) videoRef.current?.pause();
-  }, [shielded]);
-
-  function goFullscreen() {
-    const el = playerRef.current;
-    const v = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    if (el?.requestFullscreen) void el.requestFullscreen();
-    else v?.webkitEnterFullscreen?.(); // iPhone fallback (no watermark possible there)
+  function onInfoMove(e: MouseEvent<HTMLDivElement>) {
+    const el = infoRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--my", `${e.clientY - r.top}px`);
   }
+
+  /* ---------- loading ---------- */
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#070707]">
-        <div className="h-8 w-56 animate-pulse rounded bg-white/10" />
+      <div className="cv-root relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-5">
+        <style>{css}</style>
+        <Backdrop />
+        <div className="relative z-10 flex w-full max-w-4xl flex-col gap-6">
+          <div className="cv-skeleton h-6 w-40 rounded-full" />
+          <div className="cv-skeleton aspect-video w-full rounded-2xl" />
+          <div className="cv-skeleton h-10 w-2/3 rounded-lg" />
+          <div className="cv-skeleton h-4 w-full rounded" />
+          <div className="cv-skeleton h-4 w-4/5 rounded" />
+        </div>
       </div>
     );
   }
 
+  /* ---------- not found ---------- */
+
   if (error || !course) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#070707] px-5 text-center text-white">
-        <h1 className="text-2xl font-semibold">Δεν βρέθηκε</h1>
-        <p className="text-sm text-white/50">
-          {error instanceof Error ? error.message : "Άγνωστο σφάλμα."}
-        </p>
-        <Link
-          to="/courses"
-          className="mt-4 text-[11px] uppercase tracking-[0.35em] text-white/50 hover:text-white"
+      <div className="cv-root relative flex min-h-screen flex-col items-center justify-center gap-4 overflow-hidden bg-aura-bg px-5 text-center text-white">
+        <style>{css}</style>
+        <Backdrop />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 flex flex-col items-center gap-4"
         >
-          ← ΟΛΑ ΤΑ VIDEOS
-        </Link>
+          <motion.h1 variants={rise} className="cv-title text-3xl font-bold tracking-tight">
+            Δεν βρέθηκε
+          </motion.h1>
+          <motion.p variants={rise} className="text-sm text-white/50">
+            {error instanceof Error ? error.message : "Άγνωστο σφάλμα."}
+          </motion.p>
+          <motion.div variants={rise}>
+            <Link to="/courses" className="cv-back mt-4">
+              <ArrowLeft className="size-4" />
+              ΟΛΑ ΤΑ VIDEOS
+            </Link>
+          </motion.div>
+        </motion.div>
       </div>
     );
   }
@@ -127,112 +150,249 @@ function CourseVideoPage() {
   const plan = getPlan(course.required_plan);
 
   return (
-    <div className="min-h-screen w-full bg-black text-white">
-      {/* Block printing and text selection on this page only */}
-      <style>{`
-        @media print { html, body { display: none !important; } }
-        .protected-page { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
-      `}</style>
+    <div className="cv-root relative min-h-screen w-full overflow-x-clip bg-aura-bg text-white">
+      <style>{css}</style>
+      <ChromeCursor />
+      <Backdrop />
 
-      <div className="protected-page">
-        <div className="flex items-center justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-8">
-          <Link
-            to="/courses"
-            className="inline-flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-white/60 transition hover:text-white"
-          >
+      {/* ---------- top bar ---------- */}
+      <motion.header
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: EASE }}
+        className="cv-bar sticky top-0 z-30"
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <Link to="/courses" className="cv-back">
             <ArrowLeft className="size-4" />
             ΟΛΑ ΤΑ VIDEOS
           </Link>
-          {categoryLabel ? (
-            <span className="rounded-full border border-white/15 px-3 py-1 text-[10px] uppercase tracking-[0.3em] text-white/50">
-              {categoryLabel}
-            </span>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {plan ? <span className="cv-chip cv-chip-plan">{plan.name}</span> : null}
+            {categoryLabel ? <span className="cv-chip">{categoryLabel}</span> : null}
+          </div>
         </div>
+        <div className="chrome-line h-px w-full" aria-hidden />
+      </motion.header>
 
-        {locked ? (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mx-auto flex max-w-lg flex-col items-center gap-5 px-5 py-32 text-center"
-          >
-            <div className="flex size-14 items-center justify-center rounded-2xl border border-white/15 bg-white/5">
-              <Lock className="size-6 text-white/60" />
-            </div>
-            <h1 className="text-2xl font-semibold">{course.title}</h1>
-            <p className="text-sm text-white/50">
-              Αυτό το video χρειάζεται πλάνο {plan?.name ?? course.required_plan} ή ανώτερο.
-            </p>
+      {locked ? (
+        /* ---------- locked ---------- */
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 mx-auto flex max-w-lg flex-col items-center gap-6 px-5 py-28 text-center sm:py-36"
+        >
+          <motion.div variants={rise} className="cv-lock">
+            <span className="cv-lock-ring" aria-hidden />
+            <Lock className="relative size-7 text-white/80" />
+          </motion.div>
+
+          <motion.h1 variants={rise} className="cv-title text-3xl font-bold tracking-tight sm:text-4xl">
+            {course.title}
+          </motion.h1>
+
+          <motion.p variants={rise} className="max-w-sm text-sm leading-relaxed text-white/55">
+            Αυτό το video χρειάζεται πλάνο{" "}
+            <span className="text-white">{plan?.name ?? course.required_plan}</span> ή ανώτερο.
+          </motion.p>
+
+          <motion.div variants={rise}>
             <Link to="/pricing">
               <ChromeButton type="button">ΔΕΣ ΤΑ ΠΛΑΝΑ</ChromeButton>
             </Link>
           </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4 }}
-            className="mx-auto flex max-w-5xl flex-col gap-8 px-0 pb-24 pt-0 sm:px-8 sm:pt-8"
-          >
-            <div
-              ref={playerRef}
-              className="relative aspect-video w-full overflow-hidden bg-neutral-950 sm:rounded-2xl"
-              onContextMenu={(e) => e.preventDefault()}
-            >
-              {videoUrl ? (
-                <>
+        </motion.div>
+      ) : (
+        /* ---------- player ---------- */
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-0 pb-28 pt-0 sm:px-8 sm:pt-10"
+        >
+          <motion.div variants={rise} className="relative">
+            <div className="cv-glow" aria-hidden />
+
+            <div className="cv-frame sm:rounded-[1.4rem]">
+              <div className="cv-frame-border" aria-hidden />
+              <div className="relative aspect-video w-full overflow-hidden bg-black sm:rounded-[calc(1.4rem-1px)]">
+                {videoUrl ? (
                   <video
-                    ref={videoRef}
                     src={videoUrl}
                     controls
-                    controlsList="nodownload nofullscreen noremoteplayback"
-                    disablePictureInPicture
-                    disableRemotePlayback
                     playsInline
-                    onContextMenu={(e) => e.preventDefault()}
                     className="h-full w-full object-contain"
                   />
-                  <Watermark label={watermark} />
-                  <button
-                    type="button"
-                    onClick={goFullscreen}
-                    aria-label="Πλήρης οθόνη"
-                    className="absolute right-3 top-3 z-20 rounded-md bg-black/50 p-2 text-white/80 backdrop-blur transition hover:bg-black/70 hover:text-white"
-                  >
-                    <Maximize2 className="size-4" />
-                  </button>
-                </>
-              ) : videoError ? (
-                <div className="flex h-full items-center justify-center px-6 text-center text-sm text-red-400">
-                  {videoError}
-                </div>
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-white/30">
-                  {course.video_path ? "Φόρτωση βίντεο…" : "Δεν έχει ανέβει ακόμη βίντεο."}
-                </div>
-              )}
-
-              {shielded && videoUrl ? (
-                <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-black text-center">
-                  <ShieldAlert className="size-8 text-white/50" />
-                  <p className="px-6 text-sm text-white/60">
-                    Το περιεχόμενο είναι προστατευμένο. Επέστρεψε σε αυτό το παράθυρο για να συνεχίσεις.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="px-5 sm:px-0">
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{course.title}</h1>
-              {course.summary ? (
-                <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/70 sm:text-base">
-                  {course.summary}
-                </p>
-              ) : null}
+                ) : videoError ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                    <span className="text-sm text-red-300/90">{videoError}</span>
+                  </div>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                    {course.video_path ? (
+                      <>
+                        <span className="cv-spinner" aria-hidden />
+                        <span className="text-xs uppercase tracking-[0.3em] text-white/40">
+                          Φόρτωση βίντεο
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="cv-play" aria-hidden>
+                          <Play className="size-6 text-white/60" />
+                        </div>
+                        <span className="text-sm text-white/35">Δεν έχει ανέβει ακόμη βίντεο.</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
-        )}
-      </div>
+
+          {/* ---------- info ---------- */}
+          <motion.div variants={rise} className="px-5 sm:px-0">
+            <div ref={infoRef} onMouseMove={onInfoMove} className="cv-info p-7 sm:p-10">
+              <div className="cv-spot" aria-hidden />
+
+              <div className="relative">
+                <div className="mb-5 flex items-center gap-3">
+                  <Sparkles className="size-4 text-white/60" />
+                  <span className="chrome-text text-[11px] font-semibold uppercase tracking-[0.45em]">
+                    Aura
+                  </span>
+                  <span className="h-px flex-1 bg-gradient-to-r from-white/25 to-transparent" aria-hidden />
+                </div>
+
+                <h1 className="cv-title text-3xl font-bold tracking-tight sm:text-5xl">
+                  {course.title}
+                </h1>
+
+                {course.summary ? (
+                  <p className="mt-6 max-w-3xl whitespace-pre-line text-sm leading-[1.85] text-white/65 sm:text-base">
+                    {course.summary}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Styles                                                              */
+/* ------------------------------------------------------------------ */
+
+const css = `
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+@keyframes cv-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes cv-pulse { 0%,100% { opacity: .5; transform: scale(1); } 50% { opacity: .95; transform: scale(1.03); } }
+@keyframes cv-skel { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes cv-ring { 0% { transform: scale(.85); opacity: .7; } 100% { transform: scale(1.7); opacity: 0; } }
+
+.cv-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 15%, transparent 75%);
+          mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 15%, transparent 75%);
+  pointer-events: none;
+}
+.cv-orb {
+  position: absolute; border-radius: 9999px; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, rgba(232,236,242,.15), rgba(160,168,180,.05) 45%, transparent 70%);
+  filter: blur(44px);
+}
+
+/* top bar */
+.cv-bar {
+  background: linear-gradient(180deg, rgba(8,8,10,.82), rgba(8,8,10,.55));
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.cv-back {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.6);
+  transition: color .25s, transform .25s, text-shadow .25s;
+}
+.cv-back:hover { color: #fff; transform: translateX(-3px); text-shadow: 0 0 18px rgba(232,236,242,.7); }
+.cv-chip {
+  border-radius: 9999px; padding: .35rem .85rem; font-size: 10px; letter-spacing: .3em; text-transform: uppercase;
+  color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.14);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.015));
+}
+.cv-chip-plan {
+  color: #f1f5f9; border-color: rgba(232,236,242,.4);
+  box-shadow: 0 0 18px -4px rgba(232,236,242,.5);
+}
+
+/* chrome title */
+.cv-title {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 22%, #9ca3af 42%, #ffffff 58%, #8b93a1 78%, #f1f5f9 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: cv-shimmer 7s linear infinite;
+}
+
+/* player frame */
+.cv-glow {
+  position: absolute; inset: -6% -4%; pointer-events: none; z-index: 0;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(214,222,235,.22), transparent 72%);
+  filter: blur(46px); animation: cv-pulse 6s ease-in-out infinite;
+}
+.cv-frame { position: relative; z-index: 1; overflow: hidden; isolation: isolate; padding: 1px; background: rgba(255,255,255,.07); }
+.cv-frame-border {
+  position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.95) 74%, rgba(255,255,255,0) 90%, transparent 100%);
+  animation: cv-spin 8s linear infinite;
+}
+
+/* info card */
+.cv-info {
+  position: relative; overflow: hidden; border-radius: 1.4rem;
+  border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(180deg, rgba(22,23,29,.92), rgba(9,10,13,.95));
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  box-shadow: 0 30px 80px -40px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.cv-spot {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(460px circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,.08), transparent 60%);
+}
+
+/* locked */
+.cv-lock {
+  position: relative; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 1.2rem;
+  border: 1px solid rgba(255,255,255,.18);
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.16), rgba(255,255,255,.02));
+  box-shadow: 0 0 46px -8px rgba(232,236,242,.5);
+}
+.cv-lock-ring {
+  position: absolute; inset: 0; border-radius: 1.2rem; border: 1px solid rgba(232,236,242,.5);
+  animation: cv-ring 2.8s ease-out infinite;
+}
+
+/* misc states */
+.cv-spinner {
+  width: 38px; height: 38px; border-radius: 9999px;
+  border: 2px solid rgba(255,255,255,.12); border-top-color: #fff;
+  animation: cv-spin .9s linear infinite; box-shadow: 0 0 22px rgba(255,255,255,.22);
+}
+.cv-play {
+  display: grid; place-items: center; width: 64px; height: 64px; border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.16); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.12), rgba(255,255,255,.02));
+  box-shadow: 0 0 36px -8px rgba(232,236,242,.45); animation: cv-pulse 4s ease-in-out infinite;
+}
+.cv-skeleton {
+  background: linear-gradient(100deg, rgba(255,255,255,.04) 30%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.04) 70%);
+  background-size: 200% 100%; animation: cv-skel 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-frame-border, .cv-title, .cv-glow, .cv-play, .cv-lock-ring, .cv-spinner, .cv-skeleton { animation: none !important; }
+}
+`;
