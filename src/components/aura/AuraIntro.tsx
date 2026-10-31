@@ -1,11 +1,7 @@
 // src/components/aura/AuraIntro.tsx
 //
 // First-visit intro for the AURA platform.
-//   1. welcome.MOV loads and plays automatically, full screen
-//   2. When it ends, it dips to black
-//   3. The black fades out onto the landing page
-//
-// No buttons. Only plays once per browser (localStorage).
+// Plays once per browser, the first time someone enters the site on any page.
 // Clear AURA_INTRO_KEY to replay.
 
 import {
@@ -26,8 +22,23 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const useIsoLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
-// If the video cannot start within this time, skip straight to the page.
 const LOAD_TIMEOUT_MS = 8000;
+
+function hasSeenIntro(): boolean {
+  try {
+    return localStorage.getItem(AURA_INTRO_KEY) !== null;
+  } catch {
+    return false; // storage blocked: treat as first visit
+  }
+}
+
+function markIntroSeen() {
+  try {
+    localStorage.setItem(AURA_INTRO_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
 
 interface AuraIntroProps {
   onComplete?: () => void;
@@ -35,7 +46,7 @@ interface AuraIntroProps {
 
 export default function AuraIntro({ onComplete }: AuraIntroProps) {
   const [phase, setPhase] = useState<Phase>("playing");
-  const [ready, setReady] = useState(false); // video has frames to show
+  const [ready, setReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const finishing = useRef(false);
@@ -45,15 +56,11 @@ export default function AuraIntro({ onComplete }: AuraIntroProps) {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
-  // Returning visitor: skip before the first paint (no flash, SSR-safe).
+  // Returning visitor: skip before the first paint.
   useIsoLayoutEffect(() => {
-    try {
-      if (localStorage.getItem(AURA_INTRO_KEY)) {
-        setPhase("done");
-        onCompleteRef.current?.();
-      }
-    } catch {
-      /* storage blocked: just play the intro */
+    if (hasSeenIntro()) {
+      setPhase("done");
+      onCompleteRef.current?.();
     }
   }, []);
 
@@ -67,26 +74,25 @@ export default function AuraIntro({ onComplete }: AuraIntroProps) {
     };
   }, [phase === "done"]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Video -> black -> page.
   const finish = useCallback(() => {
     if (finishing.current) return;
     finishing.current = true;
-    setPhase("outro"); // video dips to black (0.9s)
-    window.setTimeout(() => setPhase("reveal"), 900); // black fades away (1.2s)
+    markIntroSeen(); // also mark here, so a finished intro never replays
+    setPhase("outro");
+    window.setTimeout(() => setPhase("reveal"), 900);
     window.setTimeout(() => {
       setPhase("done");
       onCompleteRef.current?.();
     }, 2100);
   }, []);
 
-  // Start playing as soon as the component mounts.
+  // Start playing on mount, but never for returning visitors.
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || hasSeenIntro()) return;
     const v = videoRef.current;
     if (!v) return;
 
-    // Autoplay is only allowed by browsers when the video is muted.
-    v.muted = true;
+    v.muted = true; // autoplay is only allowed when muted
     v.play().catch(finish);
 
     const timeout = window.setTimeout(() => {
@@ -125,18 +131,11 @@ export default function AuraIntro({ onComplete }: AuraIntroProps) {
           playsInline
           preload="auto"
           disablePictureInPicture
-          // object-contain shows the WHOLE frame (no crop, no zoom).
           className="h-full w-full bg-black object-contain"
           onPlaying={() => {
             setReady(true);
-            try {
-              localStorage.setItem(AURA_INTRO_KEY, "1");
-            } catch {
-              /* ignore */
-            }
+            markIntroSeen();
           }}
-          // A video whose codec the browser can't decode reports a width of 0
-          // (it "plays" as a black screen). Skip the intro in that case.
           onLoadedMetadata={(e) => {
             if (e.currentTarget.videoWidth === 0) finish();
           }}

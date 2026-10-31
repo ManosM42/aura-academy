@@ -12,12 +12,72 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import {
+  SITE_URL,
+  SITE_NAME,
+  DEFAULT_TITLE,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+} from "@/lib/seo";
+import AuraIntro from "@/components/aura/AuraIntro";
 import { Navbar } from "@/components/aura/Navbar";
 import MessageNotifications from "@/components/aura/MessageNotifications";
 import { CallProvider } from "@/components/aura/CallProvider";
 import { I18nProvider } from "@/lib/i18n";
 import { CookieConsentProvider } from "@/lib/cookieConsent";
 import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
+
+/* ------------------------------------------------------------------ */
+/* Structured data (JSON-LD)                                           */
+/* ------------------------------------------------------------------ */
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "EducationalOrganization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      alternateName: "AURA",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/logo.png`,
+      },
+      image: DEFAULT_OG_IMAGE,
+      description: DEFAULT_DESCRIPTION,
+      founder: { "@id": `${SITE_URL}/#founder` },
+      knowsAbout: [
+        "Barbering",
+        "Haircutting",
+        "Fades",
+        "Barber education",
+        "Barber seminars",
+      ],
+      // Add your real profiles when you have them, e.g.:
+      // sameAs: ["https://www.instagram.com/...", "https://www.youtube.com/@..."],
+    },
+    {
+      "@type": "Person",
+      "@id": `${SITE_URL}/#founder`,
+      name: "Theopistos",
+      jobTitle: "Founder & Barber Educator",
+      worksFor: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: SITE_NAME,
+      inLanguage: "en",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ],
+};
+
+/* ------------------------------------------------------------------ */
+/* 404 + error boundaries                                              */
+/* ------------------------------------------------------------------ */
 
 function NotFoundComponent() {
   return (
@@ -79,6 +139,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Route                                                               */
+/* ------------------------------------------------------------------ */
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -87,27 +151,54 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         name: "viewport",
         content: "width=device-width, initial-scale=1, viewport-fit=cover",
       },
-      { title: "AURA" },
-      { name: "description", content: "AURA professional barber academy." },
-      { name: "author", content: "AURA" },
-      { property: "og:title", content: "AURA" },
-      { property: "og:description", content: "The operating system for the modern barber." },
+
+      // Defaults. Page routes override these through seo() in src/lib/seo.ts.
+      { title: DEFAULT_TITLE },
+      { name: "description", content: DEFAULT_DESCRIPTION },
+      {
+        name: "robots",
+        content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+      },
+      { name: "author", content: SITE_NAME },
+      { name: "application-name", content: SITE_NAME },
+      { name: "theme-color", content: "#000000" },
+      { name: "color-scheme", content: "dark" },
+
+      // Open Graph defaults
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:locale", content: "en_US" },
       { property: "og:type", content: "website" },
+      { property: "og:title", content: DEFAULT_TITLE },
+      { property: "og:description", content: DEFAULT_DESCRIPTION },
+      { property: "og:image", content: DEFAULT_OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "AURA Academy: professional barber education" },
+
+      // Twitter / X defaults
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: DEFAULT_TITLE },
+      { name: "twitter:description", content: DEFAULT_DESCRIPTION },
+      { name: "twitter:image", content: DEFAULT_OG_IMAGE },
+      // { name: "twitter:site", content: "@youraccount" }, // add when you have one
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap",
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/site.webmanifest" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(structuredData),
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -118,7 +209,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    // Set to "en" so Chrome knows the page is natively English and doesn't trigger its native translation bar
+    // lang="en" keeps Chrome from offering its own translation bar
     <html lang="en">
       <head>
         <HeadContent />
@@ -139,9 +230,22 @@ function RootComponent() {
       <I18nProvider>
         <CookieConsentProvider>
           <CallProvider>
+            <AuraIntro />
+
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-black"
+            >
+              Skip to content
+            </a>
+
             <Navbar />
             <MessageNotifications />
-            <Outlet />
+
+            <main id="main-content" tabIndex={-1} className="outline-none">
+              <Outlet />
+            </main>
+
             <CookieConsentBanner />
           </CallProvider>
         </CookieConsentProvider>
