@@ -150,7 +150,7 @@ function CourseVideoPage() {
   const plan = getPlan(course.required_plan);
 
   return (
-    <div className="cv-root relative min-h-screen w-full overflow-x-clip bg-aura-bg text-white">
+    <div className="cv-root relative min-h-screen w-full overflow-x-clip bg-aura-bg pt-24 text-white sm:pt-28">
       <style>{css}</style>
       <ChromeCursor />
       <Backdrop />
@@ -160,7 +160,7 @@ function CourseVideoPage() {
         initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, ease: EASE }}
-        className="cv-bar sticky top-0 z-30"
+        className="cv-bar relative z-20"
       >
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
           <Link to="/courses" className="cv-back">
