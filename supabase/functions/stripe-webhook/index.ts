@@ -4,11 +4,48 @@
 import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
 
-const PLAN_IDS = ["full", "core", "starter"] as const;
+const PLAN_IDS = ["low", "mid", "high"] as const;
 type PlanId = (typeof PLAN_IDS)[number];
 
 function isPlanId(value: unknown): value is PlanId {
   return typeof value === "string" && (PLAN_IDS as readonly string[]).includes(value);
+}
+
+/** Η πηγή αλήθειας: το price ID της συνδρομής στο Stripe. */
+const PRICE_TO_PLAN: Record<string, PlanId> = {
+  price_1UYmcfLnBpuAzyZYjd8sJZmB: "low",   // AURA BASIC
+  price_1UYmdKLnBpuAzyZYxr6UrDFH: "mid",   // AURA PRO
+  price_1UYmdqLnBpuAzyZYoFITGf2H: "high",  // AURA ELITE
+
+  // ΠΑΛΙΑ prices: κράτα τα ώστε οι υπάρχοντες συνδρομητές να συνεχίσουν να έχουν πρόσβαση
+  price_1UCnzNLnBpuAzyZY2gfMNHHf: "low",
+  price_1UCo03LnBpuAzyZYR1QsDcNZ: "mid",
+  price_1UCo0PLnBpuAzyZYajqu8c5Q: "high",
+  // Το παλιό LIMITED δεν υπάρχει πια ως πλάνο. Το αντιστοίχισα στο "high":
+  // άλλαξέ το αν θέλεις διαφορετικά.
+  price_1UCo0qLnBpuAzyZYABo0Prch: "high",
+};
+
+/** Παλιά ονόματα στο metadata (αν υπάρχουν συνδρομές από παλιότερη έκδοση). */
+const LEGACY_METADATA_PLAN: Record<string, PlanId> = {
+  starter: "low",
+  core: "mid",
+  full: "high",
+};
+
+function resolvePlan(subscription: Stripe.Subscription): PlanId | null {
+  const priceId = subscription.items?.data?.[0]?.price?.id;
+  if (priceId && Object.prototype.hasOwnProperty.call(PRICE_TO_PLAN, priceId)) {
+    return PRICE_TO_PLAN[priceId]!;
+  }
+
+  const meta = subscription.metadata?.["plan_id"];
+  if (isPlanId(meta)) return meta;
+  if (typeof meta === "string" && Object.prototype.hasOwnProperty.call(LEGACY_METADATA_PLAN, meta)) {
+    return LEGACY_METADATA_PLAN[meta]!;
+  }
+
+  return null; // δεν μαντεύουμε ποτέ πλάνο
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -40,9 +77,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   /** Βρίσκει το supabase user id από metadata ή από το customer mapping. */
-  async function resolveUserId(
-    subscription: Stripe.Subscription,
-  ): Promise<string | null> {
+  async function resolveUserId(subscription: Stripe.Subscription): Promise<string | null> {
     const fromMetadata = subscription.metadata?.["supabase_user_id"];
     if (typeof fromMetadata === "string" && fromMetadata.length > 0) return fromMetadata;
 
@@ -66,33 +101,46 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return;
     }
 
-    const metadataPlan = subscription.metadata?.["plan_id"];
-    const planId: PlanId = isPlanId(metadataPlan) ? metadataPlan : "starter";
-    if (!isPlanId(metadataPlan)) {
-      console.error(`Subscription ${subscription.id} χωρίς έγκυρο plan_id — fallback σε starter.`);
-    }
-
     const item = subscription.items?.data?.[0];
     const periodEndSeconds = item?.current_period_end;
     const customerId =
       typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
 
-    const { error } = await admin.from("subscriptions").upsert(
-      {
-        user_id: userId,
-        plan_id: planId,
-        status: subscription.status,
-        stripe_customer_id: customerId ?? null,
-        stripe_subscription_id: subscription.id,
-        current_period_end: periodEndSeconds
-          ? new Date(periodEndSeconds * 1000).toISOString()
-          : null,
-        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-      },
-      { onConflict: "stripe_subscription_id" },
-    );
+    const common = {
+      status: subscription.status,
+      stripe_customer_id: customerId ?? null,
+      stripe_subscription_id: subscription.id,
+      current_period_end: periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null,
+      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+    };
 
-    if (error) console.error("subscriptions upsert failed", error.message);
+    const planId = resolvePlan(subscription);
+
+    if (!planId) {
+      // Άγνωστο price: δεν μαντεύουμε πλάνο. Αν η συνδρομή υπάρχει ήδη, συγχρονίζουμε
+      // μόνο status/ημερομηνίες. Αν δεν υπάρχει, πετάμε σφάλμα: το Stripe θα κάνει
+      // retry και, μόλις προσθέσεις το price στο PRICE_TO_PLAN, θα περάσει.
+      const priceId = item?.price?.id;
+      const { data: updated, error } = await admin
+        .from("subscriptions")
+        .update(common)
+        .eq("stripe_subscription_id", subscription.id)
+        .select("id");
+      if (error) throw new Error(`subscriptions update failed: ${error.message}`);
+      if (!updated || updated.length === 0) {
+        throw new Error(
+          `Unknown price ${priceId} for subscription ${subscription.id}: add it to PRICE_TO_PLAN`,
+        );
+      }
+      console.error(`Unknown price ${priceId}: synced status only for ${subscription.id}`);
+      return;
+    }
+
+    const { error } = await admin
+      .from("subscriptions")
+      .upsert({ user_id: userId, plan_id: planId, ...common }, { onConflict: "stripe_subscription_id" });
+
+    if (error) throw new Error(`subscriptions upsert failed: ${error.message}`);
   }
 
   try {
@@ -100,9 +148,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const subscriptionId =
-          typeof session.subscription === "string"
-            ? session.subscription
-            : session.subscription?.id;
+          typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
         if (!subscriptionId) break;
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
         await upsertSubscription(subscription);

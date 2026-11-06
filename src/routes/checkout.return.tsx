@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/useAuth";
 import { useSubscription } from "@/lib/useSubscription";
 import { clearCheckoutIntent } from "@/lib/checkout-intent";
 import { verifyCheckoutSession } from "@/lib/verify-checkout";
+import { getPlan } from "@/lib/plans";
 
 const MAX_ATTEMPTS = 12; // ~18 δευτ. με 1.5s βήμα στον άμεσο έλεγχο
 const VERIFY_DELAY_MS = 1500;
@@ -146,7 +147,7 @@ function CheckoutReturnPage() {
     void refreshRef.current();
   }, []);
 
-  const planLabel = subscription?.plan_id ?? verifiedPlan;
+  const planLabel = getPlan(subscription?.plan_id ?? verifiedPlan)?.name ?? null;
   const noSession = !authLoading && !session?.user.id;
   const timedOut =
     !activated &&
