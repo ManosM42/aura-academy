@@ -116,6 +116,7 @@ export function Navbar() {
       { to: "/dashboard", label: "Dashboard" },
       { to: "/courses", label: "Courses" },
       { to: "/academy", label: "Academy" },
+      { to: "/elite", label: "Elite Community" },
       { to: "/messages", label: "Messages" },
       { to: "/seminars", label: "Book Your Seminars" },
       { to: "/online-seminars", label: "Online Seminars" },
