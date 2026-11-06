@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { db } from "@/lib/db";
 
-// The new tables are not in the generated types yet, so use an untyped client.
+// The elite_* tables are not in the generated types, so use an untyped client.
 const sb = db as unknown as SupabaseClient;
 
 export const BUCKET = "elite-chat";
@@ -59,6 +59,21 @@ function errMessage(e: unknown, fallback: string): string {
 
 function safeFileName(name: string): string {
   return name.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
+}
+
+// crypto.randomUUID only exists on secure pages (https/localhost) and newer
+// browsers, so fall back gracefully instead of crashing on send.
+function uid(): string {
+  const c: Crypto | undefined = typeof crypto !== "undefined" ? crypto : undefined;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  if (c && typeof c.getRandomValues === "function") {
+    const b = c.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  }
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
 }
 
 export function useEliteChat(meId: string) {
@@ -140,11 +155,7 @@ export function useEliteChat(meId: string) {
       setError(null);
 
       const [msgRes, memRes, readRes] = await Promise.all([
-        sb
-          .from("elite_messages")
-          .select(SELECT)
-          .order("created_at", { ascending: false })
-          .limit(PAGE_SIZE),
+        sb.from("elite_messages").select(SELECT).order("created_at", { ascending: false }).limit(PAGE_SIZE),
         sb.rpc("elite_members"),
         sb.from("elite_reads").select("user_id, last_read_at"),
       ]);
@@ -164,6 +175,7 @@ export function useEliteChat(meId: string) {
       const map: Record<string, Member> = {};
       for (const m of memberRows) map[m.id] = m;
       memberRows.forEach((m) => requestedRef.current.add(m.id));
+      membersRef.current = map;
       setMembers(map);
       setMemberIds(memberRows.map((m) => m.id));
 
@@ -174,7 +186,6 @@ export function useEliteChat(meId: string) {
       setReads(readMap);
       setInitialRead(readMap[meId] ?? null);
 
-      membersRef.current = map;
       void ensureProfiles(rows.map((m) => m.user_id));
       void ensureUrls(rows);
       setLoading(false);
@@ -384,7 +395,7 @@ export function useEliteChat(meId: string) {
       setSending(true);
       setActionError(null);
 
-      const tempId = `tmp-${crypto.randomUUID()}`;
+      const tempId = `tmp-${uid()}`;
       const temp: EliteMessage = {
         id: tempId,
         user_id: meId,
@@ -406,7 +417,7 @@ export function useEliteChat(meId: string) {
       let uploadedPath: string | null = null;
       try {
         if (file) {
-          uploadedPath = `${meId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${safeFileName(file.name)}`;
+          uploadedPath = `${meId}/${Date.now()}-${uid().slice(0, 8)}-${safeFileName(file.name)}`;
           const up = await sb.storage.from(BUCKET).upload(uploadedPath, file, {
             contentType: file.type || undefined,
             upsert: false,
@@ -558,10 +569,6 @@ export function useEliteChat(meId: string) {
     return rows.length > 0;
   }, [loadingMore, hasMore, ensureProfiles, ensureUrls]);
 
-  const clearFresh = useCallback(() => {
-    setMessages((prev) => (prev.some((m) => m.fresh) ? prev.map((m) => (m.fresh ? { ...m, fresh: false } : m)) : prev));
-  }, []);
-
   const typingNames = useMemo(() => Object.values(typing).map((t) => t.name), [typing]);
 
   return {
@@ -587,6 +594,5 @@ export function useEliteChat(meId: string) {
     loadOlder,
     markRead,
     notifyTyping,
-    clearFresh,
   };
 }
