@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Loader2 } from "lucide-react";
 import { db } from "@/lib/db";
-import EliteLocked from "@/components/aura/elite/EliteLocked";
+import  EliteLocked  from "@/components/aura/elite/EliteLocked";
 
 // Chat code (and its heavy CSS) only downloads for Elite members.
 const EliteCommunity = lazy(() => import("@/components/aura/elite/EliteCommunity"));
