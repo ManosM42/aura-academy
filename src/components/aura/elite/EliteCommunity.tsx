@@ -15,13 +15,18 @@ import {
   AlertCircle,
   ArrowDown,
   ChevronRight,
+  ChevronLeft,
+  ChevronUp,
   Copy,
-  Crown,
   FileText,
   Gem,
   Loader2,
+  Lock,
+  Mic,
   Paperclip,
+  Pause,
   Pencil,
+  Play,
   Plus,
   Reply,
   Send,
@@ -37,6 +42,13 @@ import {
   type EliteMessage,
   type Member,
 } from "@/lib/useEliteChat";
+import {
+  LIVE_BARS,
+  MAX_VOICE_MS,
+  MIN_VOICE_MS,
+  useVoiceRecorder,
+  type VoiceClip,
+} from "@/lib/useVoiceRecorder";
 
 /* ------------------------------------------------------------------ */
 /* Constants + helpers                                                 */
@@ -68,6 +80,11 @@ function fmtSize(bytes: number | null): string {
   if (!bytes) return "";
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fmtClock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function initials(m?: Member | null): string {
@@ -163,6 +180,217 @@ function ChromeGem() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Voice message player (Instagram style)                              */
+/* ------------------------------------------------------------------ */
+
+const SPEEDS = [1, 1.5, 2];
+const PLAYER_BARS = 34;
+
+// Only one voice message plays at a time.
+let activeAudio: HTMLAudioElement | null = null;
+let activeStop: (() => void) | null = null;
+
+function resampleBars(src: number[] | null, n: number): number[] {
+  if (!src || src.length === 0) {
+    return Array.from({ length: n }, (_, i) => 22 + Math.round(Math.abs(Math.sin(i * 1.7)) * 46));
+  }
+  return Array.from({ length: n }, (_, i) => {
+    const a = Math.floor((i * src.length) / n);
+    const b = Math.max(a + 1, Math.floor(((i + 1) * src.length) / n));
+    let peak = 0;
+    for (let j = a; j < b && j < src.length; j += 1) peak = Math.max(peak, src[j] ?? 0);
+    return Math.max(12, Math.min(100, peak));
+  });
+}
+
+const VoiceBubble = memo(function VoiceBubble({ msg, url }: { msg: EliteMessage; url?: string }) {
+  const src = msg.localUrl ?? url;
+  const total = Math.max(1000, msg.voice_duration_ms ?? 1000);
+  const bars = useMemo(() => resampleBars(msg.voice_waveform, PLAYER_BARS), [msg.voice_waveform]);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rafRef = useRef<number | undefined>(undefined);
+  const seekingRef = useRef(false);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [failed, setFailed] = useState(false);
+
+  const stopTick = useCallback(() => {
+    if (rafRef.current !== undefined) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = undefined;
+    }
+  }, []);
+
+  const tick = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (!seekingRef.current) setProgress(Math.min(1, (a.currentTime * 1000) / total));
+    rafRef.current = requestAnimationFrame(tick);
+  }, [total]);
+
+  const pause = useCallback(() => {
+    audioRef.current?.pause();
+    stopTick();
+    setPlaying(false);
+  }, [stopTick]);
+
+  // New source (e.g. local blob replaced by the signed url) or unmount: reset.
+  useEffect(
+    () => () => {
+      stopTick();
+      const a = audioRef.current;
+      if (a) {
+        a.pause();
+        a.removeAttribute("src");
+        a.load();
+      }
+      if (activeAudio === a) {
+        activeAudio = null;
+        activeStop = null;
+      }
+      audioRef.current = null;
+    },
+    [src, stopTick],
+  );
+
+  const ensureAudio = (): HTMLAudioElement | null => {
+    if (!src) return null;
+    if (audioRef.current) return audioRef.current;
+    const a = new Audio();
+    a.preload = "metadata";
+    a.src = src;
+    a.playbackRate = speed;
+    a.onended = () => {
+      stopTick();
+      setPlaying(false);
+      setProgress(0);
+      a.currentTime = 0;
+      if (activeAudio === a) {
+        activeAudio = null;
+        activeStop = null;
+      }
+    };
+    a.onerror = () => {
+      stopTick();
+      setPlaying(false);
+      setFailed(true);
+    };
+    audioRef.current = a;
+    return a;
+  };
+
+  const toggle = async () => {
+    if (playing) {
+      pause();
+      return;
+    }
+    const a = ensureAudio();
+    if (!a) return;
+    if (activeAudio && activeAudio !== a) activeStop?.();
+    activeAudio = a;
+    activeStop = pause;
+    try {
+      a.playbackRate = speed;
+      await a.play();
+      setFailed(false);
+      setPlaying(true);
+      stopTick();
+      rafRef.current = requestAnimationFrame(tick);
+    } catch {
+      setFailed(true);
+      setPlaying(false);
+    }
+  };
+
+  const seekTo = (ratio: number) => {
+    const a = ensureAudio();
+    const r = Math.max(0, Math.min(1, ratio));
+    setProgress(r);
+    if (a) {
+      try {
+        a.currentTime = (r * total) / 1000;
+      } catch {
+        /* some formats cannot seek before they are loaded */
+      }
+    }
+  };
+
+  const ratioFrom = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return rect.width ? (e.clientX - rect.left) / rect.width : 0;
+  };
+
+  const cycleSpeed = () => {
+    const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
+    setSpeed(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
+  };
+
+  const started = playing || progress > 0;
+  const label = failed ? "Can’t play" : fmtClock(started ? total * (1 - progress) : total);
+
+  return (
+    <div className={`ec-voice ${failed ? "ec-voice-fail" : ""}`}>
+      <button
+        type="button"
+        className="ec-voice-play"
+        onClick={() => void toggle()}
+        disabled={!src}
+        aria-label={playing ? "Pause voice message" : "Play voice message"}
+      >
+        {playing ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
+      </button>
+
+      <div
+        className="ec-voice-wave"
+        role="slider"
+        tabIndex={0}
+        aria-label="Voice message position"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        onPointerDown={(e) => {
+          seekingRef.current = true;
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          seekTo(ratioFrom(e));
+        }}
+        onPointerMove={(e) => {
+          if (seekingRef.current) seekTo(ratioFrom(e));
+        }}
+        onPointerUp={() => {
+          seekingRef.current = false;
+        }}
+        onPointerCancel={() => {
+          seekingRef.current = false;
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight") seekTo(progress + 0.05);
+          if (e.key === "ArrowLeft") seekTo(progress - 0.05);
+        }}
+      >
+        {bars.map((h, i) => (
+          <i key={i} className={i / bars.length < progress ? "on" : ""} style={{ height: `${h}%` }} />
+        ))}
+      </div>
+
+      <span className="ec-voice-time">{label}</span>
+
+      {started && !failed && (
+        <button type="button" className="ec-voice-speed" onClick={cycleSpeed} aria-label="Playback speed">
+          {speed}x
+        </button>
+      )}
+    </div>
+  );
+});
+
+/* ------------------------------------------------------------------ */
 /* Message row                                                         */
 /* ------------------------------------------------------------------ */
 
@@ -231,6 +459,7 @@ const Row = memo(function Row({
   }, [msg.reactions]);
 
   const isImage = Boolean(msg.attachment_type?.startsWith("image/"));
+  const isVoice = Boolean(msg.attachment_type?.startsWith("audio/"));
   const name = displayName(author);
 
   if (msg.deleted_at) {
@@ -263,7 +492,7 @@ const Row = memo(function Row({
         <div className="ec-bubble-wrap">
           <div
             ref={bubbleRef}
-            className={`ec-bubble ${mine ? "ec-bubble-mine" : ""} ${msg.pending ? "ec-pending" : ""}`}
+            className={`ec-bubble ${mine ? "ec-bubble-mine" : ""} ${isVoice ? "ec-bubble-voice" : ""} ${msg.pending ? "ec-pending" : ""}`}
             title={new Date(msg.created_at).toLocaleString()}
             onDoubleClick={() => !msg.pending && onReact(msg.id, "❤️")}
             onContextMenu={(e) => {
@@ -283,6 +512,8 @@ const Row = memo(function Row({
               </button>
             )}
 
+            {isVoice && <VoiceBubble msg={msg} url={url} />}
+
             {msg.attachment_name && isImage && (
               <a href={url} target="_blank" rel="noreferrer" className="ec-img-link" aria-label="Open image">
                 {url ? (
@@ -293,7 +524,7 @@ const Row = memo(function Row({
               </a>
             )}
 
-            {msg.attachment_name && !isImage && (
+            {msg.attachment_name && !isImage && !isVoice && (
               <a href={url} target="_blank" rel="noreferrer" className="ec-file" download={msg.attachment_name}>
                 <FileText className="size-5 shrink-0" aria-hidden />
                 <span className="min-w-0">
@@ -460,7 +691,7 @@ function MessageMenu({
                   <Copy className="size-4" /> Copy
                 </button>
               )}
-              {state.mine && (
+              {state.mine && !msg.attachment_type?.startsWith("audio/") && (
                 <button type="button" role="menuitem" onClick={onEdit}>
                   <Pencil className="size-4" /> Edit
                 </button>
@@ -540,6 +771,7 @@ function Composer({
   onCancelEdit,
   onSend,
   onEditSubmit,
+  onSendVoice,
   onTyping,
 }: {
   members: Member[];
@@ -551,6 +783,7 @@ function Composer({
   onCancelEdit: () => void;
   onSend: (text: string, file: File | null) => Promise<boolean>;
   onEditSubmit: (id: string, text: string) => Promise<boolean>;
+  onSendVoice: (clip: VoiceClip) => Promise<boolean>;
   onTyping: () => void;
 }) {
   const [text, setText] = useState("");
@@ -559,8 +792,18 @@ function Composer({
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [caret, setCaret] = useState(0);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [slide, setSlide] = useState({ dx: 0, dy: 0 });
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const gesture = useRef({ down: false, x: 0, y: 0, t0: 0, cancelArmed: false });
+  const finishing = useRef(false);
+
+  const rec = useVoiceRecorder();
+  const recActive = rec.state !== "idle";
+  const holding = recActive && !locked;
+  const cancelArmed = holding && slide.dx < -110;
+  const lockArmed = holding && slide.dy < -40;
 
   // Entering edit mode loads the old text; entering reply mode focuses the box.
   useEffect(() => {
@@ -580,7 +823,7 @@ function Composer({
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
-  }, [text]);
+  }, [text, recActive]);
 
   useEffect(() => {
     if (!file || !file.type.startsWith("image/")) {
@@ -591,6 +834,14 @@ function Composer({
     setPreview(u);
     return () => URL.revokeObjectURL(u);
   }, [file]);
+
+  useEffect(() => {
+    if (rec.error) setFileError(rec.error);
+  }, [rec.error]);
+
+  useEffect(() => {
+    if (recActive) setEmojiOpen(false);
+  }, [recActive]);
 
   const mention = useMemo(() => {
     const m = /(?:^|\s)@([a-zA-Z0-9_]{0,20})$/.exec(text.slice(0, caret));
@@ -612,6 +863,7 @@ function Composer({
   };
 
   const canSend = (text.trim().length > 0 || Boolean(file)) && !sending;
+  const showMic = !editing && text.trim().length === 0 && !file;
 
   const submit = async () => {
     if (!canSend) return;
@@ -657,13 +909,146 @@ function Composer({
     setFile(f);
   };
 
+  /* ---------------- voice messages ---------------- */
+
+  const resetGesture = () => {
+    gesture.current.down = false;
+    gesture.current.cancelArmed = false;
+    setLocked(false);
+    setSlide({ dx: 0, dy: 0 });
+  };
+
+  const finishVoice = async () => {
+    if (finishing.current) return;
+    finishing.current = true;
+    resetGesture();
+    try {
+      const clip = await rec.stop();
+      if (!clip) return;
+      if (clip.durationMs < MIN_VOICE_MS) {
+        setFileError("Hold the mic to record a voice message.");
+        return;
+      }
+      await onSendVoice(clip);
+    } finally {
+      finishing.current = false;
+    }
+  };
+
+  const cancelVoice = () => {
+    resetGesture();
+    rec.cancel();
+  };
+
+  // auto-send when the time limit is reached
+  const finishRef = useRef(finishVoice);
+  finishRef.current = finishVoice;
+  useEffect(() => {
+    if (rec.elapsedMs >= MAX_VOICE_MS && (rec.state === "recording" || rec.state === "paused")) {
+      void finishRef.current();
+    }
+  }, [rec.elapsedMs, rec.state]);
+
+  const onMicDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    // Already recording in locked mode: this press sends it.
+    if (rec.state !== "idle") {
+      if (locked) {
+        e.preventDefault();
+        void finishVoice();
+      }
+      return;
+    }
+
+    setFileError(null);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    gesture.current = { down: true, x: e.clientX, y: e.clientY, t0: Date.now(), cancelArmed: false };
+    setSlide({ dx: 0, dy: 0 });
+
+    void (async () => {
+      const ok = await rec.start();
+      if (!ok) {
+        gesture.current.down = false;
+        return;
+      }
+      navigator.vibrate?.(12);
+      // finger already lifted while the permission prompt was open: keep recording, locked
+      if (!gesture.current.down) setLocked(true);
+    })();
+  };
+
+  const onMicMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const g = gesture.current;
+    if (!g.down || locked) return;
+    const dx = Math.min(0, e.clientX - g.x);
+    const dy = Math.min(0, e.clientY - g.y);
+    setSlide({ dx, dy });
+    g.cancelArmed = dx < -110;
+    if (dy < -80 && rec.state === "recording") {
+      g.down = false;
+      setSlide({ dx: 0, dy: 0 });
+      setLocked(true);
+      navigator.vibrate?.(10);
+    }
+  };
+
+  const onMicUp = () => {
+    const g = gesture.current;
+    if (!g.down) return;
+    g.down = false;
+    if (rec.state === "starting" || locked) return; // the start() continuation locks it
+    const held = Date.now() - g.t0;
+    if (held < 350) {
+      // a quick tap: keep recording hands-free
+      setSlide({ dx: 0, dy: 0 });
+      setLocked(true);
+      return;
+    }
+    if (g.cancelArmed) {
+      cancelVoice();
+      return;
+    }
+    void finishVoice();
+  };
+
+  const onMicCancel = () => {
+    const g = gesture.current;
+    if (!g.down) return;
+    g.down = false;
+    if (!locked && rec.state === "recording") cancelVoice();
+  };
+
+  const onMicKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (rec.state === "idle") {
+      setFileError(null);
+      void rec.start().then((ok) => {
+        if (ok) setLocked(true);
+      });
+    } else if (rec.state === "recording" || rec.state === "paused") {
+      void finishVoice();
+    }
+  };
+
+  const slots = Array.from({ length: LIVE_BARS }, (_, i) => {
+    const v = rec.live[rec.live.length - LIVE_BARS + i];
+    return v === undefined ? 0.06 : v;
+  });
+
   return (
     <div className="ec-composer-wrap">
-      {(replyTo || editing) && (
+      {(replyTo || editing) && !recActive && (
         <div className="ec-ctx">
           <div className="min-w-0">
             <span className="ec-ctx-title">{editing ? "Editing message" : `Replying to ${replyName}`}</span>
-            <span className="ec-ctx-text">{(editing ?? replyTo)?.body || "Attachment"}</span>
+            <span className="ec-ctx-text">{(editing ?? replyTo)?.body || (replyTo ? replyTo.attachment_name : "") || "Attachment"}</span>
           </div>
           <button
             type="button"
@@ -681,7 +1066,7 @@ function Composer({
         </div>
       )}
 
-      {file && (
+      {file && !recActive && (
         <div className="ec-attach-preview">
           {preview ? <img src={preview} alt="" /> : <FileText className="size-5" aria-hidden />}
           <span className="truncate">{file.name}</span>
@@ -697,7 +1082,7 @@ function Composer({
         </p>
       )}
 
-      {mention && (
+      {mention && !recActive && (
         <ul className="ec-mentions" role="listbox" aria-label="Mention a member">
           {mention.list.map((m) => (
             <li key={m.id}>
@@ -711,7 +1096,7 @@ function Composer({
         </ul>
       )}
 
-      {emojiOpen && (
+      {emojiOpen && !recActive && (
         <div className="ec-emoji-grid ec-emoji-pop">
           {EMOJI_GRID.map((e) => (
             <button
@@ -728,7 +1113,7 @@ function Composer({
         </div>
       )}
 
-      <div className="ec-composer">
+      <div className={`ec-composer ${recActive ? "ec-composer-rec" : ""}`}>
         <input
           ref={fileRef}
           type="file"
@@ -739,53 +1124,131 @@ function Composer({
             e.target.value = "";
           }}
         />
-        <button
-          type="button"
-          className="ec-compbtn"
-          aria-label="Attach a file"
-          onClick={() => fileRef.current?.click()}
-          disabled={Boolean(editing)}
-        >
-          <Paperclip className="size-5" />
-        </button>
 
-        <textarea
-          ref={ref}
-          value={text}
-          rows={1}
-          placeholder={editing ? "Edit your message…" : "Type a message…"}
-          aria-label="Message"
-          enterKeyHint="send"
-          maxLength={4000}
-          onChange={(e) => {
-            setText(e.target.value);
-            setCaret(e.target.selectionStart ?? e.target.value.length);
-            if (!editing) onTyping();
-          }}
-          onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
-          onKeyDown={onKeyDown}
-          onFocus={() => window.setTimeout(() => ref.current?.scrollIntoView({ block: "nearest" }), 250)}
-        />
+        {holding && (
+          <span
+            className={`ec-lock ${lockArmed ? "ec-lock-on" : ""}`}
+            style={{ transform: `translateY(${Math.max(slide.dy * 0.35, -30)}px)` }}
+            aria-hidden
+          >
+            <Lock className="size-4" />
+            <ChevronUp className="size-4" />
+          </span>
+        )}
 
-        <button
-          type="button"
-          className="ec-compbtn"
-          aria-label="Emoji"
-          aria-expanded={emojiOpen}
-          onClick={() => setEmojiOpen((o) => !o)}
-        >
-          <Smile className="size-5" />
-        </button>
+        {!recActive && (
+          <>
+            <button
+              type="button"
+              className="ec-compbtn"
+              aria-label="Attach a file"
+              onClick={() => fileRef.current?.click()}
+              disabled={Boolean(editing)}
+            >
+              <Paperclip className="size-5" />
+            </button>
 
-        <button
-          type="button"
-          className="ec-send"
-          aria-label={editing ? "Save edit" : "Send message"}
-          disabled={!canSend}
-          onClick={() => void submit()}
-        >
-          {sending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" style={{ marginLeft: -2 }} />}
-        </button>
+            <textarea
+              ref={ref}
+              value={text}
+              rows={1}
+              placeholder={editing ? "Edit your message…" : "Type a message…"}
+              aria-label="Message"
+              enterKeyHint="send"
+              maxLength={4000}
+              onChange={(e) => {
+                setText(e.target.value);
+                setCaret(e.target.selectionStart ?? e.target.value.length);
+                if (!editing) onTyping();
+              }}
+              onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+              onKeyDown={onKeyDown}
+              onFocus={() => window.setTimeout(() => ref.current?.scrollIntoView({ block: "nearest" }), 250)}
+            />
+
+            <button
+              type="button"
+              className="ec-compbtn"
+              aria-label="Emoji"
+              aria-expanded={emojiOpen}
+              onClick={() => setEmojiOpen((o) => !o)}
+            >
+              <Smile className="size-5" />
+            </button>
+          </>
+        )}
+
+        {recActive && (
+          <div className="ec-rec" role="status" aria-label="Recording voice message">
+            <button
+              type="button"
+              className={`ec-rec-trash ${cancelArmed ? "ec-rec-trash-armed" : ""}`}
+              aria-label="Discard recording"
+              onClick={cancelVoice}
+            >
+              <Trash2 className="size-4" />
+            </button>
+            <span className={`ec-rec-dot ${rec.state === "paused" ? "ec-rec-dot-paused" : ""}`} aria-hidden />
+            <span className="ec-rec-time">{fmtClock(rec.elapsedMs)}</span>
+            <div className="ec-rec-wave" aria-hidden>
+              {slots.map((v, i) => (
+                <i key={i} style={{ height: `${Math.max(10, v * 100)}%` }} />
+              ))}
+            </div>
+            {locked ? (
+              <button
+                type="button"
+                className="ec-compbtn"
+                onClick={rec.togglePause}
+                aria-label={rec.state === "paused" ? "Resume recording" : "Pause recording"}
+              >
+                {rec.state === "paused" ? <Mic className="size-5" /> : <Pause className="size-5" />}
+              </button>
+            ) : (
+              <span className="ec-rec-slide" style={{ opacity: Math.max(0.15, 1 + slide.dx / 110) }}>
+                <ChevronLeft className="size-4" /> Slide to cancel
+              </span>
+            )}
+          </div>
+        )}
+
+        {recActive || showMic ? (
+          <button
+            type="button"
+            className={`ec-send ec-mic ${holding ? "ec-mic-hot" : ""}`}
+            aria-label={recActive ? "Send voice message" : "Hold to record a voice message"}
+            disabled={sending && !recActive}
+            style={
+              holding
+                ? { transform: `translate(${slide.dx * 0.5}px, ${slide.dy * 0.5}px) scale(1.18)`, transition: "none" }
+                : undefined
+            }
+            onPointerDown={onMicDown}
+            onPointerMove={onMicMove}
+            onPointerUp={onMicUp}
+            onPointerCancel={onMicCancel}
+            onKeyDown={onMicKey}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {sending && !recActive ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : recActive && locked ? (
+              <Send className="size-5" style={{ marginLeft: -2 }} />
+            ) : (
+              <Mic className="size-5" />
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ec-send"
+            aria-label={editing ? "Save edit" : "Send message"}
+            disabled={!canSend}
+            onClick={() => void submit()}
+          >
+            {sending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" style={{ marginLeft: -2 }} />}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -889,7 +1352,7 @@ export default function EliteCommunity({ meId, meName }: { meId: string; meName:
   const sharedMedia = useMemo(
     () =>
       messages
-        .filter((m) => !m.deleted_at && m.attachment_path && urls[m.attachment_path])
+        .filter((m) => !m.deleted_at && m.attachment_path && urls[m.attachment_path] && !m.attachment_type?.startsWith("audio/"))
         .slice(-8)
         .reverse(),
     [messages, urls],
@@ -1018,7 +1481,7 @@ export default function EliteCommunity({ meId, meName }: { meId: string; meName:
     return () => window.clearTimeout(t);
   }, [chat.actionError, setActionError]);
 
-  const { send, notifyTyping } = chat;
+  const { send, sendVoice, notifyTyping } = chat;
 
   const handleSend = useCallback(
     async (text: string, file: File | null) => {
@@ -1027,6 +1490,15 @@ export default function EliteCommunity({ meId, meName }: { meId: string; meName:
       return ok;
     },
     [send, replyToId],
+  );
+
+  const handleSendVoice = useCallback(
+    async (clip: VoiceClip) => {
+      const ok = await sendVoice(clip, replyToId);
+      if (ok) setReplyToId(null);
+      return ok;
+    },
+    [sendVoice, replyToId],
   );
 
   const handleTyping = useCallback(() => notifyTyping(meName), [notifyTyping, meName]);
@@ -1236,17 +1708,6 @@ export default function EliteCommunity({ meId, meName }: { meId: string; meName:
             </div>
           )}
 
-          <div className="ec-exclusive">
-            <span className="ec-crown">
-              <Crown className="size-5" />
-            </span>
-            <span className="ec-exclusive-rule" aria-hidden />
-            <div className="min-w-0">
-              <p className="ec-exclusive-title">ELITE EXCLUSIVE</p>
-              <p className="ec-exclusive-text">This private community is reserved for AURA Elite members.</p>
-            </div>
-          </div>
-
           <Composer
             members={memberList}
             sending={chat.sending}
@@ -1257,6 +1718,7 @@ export default function EliteCommunity({ meId, meName }: { meId: string; meName:
             onCancelEdit={() => setEditingId(null)}
             onSend={handleSend}
             onEditSubmit={chat.edit}
+            onSendVoice={handleSendVoice}
             onTyping={handleTyping}
           />
         </section>
@@ -1653,24 +2115,10 @@ const css = `
 .ec-toast{ display:flex; align-items:center; gap:10px; margin:0 16px 8px; padding:.6rem .8rem; border-radius:.9rem; font-size:12px; color:#fecaca; background:rgba(127,29,29,.25); border:1px solid rgba(248,113,113,.35); }
 .ec-toast span{ flex:1; }
 .ec-newpill{
-  position:absolute; left:50%; transform:translateX(-50%); bottom:190px; z-index:5; display:inline-flex; align-items:center; gap:8px; padding:.55rem 1rem; border-radius:9999px; font-size:12px; color:#0b0b0c; cursor:pointer;
+  position:absolute; left:50%; transform:translateX(-50%); bottom:128px; z-index:5; display:inline-flex; align-items:center; gap:8px; padding:.55rem 1rem; border-radius:9999px; font-size:12px; color:#0b0b0c; cursor:pointer;
   background:linear-gradient(180deg,#fff,#b9bec7); box-shadow:0 10px 24px rgba(0,0,0,.6), 0 0 26px -4px rgba(232,236,242,.7), inset 0 1px 0 #fff;
   animation: ec-pop .3s ease;
 }
-
-/* ---- exclusive strip ---- */
-.ec-exclusive{
-  position:relative; overflow:hidden; display:flex; align-items:center; gap:12px; margin:4px 14px 10px; padding:10px 14px; border-radius:1.2rem; flex-shrink:0;
-  border:1.5px solid transparent;
-  background: var(--ec-brush) padding-box, linear-gradient(180deg,rgba(20,20,22,.94),rgba(7,7,8,.96)) padding-box, var(--ec-rim) border-box;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
-}
-.ec-exclusive::after{ content:""; position:absolute; right:-40px; top:-40px; width:200px; height:200px; background:radial-gradient(circle,rgba(232,236,242,.16),transparent 65%); pointer-events:none; }
-.ec-exclusive .ec-crown{ margin:0; width:40px; height:40px; }
-.ec-exclusive-rule{ width:1px; align-self:stretch; background:linear-gradient(180deg,transparent,rgba(255,255,255,.4),transparent); }
-.ec-exclusive-title{ font-family:"Cormorant Garamond",Georgia,serif; font-size:1.05rem; letter-spacing:.18em; color:#f3f4f6; }
-.ec-exclusive-text{ font-size:11.5px; color:rgba(255,255,255,.52); line-height:1.4; }
-@media (min-width:1024px){ .ec-exclusive{ margin:4px 26px 10px; } }
 
 /* ---- composer ---- */
 .ec-composer-wrap{ position:relative; flex-shrink:0; padding:0 14px 12px; }
@@ -1784,6 +2232,65 @@ const css = `
 .ec-skel-av{ width:44px; height:44px; border-radius:9999px; flex-shrink:0; }
 .ec-skel-col{ display:flex; flex-direction:column; gap:8px; flex:1; }
 .ec-skel-line{ height:12px; } .ec-skel-bubble{ height:54px; }
+
+/* ---- voice messages: player ---- */
+.ec-bubble-voice{ padding:.55rem .8rem .55rem .55rem; }
+.ec-voice{ position:relative; display:flex; align-items:center; gap:10px; width:min(270px,66vw); }
+.ec-voice-play{
+  display:grid; place-items:center; width:38px; height:38px; border-radius:9999px; flex-shrink:0; cursor:pointer; color:#101012;
+  border:1.5px solid transparent;
+  background: radial-gradient(circle at 32% 22%,#fff 0%,#e0e4ea 25%,#98a0ab 65%,#565c66 100%) padding-box, var(--ec-rim) border-box;
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 -4px 8px rgba(0,0,0,.3) inset, 0 6px 12px rgba(0,0,0,.6);
+  transition: transform .15s, filter .2s;
+}
+.ec-voice-play:hover:not(:disabled){ filter:brightness(1.1); }
+.ec-voice-play:active:not(:disabled){ transform:scale(.94); }
+.ec-voice-play:disabled{ opacity:.45; cursor:not-allowed; }
+.ec-voice-wave{ position:relative; flex:1; min-width:0; height:32px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; touch-action:none; user-select:none; }
+.ec-voice-wave i{ display:block; width:3px; flex:none; border-radius:9999px; background:rgba(255,255,255,.27); transition:background .12s; }
+.ec-voice-wave i.on{ background:linear-gradient(180deg,#ffffff,#b4bac5); box-shadow:0 0 8px rgba(255,255,255,.35); }
+.ec-voice-time{ min-width:34px; text-align:right; font-size:12px; font-variant-numeric:tabular-nums; color:rgba(255,255,255,.78); }
+.ec-voice-speed{
+  flex-shrink:0; padding:.12rem .5rem; border-radius:9999px; font-size:11px; font-weight:600; color:#eef1f5; cursor:pointer;
+  border:1px solid rgba(232,236,242,.4); background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.03)),#0b0b0c;
+}
+.ec-voice-fail .ec-voice-time{ color:#fca5a5; }
+.ec-voice-fail .ec-voice-wave{ opacity:.45; }
+
+/* ---- voice messages: recorder ---- */
+.ec-composer{ position:relative; }
+.ec-composer-rec{ border-color:transparent; }
+.ec-rec{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; height:48px; padding:0 6px 0 3px; }
+.ec-rec-trash{
+  display:grid; place-items:center; width:36px; height:36px; border-radius:9999px; flex-shrink:0; cursor:pointer; color:#e5e7eb;
+  border:1px solid rgba(232,236,242,.3); background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.02)),#0b0b0c;
+  transition:color .15s, border-color .15s, background .15s, transform .15s;
+}
+.ec-rec-trash-armed{ color:#fecaca; border-color:rgba(248,113,113,.8); background:rgba(127,29,29,.5); transform:scale(1.12); }
+.ec-rec-dot{ width:10px; height:10px; border-radius:9999px; flex-shrink:0; background:#ef4444; box-shadow:0 0 12px rgba(239,68,68,.9); animation: ec-rec-pulse 1.1s ease-in-out infinite; }
+.ec-rec-dot-paused{ animation:none; background:#6b7280; box-shadow:none; }
+@keyframes ec-rec-pulse{ 0%,100%{ opacity:1; transform:scale(1) } 50%{ opacity:.35; transform:scale(.8) } }
+.ec-rec-time{ min-width:38px; font-size:15px; font-variant-numeric:tabular-nums; color:#fff; }
+.ec-rec-wave{ flex:1; min-width:0; height:30px; display:flex; align-items:center; justify-content:flex-end; gap:2px; overflow:hidden; }
+.ec-rec-wave i{ display:block; width:3px; flex:none; border-radius:9999px; background:linear-gradient(180deg,#ffffff,#8f97a4); transition:height .08s linear; }
+.ec-rec-slide{ display:inline-flex; align-items:center; gap:2px; flex-shrink:0; font-size:12px; color:rgba(255,255,255,.65); white-space:nowrap; }
+@media (max-width:380px){ .ec-rec-slide{ display:none; } }
+
+.ec-mic{ touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.ec-mic-hot{
+  z-index:3;
+  background: radial-gradient(circle at 32% 22%,#ffffff 0%,#ffd5d5 22%,#e25555 58%,#7f1d1d 100%) padding-box, var(--ec-rim) border-box;
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 10px 22px rgba(0,0,0,.7), 0 0 34px -2px rgba(239,68,68,.7);
+}
+.ec-lock{
+  position:absolute; right:7px; bottom:calc(100% + 10px); z-index:2; width:44px; height:84px; border-radius:9999px;
+  display:flex; flex-direction:column; align-items:center; justify-content:space-around; padding:10px 0; color:rgba(255,255,255,.75); pointer-events:none;
+  border:1.5px solid transparent;
+  background: linear-gradient(180deg,#1c1c1e,#0a0a0b) padding-box, var(--ec-rim) border-box;
+  box-shadow:0 14px 30px rgba(0,0,0,.7), 0 0 24px -8px rgba(232,236,242,.6);
+  animation: ec-pop .2s ease;
+}
+.ec-lock-on{ color:#fff; box-shadow:0 14px 30px rgba(0,0,0,.7), 0 0 34px -4px rgba(232,236,242,.9); }
 
 .ec-root a:focus-visible,.ec-root button:focus-visible,.ec-root textarea:focus-visible{ outline:2px solid rgba(232,236,242,.85); outline-offset:2px; }
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import { db } from "@/lib/db";
+import type { VoiceClip } from "@/lib/useVoiceRecorder";
 
 // The elite_* tables are not in the generated types, so use an untyped client.
 const sb = db as unknown as SupabaseClient;
@@ -27,12 +28,16 @@ export interface EliteMessage {
   attachment_name: string | null;
   attachment_type: string | null;
   attachment_size: number | null;
+  voice_duration_ms: number | null;
+  voice_waveform: number[] | null;
   created_at: string;
   edited_at: string | null;
   deleted_at: string | null;
   reactions: Reaction[];
   pending?: boolean;
   fresh?: boolean;
+  /** Local blob URL for voice messages I just sent (plays instantly). */
+  localUrl?: string;
 }
 
 export interface Member {
@@ -97,6 +102,15 @@ export function useEliteChat(meId: string) {
   const urlsRef = useRef<Record<string, string>>({});
   const requestedRef = useRef<Set<string>>(new Set());
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const localUrlsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const urlsToFree = localUrlsRef.current;
+    return () => {
+      urlsToFree.forEach((u) => URL.revokeObjectURL(u));
+      urlsToFree.clear();
+    };
+  }, []);
 
   useEffect(() => {
     messagesRef.current = messages;
@@ -231,6 +245,8 @@ export function useEliteChat(meId: string) {
                   attachment_name: row.attachment_name,
                   attachment_type: row.attachment_type,
                   attachment_size: row.attachment_size,
+                  voice_duration_ms: row.voice_duration_ms ?? null,
+                  voice_waveform: row.voice_waveform ?? null,
                   reactions: row.deleted_at ? [] : m.reactions,
                   fresh: false,
                 }
@@ -405,6 +421,8 @@ export function useEliteChat(meId: string) {
         attachment_name: file?.name ?? null,
         attachment_type: file?.type ?? null,
         attachment_size: file?.size ?? null,
+        voice_duration_ms: null,
+        voice_waveform: null,
         created_at: new Date().toISOString(),
         edited_at: null,
         deleted_at: null,
@@ -459,6 +477,101 @@ export function useEliteChat(meId: string) {
     [meId, ensureUrls],
   );
 
+  const sendVoice = useCallback(
+    async (clip: VoiceClip, replyTo?: string | null): Promise<boolean> => {
+      if (clip.blob.size > MAX_FILE_BYTES) {
+        setActionError("This voice message is too large.");
+        return false;
+      }
+
+      setSending(true);
+      setActionError(null);
+
+      const tempId = `tmp-${uid()}`;
+      const localUrl = URL.createObjectURL(clip.blob);
+      localUrlsRef.current.add(localUrl);
+
+      const temp: EliteMessage = {
+        id: tempId,
+        user_id: meId,
+        body: "",
+        reply_to: replyTo ?? null,
+        attachment_path: null,
+        attachment_name: "Voice message",
+        attachment_type: clip.mime,
+        attachment_size: clip.blob.size,
+        voice_duration_ms: clip.durationMs,
+        voice_waveform: clip.waveform,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        reactions: [],
+        pending: true,
+        fresh: true,
+        localUrl,
+      };
+      setMessages((prev) => [...prev, temp]);
+
+      let uploadedPath: string | null = null;
+      try {
+        const ext = clip.mime.includes("mp4")
+          ? "m4a"
+          : clip.mime.includes("ogg")
+            ? "ogg"
+            : clip.mime.includes("mpeg")
+              ? "mp3"
+              : clip.mime.includes("wav")
+                ? "wav"
+                : "webm";
+        uploadedPath = `${meId}/${Date.now()}-${uid().slice(0, 8)}-voice.${ext}`;
+
+        const up = await sb.storage.from(BUCKET).upload(uploadedPath, clip.blob, {
+          contentType: clip.mime,
+          upsert: false,
+        });
+        if (up.error) throw up.error;
+
+        const { data, error: insertError } = await sb
+          .from("elite_messages")
+          .insert({
+            user_id: meId,
+            body: "",
+            reply_to: replyTo ?? null,
+            attachment_path: uploadedPath,
+            attachment_name: "Voice message",
+            attachment_type: clip.mime,
+            attachment_size: clip.blob.size,
+            voice_duration_ms: clip.durationMs,
+            voice_waveform: clip.waveform,
+          })
+          .select(SELECT)
+          .single();
+        if (insertError) throw insertError;
+
+        const real = { ...(data as EliteMessage), fresh: true, localUrl };
+        setMessages((prev) => {
+          const without = prev.filter((m) => m.id !== tempId);
+          // the realtime INSERT may already have added it: keep that row, attach the local url
+          return without.some((m) => m.id === real.id)
+            ? without.map((m) => (m.id === real.id ? { ...m, localUrl } : m))
+            : sortMessages([...without, real]);
+        });
+        void ensureUrls([real]);
+        return true;
+      } catch (e) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        localUrlsRef.current.delete(localUrl);
+        URL.revokeObjectURL(localUrl);
+        if (uploadedPath) void sb.storage.from(BUCKET).remove([uploadedPath]);
+        setActionError(errMessage(e, "Your voice message could not be sent."));
+        return false;
+      } finally {
+        setSending(false);
+      }
+    },
+    [meId, ensureUrls],
+  );
+
   const edit = useCallback(async (id: string, body: string): Promise<boolean> => {
     const text = body.trim();
     const before = messagesRef.current.find((m) => m.id === id);
@@ -487,7 +600,15 @@ export function useEliteChat(meId: string) {
     setMessages((prev) =>
       prev.map((m) =>
         m.id === id
-          ? { ...m, body: "", deleted_at: new Date().toISOString(), attachment_path: null, reactions: [] }
+          ? {
+              ...m,
+              body: "",
+              deleted_at: new Date().toISOString(),
+              attachment_path: null,
+              voice_duration_ms: null,
+              voice_waveform: null,
+              reactions: [],
+            }
           : m,
       ),
     );
@@ -588,6 +709,7 @@ export function useEliteChat(meId: string) {
     setActionError,
     sending,
     send,
+    sendVoice,
     edit,
     remove,
     react,
