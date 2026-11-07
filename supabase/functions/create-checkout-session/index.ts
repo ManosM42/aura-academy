@@ -1,11 +1,15 @@
 // supabase/functions/create-checkout-session/index.ts
+//
+// The price now comes from public.plans (edited in the admin panel).
+// There is no Stripe Price ID to maintain: we send the amount inline with
+// `price_data`, attached to ONE Stripe product per plan that we create and
+// remember automatically (plans.stripe_product_id).
 import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -16,34 +20,14 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type PlanId = "low" | "mid" | "high" | "limited" | "full" | "core" | "starter";
-
-const PLAN_PRICE_ENV: Record<PlanId, string> = {
-  low: "STRIPE_PRICE_LOW",
-  mid: "STRIPE_PRICE_MID",
-  high: "STRIPE_PRICE_HIGH",
-  limited: "STRIPE_PRICE_LIMITED",
-  full: "STRIPE_PRICE_FULL",
-  core: "STRIPE_PRICE_CORE",
-  starter: "STRIPE_PRICE_STARTER",
-};
+type PlanId = "low" | "mid" | "high";
 
 function isPlanId(value: unknown): value is PlanId {
-  return (
-    value === "low" ||
-    value === "mid" ||
-    value === "high" ||
-    value === "limited" ||
-    value === "full" ||
-    value === "core" ||
-    value === "starter"
-  );
+  return value === "low" || value === "mid" || value === "high";
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -61,44 +45,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Server misconfigured" }, 500);
   }
 
-  let rawBody = "";
-  try {
-    rawBody = await req.text();
-  } catch (readError) {
-    console.error("Could not read request body", readError);
-    return json({ error: "Invalid JSON body" }, 400);
-  }
-
   let planId: unknown;
   try {
-    const parsed = JSON.parse(rawBody) as { planId?: unknown };
+    const parsed = JSON.parse(await req.text()) as { planId?: unknown };
     planId = parsed?.planId;
   } catch {
-    console.error("Invalid JSON body", {
-      contentType: req.headers.get("content-type"),
-      length: rawBody.length,
-      preview: rawBody.slice(0, 200),
-    });
     return json({ error: "Invalid JSON body" }, 400);
   }
 
-  if (!isPlanId(planId)) {
-    console.error("Unknown plan", { received: planId, rawBody: rawBody.slice(0, 200) });
-    return json({ error: "Unknown plan" }, 400);
-  }
-
-  const envVarName = PLAN_PRICE_ENV[planId];
-  const priceId = Deno.env.get(envVarName);
-  if (!priceId) {
-    console.error(`Missing price env var ${envVarName} for plan ${planId}`);
-    return json({ error: "Plan not available" }, 500);
-  }
+  if (!isPlanId(planId)) return json({ error: "Unknown plan" }, 400);
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  if (!authHeader.startsWith("Bearer ")) {
-    console.error("Missing bearer token");
-    return json({ error: "Unauthorized" }, 401);
-  }
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
@@ -112,21 +70,39 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false },
-  });
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const stripe = new Stripe(stripeKey);
 
   try {
+    // 1. The plan and its CURRENT price, straight from the database.
+    const { data: plan, error: planError } = await admin
+      .from("plans")
+      .select("id, name, price_cents, currency, active, stripe_product_id")
+      .eq("id", planId)
+      .maybeSingle();
+
+    if (planError) {
+      console.error("plans lookup failed", planError.message);
+      return json({ error: "Could not load the plan." }, 500);
+    }
+    if (!plan || !plan.active) return json({ error: "Το πλάνο δεν είναι διαθέσιμο." }, 404);
+
+    const unitAmount = Number(plan.price_cents);
+    if (!Number.isInteger(unitAmount) || unitAmount < 50) {
+      console.error("Invalid price on plan", plan.id, plan.price_cents);
+      return json({ error: "Το πλάνο δεν έχει έγκυρη τιμή." }, 500);
+    }
+
+    // 2. Already subscribed? No second charge.
     const { data: existing } = await admin
       .from("subscriptions")
       .select("id")
       .eq("user_id", user.id)
       .in("status", ["active", "trialing"])
       .maybeSingle();
-
     if (existing) return json({ error: "Υπάρχει ήδη ενεργή συνδρομή." }, 409);
 
+    // 3. Stripe customer
     const { data: mapping } = await admin
       .from("stripe_customers")
       .select("stripe_customer_id")
@@ -134,7 +110,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .maybeSingle();
 
     let customerId = mapping?.stripe_customer_id as string | undefined;
-
     if (!customerId) {
       const customer = await stripe.customers.create({
         email: user.email,
@@ -145,22 +120,52 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { error: insertError } = await admin
         .from("stripe_customers")
         .insert({ user_id: user.id, stripe_customer_id: customerId });
+      if (insertError) console.error("stripe_customers insert failed", insertError.message);
+    }
 
-      if (insertError) {
-        console.error("stripe_customers insert failed", insertError.message);
+    // 4. One Stripe product per plan: keep its name in sync, or create it.
+    let productId: string | null = (plan.stripe_product_id as string | null) ?? null;
+    if (productId) {
+      try {
+        await stripe.products.update(productId, { name: String(plan.name) });
+      } catch (err) {
+        // Deleted product, or the ID belongs to the other Stripe mode (test/live).
+        console.error("Stored product unusable, creating a new one", err);
+        productId = null;
       }
+    }
+    if (!productId) {
+      const product = await stripe.products.create({
+        name: String(plan.name),
+        metadata: { plan_id: String(plan.id) },
+      });
+      productId = product.id;
+      const { error: saveError } = await admin
+        .from("plans")
+        .update({ stripe_product_id: productId })
+        .eq("id", plan.id);
+      if (saveError) console.error("Could not store stripe_product_id", saveError.message);
     }
 
     const origin =
-      Deno.env.get("PUBLIC_SITE_URL") ??
-      req.headers.get("origin") ??
-      "http://localhost:3000";
+      Deno.env.get("PUBLIC_SITE_URL") ?? req.headers.get("origin") ?? "http://localhost:3000";
 
+    // 5. Embedded checkout with an inline monthly price.
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       ui_mode: "embedded",
       customer: customerId,
-      line_items: [{ price: priceId, quantity: 1 }],
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: String(plan.currency ?? "eur").toLowerCase(),
+            product: productId,
+            unit_amount: unitAmount,
+            recurring: { interval: "month" },
+          },
+        },
+      ],
       allow_promotion_codes: true,
       client_reference_id: user.id,
       metadata: { supabase_user_id: user.id, plan_id: planId },

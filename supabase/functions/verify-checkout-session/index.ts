@@ -1,11 +1,16 @@
 // supabase/functions/verify-checkout-session/index.ts
 import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  ACCESS_STATUSES,
+  recordInvoice,
+  refId,
+  syncSubscription,
+} from "../_shared/billing.ts";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -16,71 +21,8 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type PlanId = "low" | "mid" | "high" | "limited" | "full" | "core" | "starter";
-
-const PLAN_PRICE_ENV: Record<PlanId, string> = {
-  low: "STRIPE_PRICE_LOW",
-  mid: "STRIPE_PRICE_MID",
-  high: "STRIPE_PRICE_HIGH",
-  limited: "STRIPE_PRICE_LIMITED",
-  full: "STRIPE_PRICE_FULL",
-  core: "STRIPE_PRICE_CORE",
-  starter: "STRIPE_PRICE_STARTER",
-};
-
-const ACCESS_STATUSES = new Set(["active", "trialing"]);
-
-function isPlanId(value: unknown): value is PlanId {
-  return (
-    value === "low" ||
-    value === "mid" ||
-    value === "high" ||
-    value === "limited" ||
-    value === "full" ||
-    value === "core" ||
-    value === "starter"
-  );
-}
-
-/** Αντίστροφη αντιστοίχιση price -> plan, για session χωρίς metadata. */
-function planFromPrice(priceId: string | null): PlanId | null {
-  if (!priceId) return null;
-  for (const [plan, envName] of Object.entries(PLAN_PRICE_ENV) as [
-    PlanId,
-    string,
-  ][]) {
-    if (Deno.env.get(envName) === priceId) return plan;
-  }
-  return null;
-}
-
-type PeriodBearing = { current_period_end?: number | null };
-
-function resolvePeriodEnd(sub: Stripe.Subscription): string | null {
-  const item = sub.items?.data?.[0] as
-    | (Stripe.SubscriptionItem & PeriodBearing)
-    | undefined;
-  const fromItem = item?.current_period_end;
-  const fromSub = (sub as unknown as PeriodBearing).current_period_end;
-  const seconds =
-    typeof fromItem === "number"
-      ? fromItem
-      : typeof fromSub === "number"
-        ? fromSub
-        : null;
-  return seconds ? new Date(seconds * 1000).toISOString() : null;
-}
-
-function priceIdOf(sub: Stripe.Subscription): string | null {
-  const price = sub.items?.data?.[0]?.price;
-  if (!price) return null;
-  return typeof price === "string" ? price : price.id;
-}
-
 Deno.serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
-  }
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -89,45 +31,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
   if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
-    console.error("Missing environment configuration", {
-      stripeKey: Boolean(stripeKey),
-      supabaseUrl: Boolean(supabaseUrl),
-      anonKey: Boolean(anonKey),
-      serviceKey: Boolean(serviceKey),
-    });
+    console.error("Missing environment configuration");
     return json({ error: "Server misconfigured" }, 500);
-  }
-
-  let rawBody = "";
-  try {
-    rawBody = await req.text();
-  } catch (readError) {
-    console.error("Could not read request body", readError);
-    return json({ error: "Invalid JSON body" }, 400);
   }
 
   let sessionId: unknown;
   try {
-    const parsed = JSON.parse(rawBody) as { sessionId?: unknown };
+    const parsed = JSON.parse(await req.text()) as { sessionId?: unknown };
     sessionId = parsed?.sessionId;
   } catch {
-    console.error("Invalid JSON body", {
-      contentType: req.headers.get("content-type"),
-      preview: rawBody.slice(0, 200),
-    });
     return json({ error: "Invalid JSON body" }, 400);
   }
 
   if (typeof sessionId !== "string" || !sessionId.startsWith("cs_")) {
-    console.error("Invalid sessionId", { received: sessionId });
     return json({ error: "Μη έγκυρο session πληρωμής." }, 400);
   }
 
   const authHeader = req.headers.get("Authorization") ?? "";
-  if (!authHeader.startsWith("Bearer ")) {
-    console.error("Missing bearer token");
-    return json({ error: "Unauthorized" }, 401);
-  }
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
   const userClient = createClient(supabaseUrl, anonKey, {
     global: { headers: { Authorization: authHeader } },
@@ -141,9 +62,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  const admin = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false },
-  });
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
   const stripe = new Stripe(stripeKey);
 
   try {
@@ -152,16 +71,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     });
 
     const ownerId =
-      checkoutSession.client_reference_id ??
-      checkoutSession.metadata?.supabase_user_id ??
-      null;
+      checkoutSession.client_reference_id ?? checkoutSession.metadata?.supabase_user_id ?? null;
 
     if (ownerId !== user.id) {
-      console.error("Session ownership mismatch", {
-        sessionId,
-        ownerId,
-        caller: user.id,
-      });
+      console.error("Session ownership mismatch", { sessionId, ownerId, caller: user.id });
       return json({ error: "Το session δεν ανήκει σε αυτόν τον χρήστη." }, 403);
     }
 
@@ -183,75 +96,58 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const subscription: Stripe.Subscription =
       typeof subRef === "string"
-        ? await stripe.subscriptions.retrieve(subRef, {
-            expand: ["items.data.price"],
-          })
+        ? await stripe.subscriptions.retrieve(subRef, { expand: ["items.data.price"] })
         : subRef;
 
-    const metaPlan = checkoutSession.metadata?.plan_id;
-    const planId: PlanId | null = isPlanId(metaPlan)
-      ? metaPlan
-      : planFromPrice(priceIdOf(subscription));
-
-    if (!planId) {
-      console.error("Could not resolve plan", {
-        sessionId,
-        metaPlan,
-        priceId: priceIdOf(subscription),
-      });
-      return json({ error: "Δεν αναγνωρίστηκε το πακέτο." }, 502);
-    }
-
-    const customerId =
-      typeof subscription.customer === "string"
-        ? subscription.customer
-        : (subscription.customer?.id ?? null);
-
+    const customerId = refId(subscription.customer);
     if (customerId) {
       const { error: customerError } = await admin
         .from("stripe_customers")
-        .upsert(
-          { user_id: user.id, stripe_customer_id: customerId },
-          { onConflict: "user_id" },
-        );
-      if (customerError) {
-        console.error("stripe_customers upsert failed", customerError.message);
+        .upsert({ user_id: user.id, stripe_customer_id: customerId }, { onConflict: "user_id" });
+      if (customerError) console.error("stripe_customers upsert failed", customerError.message);
+    }
+
+    const synced = await syncSubscription(admin, subscription, {
+      planId: checkoutSession.metadata?.plan_id,
+      userId: user.id,
+    });
+
+    if (!synced) {
+      return json({ error: "Δεν αναγνωρίστηκε το πακέτο." }, 502);
+    }
+
+    // Record the first payment right away, so income shows up even before
+    // the webhook arrives. Never block the user's access on this.
+    try {
+      const invoiceId = refId(subscription.latest_invoice);
+      if (invoiceId) {
+        let invoice: Stripe.Invoice;
+        try {
+          invoice = await stripe.invoices.retrieve(invoiceId, { expand: ["payments"] });
+        } catch {
+          invoice = await stripe.invoices.retrieve(invoiceId);
+        }
+        await recordInvoice(admin, invoice, { userId: user.id, planId: synced.planId });
       }
+    } catch (err) {
+      console.error("Could not record the first payment (webhook will)", err);
     }
 
-    const row = {
-      user_id: user.id,
-      plan_id: planId,
-      status: subscription.status,
-      stripe_customer_id: customerId,
-      stripe_subscription_id: subscription.id,
-      current_period_end: resolvePeriodEnd(subscription),
-      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: upsertError } = await admin
+    const hasAccess = ACCESS_STATUSES.includes(subscription.status);
+    const { data: stored } = await admin
       .from("subscriptions")
-      .upsert(row, { onConflict: "stripe_subscription_id" });
-
-    if (upsertError) {
-      console.error("subscriptions upsert failed", upsertError.message);
-      return json(
-        { error: `Η καταγραφή της συνδρομής απέτυχε: ${upsertError.message}` },
-        500,
-      );
-    }
-
-    const hasAccess = ACCESS_STATUSES.has(subscription.status);
+      .select("current_period_end, cancel_at_period_end")
+      .eq("stripe_subscription_id", subscription.id)
+      .maybeSingle();
 
     return json({
       state: hasAccess ? "active" : "pending",
       hasAccess,
       subscription: {
-        planId,
+        planId: synced.planId,
         status: subscription.status,
-        currentPeriodEnd: row.current_period_end,
-        cancelAtPeriodEnd: row.cancel_at_period_end,
+        currentPeriodEnd: stored?.current_period_end ?? null,
+        cancelAtPeriodEnd: stored?.cancel_at_period_end ?? false,
       },
     });
   } catch (error) {

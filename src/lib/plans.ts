@@ -1,4 +1,9 @@
 // src/lib/plans.ts
+//
+// The REAL plans (names, features, prices) now live in the database table
+// `public.plans` and are edited from /admin/plans-and-users.
+// The list below is only the fallback used if the database cannot be reached,
+// and the shape/types every page shares.
 export type PlanId = "low" | "mid" | "high";
 
 export interface AuraPlan {
@@ -11,12 +16,22 @@ export interface AuraPlan {
   amountCents: number;
   currency: "eur";
   interval: "month";
-  stripePriceId: string; // βάλε τα νέα Price IDs από το Stripe (βλ. οδηγίες)
+  /** Deprecated: prices are no longer configured in Stripe. Kept so old code compiles. */
+  stripePriceId?: string;
   features: string[];
   highlight: boolean;
 }
 
-export const AURA_PLANS: AuraPlan[] = [
+/** 2499 -> "24,99€" */
+export function formatEuro(cents: number): string {
+  const euros = cents / 100;
+  const text = Number.isInteger(euros)
+    ? String(euros)
+    : euros.toFixed(2).replace(".", ",");
+  return `${text}€`;
+}
+
+export const AURA_DEFAULT_PLANS: AuraPlan[] = [
   {
     id: "low",
     name: "AURA BASIC",
@@ -27,7 +42,6 @@ export const AURA_PLANS: AuraPlan[] = [
     amountCents: 2499,
     currency: "eur",
     interval: "month",
-    stripePriceId: "price_1UYmcfLnBpuAzyZYjd8sJZmB",
     features: [
       "Μηνιαία εκπαιδευτικά videos",
       "AURA Social Access",
@@ -48,7 +62,6 @@ export const AURA_PLANS: AuraPlan[] = [
     amountCents: 4999,
     currency: "eur",
     interval: "month",
-    stripePriceId: "price_1UYmdKLnBpuAzyZYxr6UrDFH",
     features: [
       "Όλα τα προνόμια του AURA BASIC",
       "Προχωρημένα εκπαιδευτικά videos κουρεμάτων",
@@ -70,7 +83,6 @@ export const AURA_PLANS: AuraPlan[] = [
     amountCents: 7999,
     currency: "eur",
     interval: "month",
-    stripePriceId: "price_1UYmdqLnBpuAzyZYoFITGf2H",
     features: [
       "Όλα τα προνόμια του AURA PRO",
       "Προσωπικό AURA Portfolio",
@@ -94,12 +106,41 @@ export const AURA_PLANS: AuraPlan[] = [
   },
 ];
 
+/** Backward compatible name: still the static defaults. Prefer usePlans(). */
+export const AURA_PLANS = AURA_DEFAULT_PLANS;
+
+/* ------------------------------------------------------------------ */
+/* Live plans (filled by usePlans from the database)                   */
+/* ------------------------------------------------------------------ */
+
+let livePlans: AuraPlan[] | null = null;
+const listeners = new Set<() => void>();
+
+export function setLivePlans(next: AuraPlan[] | null): void {
+  livePlans = next;
+  listeners.forEach((l) => l());
+}
+
+export function getLivePlans(): AuraPlan[] {
+  return livePlans ?? AURA_DEFAULT_PLANS;
+}
+
+export function subscribePlans(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
 export function isPlanId(value: unknown): value is PlanId {
   return value === "low" || value === "mid" || value === "high";
 }
 
+/** Live (admin-edited) plan if loaded, otherwise the default one. */
 export function getPlan(id: string | undefined | null): AuraPlan | undefined {
   if (!isPlanId(id)) return undefined;
-  return AURA_PLANS.find((plan) => plan.id === id);
-  
+  return (
+    getLivePlans().find((plan) => plan.id === id) ??
+    AURA_DEFAULT_PLANS.find((plan) => plan.id === id)
+  );
 }

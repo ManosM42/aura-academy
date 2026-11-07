@@ -7,7 +7,8 @@ import ChromeButton from "@/components/aura/ChromeButton";
 import { useAuth } from "@/lib/useAuth";
 import { useSubscription } from "@/lib/useSubscription";
 import { setCheckoutIntent } from "@/lib/checkout-intent";
-import { AURA_PLANS, type AuraPlan, type PlanId } from "@/lib/plans";
+import type { AuraPlan, PlanId } from "@/lib/plans";
+import { usePlans } from "@/lib/usePlans";
 
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 const COLLAPSED = 7;
@@ -124,10 +125,21 @@ function PlanCard({
   );
 }
 
+function PlansSkeleton() {
+  return (
+    <div className="grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6" aria-busy="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-[520px] animate-pulse rounded-[1.4rem] border border-white/10 bg-white/[0.03]" />
+      ))}
+    </div>
+  );
+}
+
 export default function PricingCards() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const { hasAccess, loading } = useSubscription(session?.user.id);
+  const { plans, loading: plansLoading } = usePlans();
 
   function handleSelect(planId: PlanId) {
     if (!session) {
@@ -147,18 +159,22 @@ export default function PricingCards() {
   return (
     <>
       <style>{css}</style>
-      <div className="grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6">
-        {AURA_PLANS.map((plan, i) => (
-          <PlanCard
-            key={plan.id}
-            plan={plan}
-            index={i}
-            hasAccess={hasAccess}
-            loading={loading}
-            onSelect={handleSelect}
-          />
-        ))}
-      </div>
+      {plansLoading ? (
+        <PlansSkeleton />
+      ) : (
+        <div className="grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6">
+          {plans.map((plan, i) => (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              index={i}
+              hasAccess={hasAccess}
+              loading={loading}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      )}
     </>
   );
 }

@@ -133,6 +133,7 @@ function OverviewSection() {
         <QuickLink to="/online-seminars" label="Online Seminars" icon={<Globe className="size-4" />} />
         <ChromeCTALink to="/admin/book">Book &amp; Orders</ChromeCTALink>
         <ChromeCTALink to="/admin/notifications">Notifications</ChromeCTALink>
+        <ChromeCTALink to="/admin/plans-and-users">Plans And Users</ChromeCTALink>
       </div>
     </section>
   );
