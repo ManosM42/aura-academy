@@ -122,6 +122,7 @@ export function Navbar() {
       { to: "/online-seminars", label: "Online Seminars" },
       { to: "/gallery", label: "Gallery" },
       { to: "/book", label: "Order Book" },
+      { to: "/find-job", label: "Find Job" },
 
 
       ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),
