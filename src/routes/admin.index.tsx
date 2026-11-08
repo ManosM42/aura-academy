@@ -134,6 +134,7 @@ function OverviewSection() {
         <ChromeCTALink to="/admin/book">Book &amp; Orders</ChromeCTALink>
         <ChromeCTALink to="/admin/notifications">Notifications</ChromeCTALink>
         <ChromeCTALink to="/admin/plans-and-users">Plans And Users</ChromeCTALink>
+        <ChromeCTALink to="/admin/jobs">Book &amp; Jobs</ChromeCTALink>
       </div>
     </section>
   );
