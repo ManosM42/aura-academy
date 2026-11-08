@@ -70,7 +70,7 @@ export default function Hero() {
             height={2179}
             draggable={false}
             decoding="async"
-            // @ts-expect-error fetchpriority is valid HTML, older React typings do not know it
+            
             fetchPriority="high"
           />
           <span className="ah-flare" aria-hidden />
@@ -84,7 +84,7 @@ export default function Hero() {
           initial={reduced ? false : "hidden"}
           animate="show"
         >
-          <p className="ah-tagline">OBSERVE. ANALYZE. EXECUTE.</p>
+          <p className="ah-tagline"></p>
 
           <motion.div className="ah-sub-row" variants={rise}>
             <span className="ah-rule ah-rule-l" aria-hidden />
@@ -301,10 +301,20 @@ const css = `
 .ah-cta:focus-visible,.ah-scroll:focus-visible{ outline:2px solid rgba(255,255,255,.85); outline-offset:4px; }
 
 /* ---------- scroll indicator ---------- */
-.ah-scroll{
-  position:absolute; left:50%; bottom:clamp(10px,2.6svh,28px); z-index:3; transform:translateX(-50%);
-  display:flex; flex-direction:column; align-items:center; gap:7px; padding:6px 10px; cursor:pointer; opacity:.88;
-  transition:opacity .25s;
+.ah-scroll {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(8px, 2.2svh, 22px);
+  z-index: 3;
+  transform: translateX(-50%) scale(0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 7px;
+  cursor: pointer;
+  opacity: .88;
+  transition: opacity .25s;
 }
 .ah-scroll:hover{ opacity:1; }
 .ah-mouse{ position:relative; display:block; width:22px; height:36px; border-radius:12px; border:1.5px solid rgba(255,255,255,.72); box-shadow:0 0 12px rgba(255,255,255,.18); }

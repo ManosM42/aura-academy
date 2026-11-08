@@ -33,6 +33,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBookRouteImport } from './routes/admin.book'
 import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminPlansAndUsersRouteImport } from './routes/admin.plans-and-users'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
@@ -170,6 +171,11 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   path: '/admin/notifications',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPlansAndUsersRoute = AdminPlansAndUsersRouteImport.update({
+  id: '/admin/plans-and-users',
+  path: '/admin/plans-and-users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
@@ -274,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/plans-and-users': typeof AdminPlansAndUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
@@ -316,6 +323,7 @@ export interface FileRoutesByTo {
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/plans-and-users': typeof AdminPlansAndUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
@@ -359,6 +367,7 @@ export interface FileRoutesById {
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
   '/admin/notifications': typeof AdminNotificationsRoute
+  '/admin/plans-and-users': typeof AdminPlansAndUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
@@ -403,6 +412,7 @@ export interface FileRouteTypes {
     | '/admin/book'
     | '/admin/inbox'
     | '/admin/notifications'
+    | '/admin/plans-and-users'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
@@ -445,6 +455,7 @@ export interface FileRouteTypes {
     | '/admin/book'
     | '/admin/inbox'
     | '/admin/notifications'
+    | '/admin/plans-and-users'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
@@ -487,6 +498,7 @@ export interface FileRouteTypes {
     | '/admin/book'
     | '/admin/inbox'
     | '/admin/notifications'
+    | '/admin/plans-and-users'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
@@ -530,6 +542,7 @@ export interface RootRouteChildren {
   AdminBookRoute: typeof AdminBookRoute
   AdminInboxRoute: typeof AdminInboxRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
+  AdminPlansAndUsersRoute: typeof AdminPlansAndUsersRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CoursesSlugRoute: typeof CoursesSlugRoute
@@ -720,6 +733,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/plans-and-users': {
+      id: '/admin/plans-and-users'
+      path: '/admin/plans-and-users'
+      fullPath: '/admin/plans-and-users'
+      preLoaderRoute: typeof AdminPlansAndUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth/callback': {
       id: '/auth/callback'
       path: '/auth/callback'
@@ -858,6 +878,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminBookRoute: AdminBookRoute,
   AdminInboxRoute: AdminInboxRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
+  AdminPlansAndUsersRoute: AdminPlansAndUsersRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   CoursesSlugRoute: CoursesSlugRoute,

@@ -3,50 +3,12 @@
 // γιατί το καλεί το Stripe. Η ασφάλεια βασίζεται στην υπογραφή.
 import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
-
-const PLAN_IDS = ["low", "mid", "high"] as const;
-type PlanId = (typeof PLAN_IDS)[number];
-
-function isPlanId(value: unknown): value is PlanId {
-  return typeof value === "string" && (PLAN_IDS as readonly string[]).includes(value);
-}
-
-/** Η πηγή αλήθειας: το price ID της συνδρομής στο Stripe. */
-const PRICE_TO_PLAN: Record<string, PlanId> = {
-  price_1UYmcfLnBpuAzyZYjd8sJZmB: "low",   // AURA BASIC
-  price_1UYmdKLnBpuAzyZYxr6UrDFH: "mid",   // AURA PRO
-  price_1UYmdqLnBpuAzyZYoFITGf2H: "high",  // AURA ELITE
-
-  // ΠΑΛΙΑ prices: κράτα τα ώστε οι υπάρχοντες συνδρομητές να συνεχίσουν να έχουν πρόσβαση
-  price_1UCnzNLnBpuAzyZY2gfMNHHf: "low",
-  price_1UCo03LnBpuAzyZYR1QsDcNZ: "mid",
-  price_1UCo0PLnBpuAzyZYajqu8c5Q: "high",
-  // Το παλιό LIMITED δεν υπάρχει πια ως πλάνο. Το αντιστοίχισα στο "high":
-  // άλλαξέ το αν θέλεις διαφορετικά.
-  price_1UCo0qLnBpuAzyZYABo0Prch: "high",
-};
-
-/** Παλιά ονόματα στο metadata (αν υπάρχουν συνδρομές από παλιότερη έκδοση). */
-const LEGACY_METADATA_PLAN: Record<string, PlanId> = {
-  starter: "low",
-  core: "mid",
-  full: "high",
-};
-
-function resolvePlan(subscription: Stripe.Subscription): PlanId | null {
-  const priceId = subscription.items?.data?.[0]?.price?.id;
-  if (priceId && Object.prototype.hasOwnProperty.call(PRICE_TO_PLAN, priceId)) {
-    return PRICE_TO_PLAN[priceId]!;
-  }
-
-  const meta = subscription.metadata?.["plan_id"];
-  if (isPlanId(meta)) return meta;
-  if (typeof meta === "string" && Object.prototype.hasOwnProperty.call(LEGACY_METADATA_PLAN, meta)) {
-    return LEGACY_METADATA_PLAN[meta]!;
-  }
-
-  return null; // δεν μαντεύουμε ποτέ πλάνο
-}
+import {
+  invoiceSubscriptionId,
+  recordInvoice,
+  refId,
+  syncSubscription,
+} from "../_shared/billing.ts";
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -76,82 +38,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  /** Βρίσκει το supabase user id από metadata ή από το customer mapping. */
-  async function resolveUserId(subscription: Stripe.Subscription): Promise<string | null> {
-    const fromMetadata = subscription.metadata?.["supabase_user_id"];
-    if (typeof fromMetadata === "string" && fromMetadata.length > 0) return fromMetadata;
-
-    const customerId =
-      typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
-    if (!customerId) return null;
-
-    const { data } = await admin
-      .from("stripe_customers")
-      .select("user_id")
-      .eq("stripe_customer_id", customerId)
-      .maybeSingle();
-
-    return (data?.user_id as string | undefined) ?? null;
-  }
-
-  async function upsertSubscription(subscription: Stripe.Subscription): Promise<void> {
-    const userId = await resolveUserId(subscription);
-    if (!userId) {
-      console.error(`No user mapping for subscription ${subscription.id}`);
-      return;
+  /** Fetches the subscription and mirrors it into public.subscriptions. */
+  async function syncById(subscriptionId: string, planHint?: unknown): Promise<void> {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ["items.data.price"],
+    });
+    const result = await syncSubscription(admin, subscription, { planId: planHint });
+    if (!result) {
+      // 500 → Stripe retries; usually the user mapping was not written yet.
+      throw new Error(`Could not map subscription ${subscriptionId}`);
     }
-
-    const item = subscription.items?.data?.[0];
-    const periodEndSeconds = item?.current_period_end;
-    const customerId =
-      typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
-
-    const common = {
-      status: subscription.status,
-      stripe_customer_id: customerId ?? null,
-      stripe_subscription_id: subscription.id,
-      current_period_end: periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : null,
-      cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-    };
-
-    const planId = resolvePlan(subscription);
-
-    if (!planId) {
-      // Άγνωστο price: δεν μαντεύουμε πλάνο. Αν η συνδρομή υπάρχει ήδη, συγχρονίζουμε
-      // μόνο status/ημερομηνίες. Αν δεν υπάρχει, πετάμε σφάλμα: το Stripe θα κάνει
-      // retry και, μόλις προσθέσεις το price στο PRICE_TO_PLAN, θα περάσει.
-      const priceId = item?.price?.id;
-      const { data: updated, error } = await admin
-        .from("subscriptions")
-        .update(common)
-        .eq("stripe_subscription_id", subscription.id)
-        .select("id");
-      if (error) throw new Error(`subscriptions update failed: ${error.message}`);
-      if (!updated || updated.length === 0) {
-        throw new Error(
-          `Unknown price ${priceId} for subscription ${subscription.id}: add it to PRICE_TO_PLAN`,
-        );
-      }
-      console.error(`Unknown price ${priceId}: synced status only for ${subscription.id}`);
-      return;
-    }
-
-    const { error } = await admin
-      .from("subscriptions")
-      .upsert({ user_id: userId, plan_id: planId, ...common }, { onConflict: "stripe_subscription_id" });
-
-    if (error) throw new Error(`subscriptions upsert failed: ${error.message}`);
   }
 
   try {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
-        const subscriptionId =
-          typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+        const subscriptionId = refId(session.subscription);
         if (!subscriptionId) break;
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        await upsertSubscription(subscription);
+        await syncById(subscriptionId, session.metadata?.plan_id);
         break;
       }
 
@@ -160,7 +65,48 @@ Deno.serve(async (req: Request): Promise<Response> => {
       case "customer.subscription.deleted":
       case "customer.subscription.paused":
       case "customer.subscription.resumed": {
-        await upsertSubscription(event.data.object as Stripe.Subscription);
+        const sub = event.data.object as Stripe.Subscription;
+        const result = await syncSubscription(admin, sub);
+        if (!result) throw new Error(`Could not map subscription ${sub.id}`);
+        break;
+      }
+
+      // A monthly charge succeeded: this is what feeds the income tables.
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
+        const inv = event.data.object as Stripe.Invoice;
+
+        const subId = invoiceSubscriptionId(inv);
+        if (subId) await syncById(subId);
+
+        let full: Stripe.Invoice = inv;
+        try {
+          full = await stripe.invoices.retrieve(inv.id as string, { expand: ["payments"] });
+        } catch {
+          /* the payment intent id is optional (only needed for refunds) */
+        }
+        await recordInvoice(admin, full);
+        break;
+      }
+
+      // A renewal failed: Stripe moves the subscription to past_due.
+      case "invoice.payment_failed": {
+        const inv = event.data.object as Stripe.Invoice;
+        const subId = invoiceSubscriptionId(inv);
+        if (subId) await syncById(subId);
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const pi = refId(charge.payment_intent);
+        if (pi) {
+          const { error } = await admin
+            .from("payments")
+            .update({ amount_refunded_cents: charge.amount_refunded ?? 0 })
+            .eq("stripe_payment_intent_id", pi);
+          if (error) throw new Error(`refund update failed: ${error.message}`);
+        }
         break;
       }
 
