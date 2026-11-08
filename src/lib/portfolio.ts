@@ -70,11 +70,35 @@ export interface PortfolioForm {
   instagram: string;
 }
 
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
 function errMessage(e: unknown, fallback: string): string {
   if (e && typeof e === "object" && "message" in e && typeof (e as any).message === "string") {
     return (e as any).message as string;
   }
   return fallback;
+}
+
+/**
+ * Short random id for file names.
+ * crypto.randomUUID() only exists on HTTPS / localhost, so we fall back safely.
+ */
+function randomId(): string {
+  try {
+    if (typeof crypto !== "undefined") {
+      if (typeof crypto.randomUUID === "function") return crypto.randomUUID().slice(0, 8);
+      if (typeof crypto.getRandomValues === "function") {
+        const bytes = new Uint8Array(4);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return Math.random().toString(36).slice(2, 10);
 }
 
 /* ------------------------------------------------------------------ */
@@ -163,7 +187,7 @@ export async function compressImage(file: File, maxSide = 1600, quality = 0.86):
     const img = await new Promise<HTMLImageElement>((resolve, reject) => {
       const el = new Image();
       el.onload = () => resolve(el);
-      el.onerror = () => reject(new Error("Η εικόνα δεν μπόρεσε να διαβαστεί."));
+      el.onerror = () => reject(new Error("Η εικόνα δεν μπόρεσε να διαβαστεί. Δοκίμασε JPG, PNG ή WebP."));
       el.src = url;
     });
 
@@ -190,7 +214,7 @@ export async function compressImage(file: File, maxSide = 1600, quality = 0.86):
 
 export async function publishPost(userId: string, file: File, caption: string): Promise<PortfolioPost> {
   const blob = await compressImage(file);
-  const path = `${userId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.jpg`;
+  const path = `${userId}/${Date.now()}-${randomId()}.jpg`;
 
   const up = await sb.storage.from(PORTFOLIO_BUCKET).upload(path, blob, {
     contentType: "image/jpeg",
@@ -225,7 +249,7 @@ export async function deletePost(post: PortfolioPost): Promise<void> {
 /** Is this user on the active AURA ELITE plan (plan id "high")? */
 export function useIsElite(userId: string | undefined): { isElite: boolean; loading: boolean } {
   const { subscription, hasAccess, loading } = useSubscription(userId);
-  return { isElite: hasAccess && subscription?.plan_id === "high", loading };
+  return { isElite: Boolean(hasAccess) && subscription?.plan_id === "high", loading };
 }
 
 /** The signed-in user's own portfolio (null = none yet). Pass undefined to skip loading. */
@@ -249,9 +273,15 @@ export function useMyPortfolio(userId: string | undefined): {
     }
     setLoading(true);
     fetchMyPortfolio(userId)
-      .then((p) => active && setPortfolio(p))
-      .catch(() => active && setPortfolio(null))
-      .finally(() => active && setLoading(false));
+      .then((p) => {
+        if (active) setPortfolio(p);
+      })
+      .catch(() => {
+        if (active) setPortfolio(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
