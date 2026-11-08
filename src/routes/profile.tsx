@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/useAuth";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import SubscriptionCard from "@/components/aura/SubscriptionCard";
 import CompletedCourses from "@/components/aura/CompletedCourses";
+import CreatePortfolioButton from "@/components/aura/portfolio/CreatePortfolioButton";
 
 
 export const Route = createFileRoute("/profile")({ component: ProfilePage });
@@ -99,8 +100,10 @@ function ProfilePage() {
     .join("")
     .toUpperCase();
 
-  return (
+    return (
     <main className="mx-auto min-h-screen max-w-2xl px-6 py-12 text-white">
+      <CreatePortfolioButton userId={session.user.id} />
+
       <header className="mb-8">
         <p className="text-xs uppercase tracking-[0.3em] text-white/40">
           Account
