@@ -8,6 +8,7 @@ import {
   recordInvoice,
   refId,
   syncSubscription,
+  UserDeletedError,
 } from "../_shared/billing.ts";
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -115,6 +116,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         break;
     }
   } catch (error) {
+    // The account was deleted: nothing to record. Answer 200 so Stripe does not retry for days.
+    if (error instanceof UserDeletedError) {
+      console.log(`Ignoring ${event.type}: ${error.message}`);
+      return new Response(JSON.stringify({ received: true, ignored: "account_deleted" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     // 500 → το Stripe κάνει retry.
     console.error(`Handler failed for ${event.type}`, error);
     return new Response("Handler error", { status: 500 });

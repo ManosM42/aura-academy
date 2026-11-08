@@ -23,6 +23,22 @@ export function normalizePlanId(value: unknown): PlanId | null {
   return null;
 }
 
+/** Thrown when an event belongs to an account that was deleted (or is being deleted). */
+export class UserDeletedError extends Error {
+  constructor(userId: string) {
+    super(`User ${userId} no longer exists`);
+    this.name = "UserDeletedError";
+  }
+}
+
+/** False once the account is being deleted or is gone, so webhooks never recreate its data. */
+export async function userIsActive(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: profile } = await admin.from("profiles").select("status").eq("id", userId).maybeSingle();
+  if (profile && String(profile.status) === "deleted") return false;
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  return !error && Boolean(data?.user);
+}
+
 /** Stripe returns either an id string or an expanded object. */
 export function refId(ref: unknown): string | null {
   if (!ref) return null;
@@ -114,6 +130,8 @@ export async function syncSubscription(
     console.error(`No user mapping for subscription ${sub.id}`);
     return null;
   }
+
+  if (!(await userIsActive(admin, userId))) throw new UserDeletedError(userId);
 
   const planId = await resolvePlanId(admin, sub, hint?.planId);
   if (!planId) {

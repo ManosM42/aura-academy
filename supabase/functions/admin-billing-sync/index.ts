@@ -7,7 +7,7 @@
 // Safe to run any time (everything is an idempotent upsert).
 import Stripe from "npm:stripe@^18";
 import { createClient } from "npm:@supabase/supabase-js@^2";
-import { recordInvoice, refId, syncSubscription } from "../_shared/billing.ts";
+import { recordInvoice, refId, syncSubscription, UserDeletedError } from "../_shared/billing.ts";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -84,6 +84,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (synced) result.subscriptions += 1;
         else result.skippedSubscriptions += 1;
       } catch (err) {
+        if (err instanceof UserDeletedError) {
+          result.skippedSubscriptions += 1; // belongs to a deleted account
+          continue;
+        }
         note(`subscription ${sub.id}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
