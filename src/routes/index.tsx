@@ -12,6 +12,7 @@ import OurTeam from "@/components/aura/OurTeam";
 import GalleryTeaser from "@/components/aura/GalleryTeaser";
 import { seo } from "@/lib/seo";
 import ChristmasSnow from "@/components/aura/ChristmasSnow";
+import PromoPopup from "@/components/aura/PromoPopup";
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -52,6 +53,7 @@ function Index() {
       <div className="aura-grain" aria-hidden />
       <ChromeCursor />
       <ChristmasSnow />
+      <PromoPopup />
 
       <div className="w-full overflow-x-clip">
         <Hero />
