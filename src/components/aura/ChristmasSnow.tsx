@@ -18,7 +18,7 @@ interface ChristmasSnowProps {
   onlyInWinter?: boolean;
 }
 
-export default function ChristmasSnow({ count = 90, zIndex = 40, onlyInWinter = false }: ChristmasSnowProps) {
+export default function ChristmasSnow({ count = 110, zIndex = 40, onlyInWinter = false }: ChristmasSnowProps) {
   const [flakes, setFlakes] = useState<number | null>(null);
 
   // Client only: decide the amount after mount (no server/client mismatch).
@@ -36,16 +36,16 @@ export default function ChristmasSnow({ count = 90, zIndex = 40, onlyInWinter = 
   return (
     <Snowfall
       fullScreen
-      flake="mixed"
+      flake="mixed" // real crystal shapes, from tiny soft dots to detailed stars
       count={flakes}
-      size={[2, 6]} // small flakes: the default goes up to 20px
-      speed={0.75} // slow and calm
-      wind={0.25}
-      sway={1.1}
-      spin={0.6}
-      depth={0.7}
-      opacity={[0.3, 0.85]}
-      colors={["#ffffff", "#eaf4ff", "#dbe7ff"]}
+      size={[3, 9]} // a bit bigger than before, still delicate
+      speed={0.9}
+      wind={0.35} // a light breeze
+      sway={1.5} // natural side-to-side flutter
+      spin={0.8}
+      depth={1} // full depth of field: far flakes small, slow and blurry; near ones sharp
+      opacity={[0.25, 0.95]}
+      colors={["#ffffff", "#f4f8ff", "#e3eeff", "#d6e6ff"]}
       zIndex={zIndex}
     />
   );
