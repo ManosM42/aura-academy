@@ -16,6 +16,7 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CookiePolicyRouteImport } from './routes/cookie-policy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as EliteRouteImport } from './routes/elite'
+import { Route as FindJobRouteImport } from './routes/find-job'
 import { Route as GalleryRouteImport } from './routes/gallery'
 import { Route as HaircutReviewRouteImport } from './routes/haircut-review'
 import { Route as LoginRouteImport } from './routes/login'
@@ -32,6 +33,7 @@ import { Route as AcademySlugRouteImport } from './routes/academy.$slug'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminBookRouteImport } from './routes/admin.book'
 import { Route as AdminInboxRouteImport } from './routes/admin.inbox'
+import { Route as AdminJobsRouteImport } from './routes/admin.jobs'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
 import { Route as AdminPlansAndUsersRouteImport } from './routes/admin.plans-and-users'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
@@ -39,7 +41,11 @@ import { Route as CheckoutIndexRouteImport } from './routes/checkout.index'
 import { Route as CheckoutReturnRouteImport } from './routes/checkout.return'
 import { Route as CoursesIndexRouteImport } from './routes/courses.index'
 import { Route as CoursesSlugRouteImport } from './routes/courses.$slug'
+import { Route as DeleteAccountRouteImport } from './routes/delete.account'
 import { Route as LessonLessonIdRouteImport } from './routes/lesson.$lessonId'
+import { Route as PortfoliosIndexRouteImport } from './routes/portfolios.index'
+import { Route as PortfoliosSlugRouteImport } from './routes/portfolios.$slug'
+import { Route as PortfoliosCreateRouteImport } from './routes/portfolios.create'
 import { Route as PracticeAssignmentIdRouteImport } from './routes/practice.$assignmentId'
 import { Route as ReviewIndexRouteImport } from './routes/review.index'
 import { Route as ReviewSubmissionIdRouteImport } from './routes/review.$submissionId'
@@ -84,6 +90,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const EliteRoute = EliteRouteImport.update({
   id: '/elite',
   path: '/elite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FindJobRoute = FindJobRouteImport.update({
+  id: '/find-job',
+  path: '/find-job',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GalleryRoute = GalleryRouteImport.update({
@@ -166,6 +177,11 @@ const AdminInboxRoute = AdminInboxRouteImport.update({
   path: '/admin/inbox',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminJobsRoute = AdminJobsRouteImport.update({
+  id: '/admin/jobs',
+  path: '/admin/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   id: '/admin/notifications',
   path: '/admin/notifications',
@@ -201,9 +217,29 @@ const CoursesSlugRoute = CoursesSlugRouteImport.update({
   path: '/courses/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeleteAccountRoute = DeleteAccountRouteImport.update({
+  id: '/delete/account',
+  path: '/delete/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LessonLessonIdRoute = LessonLessonIdRouteImport.update({
   id: '/lesson/$lessonId',
   path: '/lesson/$lessonId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfoliosIndexRoute = PortfoliosIndexRouteImport.update({
+  id: '/portfolios/',
+  path: '/portfolios/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfoliosSlugRoute = PortfoliosSlugRouteImport.update({
+  id: '/portfolios/$slug',
+  path: '/portfolios/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfoliosCreateRoute = PortfoliosCreateRouteImport.update({
+  id: '/portfolios/create',
+  path: '/portfolios/create',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PracticeAssignmentIdRoute = PracticeAssignmentIdRouteImport.update({
@@ -265,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
   '/elite': typeof EliteRoute
+  '/find-job': typeof FindJobRoute
   '/gallery': typeof GalleryRoute
   '/haircut-review': typeof HaircutReviewRoute
   '/login': typeof LoginRoute
@@ -279,12 +316,16 @@ export interface FileRoutesByFullPath {
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
+  '/admin/jobs': typeof AdminJobsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/plans-and-users': typeof AdminPlansAndUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
+  '/delete/account': typeof DeleteAccountRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
+  '/portfolios/$slug': typeof PortfoliosSlugRoute
+  '/portfolios/create': typeof PortfoliosCreateRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
   '/verify/$id': typeof VerifyIdRoute
@@ -292,6 +333,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/courses/': typeof CoursesIndexRoute
+  '/portfolios/': typeof PortfoliosIndexRoute
   '/review/': typeof ReviewIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
@@ -308,6 +350,7 @@ export interface FileRoutesByTo {
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
   '/elite': typeof EliteRoute
+  '/find-job': typeof FindJobRoute
   '/gallery': typeof GalleryRoute
   '/haircut-review': typeof HaircutReviewRoute
   '/login': typeof LoginRoute
@@ -322,12 +365,16 @@ export interface FileRoutesByTo {
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
+  '/admin/jobs': typeof AdminJobsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/plans-and-users': typeof AdminPlansAndUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
+  '/delete/account': typeof DeleteAccountRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
+  '/portfolios/$slug': typeof PortfoliosSlugRoute
+  '/portfolios/create': typeof PortfoliosCreateRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
   '/verify/$id': typeof VerifyIdRoute
@@ -335,6 +382,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/checkout': typeof CheckoutIndexRoute
   '/courses': typeof CoursesIndexRoute
+  '/portfolios': typeof PortfoliosIndexRoute
   '/review': typeof ReviewIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
@@ -352,6 +400,7 @@ export interface FileRoutesById {
   '/cookie-policy': typeof CookiePolicyRoute
   '/dashboard': typeof DashboardRoute
   '/elite': typeof EliteRoute
+  '/find-job': typeof FindJobRoute
   '/gallery': typeof GalleryRoute
   '/haircut-review': typeof HaircutReviewRoute
   '/login': typeof LoginRoute
@@ -366,12 +415,16 @@ export interface FileRoutesById {
   '/academy/$slug': typeof AcademySlugRoute
   '/admin/book': typeof AdminBookRoute
   '/admin/inbox': typeof AdminInboxRoute
+  '/admin/jobs': typeof AdminJobsRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/plans-and-users': typeof AdminPlansAndUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/checkout/return': typeof CheckoutReturnRoute
   '/courses/$slug': typeof CoursesSlugRoute
+  '/delete/account': typeof DeleteAccountRoute
   '/lesson/$lessonId': typeof LessonLessonIdRoute
+  '/portfolios/$slug': typeof PortfoliosSlugRoute
+  '/portfolios/create': typeof PortfoliosCreateRoute
   '/practice/$assignmentId': typeof PracticeAssignmentIdRoute
   '/review/$submissionId': typeof ReviewSubmissionIdRoute
   '/verify/$id': typeof VerifyIdRoute
@@ -379,6 +432,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/checkout/': typeof CheckoutIndexRoute
   '/courses/': typeof CoursesIndexRoute
+  '/portfolios/': typeof PortfoliosIndexRoute
   '/review/': typeof ReviewIndexRoute
   '/admin/courses/$courseId': typeof AdminCoursesCourseIdRoute
   '/admin/courses/new': typeof AdminCoursesNewRoute
@@ -397,6 +451,7 @@ export interface FileRouteTypes {
     | '/cookie-policy'
     | '/dashboard'
     | '/elite'
+    | '/find-job'
     | '/gallery'
     | '/haircut-review'
     | '/login'
@@ -411,12 +466,16 @@ export interface FileRouteTypes {
     | '/academy/$slug'
     | '/admin/book'
     | '/admin/inbox'
+    | '/admin/jobs'
     | '/admin/notifications'
     | '/admin/plans-and-users'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
+    | '/delete/account'
     | '/lesson/$lessonId'
+    | '/portfolios/$slug'
+    | '/portfolios/create'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
     | '/verify/$id'
@@ -424,6 +483,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/checkout/'
     | '/courses/'
+    | '/portfolios/'
     | '/review/'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
@@ -440,6 +500,7 @@ export interface FileRouteTypes {
     | '/cookie-policy'
     | '/dashboard'
     | '/elite'
+    | '/find-job'
     | '/gallery'
     | '/haircut-review'
     | '/login'
@@ -454,12 +515,16 @@ export interface FileRouteTypes {
     | '/academy/$slug'
     | '/admin/book'
     | '/admin/inbox'
+    | '/admin/jobs'
     | '/admin/notifications'
     | '/admin/plans-and-users'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
+    | '/delete/account'
     | '/lesson/$lessonId'
+    | '/portfolios/$slug'
+    | '/portfolios/create'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
     | '/verify/$id'
@@ -467,6 +532,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/checkout'
     | '/courses'
+    | '/portfolios'
     | '/review'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
@@ -483,6 +549,7 @@ export interface FileRouteTypes {
     | '/cookie-policy'
     | '/dashboard'
     | '/elite'
+    | '/find-job'
     | '/gallery'
     | '/haircut-review'
     | '/login'
@@ -497,12 +564,16 @@ export interface FileRouteTypes {
     | '/academy/$slug'
     | '/admin/book'
     | '/admin/inbox'
+    | '/admin/jobs'
     | '/admin/notifications'
     | '/admin/plans-and-users'
     | '/auth/callback'
     | '/checkout/return'
     | '/courses/$slug'
+    | '/delete/account'
     | '/lesson/$lessonId'
+    | '/portfolios/$slug'
+    | '/portfolios/create'
     | '/practice/$assignmentId'
     | '/review/$submissionId'
     | '/verify/$id'
@@ -510,6 +581,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/checkout/'
     | '/courses/'
+    | '/portfolios/'
     | '/review/'
     | '/admin/courses/$courseId'
     | '/admin/courses/new'
@@ -527,6 +599,7 @@ export interface RootRouteChildren {
   CookiePolicyRoute: typeof CookiePolicyRoute
   DashboardRoute: typeof DashboardRoute
   EliteRoute: typeof EliteRoute
+  FindJobRoute: typeof FindJobRoute
   GalleryRoute: typeof GalleryRoute
   HaircutReviewRoute: typeof HaircutReviewRoute
   LoginRoute: typeof LoginRoute
@@ -541,12 +614,16 @@ export interface RootRouteChildren {
   AcademySlugRoute: typeof AcademySlugRoute
   AdminBookRoute: typeof AdminBookRoute
   AdminInboxRoute: typeof AdminInboxRoute
+  AdminJobsRoute: typeof AdminJobsRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminPlansAndUsersRoute: typeof AdminPlansAndUsersRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   CheckoutReturnRoute: typeof CheckoutReturnRoute
   CoursesSlugRoute: typeof CoursesSlugRoute
+  DeleteAccountRoute: typeof DeleteAccountRoute
   LessonLessonIdRoute: typeof LessonLessonIdRoute
+  PortfoliosSlugRoute: typeof PortfoliosSlugRoute
+  PortfoliosCreateRoute: typeof PortfoliosCreateRoute
   PracticeAssignmentIdRoute: typeof PracticeAssignmentIdRoute
   ReviewSubmissionIdRoute: typeof ReviewSubmissionIdRoute
   VerifyIdRoute: typeof VerifyIdRoute
@@ -554,6 +631,7 @@ export interface RootRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   CheckoutIndexRoute: typeof CheckoutIndexRoute
   CoursesIndexRoute: typeof CoursesIndexRoute
+  PortfoliosIndexRoute: typeof PortfoliosIndexRoute
   ReviewIndexRoute: typeof ReviewIndexRoute
   AdminCoursesCourseIdRoute: typeof AdminCoursesCourseIdRoute
   AdminCoursesNewRoute: typeof AdminCoursesNewRoute
@@ -612,6 +690,13 @@ declare module '@tanstack/react-router' {
       path: '/elite'
       fullPath: '/elite'
       preLoaderRoute: typeof EliteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/find-job': {
+      id: '/find-job'
+      path: '/find-job'
+      fullPath: '/find-job'
+      preLoaderRoute: typeof FindJobRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gallery': {
@@ -726,6 +811,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminInboxRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/jobs': {
+      id: '/admin/jobs'
+      path: '/admin/jobs'
+      fullPath: '/admin/jobs'
+      preLoaderRoute: typeof AdminJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/notifications': {
       id: '/admin/notifications'
       path: '/admin/notifications'
@@ -775,11 +867,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoursesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/delete/account': {
+      id: '/delete/account'
+      path: '/delete/account'
+      fullPath: '/delete/account'
+      preLoaderRoute: typeof DeleteAccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lesson/$lessonId': {
       id: '/lesson/$lessonId'
       path: '/lesson/$lessonId'
       fullPath: '/lesson/$lessonId'
       preLoaderRoute: typeof LessonLessonIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolios/': {
+      id: '/portfolios/'
+      path: '/portfolios'
+      fullPath: '/portfolios/'
+      preLoaderRoute: typeof PortfoliosIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolios/$slug': {
+      id: '/portfolios/$slug'
+      path: '/portfolios/$slug'
+      fullPath: '/portfolios/$slug'
+      preLoaderRoute: typeof PortfoliosSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolios/create': {
+      id: '/portfolios/create'
+      path: '/portfolios/create'
+      fullPath: '/portfolios/create'
+      preLoaderRoute: typeof PortfoliosCreateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/practice/$assignmentId': {
@@ -863,6 +983,7 @@ const rootRouteChildren: RootRouteChildren = {
   CookiePolicyRoute: CookiePolicyRoute,
   DashboardRoute: DashboardRoute,
   EliteRoute: EliteRoute,
+  FindJobRoute: FindJobRoute,
   GalleryRoute: GalleryRoute,
   HaircutReviewRoute: HaircutReviewRoute,
   LoginRoute: LoginRoute,
@@ -877,12 +998,16 @@ const rootRouteChildren: RootRouteChildren = {
   AcademySlugRoute: AcademySlugRoute,
   AdminBookRoute: AdminBookRoute,
   AdminInboxRoute: AdminInboxRoute,
+  AdminJobsRoute: AdminJobsRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminPlansAndUsersRoute: AdminPlansAndUsersRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   CheckoutReturnRoute: CheckoutReturnRoute,
   CoursesSlugRoute: CoursesSlugRoute,
+  DeleteAccountRoute: DeleteAccountRoute,
   LessonLessonIdRoute: LessonLessonIdRoute,
+  PortfoliosSlugRoute: PortfoliosSlugRoute,
+  PortfoliosCreateRoute: PortfoliosCreateRoute,
   PracticeAssignmentIdRoute: PracticeAssignmentIdRoute,
   ReviewSubmissionIdRoute: ReviewSubmissionIdRoute,
   VerifyIdRoute: VerifyIdRoute,
@@ -890,6 +1015,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   CheckoutIndexRoute: CheckoutIndexRoute,
   CoursesIndexRoute: CoursesIndexRoute,
+  PortfoliosIndexRoute: PortfoliosIndexRoute,
   ReviewIndexRoute: ReviewIndexRoute,
   AdminCoursesCourseIdRoute: AdminCoursesCourseIdRoute,
   AdminCoursesNewRoute: AdminCoursesNewRoute,

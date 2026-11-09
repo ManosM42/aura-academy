@@ -11,6 +11,7 @@ import Footer from "@/components/aura/Footer";
 import OurTeam from "@/components/aura/OurTeam";
 import GalleryTeaser from "@/components/aura/GalleryTeaser";
 import { seo } from "@/lib/seo";
+import ChristmasSnow from "@/components/aura/ChristmasSnow";
 
 export const Route = createFileRoute("/")({
   head: () =>
@@ -50,6 +51,7 @@ function Index() {
     <div className="relative min-h-screen w-full overflow-x-clip bg-aura-bg text-aura-text antialiased">
       <div className="aura-grain" aria-hidden />
       <ChromeCursor />
+      <ChristmasSnow />
 
       <div className="w-full overflow-x-clip">
         <Hero />
