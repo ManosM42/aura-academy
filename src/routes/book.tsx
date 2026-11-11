@@ -1,5 +1,6 @@
 // src/routes/book.tsx  ->  /book
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { motion, useReducedMotion } from "motion/react";
 import {
@@ -16,7 +17,11 @@ import {
 import Book3D, { CHAPTERS } from "@/components/aura/Book3D";
 import BookCheckoutModal from "@/components/aura/BookCheckoutModal";
 import { ChromeCTA, ChromeText, EASE, Frame } from "@/components/aura/chrome";
+import { DiscountedPrice, MemberBadge, SavingsLine } from "@/components/aura/DiscountPrice";
 import { formatMoney, getBookSettings, type BookSettings } from "@/lib/book";
+import BookMemberPopup from "@/components/aura/promo/BookMemberPopup";
+import { applyPercent, usePlanDiscountTable, useMyDiscounts } from "@/lib/discounts";
+import { useGuestPromo } from "@/lib/useGuestPromo";
 
 export const Route = createFileRoute("/book")({
   head: () => ({ meta: [{ title: "AURA — The Barbering Book" }] }),
@@ -44,6 +49,17 @@ function BookPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [orderOpen, setOrderOpen] = useState(false);
+  // Member price: PRO and ELITE get their percentage off the list price.
+  const { plan: planId, bookPercent } = useMyDiscounts();
+  // Visitors who are not signed in get a "members save" pop-up (timer, or when they press Order).
+  const discountTable = usePlanDiscountTable();
+  const promo = useGuestPromo({
+    storageKey: "aura-book-member-promo",
+    delayMs: 9000,
+    enabled: discountTable.mid.book > 0 || discountTable.high.book > 0,
+    paused: orderOpen,
+  });
+  const openOrder = () => promo.guard(() => setOrderOpen(true));
 
   useEffect(() => {
     let alive = true;
@@ -59,6 +75,9 @@ function BookPage() {
   const soldOut = settings?.stock != null && settings.stock <= 0;
   const available = !!settings && settings.is_active && settings.price_cents > 0 && !soldOut;
   const lowStock = settings?.stock != null && settings.stock > 0 && settings.stock <= 10;
+  const listCents = settings?.price_cents ?? 0;
+  const memberCents = applyPercent(listCents, bookPercent);
+  const hasDiscount = !!settings && listCents > 0 && bookPercent > 0 && memberCents < listCents;
 
   return (
     <main className="relative isolate overflow-hidden px-4 pb-28 pt-32 text-white sm:px-6 sm:pt-40 md:px-10">
@@ -103,10 +122,30 @@ function BookPage() {
                 ) : (
                   <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">Price</p>
-                      <p className="mt-1 text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_0_24px_rgba(255,255,255,0.45)]">
-                        {settings.price_cents > 0 ? formatMoney(settings.price_cents, settings.currency) : "—"}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <p className="text-[11px] uppercase tracking-[0.3em] text-white/45">
+                          {hasDiscount ? "Member price" : "Price"}
+                        </p>
+                        {hasDiscount && <MemberBadge planId={planId} percent={bookPercent} />}
+                      </div>
+                      {hasDiscount ? (
+                        <div className="mt-2">
+                          <DiscountedPrice
+                            listCents={listCents}
+                            finalCents={memberCents}
+                            format={(c) => formatMoney(c, settings.currency)}
+                            size="lg"
+                            align="start"
+                          />
+                          <div className="mt-3">
+                            <SavingsLine label="You save" amount={formatMoney(listCents - memberCents, settings.currency)} />
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-4xl font-extrabold tracking-tight text-white drop-shadow-[0_0_24px_rgba(255,255,255,0.45)]">
+                          {settings.price_cents > 0 ? formatMoney(settings.price_cents, settings.currency) : "—"}
+                        </p>
+                      )}
                       <p className="mt-1 text-xs text-white/45">
                         {settings.shipping_cents > 0
                           ? `+ ${formatMoney(settings.shipping_cents, settings.currency)} shipping`
@@ -122,7 +161,7 @@ function BookPage() {
                         </p>
                       )}
                     </div>
-                    <ChromeCTA type="button" disabled={!available} onClick={() => setOrderOpen(true)} className="sm:min-w-[210px]">
+                    <ChromeCTA type="button" disabled={!available} onClick={openOrder} className="sm:min-w-[210px]">
                       <BookOpen className="size-4" />
                       {soldOut ? "Sold out" : "Order the book"}
                     </ChromeCTA>
@@ -227,8 +266,24 @@ function BookPage() {
                 <Detail label="Format" value="Hardcover, black pages" />
                 <Detail label="Title" value={settings?.title ?? "ΛURΛ — The Barbering Book"} />
                 <Detail
-                  label="Price"
-                  value={settings && settings.price_cents > 0 ? formatMoney(settings.price_cents, settings.currency) : "—"}
+                  label={hasDiscount ? "Member price" : "Price"}
+                  value={
+                    settings && settings.price_cents > 0 ? (
+                      hasDiscount ? (
+                        <DiscountedPrice
+                          listCents={listCents}
+                          finalCents={memberCents}
+                          format={(c) => formatMoney(c, settings.currency)}
+                          size="sm"
+                          layout="inline"
+                        />
+                      ) : (
+                        formatMoney(settings.price_cents, settings.currency)
+                      )
+                    ) : (
+                      "—"
+                    )
+                  }
                 />
                 <Detail
                   label="Shipping"
@@ -242,7 +297,7 @@ function BookPage() {
                 <p className="max-w-md text-sm leading-relaxed text-white/55">
                   Order in less than a minute. Enter your shipping details, pay securely, and we take care of the rest.
                 </p>
-                <ChromeCTA type="button" disabled={!available} onClick={() => setOrderOpen(true)}>
+                <ChromeCTA type="button" disabled={!available} onClick={openOrder}>
                   <BookOpen className="size-4" />
                   {soldOut ? "Sold out" : "Order the book"}
                 </ChromeCTA>
@@ -252,14 +307,22 @@ function BookPage() {
         </section>
       </div>
 
+      <BookMemberPopup open={promo.open} onClose={promo.close} canContinue={promo.canContinue} />
+
       {settings && (
-        <BookCheckoutModal open={orderOpen} onClose={() => setOrderOpen(false)} settings={settings} />
+        <BookCheckoutModal
+          open={orderOpen}
+          onClose={() => setOrderOpen(false)}
+          settings={settings}
+          discountPercent={bookPercent}
+          planId={planId}
+        />
       )}
     </main>
   );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="border-b border-white/[0.07] pb-4">
       <dt className="text-[11px] uppercase tracking-[0.3em] text-white/40">{label}</dt>

@@ -23,6 +23,9 @@ export type OnlineBooking = {
   phone: string;
   status: "pending" | "paid" | "failed" | "refunded";
   amount_cents: number | null;
+  /** Price before the member discount (null on bookings made before discounts existed). */
+  list_price_cents?: number | null;
+  discount_percent?: number | null;
   paid_at: string | null;
   created_at: string;
   online_seminars: { title: string; starts_at: string } | null;
@@ -88,21 +91,35 @@ export async function setOnlineBookingStatus(id: string, status: OnlineBooking["
   if (error) throw error;
 }
 
+export interface OnlineCheckoutResult {
+  clientSecret: string;
+  sessionId: string;
+  /** What Stripe will charge, decided by the server (member price included). */
+  amountCents?: number;
+  listPriceCents?: number;
+  discountPercent?: number;
+}
+
 export async function startOnlineCheckout(p: {
   seminarId: string;
   fullName: string;
   email: string;
   phone: string;
-}): Promise<{ clientSecret: string; sessionId: string }> {
+}): Promise<OnlineCheckoutResult> {
   // Plain fetch to the edge function so the real error code is never hidden.
   const url = (supabase as any).supabaseUrl as string;
   const key = (supabase as any).supabaseKey as string;
+
+  // Send the member's own session token so the server can apply their plan
+  // discount. Guests fall back to the public key and pay the list price.
+  const { data: sessionData } = await supabase.auth.getSession();
+  const bearer = sessionData.session?.access_token ?? key;
 
   let res: Response;
   try {
     res = await fetch(`${url}/functions/v1/create-online-checkout`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
+      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${bearer}` },
       body: JSON.stringify(p),
     });
   } catch {

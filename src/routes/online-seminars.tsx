@@ -21,6 +21,11 @@ import {
 } from "lucide-react";
 import { useAsync } from "@/lib/useAsync";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import { DiscountedPrice, MemberBadge, SavingsLine } from "@/components/aura/DiscountPrice";
+import SeminarMemberPopup from "@/components/aura/promo/SeminarMemberPopup";
+import { applyPercent, usePlanDiscountTable, useMyDiscounts } from "@/lib/discounts";
+import { useGuestPromo } from "@/lib/useGuestPromo";
+import type { PlanId } from "@/lib/plans";
 import {
   formatPrice,
   getPublicOnlineSeminars,
@@ -47,6 +52,16 @@ function OnlineSeminarsRoute() {
   const [reload, setReload] = useState(0);
   const { data, error, loading } = useAsync(getPublicOnlineSeminars, [reload]);
   const [selected, setSelected] = useState<PublicOnlineSeminar | null>(null);
+  // Member discount (only plans that have one in public.plan_discounts, i.e. ELITE).
+  const { plan: planId, seminarPercent } = useMyDiscounts();
+  // Visitors who are not signed in get a "members save" pop-up (timer, or when they press Book).
+  const discountTable = usePlanDiscountTable();
+  const promo = useGuestPromo({
+    storageKey: "aura-seminar-member-promo",
+    delayMs: 9000,
+    enabled: discountTable.high.online_seminar > 0 || discountTable.mid.online_seminar > 0,
+    paused: selected !== null,
+  });
 
   return (
     <main ref={ref} className="relative min-h-screen overflow-hidden bg-black pb-24 pt-28 text-white selection:bg-white selection:text-black">
@@ -91,17 +106,29 @@ function OnlineSeminarsRoute() {
           {data && data.length > 0 && (
             <div className="grid gap-6 md:grid-cols-2">
               {data.map((s, i) => (
-                <SeminarCard key={s.id} s={s} index={i} reduce={!!reduce} onBook={() => setSelected(s)} />
+                <SeminarCard
+                  key={s.id}
+                  s={s}
+                  index={i}
+                  reduce={!!reduce}
+                  percent={seminarPercent}
+                  planId={planId}
+                  onBook={() => promo.guard(() => setSelected(s))}
+                />
               ))}
             </div>
           )}
         </div>
       </div>
 
+      <SeminarMemberPopup open={promo.open} onClose={promo.close} canContinue={promo.canContinue} />
+
       <AnimatePresence>
         {selected && (
           <BookingModal
             seminar={selected}
+            percent={seminarPercent}
+            planId={planId}
             onClose={() => {
               setSelected(null);
               setReload((n) => n + 1);
@@ -113,7 +140,23 @@ function OnlineSeminarsRoute() {
   );
 }
 
-function SeminarCard({ s, index, reduce, onBook }: { s: PublicOnlineSeminar; index: number; reduce: boolean; onBook: () => void }) {
+function SeminarCard({
+  s,
+  index,
+  reduce,
+  percent,
+  planId,
+  onBook,
+}: {
+  s: PublicOnlineSeminar;
+  index: number;
+  reduce: boolean;
+  percent: number;
+  planId: PlanId | null;
+  onBook: () => void;
+}) {
+  const memberPrice = applyPercent(s.price_cents, percent);
+  const discounted = percent > 0 && memberPrice < s.price_cents;
   const left = s.capacity ? s.capacity - s.taken : null;
   const soldOut = left !== null && left <= 0;
   const date = new Date(s.starts_at);
@@ -134,9 +177,21 @@ function SeminarCard({ s, index, reduce, onBook }: { s: PublicOnlineSeminar; ind
         <div className="flex size-12 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
           <Video className="size-6" />
         </div>
-        <span className={`bg-clip-text text-2xl font-extrabold text-transparent bg-gradient-to-b from-white to-zinc-400`}>
-          {formatPrice(s.price_cents, s.currency)}
-        </span>
+        {discounted ? (
+          <div className="flex flex-col items-end gap-2.5">
+            <MemberBadge planId={planId} percent={percent} />
+            <DiscountedPrice
+              listCents={s.price_cents}
+              finalCents={memberPrice}
+              format={(c) => formatPrice(c, s.currency)}
+              size="md"
+            />
+          </div>
+        ) : (
+          <span className={`bg-clip-text text-2xl font-extrabold text-transparent bg-gradient-to-b from-white to-zinc-400`}>
+            {formatPrice(s.price_cents, s.currency)}
+          </span>
+        )}
       </div>
 
       <h2 className={`relative mt-5 text-2xl font-bold ${chromeText}`}>{s.title}</h2>
@@ -173,7 +228,17 @@ function SeminarCard({ s, index, reduce, onBook }: { s: PublicOnlineSeminar; ind
 
 type Stage = "details" | "pay" | "verifying" | "done";
 
-function BookingModal({ seminar, onClose }: { seminar: PublicOnlineSeminar; onClose: () => void }) {
+function BookingModal({
+  seminar,
+  percent,
+  planId,
+  onClose,
+}: {
+  seminar: PublicOnlineSeminar;
+  percent: number;
+  planId: PlanId | null;
+  onClose: () => void;
+}) {
   const [stage, setStage] = useState<Stage>("details");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -182,6 +247,16 @@ function BookingModal({ seminar, onClose }: { seminar: PublicOnlineSeminar; onCl
   const [error, setError] = useState<string | null>(null);
   const [secret, setSecret] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(true);
+  const sessionRef = useRef<string>("");
+  // What the SERVER will charge (returned by the checkout function). Until we
+  // have it, show the price calculated from the member discount.
+  const [quote, setQuote] = useState<{ list: number; final: number; percent: number } | null>(null);
+
+  const shownPercent = quote ? quote.percent : percent;
+  const shownList = quote ? quote.list : seminar.price_cents;
+  const shownFinal = quote ? quote.final : applyPercent(seminar.price_cents, percent);
+  const hasDiscount = shownPercent > 0 && shownFinal < shownList;
+  const fmt = (c: number) => formatPrice(c, seminar.currency);
 
   const valid =
     fullName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && phone.trim().length >= 6;
@@ -191,9 +266,16 @@ function BookingModal({ seminar, onClose }: { seminar: PublicOnlineSeminar; onCl
     setBusy(true);
     setError(null);
     try {
-      const { clientSecret, sessionId } = await startOnlineCheckout({ seminarId: seminar.id, fullName, email, phone });
-      setSecret(clientSecret);
-      sessionRef.current = sessionId;
+      const res = await startOnlineCheckout({ seminarId: seminar.id, fullName, email, phone });
+      setSecret(res.clientSecret);
+      sessionRef.current = res.sessionId;
+      if (typeof res.amountCents === "number") {
+        setQuote({
+          list: res.listPriceCents ?? seminar.price_cents,
+          final: res.amountCents,
+          percent: res.discountPercent ?? 0,
+        });
+      }
       setStage("pay");
     } catch (e) {
       setError(
@@ -205,8 +287,6 @@ function BookingModal({ seminar, onClose }: { seminar: PublicOnlineSeminar; onCl
       setBusy(false);
     }
   }
-
-  const sessionRef = useRef<string>("");
 
   async function onComplete() {
     setStage("verifying");
@@ -247,9 +327,19 @@ function BookingModal({ seminar, onClose }: { seminar: PublicOnlineSeminar; onCl
                 <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Κράτηση θέσης</p>
                 <h3 className={`mt-2 text-2xl font-bold ${chromeText}`}>{seminar.title}</h3>
                 <p className="mt-1 text-sm text-zinc-400">
-                  {new Date(seminar.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })} ·{" "}
-                  {formatPrice(seminar.price_cents, seminar.currency)}
+                  {new Date(seminar.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })}
+                  {!hasDiscount && ` · ${fmt(seminar.price_cents)}`}
                 </p>
+
+                {hasDiscount && (
+                  <div className="mt-5 rounded-2xl border border-white/20 bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-4 shadow-[0_0_40px_-18px_rgba(255,255,255,0.5)]">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <MemberBadge planId={planId} percent={shownPercent} />
+                      <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} layout="inline" size="md" />
+                    </div>
+                    <SavingsLine className="mt-3" label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
+                  </div>
+                )}
 
                 <div className="mt-6 space-y-4">
                   {[
@@ -294,6 +384,20 @@ function BookingModal({ seminar, onClose }: { seminar: PublicOnlineSeminar; onCl
                 <button type="button" onClick={() => setStage("details")} className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white">
                   <ArrowLeft className="size-3.5" /> Πίσω
                 </button>
+                <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-white/15 bg-white/[0.03] px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-white">{seminar.title}</p>
+                    {hasDiscount ? (
+                      <div className="mt-2 flex flex-col items-start gap-1.5">
+                        <MemberBadge planId={planId} percent={shownPercent} />
+                        <SavingsLine label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
+                      </div>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-zinc-500">Σύνολο πληρωμής</p>
+                    )}
+                  </div>
+                  <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} size="md" />
+                </div>
                 <div className="overflow-hidden rounded-2xl bg-white">
                   <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: secret, onComplete }}>
                     <EmbeddedCheckout />

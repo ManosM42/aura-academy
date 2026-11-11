@@ -16,6 +16,9 @@ import {
   type BookSettings,
 } from "@/lib/book";
 import { CHROME_FILL, ChromeCTA, ChromeText, EASE, fieldClass } from "@/components/aura/chrome";
+import { MemberBadge } from "@/components/aura/DiscountPrice";
+import { applyPercent } from "@/lib/discounts";
+import { getPlan, type PlanId } from "@/lib/plans";
 
 // Change the env var name if your seminar checkout uses a different one.
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string);
@@ -45,10 +48,15 @@ export default function BookCheckoutModal({
   open,
   onClose,
   settings,
+  discountPercent = 0,
+  planId = null,
 }: {
   open: boolean;
   onClose: () => void;
   settings: BookSettings;
+  /** Member discount for this visitor (0 for guests / BASIC). Display only: the server decides the real price. */
+  discountPercent?: number;
+  planId?: PlanId | null;
 }) {
   const reduce = useReducedMotion();
   const [step, setStep] = useState<Step>("details");
@@ -59,11 +67,20 @@ export default function BookCheckoutModal({
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // What the server will really charge, returned by create-book-checkout.
+  const [serverQuote, setServerQuote] = useState<{ total: number; percent: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const maxQty = Math.min(10, settings.stock ?? 10);
-  const subtotal = settings.price_cents * quantity;
-  const total = subtotal + settings.shipping_cents;
+  const unitCents = applyPercent(settings.price_cents, discountPercent);
+  const listSubtotal = settings.price_cents * quantity;
+  const subtotal = unitCents * quantity;
+  const saving = listSubtotal - subtotal;
+  const hasDiscount = discountPercent > 0 && saving > 0;
+  const total = subtotal + settings.shipping_cents; // shipping is never discounted
+  const payTotal = serverQuote?.total ?? total;
+  const payPercent = serverQuote ? serverQuote.percent : discountPercent;
+  const planName = getPlan(planId)?.name ?? "AURA MEMBER";
   const locked = step === "pay" && !!clientSecret; // do not lose a paid session by accident
 
   // Reset every time it opens
@@ -76,6 +93,7 @@ export default function BookCheckoutModal({
     setError(null);
     setClientSecret(null);
     setOrderId(null);
+    setServerQuote(null);
     setConfirmed(false);
   }, [open]);
 
@@ -107,6 +125,7 @@ export default function BookCheckoutModal({
       const res = await createBookCheckout({ quantity, ...form });
       setClientSecret(res.clientSecret);
       setOrderId(res.orderId);
+      setServerQuote({ total: res.totalCents, percent: res.discountPercent ?? 0 });
       setStep("pay");
       panelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -289,7 +308,10 @@ export default function BookCheckoutModal({
                       {/* summary */}
                       <div className="md:sticky md:top-0 md:self-start">
                         <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">Summary</p>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">Summary</p>
+                            {hasDiscount && <MemberBadge planId={planId} percent={discountPercent} />}
+                          </div>
 
                           <div className="mt-4 flex items-center justify-between">
                             <span className="text-sm text-white/80">Quantity</span>
@@ -305,7 +327,36 @@ export default function BookCheckoutModal({
                           </div>
 
                           <dl className="mt-5 space-y-2.5 border-t border-white/10 pt-4 text-sm">
-                            <Row label={`Book × ${quantity}`} value={formatMoney(subtotal, settings.currency)} />
+                            <Row
+                              label={`Book × ${quantity}`}
+                              value={
+                                hasDiscount ? (
+                                  <s className="font-normal text-white/40 decoration-white/40">
+                                    {formatMoney(listSubtotal, settings.currency)}
+                                  </s>
+                                ) : (
+                                  formatMoney(subtotal, settings.currency)
+                                )
+                              }
+                            />
+                            {hasDiscount && (
+                              <Row
+                                label={`${planName} member price`}
+                                value={
+                                  <span
+                                    className="font-bold drop-shadow-[0_0_14px_rgba(255,255,255,0.4)]"
+                                    style={{
+                                      backgroundImage: CHROME_FILL,
+                                      WebkitBackgroundClip: "text",
+                                      backgroundClip: "text",
+                                      WebkitTextFillColor: "transparent",
+                                    }}
+                                  >
+                                    {formatMoney(subtotal, settings.currency)}
+                                  </span>
+                                }
+                              />
+                            )}
                             <Row label="Shipping" value={settings.shipping_cents > 0 ? formatMoney(settings.shipping_cents, settings.currency) : "Free"} />
                           </dl>
 
@@ -346,7 +397,10 @@ export default function BookCheckoutModal({
                         <span className="text-sm text-white/70">
                           {quantity} × book · to {form.city}
                         </span>
-                        <span className="text-lg font-extrabold text-white">{formatMoney(total, settings.currency)}</span>
+                        <span className="flex flex-col items-end gap-1.5">
+                          {payPercent > 0 && <MemberBadge planId={planId} percent={payPercent} />}
+                          <span className="text-lg font-extrabold text-white">{formatMoney(payTotal, settings.currency)}</span>
+                        </span>
                       </div>
                       <div className="overflow-hidden rounded-2xl bg-white p-1 shadow-[0_0_60px_rgba(255,255,255,0.12)]">
                         <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret, onComplete: handleComplete }}>
@@ -425,7 +479,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between">
       <dt className="text-white/55">{label}</dt>

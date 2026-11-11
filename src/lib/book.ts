@@ -26,6 +26,9 @@ export interface BookOrder {
   status: BookOrderStatus;
   quantity: number;
   unit_price_cents: number;
+  /** Price per copy before the member discount (null on older orders). */
+  list_unit_price_cents?: number | null;
+  discount_percent?: number | null;
   shipping_cents: number;
   total_cents: number;
   currency: string;
@@ -108,7 +111,14 @@ export async function getBookSettings(): Promise<BookSettings | null> {
 }
 
 export function createBookCheckout(input: ShippingInput) {
-  return invoke<{ clientSecret: string; orderId: string; totalCents: number }>(
+  return invoke<{
+    clientSecret: string;
+    orderId: string;
+    /** Final amount Stripe will charge (member price + shipping), from the server. */
+    totalCents: number;
+    unitPriceCents?: number;
+    discountPercent?: number;
+  }>(
     "create-book-checkout",
     input,
   );

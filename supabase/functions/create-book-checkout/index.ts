@@ -5,6 +5,7 @@
 // which only an admin can edit.
 import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { quoteForCaller } from "../_shared/discount.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -70,7 +71,9 @@ Deno.serve(async (req) => {
       return reply({ error: "sold_out" }, 409);
     }
 
-    const unit = settings.price_cents as number;
+    // Member price per copy (PRO / ELITE). Shipping is never discounted.
+    const quote = await quoteForCaller(req, db, "book", settings.price_cents as number);
+    const unit = quote.finalCents;
     const shipping = settings.shipping_cents as number;
     const total = unit * quantity + shipping;
     const orderId = crypto.randomUUID();
@@ -81,7 +84,12 @@ Deno.serve(async (req) => {
         price_data: {
           currency: settings.currency,
           unit_amount: unit,
-          product_data: { name: settings.title },
+          product_data: {
+            name: settings.title,
+            ...(quote.percent > 0
+              ? { description: `AURA member discount -${quote.percent}% (list price ${(quote.listCents / 100).toFixed(2)} each)` }
+              : {}),
+          },
         },
       },
     ];
@@ -102,13 +110,16 @@ Deno.serve(async (req) => {
       redirect_on_completion: "never",
       customer_email: email,
       line_items: lineItems,
-      metadata: { order_id: orderId, kind: "book" },
+      metadata: { order_id: orderId, kind: "book", discount_percent: String(quote.percent) },
     });
 
     const { error } = await db.from("book_orders").insert({
       id: orderId,
       quantity,
       unit_price_cents: unit,
+      list_unit_price_cents: quote.listCents,
+      discount_percent: quote.percent,
+      user_id: quote.userId,
       shipping_cents: shipping,
       total_cents: total,
       currency: settings.currency,
@@ -126,7 +137,13 @@ Deno.serve(async (req) => {
     });
     if (error) throw error;
 
-    return reply({ clientSecret: session.client_secret, orderId, totalCents: total });
+    return reply({
+      clientSecret: session.client_secret,
+      orderId,
+      totalCents: total,
+      unitPriceCents: unit,
+      discountPercent: quote.percent,
+    });
   } catch (e) {
     console.error("create-book-checkout failed:", e);
     return reply({ error: "server_error", detail: String((e as Error)?.message ?? e) }, 500);
