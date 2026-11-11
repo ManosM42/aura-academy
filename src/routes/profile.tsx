@@ -6,6 +6,7 @@ import { updateMyProfile, uploadAvatar } from "@/lib/queries";
 import { useAuth } from "@/lib/useAuth";
 import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
 import SubscriptionCard from "@/components/aura/SubscriptionCard";
+import ForzaBravaPerk from "@/components/aura/ForzaBravaPerk";
 import CompletedCourses from "@/components/aura/CompletedCourses";
 import CreatePortfolioButton from "@/components/aura/portfolio/CreatePortfolioButton";
 
@@ -162,6 +163,9 @@ function ProfilePage() {
       {/* Το αγορασμένο πακέτο. Το session είναι ήδη narrowed από το
           `if (!session || !profile)` guard παραπάνω. */}
       <SubscriptionCard userId={session.user.id} />
+
+      {/* FORZA BRAVA member code: PRO / ELITE see their code, everyone else is invited to upgrade. */}
+      <ForzaBravaPerk userId={session.user.id} />
 
       {/* Ποια courses έχει ολοκληρώσει ο μαθητής */}
       <CompletedCourses />
