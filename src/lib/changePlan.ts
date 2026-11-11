@@ -22,6 +22,11 @@ export function getPlanCardState(
   return PLAN_RANK[cardPlanId] > PLAN_RANK[currentPlanId] ? "upgrade" : "lower";
 }
 
+export interface CardInfo {
+  brand: string;
+  last4: string;
+}
+
 export interface UpgradePreview {
   currentPlanId: PlanId;
   targetPlanId: PlanId;
@@ -30,12 +35,20 @@ export interface UpgradePreview {
   currency: string;
   /** What the customer pays per month right now. */
   currentAmountCents: number;
-  /** Full monthly price of the new plan (charged from the next cycle on). */
+  /** Full monthly price of the new plan (charged from the next renewal on). */
   newAmountCents: number;
-  /** What is charged today. */
-  differenceCents: number;
-  /** ISO date of the next renewal (same day next month). */
-  nextRenewal: string;
+  /** Length of the current billing period in days (e.g. 31). */
+  periodDays: number;
+  /** Days left in the current billing period (a started day counts). */
+  remainingDays: number;
+  /** Deducted for unused days of the old plan (0 unless the server enables it). */
+  creditCents: number;
+  /** What is charged today: new price x remainingDays / periodDays. */
+  dueTodayCents: number;
+  /** ISO date of the next renewal. It does NOT change when upgrading. */
+  renewalDate: string;
+  /** The saved card that will be charged, if Stripe could tell us. */
+  card: CardInfo | null;
 }
 
 export interface UpgradeResult {
@@ -43,6 +56,9 @@ export interface UpgradeResult {
   planId: PlanId;
   chargedCents: number | null;
   nextRenewal: string | null;
+  card: CardInfo | null;
+  invoiceUrl: string | null;
+  invoiceNumber: string | null;
 }
 
 async function callChangePlan<T>(body: { planId: PlanId; preview?: boolean }): Promise<T> {

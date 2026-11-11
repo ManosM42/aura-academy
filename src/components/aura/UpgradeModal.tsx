@@ -293,15 +293,28 @@ export default function UpgradeModal({ plan, open, onClose, onUpgraded }: Upgrad
                               <dd className="tabular-nums">{money(preview.newAmountCents)}</dd>
                             </div>
                             <div className="flex items-baseline justify-between gap-4 text-white/60">
-                              <dt>Credit for your current {preview.currentPlanName}</dt>
-                              <dd className="tabular-nums text-emerald-300/90">−{money(preview.currentAmountCents)}</dd>
+                              <dt>Days left in this billing period</dt>
+                              <dd className="tabular-nums">
+                                {preview.remainingDays} of {preview.periodDays} days
+                              </dd>
                             </div>
+                            {preview.creditCents > 0 && (
+                              <div className="flex items-baseline justify-between gap-4 text-white/60">
+                                <dt>Credit for unused days of {preview.currentPlanName}</dt>
+                                <dd className="tabular-nums text-emerald-300/90">−{money(preview.creditCents)}</dd>
+                              </div>
+                            )}
                             <div className="flex items-end justify-between gap-4 border-t border-white/10 pt-4">
-                              <dt className="text-[11px] font-semibold uppercase tracking-[0.25em] text-white">
-                                Due today
+                              <dt>
+                                <span className="block text-[11px] font-semibold uppercase tracking-[0.25em] text-white">
+                                  Due today
+                                </span>
+                                <span className="mt-1 block text-[11px] text-white/40">
+                                  {money(preview.newAmountCents)} × {preview.remainingDays}/{preview.periodDays}
+                                </span>
                               </dt>
                               <dd className="um-amount text-4xl font-bold leading-none tabular-nums">
-                                {money(preview.differenceCents)}
+                                {money(preview.dueTodayCents)}
                               </dd>
                             </div>
                           </dl>
@@ -312,14 +325,13 @@ export default function UpgradeModal({ plan, open, onClose, onUpgraded }: Upgrad
                               the card you already use for your subscription.
                             </Detail>
                             <Detail icon={<CalendarClock className="size-4" />}>
-                              Your billing day changes to <strong className="font-medium text-white/85">today</strong>.
-                              Next renewal: <strong className="font-medium text-white/85">{fmtDate(preview.nextRenewal)}</strong>
-                              {preview.currentPeriodEnd && <> (instead of {fmtDate(preview.currentPeriodEnd)})</>}.
+                              Your billing date <strong className="font-medium text-white/85">does not change</strong>. On{" "}
+                              <strong className="font-medium text-white/85">{fmtDate(preview.renewalDate)}</strong> you
+                              pay the full {money(preview.newAmountCents)} for {preview.targetPlanName}.
                             </Detail>
                             <Detail icon={<Receipt className="size-4" />}>
-                              From then on you pay{" "}
-                              <strong className="font-medium text-white/85">{money(preview.newAmountCents)} / month</strong>,
-                              VAT included. Cancel any time.
+                              Today you pay {preview.targetPlanName} only for the {preview.remainingDays} days left in
+                              this period. Prices include VAT. Cancel any time.
                             </Detail>
                             <Detail icon={<ShieldCheck className="size-4" />}>
                               Secure payment by Stripe. If the payment fails, nothing changes on your account.
@@ -347,8 +359,8 @@ export default function UpgradeModal({ plan, open, onClose, onUpgraded }: Upgrad
                               >
                                 Terms of Service
                               </Link>{" "}
-                              and agree to be charged {money(preview.differenceCents)} now and{" "}
-                              {money(preview.newAmountCents)} every month.
+                              and agree to be charged {money(preview.dueTodayCents)} now and{" "}
+                              {money(preview.newAmountCents)} every month from {fmtDate(preview.renewalDate)}.
                             </span>
                           </label>
 
@@ -402,7 +414,7 @@ export default function UpgradeModal({ plan, open, onClose, onUpgraded }: Upgrad
                                 <Loader2 className="size-4 animate-spin" /> Processing payment…
                               </>
                             ) : (
-                              <>Confirm &amp; pay {money(preview.differenceCents)}</>
+                              <>Confirm &amp; pay {money(preview.dueTodayCents)}</>
                             )}
                           </button>
                           <button type="button" onClick={onClose} disabled={submitting} className="um-ghost">
@@ -466,7 +478,7 @@ function ThankYou({
   onAcademy: () => void;
   onClose: () => void;
 }) {
-  const charged = result.chargedCents ?? preview?.differenceCents ?? null;
+  const charged = result.chargedCents ?? preview?.dueTodayCents ?? null;
   const card = result.card ?? preview?.card ?? null;
   const monthly = preview?.newAmountCents ?? plan.amountCents;
 
