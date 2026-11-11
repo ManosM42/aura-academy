@@ -26,6 +26,7 @@ import { CallProvider } from "@/components/aura/CallProvider";
 import { I18nProvider } from "@/lib/i18n";
 import { CookieConsentProvider } from "@/lib/cookieConsent";
 import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
+import AccessGate from "@/components/aura/AccessGate";
 
 /* ------------------------------------------------------------------ */
 /* Structured data (JSON-LD)                                           */
@@ -243,7 +244,10 @@ function RootComponent() {
             <MessageNotifications />
 
             <main id="main-content" tabIndex={-1} className="outline-none">
-              <Outlet />
+              {/* Members-only pages show the lock screen when the user has no active plan. */}
+              <AccessGate>
+                <Outlet />
+              </AccessGate>
             </main>
 
             <CookieConsentBanner />

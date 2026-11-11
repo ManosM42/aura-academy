@@ -4,9 +4,11 @@ import { useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { Check, ChevronDown } from "lucide-react";
 import ChromeButton from "@/components/aura/ChromeButton";
+import UpgradeModal from "@/components/aura/UpgradeModal";
 import { useAuth } from "@/lib/useAuth";
 import { useSubscription } from "@/lib/useSubscription";
 import { setCheckoutIntent } from "@/lib/checkout-intent";
+import { getPlanCardState, type PlanCardState } from "@/lib/changePlan";
 import type { AuraPlan, PlanId } from "@/lib/plans";
 import { usePlans } from "@/lib/usePlans";
 
@@ -16,13 +18,13 @@ const COLLAPSED = 7;
 function PlanCard({
   plan,
   index,
-  hasAccess,
+  state,
   loading,
   onSelect,
 }: {
   plan: AuraPlan;
   index: number;
-  hasAccess: boolean;
+  state: PlanCardState;
   loading: boolean;
   onSelect: (id: PlanId) => void;
 }) {
@@ -31,6 +33,22 @@ function PlanCard({
   const list = open ? plan.features : plan.features.slice(0, COLLAPSED);
   const hidden = plan.features.length - COLLAPSED;
   const short = plan.name.replace("AURA ", "");
+
+  const label =
+    state === "current"
+      ? "ΕΧΕΙΣ ΠΡΟΣΒΑΣΗ"
+      : state === "upgrade"
+        ? `ΑΝΑΒΑΘΜΙΣΗ ΣΕ ${short}`
+        : state === "lower"
+          ? "ΠΕΡΙΛΑΜΒΑΝΕΤΑΙ"
+          : `ΞΕΚΙΝΑ ΜΕ ${short}`;
+
+  const note =
+    state === "upgrade"
+      ? "Πληρώνεις μόνο τη διαφορά από το τρέχον πλάνο σου."
+      : state === "lower"
+        ? "Έχεις ήδη πρόσβαση μέσω του ανώτερου πλάνου σου."
+        : null;
 
   function onMove(e: MouseEvent<HTMLElement>) {
     const el = ref.current;
@@ -51,7 +69,7 @@ function PlanCard({
       <article
         ref={ref}
         onMouseMove={onMove}
-        className={`pr-wrap ${plan.highlight ? "pr-wrap-hi" : ""}`}
+        className={`pr-wrap ${plan.highlight ? "pr-wrap-hi" : ""} ${state === "lower" ? "pr-lower" : ""}`}
         aria-labelledby={`plan-${plan.id}`}
       >
         {plan.highlight && <span className="pr-border" aria-hidden />}
@@ -60,7 +78,11 @@ function PlanCard({
 
           <div className="relative flex flex-1 flex-col">
             <div className="flex min-h-7 items-center">
-              {plan.badge ? <span className="pr-badge">{plan.badge}</span> : null}
+              {state === "current" ? (
+                <span className="pr-badge">ΤΟ ΠΛΑΝΟ ΣΟΥ</span>
+              ) : plan.badge ? (
+                <span className="pr-badge">{plan.badge}</span>
+              ) : null}
             </div>
 
             <h3 id={`plan-${plan.id}`} className="pr-name mt-3 text-2xl font-bold tracking-[0.12em]">
@@ -110,13 +132,14 @@ function PlanCard({
             <div className="mt-auto pt-8">
               <ChromeButton
                 type="button"
-                variant={plan.highlight ? "primary" : "secondary"}
+                variant={plan.highlight || state === "upgrade" ? "primary" : "secondary"}
                 className="w-full"
-                disabled={loading}
+                disabled={loading || state === "lower"}
                 onClick={() => onSelect(plan.id)}
               >
-                {hasAccess ? "ΕΧΕΙΣ ΠΡΟΣΒΑΣΗ" : `ΞΕΚΙΝΑ ΜΕ ${short}`}
+                {label}
               </ChromeButton>
+              {note && <p className="mt-3 text-center text-[11px] leading-relaxed text-white/45">{note}</p>}
             </div>
           </div>
         </div>
@@ -138,8 +161,12 @@ function PlansSkeleton() {
 export default function PricingCards() {
   const navigate = useNavigate();
   const { session } = useAuth();
-  const { hasAccess, loading } = useSubscription(session?.user.id);
+  const { subscription, hasAccess, loading, refresh } = useSubscription(session?.user.id);
   const { plans, loading: plansLoading } = usePlans();
+  const [upgradeTarget, setUpgradeTarget] = useState<AuraPlan | null>(null);
+
+  // Only meaningful for a signed-in user with an active/trialing subscription.
+  const currentPlanId: PlanId | null = session && hasAccess ? (subscription?.plan_id ?? null) : null;
 
   function handleSelect(planId: PlanId) {
     if (!session) {
@@ -149,10 +176,23 @@ export default function PricingCards() {
       navigate({ to: "/login", search: { plan: planId } });
       return;
     }
-    if (hasAccess) {
+
+    const state = getPlanCardState(currentPlanId, planId);
+
+    if (state === "lower") return;
+
+    if (state === "current") {
       navigate({ to: "/academy" });
       return;
     }
+
+    if (state === "upgrade") {
+      const target = plans.find((p) => p.id === planId);
+      if (target) setUpgradeTarget(target);
+      return;
+    }
+
+    // No active subscription: normal checkout.
     navigate({ to: "/checkout", search: { plan: planId } });
   }
 
@@ -168,12 +208,21 @@ export default function PricingCards() {
               key={plan.id}
               plan={plan}
               index={i}
-              hasAccess={hasAccess}
+              state={getPlanCardState(currentPlanId, plan.id)}
               loading={loading}
               onSelect={handleSelect}
             />
           ))}
         </div>
+      )}
+
+      {upgradeTarget && (
+        <UpgradeModal
+          plan={upgradeTarget}
+          open
+          onClose={() => setUpgradeTarget(null)}
+          onUpgraded={refresh}
+        />
       )}
     </>
   );
@@ -186,11 +235,13 @@ const css = `
 .pr-wrap {
   position: relative; height: 100%; padding: 1px; border-radius: 1.4rem; overflow: hidden; isolation: isolate;
   background: rgba(255,255,255,.09);
-  transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s, background .5s;
+  transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s, background .5s, opacity .4s;
 }
 .pr-wrap:hover { transform: translateY(-6px); background: rgba(255,255,255,.22); box-shadow: 0 34px 90px -34px rgba(220,228,240,.3); }
 .pr-wrap-hi { background: rgba(255,255,255,.1); box-shadow: 0 0 90px -30px rgba(232,236,242,.5); }
 .pr-wrap-hi:hover { background: rgba(255,255,255,.1); }
+.pr-lower { opacity: .6; }
+.pr-lower:hover { transform: none; box-shadow: none; background: rgba(255,255,255,.09); }
 .pr-border {
   position: absolute; inset: -60%; z-index: -1;
   background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.98) 74%, rgba(255,255,255,0) 90%, transparent 100%);
