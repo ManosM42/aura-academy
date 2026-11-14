@@ -3,6 +3,8 @@ import { loadStripe, type Stripe } from "@stripe/stripe-js";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
 import { supabase } from "@/lib/supabase";
 import type { AuraPlan } from "@/lib/plans";
+import { getCheckoutProvider, type CheckoutProvider } from "@/lib/checkout-provider";
+import { createVivaCheckout } from "@/lib/create-viva-checkout";
 
 let stripePromise: Promise<Stripe | null> | null = null;
 
@@ -27,7 +29,23 @@ interface CheckoutModalProps {
 
 export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProps) {
   const [error, setError] = useState<string | null>(null);
+  // null = still asking the server which provider applies to this visitor.
+  const [provider, setProvider] = useState<CheckoutProvider | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+
+  // Decide Stripe vs Viva each time the modal opens. Nothing is created
+  // (no Stripe session, no Viva order) until the matching pane is shown.
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setProvider(null);
+    void getCheckoutProvider().then((value) => {
+      if (active) setProvider(value);
+    });
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   // Escape + κλείδωμα scroll + αρχικό focus.
   useEffect(() => {
@@ -135,8 +153,8 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
               ))}
             </ul>
             <p className="mt-6 text-[11px] leading-relaxed text-neutral-600">
-              Ασφαλής πληρωμή μέσω Stripe. Η AURA δεν αποθηκεύει στοιχεία κάρτας. Ακύρωση ανά πάσα
-              στιγμή από το προφίλ σου.
+              Ασφαλής πληρωμή μέσω {provider === "viva" ? "Viva.com" : "Stripe"}. Η AURA δεν
+              αποθηκεύει στοιχεία κάρτας. Ακύρωση ανά πάσα στιγμή από το προφίλ σου.
             </p>
           </aside>
 
@@ -155,12 +173,76 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
                   Δοκίμασε ξανά
                 </button>
               </div>
+            ) : provider === null ? (
+              <PaneSkeleton />
+            ) : provider === "viva" ? (
+              <VivaPane planId={plan.id} />
             ) : (
               <StripePane fetchClientSecret={fetchClientSecret} onError={setError} />
             )}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function PaneSkeleton() {
+  return (
+    <div className="flex h-full min-h-[400px] animate-pulse flex-col gap-3 pt-4" aria-busy="true">
+      <div className="h-11 rounded-lg bg-white/5" />
+      <div className="h-11 rounded-lg bg-white/5" />
+      <div className="h-11 w-2/3 rounded-lg bg-white/5" />
+      <div className="mt-4 h-12 rounded-full bg-white/10" />
+    </div>
+  );
+}
+
+/**
+ * Viva Smart Checkout is a full-page redirect (it cannot be embedded).
+ * The server creates the payment order and we send the customer there.
+ * Coming back to AURA is NOT proof of payment: access is granted only after
+ * the server has verified the payment.
+ */
+function VivaPane({ planId }: { planId: AuraPlan["id"] }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function start() {
+    if (busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const url = await createVivaCheckout(planId);
+      window.location.assign(url);
+      // Keep the button disabled: the browser is navigating away.
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Η πληρωμή δεν μπόρεσε να ξεκινήσει.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex h-full min-h-[400px] flex-col items-start justify-center gap-5">
+      <p className="text-[10px] uppercase tracking-[0.4em] text-neutral-500">ΑΣΦΑΛΗΣ ΠΛΗΡΩΜΗ</p>
+      <p className="max-w-md text-sm leading-relaxed text-neutral-300">
+        Θα μεταφερθείς στη σελίδα ασφαλούς πληρωμής της Viva.com για να ολοκληρώσεις τη συνδρομή
+        σου. Μετά την πληρωμή θα επιστρέψεις εδώ και η συνδρομή σου θα ενεργοποιηθεί μόλις
+        επιβεβαιωθεί η πληρωμή.
+      </p>
+      {message && (
+        <p role="alert" className="max-w-md text-xs text-red-300">
+          {message}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={() => void start()}
+        disabled={busy}
+        className="rounded-full border border-white/30 bg-white px-7 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-black transition hover:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {busy ? "Μεταφορά…" : "Συνέχεια στην πληρωμή"}
+      </button>
     </div>
   );
 }
