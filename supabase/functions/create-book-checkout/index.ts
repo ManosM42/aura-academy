@@ -1,11 +1,24 @@
-// Deploy: supabase functions deploy create-book-checkout --no-verify-jwt
-// Secret:  STRIPE_SECRET_KEY
-//
-// The PRICE NEVER comes from the browser: it is read from book_settings,
-// which only an admin can edit.
-import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { quoteForCaller } from "../_shared/discount.ts";
+import {
+  loadVivaConfig,
+  createPaymentOrder,
+  checkoutRedirectUrl,
+  VivaConfigError,
+  VivaApiError,
+} from "../_shared/viva.ts";
+
+// Deploy:
+// supabase functions deploy create-book-checkout --no-verify-jwt
+//
+// Required secrets:
+// VIVA_ENV=sandbox
+// VIVA_SANDBOX_CLIENT_ID
+// VIVA_SANDBOX_CLIENT_SECRET
+// VIVA_SANDBOX_SOURCE_CODE
+// SUPABASE_URL
+// SUPABASE_SERVICE_ROLE_KEY
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -25,20 +38,42 @@ const str = (v: unknown, max = 200) =>
   typeof v === "string" ? v.trim().slice(0, max) : "";
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS });
-  if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: CORS });
+  }
+
+  if (req.method !== "POST") {
+    return reply({ error: "method_not_allowed" }, 405);
+  }
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!url || !serviceKey) {
+    return reply({ error: "supabase_env_missing" }, 500);
+  }
+
+  let cfg;
 
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const url = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!stripeKey) return reply({ error: "stripe_key_missing" }, 500);
-    if (!url || !serviceKey) return reply({ error: "supabase_env_missing" }, 500);
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (error) {
+    console.error(
+      "Viva configuration error:",
+      error instanceof VivaConfigError ? error.message : "unknown",
+    );
+    return reply({ error: "viva_configuration_error" }, 500);
+  }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
-    const db = createClient(url, serviceKey, { auth: { persistSession: false } });
+  const db = createClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
 
+  let orderId: string | null = null;
+
+  try {
     const body = await req.json();
+
     const quantity = Math.floor(Number(body.quantity));
     const fullName = str(body.fullName);
     const email = str(body.email, 254);
@@ -52,100 +87,203 @@ Deno.serve(async (req) => {
     const notes = str(body.notes, 500);
 
     if (
-      !Number.isFinite(quantity) || quantity < 1 || quantity > 10 ||
-      !fullName || !phone || !addressLine1 || !city || !postalCode || !country ||
+      !Number.isFinite(quantity) ||
+      quantity < 1 ||
+      quantity > 10 ||
+      !fullName ||
+      !phone ||
+      !addressLine1 ||
+      !city ||
+      !postalCode ||
+      !country ||
       !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
     ) {
       return reply({ error: "invalid_input" }, 400);
     }
 
-    const { data: settings } = await db
+    // 1. Read the authoritative book price from Supabase.
+    const { data: settings, error: settingsError } = await db
       .from("book_settings")
       .select("*")
       .eq("id", 1)
       .single();
-    if (!settings || !settings.is_active || settings.price_cents <= 0) {
+
+    if (settingsError || !settings || !settings.is_active) {
       return reply({ error: "book_unavailable" }, 409);
     }
-    if (settings.stock !== null && settings.stock < quantity) {
+
+    const listPrice = Number(settings.price_cents);
+    const shipping = Number(settings.shipping_cents ?? 0);
+    const currency = String(settings.currency ?? "eur").toLowerCase();
+
+    if (
+      !Number.isSafeInteger(listPrice) ||
+      listPrice <= 0 ||
+      !Number.isSafeInteger(shipping) ||
+      shipping < 0 ||
+      currency !== "eur"
+    ) {
+      console.error("Invalid book settings");
+      return reply({ error: "invalid_book_configuration" }, 500);
+    }
+
+    if (
+      settings.stock !== null &&
+      Number(settings.stock) < quantity
+    ) {
       return reply({ error: "sold_out" }, 409);
     }
 
-    // Member price per copy (PRO / ELITE). Shipping is never discounted.
-    const quote = await quoteForCaller(req, db, "book", settings.price_cents as number);
-    const unit = quote.finalCents;
-    const shipping = settings.shipping_cents as number;
-    const total = unit * quantity + shipping;
-    const orderId = crypto.randomUUID();
+    // 2. Apply the existing server-side member discount.
+    // Shipping is deliberately NOT discounted.
+    const quote = await quoteForCaller(
+      req,
+      db,
+      "book",
+      listPrice,
+    );
 
-    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
-      {
-        quantity,
-        price_data: {
-          currency: settings.currency,
-          unit_amount: unit,
-          product_data: {
-            name: settings.title,
-            ...(quote.percent > 0
-              ? { description: `AURA member discount -${quote.percent}% (list price ${(quote.listCents / 100).toFixed(2)} each)` }
-              : {}),
-          },
-        },
-      },
-    ];
-    if (shipping > 0) {
-      lineItems.push({
-        quantity: 1,
-        price_data: {
-          currency: settings.currency,
-          unit_amount: shipping,
-          product_data: { name: "Shipping" },
-        },
-      });
+    const unit = quote.finalCents;
+    const total = unit * quantity + shipping;
+
+    if (
+      !Number.isSafeInteger(unit) ||
+      unit <= 0 ||
+      !Number.isSafeInteger(total) ||
+      total <= 0
+    ) {
+      return reply({ error: "invalid_payment_amount" }, 500);
     }
 
-    const session = await stripe.checkout.sessions.create({
-      ui_mode: "embedded",
-      mode: "payment",
-      redirect_on_completion: "never",
-      customer_email: email,
-      line_items: lineItems,
-      metadata: { order_id: orderId, kind: "book", discount_percent: String(quote.percent) },
-    });
+    // 3. Create our internal order FIRST.
+    // Its UUID is sent to Viva as merchantTrns.
+    orderId = crypto.randomUUID();
 
-    const { error } = await db.from("book_orders").insert({
-      id: orderId,
-      quantity,
-      unit_price_cents: unit,
-      list_unit_price_cents: quote.listCents,
-      discount_percent: quote.percent,
-      user_id: quote.userId,
-      shipping_cents: shipping,
-      total_cents: total,
-      currency: settings.currency,
-      full_name: fullName,
-      email,
-      phone,
-      address_line1: addressLine1,
-      address_line2: addressLine2 || null,
-      city,
-      region: region || null,
-      postal_code: postalCode,
-      country,
-      notes: notes || null,
-      stripe_session_id: session.id,
-    });
-    if (error) throw error;
+    const { error: insertError } = await db
+      .from("book_orders")
+      .insert({
+        id: orderId,
+        quantity,
+        unit_price_cents: unit,
+        list_unit_price_cents: quote.listCents,
+        discount_percent: quote.percent,
+        user_id: quote.userId,
+        shipping_cents: shipping,
+        total_cents: total,
+        currency,
+        full_name: fullName,
+        email,
+        phone,
+        address_line1: addressLine1,
+        address_line2: addressLine2 || null,
+        city,
+        region: region || null,
+        postal_code: postalCode,
+        country,
+        notes: notes || null,
+        status: "pending",
+        payment_provider: "viva",
+        payment_environment: cfg.env,
+        viva_order_code: null,
+        stripe_session_id: null,
+      });
 
+    if (insertError) {
+      console.error("Book order insert failed:", insertError.message);
+      return reply({ error: "could_not_create_book_order" }, 500);
+    }
+
+    // 4. Create the Viva Smart Checkout order.
+    // Amount is calculated entirely on the server.
+    let vivaOrderCode: string;
+
+    try {
+      const created = await createPaymentOrder(cfg, {
+        amountCents: total,
+        merchantTrns: orderId,
+        customerTrns: `AURA Academy - ${String(settings.title)} x${quantity}`,
+        customer: {
+          email,
+          fullName,
+          requestLang: "el-GR",
+        },
+        allowRecurring: false,
+        paymentTimeoutSeconds: 1800,
+        tags: [
+          "aura-book",
+          `order-${orderId}`,
+          `quantity-${quantity}`,
+        ],
+      });
+
+      vivaOrderCode = created.orderCode;
+    } catch (error) {
+      console.error(
+        "Viva order creation failed:",
+        error instanceof VivaApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "unknown",
+      );
+
+      await db
+        .from("book_orders")
+        .update({
+          status: "failed",
+        })
+        .eq("id", orderId)
+        .eq("status", "pending");
+
+      return reply({ error: "viva_order_creation_failed" }, 502);
+    }
+
+    // 5. Persist Viva's order code BEFORE redirecting the customer.
+    const { error: updateError } = await db
+      .from("book_orders")
+      .update({
+        viva_order_code: vivaOrderCode,
+      })
+      .eq("id", orderId)
+      .eq("status", "pending");
+
+    if (updateError) {
+      console.error("Could not save Viva order code:", updateError.message);
+
+      await db
+        .from("book_orders")
+        .update({ status: "failed" })
+        .eq("id", orderId);
+
+      // Never redirect if we cannot match the payment to our order.
+      return reply({ error: "could_not_save_payment_reference" }, 500);
+    }
+
+    // 6. Return the secure Viva redirect URL.
     return reply({
-      clientSecret: session.client_secret,
+      redirectUrl: checkoutRedirectUrl(cfg, vivaOrderCode),
       orderId,
       totalCents: total,
       unitPriceCents: unit,
+      shippingCents: shipping,
       discountPercent: quote.percent,
+      currency: "EUR",
+      provider: "viva",
     });
-  } catch (e) {
-    console.error("create-book-checkout failed:", e);
-    return reply({ error: "server_error", detail: String((e as Error)?.message ?? e) }, 500);
+  } catch (error) {
+    console.error(
+      "create-book-checkout failed:",
+      error instanceof Error ? error.message : "unknown",
+    );
+
+    if (orderId) {
+      await db
+        .from("book_orders")
+        .update({ status: "failed" })
+        .eq("id", orderId)
+        .eq("status", "pending");
+    }
+
+    return reply({ error: "server_error" }, 500);
   }
 });

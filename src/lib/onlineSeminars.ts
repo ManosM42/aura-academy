@@ -1,4 +1,5 @@
-import { supabase } from "@/lib/supabase"; // <- adjust to wherever your Supabase client lives
+
+import { supabase } from "@/lib/supabase";
 
 export type OnlineSeminar = {
   id: string;
@@ -13,7 +14,10 @@ export type OnlineSeminar = {
   created_at: string;
 };
 
-export type PublicOnlineSeminar = Omit<OnlineSeminar, "published" | "created_at"> & { taken: number };
+export type PublicOnlineSeminar = Omit<
+  OnlineSeminar,
+  "published" | "created_at"
+> & { taken: number };
 
 export type OnlineBooking = {
   id: string;
@@ -23,7 +27,7 @@ export type OnlineBooking = {
   phone: string;
   status: "pending" | "paid" | "failed" | "refunded";
   amount_cents: number | null;
-  /** Price before the member discount (null on bookings made before discounts existed). */
+  /** Price before the member discount. Null for older bookings. */
   list_price_cents?: number | null;
   discount_percent?: number | null;
   paid_at: string | null;
@@ -34,7 +38,10 @@ export type OnlineBooking = {
 export type SeminarInput = Omit<OnlineSeminar, "id" | "created_at">;
 
 export function formatPrice(cents: number, currency = "eur") {
-  return new Intl.NumberFormat("el-GR", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+  return new Intl.NumberFormat("el-GR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
 }
 
 export async function getPublicOnlineSeminars(): Promise<PublicOnlineSeminar[]> {
@@ -43,6 +50,7 @@ export async function getPublicOnlineSeminars(): Promise<PublicOnlineSeminar[]> 
     .select("*")
     .gte("starts_at", new Date().toISOString())
     .order("starts_at", { ascending: true });
+
   if (error) throw error;
   return (data ?? []) as PublicOnlineSeminar[];
 }
@@ -52,25 +60,38 @@ export async function getAdminOnlineSeminars(): Promise<OnlineSeminar[]> {
     .from("online_seminars")
     .select("*")
     .order("starts_at", { ascending: false });
+
   if (error) throw error;
   return (data ?? []) as OnlineSeminar[];
 }
 
 export async function saveOnlineSeminar(input: SeminarInput, id?: string) {
-  const q = id
+  const query = id
     ? supabase.from("online_seminars").update(input).eq("id", id)
     : supabase.from("online_seminars").insert(input);
-  const { error } = await q;
+
+  const { error } = await query;
   if (error) throw error;
 }
 
-export async function setOnlineSeminarPublished(id: string, published: boolean) {
-  const { error } = await supabase.from("online_seminars").update({ published }).eq("id", id);
+export async function setOnlineSeminarPublished(
+  id: string,
+  published: boolean,
+) {
+  const { error } = await supabase
+    .from("online_seminars")
+    .update({ published })
+    .eq("id", id);
+
   if (error) throw error;
 }
 
 export async function deleteOnlineSeminar(id: string) {
-  const { error } = await supabase.from("online_seminars").delete().eq("id", id);
+  const { error } = await supabase
+    .from("online_seminars")
+    .delete()
+    .eq("id", id);
+
   if (error) throw error;
 }
 
@@ -79,25 +100,66 @@ export async function getOnlineBookings(): Promise<OnlineBooking[]> {
     .from("online_seminar_bookings")
     .select("*, online_seminars(title, starts_at)")
     .order("created_at", { ascending: false });
+
   if (error) throw error;
   return (data ?? []) as unknown as OnlineBooking[];
 }
 
-export async function setOnlineBookingStatus(id: string, status: OnlineBooking["status"]) {
+export async function setOnlineBookingStatus(
+  id: string,
+  status: OnlineBooking["status"],
+) {
   const { error } = await supabase
     .from("online_seminar_bookings")
-    .update({ status, paid_at: status === "paid" ? new Date().toISOString() : null })
+    .update({
+      status,
+      paid_at: status === "paid" ? new Date().toISOString() : null,
+    })
     .eq("id", id);
+
   if (error) throw error;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Viva.com Smart Checkout                                                    */
+/* -------------------------------------------------------------------------- */
+
 export interface OnlineCheckoutResult {
-  clientSecret: string;
-  sessionId: string;
-  /** What Stripe will charge, decided by the server (member price included). */
-  amountCents?: number;
-  listPriceCents?: number;
-  discountPercent?: number;
+  /** Viva hosted Smart Checkout URL. */
+  redirectUrl: string;
+  /** Internal AURA booking ID. Used to check payment status after checkout. */
+  bookingId: string;
+  amountCents: number;
+  listPriceCents: number;
+  discountPercent: number;
+  currency: "EUR";
+  provider: "viva";
+}
+
+/**
+ * Only allow redirects to the official Viva Smart Checkout hosts.
+ * This prevents an unexpected URL from the Edge Function being trusted.
+ */
+function isValidVivaCheckoutUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+
+  try {
+    const url = new URL(value);
+
+    const allowedHosts = [
+      "demo.vivapayments.com",
+      "www.vivapayments.com",
+    ];
+
+    return (
+      url.protocol === "https:" &&
+      allowedHosts.includes(url.hostname) &&
+      url.pathname === "/web/checkout" &&
+      /^\d{6,20}$/.test(url.searchParams.get("ref") ?? "")
+    );
+  } catch {
+    return false;
+  }
 }
 
 export async function startOnlineCheckout(p: {
@@ -106,40 +168,114 @@ export async function startOnlineCheckout(p: {
   email: string;
   phone: string;
 }): Promise<OnlineCheckoutResult> {
-  // Plain fetch to the edge function so the real error code is never hidden.
+  // Use the existing Supabase client configuration.
   const url = (supabase as any).supabaseUrl as string;
   const key = (supabase as any).supabaseKey as string;
 
-  // Send the member's own session token so the server can apply their plan
-  // discount. Guests fall back to the public key and pay the list price.
-  const { data: sessionData } = await supabase.auth.getSession();
+  if (!url || !key) {
+    throw new Error("supabase_config_missing");
+  }
+
+  // Send the authenticated user's token when available.
+  // The Edge Function verifies the user and calculates any member discount.
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw new Error("session_error");
+  }
+
   const bearer = sessionData.session?.access_token ?? key;
 
-  let res: Response;
+  let response: Response;
+
   try {
-    res = await fetch(`${url}/functions/v1/create-online-checkout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${bearer}` },
-      body: JSON.stringify(p),
-    });
+    response = await fetch(
+      `${url}/functions/v1/create-online-checkout`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: key,
+          Authorization: `Bearer ${bearer}`,
+        },
+        body: JSON.stringify({
+          seminarId: p.seminarId,
+          fullName: p.fullName.trim(),
+          email: p.email.trim(),
+          phone: p.phone.trim(),
+        }),
+      },
+    );
   } catch {
     throw new Error("network_error");
   }
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data?.clientSecret) {
-    console.error("create-online-checkout:", res.status, data);
-    throw new Error(data?.error ?? "server_error");
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    console.error("create-online-checkout failed:", response.status, data);
+    throw new Error(data?.error ?? "checkout_creation_failed");
   }
-  return data;
+
+  if (
+    !data ||
+    !isValidVivaCheckoutUrl(data.redirectUrl) ||
+    typeof data.bookingId !== "string" ||
+    !data.bookingId ||
+    typeof data.amountCents !== "number" ||
+    typeof data.listPriceCents !== "number" ||
+    typeof data.discountPercent !== "number"
+  ) {
+    console.error("Invalid Viva checkout response:", data);
+    throw new Error("invalid_viva_checkout_response");
+  }
+
+  return {
+    redirectUrl: data.redirectUrl,
+    bookingId: data.bookingId,
+    amountCents: data.amountCents,
+    listPriceCents: data.listPriceCents,
+    discountPercent: data.discountPercent,
+    currency: "EUR",
+    provider: "viva",
+  };
 }
 
-/** Polls until the Stripe webhook has marked the booking as paid. */
-export async function waitForPaid(sessionId: string, tries = 12, delayMs = 1500): Promise<boolean> {
-  for (let i = 0; i < tries; i++) {
-    const { data } = await supabase.rpc("get_online_booking_status", { p_session: sessionId });
-    if (data === "paid") return true;
-    await new Promise((r) => setTimeout(r, delayMs));
+/**
+ * Polls AURA until the Viva webhook marks this booking as paid.
+ *
+ * IMPORTANT:
+ * The get_online_booking_status RPC must accept p_booking_id
+ * and return the booking status. It must no longer search by Stripe session ID.
+ */
+export async function waitForPaid(
+  bookingId: string,
+  tries = 20,
+  delayMs = 2000,
+): Promise<boolean> {
+  if (!bookingId) {
+    throw new Error("booking_id_required");
   }
+
+  for (let i = 0; i < tries; i++) {
+    const { data, error } = await supabase.rpc(
+      "get_online_booking_status",
+      { p_booking_id: bookingId },
+    );
+
+    if (error) {
+      console.error("get_online_booking_status failed:", error);
+      throw new Error("booking_status_check_failed");
+    }
+
+    if (data === "paid") return true;
+    if (data === "failed" || data === "refunded") return false;
+
+    if (i < tries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
   return false;
 }

@@ -1,111 +1,261 @@
-// Deploy: supabase functions deploy create-online-checkout --no-verify-jwt
-// Secret:  STRIPE_SECRET_KEY
-import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { quoteForCaller } from "../_shared/discount.ts";
+import {
+  loadVivaConfig,
+  createPaymentOrder,
+  checkoutRedirectUrl,
+  VivaConfigError,
+  VivaApiError,
+} from "../_shared/viva.ts";
+
+// Deploy:
+// supabase functions deploy create-online-checkout --no-verify-jwt
+//
+// Secrets:
+// VIVA_ENV=sandbox
+// VIVA_SANDBOX_CLIENT_ID
+// VIVA_SANDBOX_CLIENT_SECRET
+// VIVA_SANDBOX_SOURCE_CODE
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Max-Age": "86400",
 };
 
 const reply = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+
+const str = (v: unknown, max = 200) =>
+  typeof v === "string" ? v.trim().slice(0, max) : "";
 
 Deno.serve(async (req) => {
-  // Always answer the preflight first, before touching anything that can fail.
-  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS });
-  if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: CORS });
+  }
+
+  if (req.method !== "POST") {
+    return reply({ error: "method_not_allowed" }, 405);
+  }
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!url || !serviceKey) {
+    return reply({ error: "supabase_env_missing" }, 500);
+  }
+
+  let cfg;
 
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const url = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!stripeKey) return reply({ error: "stripe_key_missing" }, 500);
-    if (!url || !serviceKey) return reply({ error: "supabase_env_missing" }, 500);
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (error) {
+    console.error(
+      "Viva configuration error:",
+      error instanceof VivaConfigError ? error.message : "unknown",
+    );
+    return reply({ error: "viva_configuration_error" }, 500);
+  }
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
-    const db = createClient(url, serviceKey);
+  const db = createClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
 
-    const { seminarId, fullName, email, phone } = await req.json();
-    if (!seminarId || !fullName?.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email ?? "") || !phone?.trim()) {
+  let bookingId: string | null = null;
+
+  try {
+    const body = await req.json();
+
+    const seminarId = str(body.seminarId, 100);
+    const fullName = str(body.fullName);
+    const email = str(body.email, 254).toLowerCase();
+    const phone = str(body.phone, 40);
+
+    if (
+      !seminarId ||
+      !fullName ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ||
+      !phone
+    ) {
       return reply({ error: "invalid_input" }, 400);
     }
 
-    const { data: seminar } = await db
+    // 1. Read the seminar and its price from Supabase.
+    const { data: seminar, error: seminarError } = await db
       .from("online_seminars")
       .select("*")
       .eq("id", seminarId)
       .eq("published", true)
       .single();
-    if (!seminar) return reply({ error: "not_found" }, 404);
 
-    if (seminar.capacity) {
-      const { count } = await db
+    if (seminarError || !seminar) {
+      return reply({ error: "not_found" }, 404);
+    }
+
+    const listPrice = Number(seminar.price_cents);
+    const currency = String(seminar.currency ?? "eur").toLowerCase();
+
+    if (
+      !Number.isSafeInteger(listPrice) ||
+      listPrice <= 0 ||
+      currency !== "eur"
+    ) {
+      console.error("Invalid seminar price or currency");
+      return reply({ error: "invalid_seminar_configuration" }, 500);
+    }
+
+    // 2. Check seminar capacity.
+    if (seminar.capacity !== null && seminar.capacity !== undefined) {
+      const { count, error: countError } = await db
         .from("online_seminar_bookings")
         .select("id", { count: "exact", head: true })
         .eq("seminar_id", seminarId)
-        .eq("status", "paid");
-      if ((count ?? 0) >= seminar.capacity) return reply({ error: "sold_out" }, 409);
+        .in("status", ["pending", "paid"]);
+
+      if (countError) throw countError;
+
+      if ((count ?? 0) >= Number(seminar.capacity)) {
+        return reply({ error: "sold_out" }, 409);
+      }
     }
 
-    // Member price: decided here, from the caller's verified session. Guests and
-    // plans without a discount pay the list price set by the admin.
-    const quote = await quoteForCaller(req, db, "online_seminar", seminar.price_cents);
+    // 3. Calculate the member discount server-side.
+    const quote = await quoteForCaller(
+      req,
+      db,
+      "online_seminar",
+      listPrice,
+    );
 
-    const bookingId = crypto.randomUUID();
-    const session = await stripe.checkout.sessions.create({
-      ui_mode: "embedded",
-      mode: "payment",
-      redirect_on_completion: "never",
-      customer_email: email.trim(),
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency: seminar.currency,
-            unit_amount: quote.finalCents,
-            product_data: {
-              name: `Online seminar: ${seminar.title}`,
-              ...(quote.percent > 0
-                ? { description: `AURA member discount -${quote.percent}% (list price ${(quote.listCents / 100).toFixed(2)})` }
-                : {}),
-            },
-          },
-        },
-      ],
-      metadata: {
-        booking_id: bookingId,
+    const amountCents = quote.finalCents;
+
+    if (
+      !Number.isSafeInteger(amountCents) ||
+      amountCents <= 0
+    ) {
+      return reply({ error: "invalid_payment_amount" }, 500);
+    }
+
+    // 4. Create the internal booking first.
+    bookingId = crypto.randomUUID();
+
+    const { error: insertError } = await db
+      .from("online_seminar_bookings")
+      .insert({
+        id: bookingId,
         seminar_id: seminarId,
-        discount_percent: String(quote.percent),
-      },
-    });
+        full_name: fullName,
+        email,
+        phone,
+        amount_cents: amountCents,
+        list_price_cents: quote.listCents,
+        discount_percent: quote.percent,
+        user_id: quote.userId,
+        status: "pending",
+        paid_at: null,
+        stripe_session_id: null,
+        payment_provider: "viva",
+        payment_environment: cfg.env,
+        viva_order_code: null,
+      });
 
-    const { error } = await db.from("online_seminar_bookings").insert({
-      id: bookingId,
-      seminar_id: seminarId,
-      full_name: fullName.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      amount_cents: quote.finalCents,
-      list_price_cents: quote.listCents,
-      discount_percent: quote.percent,
-      user_id: quote.userId,
-      stripe_session_id: session.id,
-    });
-    if (error) throw error;
+    if (insertError) {
+      console.error("Booking insert failed:", insertError.message);
+      return reply({ error: "booking_creation_failed" }, 500);
+    }
 
+    // 5. Create the Viva Smart Checkout order.
+    // merchantTrns links the payment to our internal booking.
+    let vivaOrderCode: string;
+
+    try {
+      const created = await createPaymentOrder(cfg, {
+        amountCents,
+        merchantTrns: bookingId,
+        customerTrns: `AURA Online Seminar - ${seminar.title}`,
+        customer: {
+          email,
+          fullName,
+          requestLang: "el-GR",
+        },
+        allowRecurring: false,
+        paymentTimeoutSeconds: 1800,
+        tags: [
+          "aura-online-seminar",
+          `booking-${bookingId}`,
+          `seminar-${seminarId}`,
+        ],
+      });
+
+      vivaOrderCode = created.orderCode;
+    } catch (error) {
+      console.error(
+        "Viva order creation failed:",
+        error instanceof VivaApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "unknown",
+      );
+
+      await db
+        .from("online_seminar_bookings")
+        .update({ status: "failed" })
+        .eq("id", bookingId)
+        .eq("status", "pending");
+
+      return reply({ error: "viva_order_creation_failed" }, 502);
+    }
+
+    // 6. Persist the Viva order reference before redirecting.
+    const { error: updateError } = await db
+      .from("online_seminar_bookings")
+      .update({ viva_order_code: vivaOrderCode })
+      .eq("id", bookingId)
+      .eq("status", "pending");
+
+    if (updateError) {
+      console.error("Could not save Viva order code:", updateError.message);
+
+      await db
+        .from("online_seminar_bookings")
+        .update({ status: "failed" })
+        .eq("id", bookingId);
+
+      return reply({ error: "could_not_save_payment_reference" }, 500);
+    }
+
+    // 7. Return Viva's secure hosted checkout URL.
     return reply({
-      clientSecret: session.client_secret,
-      sessionId: session.id,
-      amountCents: quote.finalCents,
+      redirectUrl: checkoutRedirectUrl(cfg, vivaOrderCode),
+      bookingId,
+      amountCents,
       listPriceCents: quote.listCents,
       discountPercent: quote.percent,
+      currency: "EUR",
+      provider: "viva",
     });
-  } catch (e) {
-    console.error("create-online-checkout failed:", e);
-    return reply({ error: "server_error", detail: String((e as Error)?.message ?? e) }, 500);
+
+  } catch (error) {
+    console.error(
+      "create-online-checkout failed:",
+      error instanceof Error ? error.message : "unknown",
+    );
+
+    if (bookingId) {
+      await db
+        .from("online_seminar_bookings")
+        .update({ status: "failed" })
+        .eq("id", bookingId)
+        .eq("status", "pending");
+    }
+
+    return reply({ error: "server_error" }, 500);
   }
 });
