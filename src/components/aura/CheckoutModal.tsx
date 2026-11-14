@@ -66,7 +66,7 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
     };
   }, [open, onClose]);
 
-    const fetchClientSecret = useCallback(async (): Promise<string> => {
+  const fetchClientSecret = useCallback(async (): Promise<string> => {
     setError(null);
 
     const { data, error: fnError } = await supabase.functions.invoke<{
@@ -153,12 +153,12 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
               ))}
             </ul>
             <p className="mt-6 text-[11px] leading-relaxed text-neutral-600">
-              Ασφαλής πληρωμή μέσω {provider === "viva" ? "Viva.com" : "Stripe"}. Η AURA δεν
+              Ασφαλής πληρωμή μέσω Viva.com. Η AURA δεν
               αποθηκεύει στοιχεία κάρτας. Ακύρωση ανά πάσα στιγμή από το προφίλ σου.
             </p>
           </aside>
 
-          <div className="min-h-[420px] px-4 py-5 sm:px-6">
+          <div className="min-h-[420px] px-4 py-5 sm:px-6 flex flex-col justify-center">
             {error ? (
               <div className="flex h-full flex-col items-start justify-center gap-4">
                 <p className="text-sm text-neutral-300">
@@ -175,10 +175,8 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
               </div>
             ) : provider === null ? (
               <PaneSkeleton />
-            ) : provider === "viva" ? (
-              <VivaPane planId={plan.id} />
             ) : (
-              <StripePane fetchClientSecret={fetchClientSecret} onError={setError} />
+              <VivaPane planId={plan.id} />
             )}
           </div>
         </div>
@@ -189,7 +187,7 @@ export default function CheckoutModal({ plan, open, onClose }: CheckoutModalProp
 
 function PaneSkeleton() {
   return (
-    <div className="flex h-full min-h-[400px] animate-pulse flex-col gap-3 pt-4" aria-busy="true">
+    <div className="flex h-full min-h-[400px] animate-pulse flex-col gap-3 pt-4 justify-center" aria-busy="true">
       <div className="h-11 rounded-lg bg-white/5" />
       <div className="h-11 rounded-lg bg-white/5" />
       <div className="h-11 w-2/3 rounded-lg bg-white/5" />
@@ -199,10 +197,10 @@ function PaneSkeleton() {
 }
 
 /**
- * Viva Smart Checkout is a full-page redirect (it cannot be embedded).
- * The server creates the payment order and we send the customer there.
- * Coming back to AURA is NOT proof of payment: access is granted only after
- * the server has verified the payment.
+- Viva Smart Checkout is a full-page redirect (it cannot be embedded).
+- The server creates the payment order and we send the customer there.
+- Coming back to AURA is NOT proof of payment: access is granted only after
+- the server has verified the payment.
  */
 function VivaPane({ planId }: { planId: AuraPlan["id"] }) {
   const [busy, setBusy] = useState(false);
@@ -226,7 +224,7 @@ function VivaPane({ planId }: { planId: AuraPlan["id"] }) {
     <div className="flex h-full min-h-[400px] flex-col items-start justify-center gap-5">
       <p className="text-[10px] uppercase tracking-[0.4em] text-neutral-500">ΑΣΦΑΛΗΣ ΠΛΗΡΩΜΗ</p>
       <p className="max-w-md text-sm leading-relaxed text-neutral-300">
-        Θα μεταφερθείς στη σελίδα ασφαλούς πληρωμής της Viva.com για να ολοκληρώσεις τη συνδρομή
+        Θα μεταφερθείς τη σελίδα ασφαλούς πληρωμής της Viva.com για να ολοκληρώσεις τη συνδρομή
         σου. Μετά την πληρωμή θα επιστρέψεις εδώ και η συνδρομή σου θα ενεργοποιηθεί μόλις
         επιβεβαιωθεί η πληρωμή.
       </p>
@@ -235,59 +233,19 @@ function VivaPane({ planId }: { planId: AuraPlan["id"] }) {
           {message}
         </p>
       )}
-      <button
-        type="button"
-        onClick={() => void start()}
-        disabled={busy}
-        className="rounded-full border border-white/30 bg-white px-7 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-black transition hover:bg-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {busy ? "Μεταφορά…" : "Συνέχεια στην πληρωμή"}
-      </button>
-    </div>
-  );
-}
-
-function StripePane({
-  fetchClientSecret,
-  onError,
-}: {
-  fetchClientSecret: () => Promise<string>;
-  onError: (message: string) => void;
-}) {
-  const [stripe, setStripe] = useState<Stripe | null>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    getStripe()
-      .then((instance) => {
-        if (!active) return;
-        setStripe(instance);
-        setReady(true);
-      })
-      .catch((err: unknown) => {
-        if (!active) return;
-        onError(err instanceof Error ? err.message : "Το Stripe δεν φορτώθηκε.");
-      });
-    return () => {
-      active = false;
-    };
-  }, [onError]);
-
-  if (!ready || !stripe) {
-    return (
-      <div className="flex h-full min-h-[400px] animate-pulse flex-col gap-3 pt-4" aria-busy="true">
-        <div className="h-11 rounded-lg bg-white/5" />
-        <div className="h-11 rounded-lg bg-white/5" />
-        <div className="h-11 w-2/3 rounded-lg bg-white/5" />
-        <div className="mt-4 h-12 rounded-full bg-white/10" />
+      
+      {/* Chrome Silver glowing button & animation */}
+      <div className="relative group pt-1">
+        <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-white via-neutral-300 to-neutral-500 opacity-60 blur-sm transition duration-300 group-hover:opacity-100" />
+        <button
+          type="button"
+          onClick={() => void start()}
+          disabled={busy}
+          className="relative flex items-center justify-center rounded-full border border-white/40 bg-gradient-to-r from-white via-neutral-100 to-neutral-300 px-7 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? "Μεταφορά…" : "Συνέχεια στην πληρωμή"}
+        </button>
       </div>
-    );
-  }
-
-  return (
-    <EmbeddedCheckoutProvider stripe={stripe} options={{ fetchClientSecret }}>
-      <EmbeddedCheckout className="w-full" />
-    </EmbeddedCheckoutProvider>
+    </div>
   );
 }

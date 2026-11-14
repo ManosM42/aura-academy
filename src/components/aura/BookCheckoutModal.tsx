@@ -1,13 +1,9 @@
 // src/components/aura/BookCheckoutModal.tsx
 //
-// In-app checkout: 1) shipping details  2) Stripe embedded payment  3) done.
-// Requires:  npm i @stripe/stripe-js @stripe/react-stripe-js
-// Uses the same publishable key env var as your seminar checkout modal.
+// In-app checkout: 1) shipping details  2) Viva secure checkout redirect  3) done.
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { loadStripe } from "@stripe/stripe-js";
-import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { AlertCircle, ArrowLeft, Check, Loader2, Minus, Plus, ShieldCheck, X } from "lucide-react";
 import {
   confirmBookOrder,
@@ -19,9 +15,6 @@ import { CHROME_FILL, ChromeCTA, ChromeText, EASE, fieldClass } from "@/componen
 import { MemberBadge } from "@/components/aura/DiscountPrice";
 import { applyPercent } from "@/lib/discounts";
 import { getPlan, type PlanId } from "@/lib/plans";
-
-// Change the env var name if your seminar checkout uses a different one.
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string);
 
 type Step = "details" | "pay" | "done";
 
@@ -64,7 +57,6 @@ export default function BookCheckoutModal({
   const [quantity, setQuantity] = useState(1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   // What the server will really charge, returned by create-book-checkout.
@@ -81,7 +73,6 @@ export default function BookCheckoutModal({
   const payTotal = serverQuote?.total ?? total;
   const payPercent = serverQuote ? serverQuote.percent : discountPercent;
   const planName = getPlan(planId)?.name ?? "AURA MEMBER";
-  const locked = step === "pay" && !!clientSecret; // do not lose a paid session by accident
 
   // Reset every time it opens
   useEffect(() => {
@@ -91,7 +82,6 @@ export default function BookCheckoutModal({
     setQuantity(1);
     setBusy(false);
     setError(null);
-    setClientSecret(null);
     setOrderId(null);
     setServerQuote(null);
     setConfirmed(false);
@@ -123,9 +113,15 @@ export default function BookCheckoutModal({
     setBusy(true);
     try {
       const res = await createBookCheckout({ quantity, ...form });
-      setClientSecret(res.clientSecret);
       setOrderId(res.orderId);
       setServerQuote({ total: res.totalCents, percent: res.discountPercent ?? 0 });
+      
+      // If the response returns a redirect URL (Viva Checkout), navigate directly or move to pay step
+      if (res.checkoutUrl) {
+        window.location.assign(res.checkoutUrl);
+        return;
+      }
+
       setStep("pay");
       panelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -135,22 +131,21 @@ export default function BookCheckoutModal({
     }
   }
 
-  // Stripe tells us the payment finished -> verify it server-side.
-  async function handleComplete() {
-    setStep("done");
-    panelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    if (!orderId) return;
-    for (let attempt = 0; attempt < 4; attempt++) {
-      try {
-        const res = await confirmBookOrder(orderId);
-        if (res.status !== "pending") {
-          setConfirmed(true);
-          return;
-        }
-      } catch {
-        /* retry */
+  // Handle Viva payment redirection trigger
+  async function handleVivaPayment() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await createBookCheckout({ quantity, ...form });
+      if (res.checkoutUrl) {
+        window.location.assign(res.checkoutUrl);
+      } else {
+        throw new Error("Δεν βρέθηκε σύνδεση πληρωμής Viva.");
       }
-      await new Promise((r) => setTimeout(r, 1500));
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
     }
   }
 
@@ -171,8 +166,8 @@ export default function BookCheckoutModal({
         >
           {/* backdrop */}
           <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            onClick={() => !busy && !locked && onClose()}
+            className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            onClick={() => !busy && onClose()}
           />
 
           {/* panel */}
@@ -182,12 +177,7 @@ export default function BookCheckoutModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 30, scale: 0.97 }}
             transition={{ duration: 0.55, ease: EASE }}
-            className="relative max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl p-px sm:rounded-3xl"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(255,255,255,0.5), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.45))",
-              boxShadow: "0 0 120px rgba(255,255,255,0.08), 0 30px 90px rgba(0,0,0,0.95)",
-            }}
+            className="relative max-h-[94vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl p-px sm:rounded-3xl border border-white/20 bg-gradient-to-b from-[#121316] via-[#090a0c] to-[#040405] shadow-[0_0_120px_rgba(192,202,219,0.15)]"
           >
             <div className="relative rounded-t-[23px] bg-[#09090a] p-5 sm:rounded-[23px] sm:p-8">
               {/* top sheen + ambient glow */}
@@ -212,7 +202,7 @@ export default function BookCheckoutModal({
 
               {/* header */}
               <div className="relative">
-                <p className="text-[11px] uppercase tracking-[0.4em] text-white/45">Order</p>
+                <p className="text-[11px] uppercase tracking-[0.4em] text-transparent bg-clip-text bg-gradient-to-r from-slate-300 via-neutral-100 to-slate-400 font-semibold">Order</p>
                 <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
                   <ChromeText>{settings.title}</ChromeText>
                 </h2>
@@ -375,25 +365,29 @@ export default function BookCheckoutModal({
                           </p>
                         )}
 
-                        <ChromeCTA type="submit" disabled={busy} className="mt-5 w-full">
-                          {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
-                          {busy ? "Preparing payment..." : "Continue to payment"}
-                        </ChromeCTA>
-                        <p className="mt-3 text-center text-[11px] text-white/35">Secure payment powered by Stripe.</p>
+                        <div className="relative group mt-5">
+                          <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-white via-slate-300 to-slate-500 opacity-75 blur-md transition duration-500 group-hover:opacity-100" />
+                          <ChromeCTA type="submit" disabled={busy} className="relative w-full">
+                            {busy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                            {busy ? "Μεταφορά στη Viva..." : "Συνέχεια στην πληρωμή"}
+                          </ChromeCTA>
+                        </div>
+                        <p className="mt-3 text-center text-[11px] text-white/35">Ασφαλής πληρωμή μέσω Viva.com.</p>
                       </div>
                     </motion.form>
                   )}
 
                   {/* -------------------------- PAY --------------------------- */}
-                  {step === "pay" && clientSecret && (
+                  {step === "pay" && (
                     <motion.div
                       key="pay"
                       initial={{ opacity: 0, x: 24 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -24 }}
                       transition={{ duration: 0.4, ease: EASE }}
+                      className="py-12 text-center"
                     >
-                      <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                      <div className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 max-w-md mx-auto">
                         <span className="text-sm text-white/70">
                           {quantity} × book · to {form.city}
                         </span>
@@ -402,15 +396,28 @@ export default function BookCheckoutModal({
                           <span className="text-lg font-extrabold text-white">{formatMoney(payTotal, settings.currency)}</span>
                         </span>
                       </div>
-                      <div className="overflow-hidden rounded-2xl bg-white p-1 shadow-[0_0_60px_rgba(255,255,255,0.12)]">
-                        <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret, onComplete: handleComplete }}>
-                          <EmbeddedCheckout />
-                        </EmbeddedCheckoutProvider>
+                      
+                      <p className="max-w-md mx-auto text-sm leading-relaxed text-slate-300 mb-6">
+                        Θα μεταφερθείς στη σελίδα ασφαλούς πληρωμής της <strong className="text-white font-medium">Viva.com</strong> για να ολοκληρώσεις την παραγγελία σου.
+                      </p>
+
+                      <div className="relative group max-w-xs mx-auto">
+                        <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-white via-slate-300 to-slate-500 opacity-75 blur-md transition duration-500 group-hover:opacity-100" />
+                        <button
+                          type="button"
+                          onClick={() => void handleVivaPayment()}
+                          disabled={busy}
+                          className="relative flex items-center justify-center gap-3 w-full rounded-full bg-gradient-to-r from-white via-slate-100 to-slate-300 px-7 py-3.5 text-xs font-bold uppercase tracking-[0.25em] text-black shadow-[0_0_30px_rgba(255,255,255,0.4)] transition-all hover:scale-[1.02]"
+                        >
+                          {busy ? <Loader2 className="size-4 animate-spin text-black" /> : <ShieldCheck className="size-4 text-black" />}
+                          <span>{busy ? "Μεταφορά..." : "Πληρωμή με Viva"}</span>
+                        </button>
                       </div>
+
                       <button
                         type="button"
-                        onClick={() => { setStep("details"); setClientSecret(null); setOrderId(null); }}
-                        className="mt-4 inline-flex items-center gap-2 text-xs text-white/50 outline-none transition-colors hover:text-white focus-visible:text-white"
+                        onClick={() => { setStep("details"); setOrderId(null); }}
+                        className="mt-6 inline-flex items-center gap-2 text-xs text-white/50 outline-none transition-colors hover:text-white focus-visible:text-white"
                       >
                         <ArrowLeft className="size-3.5" /> Edit shipping details
                       </button>
