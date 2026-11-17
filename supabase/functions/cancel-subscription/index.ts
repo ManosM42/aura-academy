@@ -97,7 +97,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     //    που να έρχεται από το request.
     const { data: row, error: rowError } = await admin
       .from("subscriptions")
-      .select("id, status, stripe_subscription_id, cancel_at_period_end")
+      .select("id, status, provider, stripe_subscription_id, cancel_at_period_end")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -106,6 +106,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (rowError) {
       console.error("subscriptions lookup failed", rowError.message);
       return json({ error: "Δεν ήταν δυνατή η ανάγνωση της συνδρομής." }, 500);
+    }
+
+    // Viva subscription: nothing to call at the provider. Cancelling = we stop
+    // charging; the member keeps access until the period they paid for ends.
+    if (row?.provider === "viva") {
+      if (NON_CANCELLABLE_STATUSES.has(row.status)) {
+        return json({ error: "Η συνδρομή δεν είναι ενεργή." }, 409);
+      }
+      const { data: result, error: cancelError } = await admin.rpc("viva_request_cancel", { p_user: user.id });
+      if (cancelError) {
+        console.error("viva_request_cancel failed", cancelError.message);
+        return json({ error: "Η ακύρωση απέτυχε. Δοκίμασε ξανά." }, 500);
+      }
+      const out = (result ?? {}) as { result?: string; status?: string; current_period_end?: string | null };
+      if (out.result === "no_subscription") return json({ error: "Δεν βρέθηκε συνδρομή για ακύρωση." }, 404);
+      if (out.result === "not_active") return json({ error: "Η συνδρομή δεν είναι ενεργή." }, 409);
+      return json({
+        success: true,
+        subscription: {
+          status: out.status ?? "active",
+          currentPeriodEnd: out.current_period_end ?? null,
+          cancelAtPeriodEnd: true,
+        },
+      });
     }
 
     if (!row?.stripe_subscription_id) {

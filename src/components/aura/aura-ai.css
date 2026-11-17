@@ -1,0 +1,244 @@
+.aai-root {
+  --glow: 120, 180, 255;
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #e9eef5;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, rgba(var(--glow), 0.18), transparent 60%),
+    radial-gradient(900px 600px at 85% 110%, rgba(180, 200, 230, 0.1), transparent 60%),
+    linear-gradient(180deg, #0a0d13 0%, #12161e 50%, #0a0c11 100%);
+}
+/* brushed-metal υφή */
+.aai-root::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 4px);
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, #000, transparent 75%);
+  mask-image: radial-gradient(circle at 50% 30%, #000, transparent 75%);
+}
+
+/* ακτίνες φωτός */
+.aai-rays {
+  --rx: 50%;
+  --ry: 34%;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 90deg at var(--rx) var(--ry), rgba(var(--glow), 0.3) 0deg 4deg, transparent 4deg 15deg);
+  -webkit-mask-image: radial-gradient(circle at var(--rx) var(--ry), transparent 12%, #000 38%, transparent 72%);
+  mask-image: radial-gradient(circle at var(--rx) var(--ry), transparent 12%, #000 38%, transparent 72%);
+  animation: aaiPulse 6s ease-in-out infinite;
+}
+@media (min-width: 768px) {
+  .aai-rays { --rx: 27%; --ry: 48%; }
+}
+
+/* σωματίδια */
+.aai-dot {
+  position: absolute;
+  bottom: -10px;
+  border-radius: 50%;
+  background: rgba(225, 233, 245, 0.85);
+  box-shadow: 0 0 10px rgba(var(--glow), 0.9);
+  opacity: 0;
+  animation: aaiFloat linear infinite;
+}
+
+/* chrome πλαίσιο με κινούμενη λάμψη */
+.aai-frame {
+  --panel: linear-gradient(180deg, rgba(20, 25, 34, 0.96), rgba(10, 13, 19, 0.97));
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 28px;
+  padding: 2px;
+  box-shadow: 0 0 60px rgba(var(--glow), 0.25), 0 30px 80px rgba(0, 0, 0, 0.55);
+}
+.aai-frame::before {
+  content: "";
+  position: absolute;
+  inset: -60%;
+  z-index: -2;
+  background: conic-gradient(from 0deg, #3b4350, #f5f7fa, #8e99a8, #2a303a, #e8edf3, #6f7a89, #3b4350);
+  animation: aaiSpin 9s linear infinite;
+}
+.aai-frame::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  z-index: -1;
+  border-radius: 26px;
+  background: var(--panel);
+}
+.aai-speaking { animation: aaiBreath 1.4s ease-in-out infinite; }
+.aai-speaking::before { animation-duration: 3s; }
+
+/* sheen που περνά πάνω από το avatar */
+.aai-sheen {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 26px;
+  pointer-events: none;
+}
+.aai-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 45%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.16), transparent);
+  transform: skewX(-12deg);
+  animation: aaiSheen 7s ease-in-out infinite;
+}
+
+.aai-skeleton {
+  background: linear-gradient(110deg, #141922 30%, #2a313d 50%, #141922 70%);
+  background-size: 250% 100%;
+  animation: aaiShimmerBg 1.6s linear infinite;
+}
+
+/* chrome κείμενο */
+.aai-chrome-text {
+  background: linear-gradient(110deg, #8e99a8 20%, #ffffff 40%, #c9d1dc 50%, #8e99a8 65%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: aaiShimmerBg 5s linear infinite;
+  letter-spacing: 0.35em;
+}
+
+/* status */
+.aai-live {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #7dd3ff; box-shadow: 0 0 10px #7dd3ff;
+  animation: aaiBlink 2s ease-in-out infinite;
+}
+.aai-eq { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
+.aai-eq i {
+  width: 3px; height: 4px; border-radius: 2px;
+  background: linear-gradient(#fff, #8e99a8);
+  animation: aaiEq 0.9s ease-in-out infinite;
+  animation-play-state: paused;
+}
+.aai-eq.on i { animation-play-state: running; }
+.aai-eq i:nth-child(2) { animation-delay: 0.15s; }
+.aai-eq i:nth-child(3) { animation-delay: 0.3s; }
+.aai-eq i:nth-child(4) { animation-delay: 0.45s; }
+.aai-eq i:nth-child(5) { animation-delay: 0.6s; }
+
+/* μηνύματα */
+.aai-bubble-user {
+  background: linear-gradient(180deg, #f7f9fb, #c5ccd6);
+  color: #0b0e13;
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: inset 0 1px 0 #fff, 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+.aai-bubble-ai {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(200, 212, 230, 0.18);
+  border-radius: 18px 18px 18px 4px;
+  box-shadow: 0 0 24px rgba(var(--glow), 0.08);
+}
+.aai-rise { animation: aaiRise 0.4s ease both; }
+.aai-typing { display: flex; gap: 5px; }
+.aai-typing i {
+  width: 6px; height: 6px; border-radius: 50%; background: #c9d1dc;
+  animation: aaiTyping 1.2s ease-in-out infinite;
+}
+.aai-typing i:nth-child(2) { animation-delay: 0.15s; }
+.aai-typing i:nth-child(3) { animation-delay: 0.3s; }
+
+.aai-scroll { scrollbar-width: thin; scrollbar-color: #8e99a8 transparent; }
+.aai-scroll::-webkit-scrollbar { width: 6px; }
+.aai-scroll::-webkit-scrollbar-thumb { background: linear-gradient(#e8edf3, #6f7a89); border-radius: 3px; }
+
+/* input + κουμπιά */
+.aai-input {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(200, 212, 230, 0.22);
+  color: #eef3f9;
+  border-radius: 14px;
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+.aai-input::placeholder { color: rgba(200, 212, 230, 0.45); }
+.aai-input:focus {
+  outline: none;
+  border-color: rgba(235, 242, 250, 0.7);
+  box-shadow: 0 0 0 3px rgba(var(--glow), 0.18), 0 0 28px rgba(var(--glow), 0.25);
+}
+.aai-btn {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  font-weight: 600;
+  color: #0b0e13;
+  background: linear-gradient(180deg, #fdfefe 0%, #cfd6df 45%, #9aa5b3 55%, #e6ebf1 100%);
+  box-shadow: inset 0 1px 0 #fff, 0 6px 24px rgba(var(--glow), 0.25);
+  transition: transform 0.15s, box-shadow 0.25s;
+}
+.aai-btn::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: -80%;
+  width: 50%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.6s;
+}
+.aai-btn:hover:not(:disabled)::after { left: 130%; }
+.aai-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: inset 0 1px 0 #fff, 0 8px 34px rgba(var(--glow), 0.55); }
+.aai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.aai-chip {
+  border: 1px solid rgba(200, 212, 230, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #dbe3ee;
+  transition: box-shadow 0.25s, border-color 0.25s, background 0.25s;
+}
+.aai-chip:hover {
+  border-color: rgba(240, 245, 252, 0.7);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 0 20px rgba(var(--glow), 0.35);
+}
+.aai-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(200, 212, 230, 0.28);
+  border-radius: 10px; padding: 5px 8px; color: #dbe3ee;
+  background: rgba(255, 255, 255, 0.04);
+  transition: box-shadow 0.25s, border-color 0.25s;
+}
+.aai-icon-btn:hover { border-color: rgba(240, 245, 252, 0.7); box-shadow: 0 0 16px rgba(var(--glow), 0.4); }
+
+.aai-pip { width: 22px; height: 6px; border-radius: 3px; background: rgba(200, 212, 230, 0.18); }
+.aai-pip.on { background: linear-gradient(90deg, #fff, #9aa5b3); box-shadow: 0 0 10px rgba(var(--glow), 0.7); }
+
+@keyframes aaiSpin { to { transform: rotate(360deg); } }
+@keyframes aaiPulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.95; } }
+@keyframes aaiBreath {
+  0%, 100% { box-shadow: 0 0 70px rgba(var(--glow), 0.35), 0 30px 80px rgba(0, 0, 0, 0.55); }
+  50% { box-shadow: 0 0 140px rgba(var(--glow), 0.75), 0 30px 80px rgba(0, 0, 0, 0.55); }
+}
+@keyframes aaiSheen { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+@keyframes aaiShimmerBg { to { background-position: -250% 0; } }
+@keyframes aaiBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes aaiEq { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+@keyframes aaiRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes aaiTyping { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+@keyframes aaiFloat {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 0.9; }
+  100% { transform: translateY(-100vh); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aai-root *, .aai-root *::before, .aai-root *::after { animation: none !important; }
+}

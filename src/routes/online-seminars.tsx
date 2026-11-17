@@ -1,8 +1,7 @@
-import { useRef, useState } from "react";
+// src/routes/online-seminars.tsx
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from "motion/react";
-import { loadStripe } from "@stripe/stripe-js";
-import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import {
   ArrowLeft,
   ArrowRight,
@@ -31,16 +30,62 @@ import {
   getPublicOnlineSeminars,
   startOnlineCheckout,
   waitForPaid,
+  type OnlineCheckoutResult,
   type PublicOnlineSeminar,
 } from "@/lib/onlineSeminars";
 
-export const Route = createFileRoute("/online-seminars")({ component: OnlineSeminarsRoute });
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string);
+export const Route = createFileRoute("/online-seminars")({
+  component: OnlineSeminarsRoute,
+  // ?book=<seminarId> ανοίγει κατευθείαν την κράτηση (το χρησιμοποιεί το AURA AI)
+  validateSearch: (s: Record<string, unknown>): { book?: string } => ({
+    book: typeof s.book === "string" && s.book ? s.book : undefined,
+  }),
+});
 
 const chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
 const shimmerBtn =
   "group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-7 py-3.5 text-sm font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 enabled:hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] enabled:hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40";
+
+/* ------------------------------------------------------------------ */
+/* Εκκρεμής κράτηση: θυμόμαστε το bookingId όσο ο χρήστης είναι στο Viva */
+/* ------------------------------------------------------------------ */
+
+const PENDING_KEY = "aura-pending-online-booking";
+const PENDING_TTL_MS = 2 * 60 * 60 * 1000;
+type Pending = { bookingId: string; title: string; email: string; at: number };
+
+function readPending(): Pending | null {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as Pending;
+    if (!p?.bookingId || Date.now() - p.at > PENDING_TTL_MS) {
+      localStorage.removeItem(PENDING_KEY);
+      return null;
+    }
+    return p;
+  } catch {
+    return null;
+  }
+}
+function writePending(p: Pending) {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(p));
+  } catch {
+    /* ιδιωτική περιήγηση: η πληρωμή συνεχίζει κανονικά */
+  }
+}
+function clearPending() {
+  try {
+    localStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
 
 function OnlineSeminarsRoute() {
   const reduce = useReducedMotion();
@@ -49,9 +94,14 @@ function OnlineSeminarsRoute() {
   const glowY = useTransform(scrollYProgress, [0, 1], [-60, 140]);
   const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 80]);
 
+  const { book } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
   const [reload, setReload] = useState(0);
   const { data, error, loading } = useAsync(getPublicOnlineSeminars, [reload]);
   const [selected, setSelected] = useState<PublicOnlineSeminar | null>(null);
+  const [returning, setReturning] = useState<{ pending: Pending; long: boolean } | null>(null);
+
   // Member discount (only plans that have one in public.plan_discounts, i.e. ELITE).
   const { plan: planId, seminarPercent } = useMyDiscounts();
   // Visitors who are not signed in get a "members save" pop-up (timer, or when they press Book).
@@ -60,8 +110,28 @@ function OnlineSeminarsRoute() {
     storageKey: "aura-seminar-member-promo",
     delayMs: 9000,
     enabled: discountTable.high.online_seminar > 0 || discountTable.mid.online_seminar > 0,
-    paused: selected !== null,
+    paused: selected !== null || returning !== null,
   });
+
+  // Επιστροφή από το Viva: αν υπάρχει εκκρεμής κράτηση, έλεγξε αν πληρώθηκε.
+  useEffect(() => {
+    const pending = readPending();
+    if (!pending) return;
+    const q = new URLSearchParams(window.location.search);
+    // Το Viva προσθέτει παραμέτρους στο URL επιστροφής. Αν υπάρχουν, περιμένουμε το webhook.
+    const long = ["t", "s", "eventId", "eci", "paid", "return"].some((k) => q.has(k));
+    setReturning({ pending, long });
+  }, []);
+
+  // Άνοιγμα κράτησης από σύνδεσμο (?book=...), μία φορά
+  const autoOpened = useRef(false);
+  useEffect(() => {
+    if (autoOpened.current || !book || !data) return;
+    const match = data.find((s) => s.id === book);
+    autoOpened.current = true;
+    if (match) setSelected(match);
+    void navigate({ search: {}, replace: true });
+  }, [book, data, navigate]);
 
   return (
     <main ref={ref} className="relative min-h-screen overflow-hidden bg-black pb-24 pt-28 text-white selection:bg-white selection:text-black">
@@ -126,6 +196,7 @@ function OnlineSeminarsRoute() {
       <AnimatePresence>
         {selected && (
           <BookingModal
+            key="booking"
             seminar={selected}
             percent={seminarPercent}
             planId={planId}
@@ -135,10 +206,25 @@ function OnlineSeminarsRoute() {
             }}
           />
         )}
+        {returning && (
+          <PaymentReturnModal
+            key="return"
+            pending={returning.pending}
+            long={returning.long}
+            onClose={() => {
+              setReturning(null);
+              setReload((n) => n + 1);
+            }}
+          />
+        )}
       </AnimatePresence>
     </main>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Card                                                                */
+/* ------------------------------------------------------------------ */
 
 function SeminarCard({
   s,
@@ -188,7 +274,7 @@ function SeminarCard({
             />
           </div>
         ) : (
-          <span className={`bg-clip-text text-2xl font-extrabold text-transparent bg-gradient-to-b from-white to-zinc-400`}>
+          <span className="bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-2xl font-extrabold text-transparent">
             {formatPrice(s.price_cents, s.currency)}
           </span>
         )}
@@ -223,10 +309,51 @@ function SeminarCard({
 }
 
 /* ------------------------------------------------------------------ */
-/* Booking modal: details -> Stripe checkout -> confirmation          */
+/* Κοινό κέλυφος modal                                                  */
 /* ------------------------------------------------------------------ */
 
-type Stage = "details" | "pay" | "verifying" | "done";
+function ModalShell({
+  children,
+  onClose,
+  closable = true,
+}: {
+  children: ReactNode;
+  onClose: () => void;
+  closable?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md"
+      onClick={closable ? onClose : undefined}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 30, scale: 0.97 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-black to-zinc-950 p-6 shadow-[0_0_100px_-30px_rgba(255,255,255,0.3)] sm:p-8"
+      >
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-white/[0.07] blur-[80px]" />
+        {closable && (
+          <button type="button" onClick={onClose} aria-label="Κλείσιμο" className="absolute right-4 top-4 z-10 text-zinc-500 transition hover:text-white">
+            <X className="size-5" />
+          </button>
+        )}
+        <div className="relative">{children}</div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Booking modal: στοιχεία -> επιβεβαίωση τιμής -> μεταφορά στο Viva     */
+/* ------------------------------------------------------------------ */
+
+type Stage = "details" | "confirm";
 
 function BookingModal({
   seminar,
@@ -244,17 +371,15 @@ function BookingModal({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [secret, setSecret] = useState<string | null>(null);
-  const [confirmed, setConfirmed] = useState(true);
-  const sessionRef = useRef<string>("");
-  // What the SERVER will charge (returned by the checkout function). Until we
-  // have it, show the price calculated from the member discount.
-  const [quote, setQuote] = useState<{ list: number; final: number; percent: number } | null>(null);
+  const [checkout, setCheckout] = useState<OnlineCheckoutResult | null>(null);
 
-  const shownPercent = quote ? quote.percent : percent;
-  const shownList = quote ? quote.list : seminar.price_cents;
-  const shownFinal = quote ? quote.final : applyPercent(seminar.price_cents, percent);
+  // Η τιμή που θα χρεώσει ΠΡΑΓΜΑΤΙΚΑ ο server (επιστρέφεται από το checkout).
+  // Μέχρι να την έχουμε, δείχνουμε την τιμή με βάση την έκπτωση μέλους.
+  const shownPercent = checkout ? checkout.discountPercent : percent;
+  const shownList = checkout ? checkout.listPriceCents : seminar.price_cents;
+  const shownFinal = checkout ? checkout.amountCents : applyPercent(seminar.price_cents, percent);
   const hasDiscount = shownPercent > 0 && shownFinal < shownList;
   const fmt = (c: number) => formatPrice(c, seminar.currency);
 
@@ -267,178 +392,256 @@ function BookingModal({
     setError(null);
     try {
       const res = await startOnlineCheckout({ seminarId: seminar.id, fullName, email, phone });
-      setSecret(res.clientSecret);
-      sessionRef.current = res.sessionId;
-      if (typeof res.amountCents === "number") {
-        setQuote({
-          list: res.listPriceCents ?? seminar.price_cents,
-          final: res.amountCents,
-          percent: res.discountPercent ?? 0,
-        });
-      }
-      setStage("pay");
+      setCheckout(res);
+      setStage("confirm");
     } catch (e) {
+      const code = e instanceof Error ? e.message : "";
       setError(
-        e instanceof Error && e.message === "sold_out"
+        code === "sold_out"
           ? "Δυστυχώς οι θέσεις εξαντλήθηκαν."
-          : "Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.",
+          : code === "network_error"
+            ? "Πρόβλημα σύνδεσης. Έλεγξε το internet σου και δοκίμασε ξανά."
+            : "Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.",
       );
     } finally {
       setBusy(false);
     }
   }
 
-  async function onComplete() {
-    setStage("verifying");
-    setConfirmed(await waitForPaid(sessionRef.current));
-    setStage("done");
+  function goToViva() {
+    if (!checkout || redirecting) return;
+    setRedirecting(true);
+    // Θυμόμαστε την κράτηση: όταν ο χρήστης γυρίσει από το Viva, θα την ελέγξουμε.
+    writePending({ bookingId: checkout.bookingId, title: seminar.title, email: email.trim(), at: Date.now() });
+    window.location.assign(checkout.redirectUrl);
   }
 
   const inputWrap =
     "flex items-center gap-2 rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 transition-colors focus-within:border-white/40 focus-within:ring-2 focus-within:ring-white/10";
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md"
-      onClick={stage === "details" || stage === "done" ? onClose : undefined}
-    >
-      <motion.div
-        initial={{ opacity: 0, y: 30, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 30, scale: 0.97 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        onClick={(e) => e.stopPropagation()}
-        className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-black to-zinc-950 p-6 shadow-[0_0_100px_-30px_rgba(255,255,255,0.3)] sm:p-8"
-      >
-        <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-white/[0.07] blur-[80px]" />
-        {stage !== "verifying" && (
-          <button type="button" onClick={onClose} aria-label="Κλείσιμο" className="absolute right-4 top-4 z-10 text-zinc-500 transition hover:text-white">
-            <X className="size-5" />
-          </button>
+    <ModalShell onClose={onClose} closable={!redirecting}>
+      <AnimatePresence mode="wait">
+        {stage === "details" && (
+          <motion.div key="d" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Κράτηση θέσης</p>
+            <h3 className={`mt-2 text-2xl font-bold ${chromeText}`}>{seminar.title}</h3>
+            <p className="mt-1 text-sm text-zinc-400">
+              {new Date(seminar.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })}
+              {!hasDiscount && ` · ${fmt(seminar.price_cents)}`}
+            </p>
+
+            {hasDiscount && (
+              <div className="mt-5 rounded-2xl border border-white/20 bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-4 shadow-[0_0_40px_-18px_rgba(255,255,255,0.5)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <MemberBadge planId={planId} percent={shownPercent} />
+                  <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} layout="inline" size="md" />
+                </div>
+                <SavingsLine className="mt-3" label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
+              </div>
+            )}
+
+            <div className="mt-6 space-y-4">
+              {[
+                { icon: User, label: "Ονοματεπώνυμο", v: fullName, set: setFullName, type: "text", ac: "name" },
+                { icon: Mail, label: "Email", v: email, set: setEmail, type: "email", ac: "email" },
+                { icon: Phone, label: "Τηλέφωνο", v: phone, set: setPhone, type: "tel", ac: "tel" },
+              ].map((f) => (
+                <label key={f.label} className="block">
+                  <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">{f.label}</span>
+                  <div className={inputWrap}>
+                    <f.icon className="size-4 shrink-0 text-zinc-500" />
+                    <input
+                      type={f.type}
+                      value={f.v}
+                      autoComplete={f.ac}
+                      onChange={(e) => f.set(e.target.value)}
+                      className="w-full bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                    />
+                  </div>
+                </label>
+              ))}
+            </div>
+
+            {error && <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">{error}</p>}
+
+            <button type="button" disabled={!valid || busy} onClick={toPayment} className={`${shimmerBtn} mt-6 w-full`}>
+              {busy ? <Loader2 className="relative size-5 animate-spin" /> : (
+                <>
+                  <span className="relative">Συνέχεια στην πληρωμή</span>
+                  <ArrowRight className="relative size-4" />
+                </>
+              )}
+            </button>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600">
+              <ShieldCheck className="size-3.5" /> Ασφαλής πληρωμή μέσω Viva
+            </p>
+          </motion.div>
         )}
 
-        <div className="relative">
-          <AnimatePresence mode="wait">
-            {stage === "details" && (
-              <motion.div key="d" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Κράτηση θέσης</p>
-                <h3 className={`mt-2 text-2xl font-bold ${chromeText}`}>{seminar.title}</h3>
-                <p className="mt-1 text-sm text-zinc-400">
-                  {new Date(seminar.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })}
-                  {!hasDiscount && ` · ${fmt(seminar.price_cents)}`}
-                </p>
+        {stage === "confirm" && checkout && (
+          <motion.div key="c" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+            <button
+              type="button"
+              disabled={redirecting}
+              onClick={() => setStage("details")}
+              className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white disabled:opacity-40"
+            >
+              <ArrowLeft className="size-3.5" /> Πίσω
+            </button>
 
-                {hasDiscount && (
-                  <div className="mt-5 rounded-2xl border border-white/20 bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-4 shadow-[0_0_40px_-18px_rgba(255,255,255,0.5)]">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <MemberBadge planId={planId} percent={shownPercent} />
-                      <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} layout="inline" size="md" />
-                    </div>
-                    <SavingsLine className="mt-3" label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
+            <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Σύνοψη κράτησης</p>
+            <h3 className={`mt-2 text-2xl font-bold ${chromeText}`}>{seminar.title}</h3>
+            <p className="mt-1 text-sm text-zinc-400">
+              {new Date(seminar.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })}
+            </p>
+
+            <div className="mt-5 flex items-center justify-between gap-4 rounded-2xl border border-white/15 bg-white/[0.03] px-4 py-3">
+              <div className="min-w-0">
+                {hasDiscount ? (
+                  <div className="flex flex-col items-start gap-1.5">
+                    <MemberBadge planId={planId} percent={shownPercent} />
+                    <SavingsLine label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
                   </div>
+                ) : (
+                  <p className="text-xs text-zinc-500">Σύνολο πληρωμής</p>
                 )}
+              </div>
+              <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} size="md" />
+            </div>
 
-                <div className="mt-6 space-y-4">
-                  {[
-                    { icon: User, label: "Ονοματεπώνυμο", v: fullName, set: setFullName, type: "text", ac: "name" },
-                    { icon: Mail, label: "Email", v: email, set: setEmail, type: "email", ac: "email" },
-                    { icon: Phone, label: "Τηλέφωνο", v: phone, set: setPhone, type: "tel", ac: "tel" },
-                  ].map((f) => (
-                    <label key={f.label} className="block">
-                      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">{f.label}</span>
-                      <div className={inputWrap}>
-                        <f.icon className="size-4 shrink-0 text-zinc-500" />
-                        <input
-                          type={f.type}
-                          value={f.v}
-                          autoComplete={f.ac}
-                          onChange={(e) => f.set(e.target.value)}
-                          className="w-full bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
-                        />
-                      </div>
-                    </label>
-                  ))}
-                </div>
+            <p className="mt-4 text-xs leading-relaxed text-zinc-500">
+              Θα μεταφερθείς στην ασφαλή σελίδα πληρωμής του Viva. Μετά την πληρωμή θα επιστρέψεις εδώ για την επιβεβαίωση.
+            </p>
 
-                {error && <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">{error}</p>}
+            <button type="button" disabled={redirecting} onClick={goToViva} className={`${shimmerBtn} mt-6 w-full`}>
+              {redirecting ? (
+                <Loader2 className="relative size-5 animate-spin" />
+              ) : (
+                <>
+                  <span className="relative">Πληρωμή {fmt(shownFinal)}</span>
+                  <ArrowRight className="relative size-4" />
+                </>
+              )}
+            </button>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600">
+              <ShieldCheck className="size-3.5" /> Ασφαλής πληρωμή μέσω Viva
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </ModalShell>
+  );
+}
 
-                <button type="button" disabled={!valid || busy} onClick={toPayment} className={`${shimmerBtn} mt-6 w-full`}>
-                  {busy ? <Loader2 className="relative size-5 animate-spin" /> : (
-                    <>
-                      <span className="relative">Συνέχεια στην πληρωμή</span>
-                      <ArrowRight className="relative size-4" />
-                    </>
-                  )}
-                </button>
-                <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600">
-                  <ShieldCheck className="size-3.5" /> Ασφαλής πληρωμή μέσω Stripe
-                </p>
-              </motion.div>
-            )}
+/* ------------------------------------------------------------------ */
+/* Επιστροφή από το Viva: έλεγχος πληρωμής -> επιβεβαίωση               */
+/* ------------------------------------------------------------------ */
 
-            {stage === "pay" && secret && (
-              <motion.div key="p" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <button type="button" onClick={() => setStage("details")} className="mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white">
-                  <ArrowLeft className="size-3.5" /> Πίσω
-                </button>
-                <div className="mb-4 flex items-center justify-between gap-4 rounded-2xl border border-white/15 bg-white/[0.03] px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-white">{seminar.title}</p>
-                    {hasDiscount ? (
-                      <div className="mt-2 flex flex-col items-start gap-1.5">
-                        <MemberBadge planId={planId} percent={shownPercent} />
-                        <SavingsLine label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
-                      </div>
-                    ) : (
-                      <p className="mt-0.5 text-xs text-zinc-500">Σύνολο πληρωμής</p>
-                    )}
-                  </div>
-                  <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} size="md" />
-                </div>
-                <div className="overflow-hidden rounded-2xl bg-white">
-                  <EmbeddedCheckoutProvider stripe={stripePromise} options={{ clientSecret: secret, onComplete }}>
-                    <EmbeddedCheckout />
-                  </EmbeddedCheckoutProvider>
-                </div>
-              </motion.div>
-            )}
+type ReturnStage = "verifying" | "paid" | "unconfirmed";
 
-            {stage === "verifying" && (
-              <motion.div key="v" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center py-14 text-center">
-                <Loader2 className="size-10 animate-spin text-zinc-300" />
-                <p className="mt-5 text-zinc-300">Επιβεβαίωση πληρωμής…</p>
-              </motion.div>
-            )}
+function PaymentReturnModal({
+  pending,
+  long,
+  onClose,
+}: {
+  pending: Pending;
+  long: boolean;
+  onClose: () => void;
+}) {
+  const [stage, setStage] = useState<ReturnStage>("verifying");
+  const [attempt, setAttempt] = useState(0);
 
-            {stage === "done" && (
-              <motion.div key="x" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-6 text-center">
-                <motion.div
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                  className="flex size-20 items-center justify-center rounded-full border border-white/25 bg-black shadow-[0_0_40px_rgba(255,255,255,0.3)]"
-                >
-                  <Check className="size-9 text-zinc-100" />
-                </motion.div>
-                <h3 className={`mt-6 text-2xl font-bold ${chromeText}`}>
-                  {confirmed ? "Η πληρωμή ολοκληρώθηκε!" : "Λάβαμε την πληρωμή σου!"}
-                </h3>
-                <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
-                  Ο διαχειριστής θα επικοινωνήσει σύντομα μαζί σου στο <span className="text-zinc-200">{email}</span> με
-                  όλες τις πληροφορίες για το σεμινάριο.
-                  {!confirmed && " Η επιβεβαίωση μπορεί να διαρκέσει λίγα λεπτά."}
-                </p>
-                <button type="button" onClick={onClose} className={`${shimmerBtn} mt-7`}>
-                  <span className="relative">Τέλεια</span>
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </motion.div>
-    </motion.div>
+  useEffect(() => {
+    let alive = true;
+    setStage("verifying");
+
+    void (async () => {
+      let paid = false;
+      try {
+        // Με παραμέτρους Viva περιμένουμε το webhook (έως ~40s). Αλλιώς ένας γρήγορος έλεγχος.
+        paid = await waitForPaid(pending.bookingId, long || attempt > 0 ? 20 : 1, 2000);
+      } catch {
+        paid = false;
+      }
+      if (!alive) return;
+      if (paid) {
+        clearPending();
+        setStage("paid");
+      } else if (long || attempt > 0) {
+        setStage("unconfirmed");
+      } else {
+        // Γύρισε χωρίς να πληρώσει (π.χ. πάτησε πίσω): δεν δείχνουμε τίποτα.
+        onClose();
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attempt]);
+
+  return (
+    <ModalShell onClose={onClose} closable={stage !== "verifying"}>
+      <AnimatePresence mode="wait">
+        {stage === "verifying" && (
+          <motion.div key="v" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center py-14 text-center">
+            <Loader2 className="size-10 animate-spin text-zinc-300" />
+            <p className="mt-5 text-zinc-300">Επιβεβαίωση πληρωμής…</p>
+          </motion.div>
+        )}
+
+        {stage === "paid" && (
+          <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-6 text-center">
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+              className="flex size-20 items-center justify-center rounded-full border border-white/25 bg-black shadow-[0_0_40px_rgba(255,255,255,0.3)]"
+            >
+              <Check className="size-9 text-zinc-100" />
+            </motion.div>
+            <h3 className={`mt-6 text-2xl font-bold ${chromeText}`}>Η πληρωμή ολοκληρώθηκε!</h3>
+            <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
+              Η θέση σου για «{pending.title}» κρατήθηκε. Ο διαχειριστής θα επικοινωνήσει σύντομα μαζί σου στο{" "}
+              <span className="text-zinc-200">{pending.email}</span> με όλες τις πληροφορίες για το σεμινάριο.
+            </p>
+            <button type="button" onClick={onClose} className={`${shimmerBtn} mt-7`}>
+              <span className="relative">Τέλεια</span>
+            </button>
+          </motion.div>
+        )}
+
+        {stage === "unconfirmed" && (
+          <motion.div key="u" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center py-6 text-center">
+            <div className="flex size-20 items-center justify-center rounded-full border border-white/25 bg-black">
+              <Clock className="size-9 text-zinc-300" />
+            </div>
+            <h3 className={`mt-6 text-2xl font-bold ${chromeText}`}>Δεν επιβεβαιώθηκε ακόμη</h3>
+            <p className="mt-3 max-w-sm text-sm leading-relaxed text-zinc-400">
+              Δεν λάβαμε ακόμη την επιβεβαίωση της πληρωμής για «{pending.title}». Αν η πληρωμή ολοκληρώθηκε, η
+              επιβεβαίωση μπορεί να διαρκέσει λίγα λεπτά και θα επικοινωνήσουμε μαζί σου στο{" "}
+              <span className="text-zinc-200">{pending.email}</span>. Αν δεν ολοκληρώθηκε, μπορείς να ξαναπροσπαθήσεις.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+              <button type="button" onClick={() => setAttempt((n) => n + 1)} className={shimmerBtn}>
+                <span className="relative">Έλεγχος ξανά</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearPending();
+                  onClose();
+                }}
+                className="text-sm text-zinc-500 transition hover:text-white"
+              >
+                Κλείσιμο
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </ModalShell>
   );
 }

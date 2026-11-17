@@ -11,7 +11,10 @@
 //   VIVA_SANDBOX_CLIENT_SECRET    Smart Checkout client secret    (demo)
 //   VIVA_SANDBOX_SOURCE_CODE      payment source code             (demo)
 //   VIVA_SANDBOX_WEBHOOK_KEY      verification key for the webhook (demo, Stage 3)
-//   VIVA_PRODUCTION_CLIENT_ID / _CLIENT_SECRET / _SOURCE_CODE / _WEBHOOK_KEY   (live)
+//   VIVA_SANDBOX_MERCHANT_ID      Merchant ID  } Basic auth, used ONLY for the
+//   VIVA_SANDBOX_API_KEY          API key      } recurring charge (Stage 4)
+//   VIVA_PRODUCTION_CLIENT_ID / _CLIENT_SECRET / _SOURCE_CODE / _WEBHOOK_KEY /
+//   _MERCHANT_ID / _API_KEY                                                  (live)
 //
 // Endpoints below are the ones documented at developer.viva.com:
 //   token    POST {accounts}/connect/token         (OAuth2 client credentials)
@@ -27,19 +30,26 @@ export interface VivaConfig {
   sourceCode: string;
   /** Only needed by the webhook endpoint (answers Viva's verification request). */
   webhookKey: string | null;
+  /** Basic-auth credentials: only needed to charge renewals (Stage 4). */
+  merchantId: string | null;
+  apiKey: string | null;
   apiBase: string;
+  /** Host of the older /api/transactions endpoints (recurring charges). */
+  legacyBase: string;
   accountsBase: string;
   checkoutBase: string;
 }
 
-const URLS: Record<VivaEnv, { apiBase: string; accountsBase: string; checkoutBase: string }> = {
+const URLS: Record<VivaEnv, { apiBase: string; legacyBase: string; accountsBase: string; checkoutBase: string }> = {
   sandbox: {
     apiBase: "https://demo-api.vivapayments.com",
+    legacyBase: "https://demo.vivapayments.com",
     accountsBase: "https://demo-accounts.vivapayments.com",
     checkoutBase: "https://demo.vivapayments.com/web/checkout",
   },
   production: {
     apiBase: "https://api.vivapayments.com",
+    legacyBase: "https://www.vivapayments.com",
     accountsBase: "https://accounts.vivapayments.com",
     checkoutBase: "https://www.vivapayments.com/web/checkout",
   },
@@ -83,7 +93,9 @@ export function loadVivaConfig(getEnv: (name: string) => string | undefined): Vi
     throw new VivaConfigError(`Missing Viva secrets: ${missing.join(", ")}`);
   }
   const webhookKey = getEnv(`${prefix}WEBHOOK_KEY`) || null;
-  return { env, clientId, clientSecret, sourceCode, webhookKey, ...URLS[env] };
+  const merchantId = getEnv(`${prefix}MERCHANT_ID`) || null;
+  const apiKey = getEnv(`${prefix}API_KEY`) || null;
+  return { env, clientId, clientSecret, sourceCode, webhookKey, merchantId, apiKey, ...URLS[env] };
 }
 
 type FetchFn = typeof fetch;
@@ -214,7 +226,8 @@ export interface VivaTransaction {
   transactionId: string;
   /** 'F' = finished/successful. Other letters are not final (see Viva response codes). */
   statusId: string;
-  orderCode: string;
+  /** Null for a transaction that was not created from a payment order (e.g. a renewal). */
+  orderCode: string | null;
   /** Viva returns the amount in EUROS (e.g. 49.99). Converted here to cents. */
   amountCents: number;
   currencyCode: string | null;
@@ -259,7 +272,7 @@ export async function retrieveTransaction(
 
   const orderMatch = /"orderCode"\s*:\s*"?(\d{6,20})"?/.exec(text);
   const amount = Number(parsed.amount);
-  if (!orderMatch || !orderMatch[1] || typeof parsed.statusId !== "string" || !Number.isFinite(amount)) {
+  if (typeof parsed.statusId !== "string" || !Number.isFinite(amount)) {
     throw new VivaApiError("retrieve transaction: unexpected response shape", 502);
   }
 
@@ -273,7 +286,7 @@ export async function retrieveTransaction(
   return {
     transactionId,
     statusId: parsed.statusId,
-    orderCode: orderMatch[1],
+    orderCode: orderMatch && orderMatch[1] ? orderMatch[1] : null,
     amountCents: cents,
     currencyCode: parsed.currencyCode == null ? null : String(parsed.currencyCode),
     merchantTrns: typeof parsed.merchantTrns === "string" ? parsed.merchantTrns : null,
@@ -324,4 +337,97 @@ export function isVivaWebhookIp(ip: string | null | undefined, env: VivaEnv): bo
     if (Math.floor(addr / size) === Math.floor(baseInt / size)) return true;
   }
   return false;
+}
+
+/* ------------------------------ Recurring charge ------------------------------ */
+
+export type RecurringChargeResult =
+  /** Viva answered with a transaction id. Not trusted yet: confirm with retrieveTransaction(). */
+  | { kind: "transaction"; transactionId: string; statusId: string | null; success: boolean }
+  /** The charge was refused by the bank / Viva (declined, insufficient funds...). Nothing moved. */
+  | { kind: "declined"; errorCode: number | null; errorText: string | null }
+  /** OUR request was refused (bad credentials, bad request). Nothing moved, not the customer's fault. */
+  | { kind: "rejected"; status: number }
+  /** Network cut, timeout, 5xx or unreadable answer: we do NOT know whether money moved. */
+  | { kind: "unknown"; reason: string };
+
+/**
+ * Charges a renewal against the customer's saved payment method:
+ *   POST {legacy}/api/transactions/{initialTransactionId}   (Basic auth)
+ * No customer interaction. The amount is in CENTS in the request. The caller
+ * must treat "unknown" as "money may have moved" and never blindly retry it.
+ */
+export async function chargeRecurring(
+  cfg: VivaConfig,
+  initialTransactionId: string,
+  input: { amountCents: number; customerTrns: string; merchantTrns: string },
+  fetchFn: FetchFn = fetch,
+): Promise<RecurringChargeResult> {
+  if (!cfg.merchantId || !cfg.apiKey) {
+    throw new VivaConfigError(`Missing Viva secrets: VIVA_${cfg.env === "sandbox" ? "SANDBOX" : "PRODUCTION"}_MERCHANT_ID / _API_KEY`);
+  }
+  if (!isTransactionId(initialTransactionId)) throw new VivaApiError("invalid initial transaction id", 400);
+  if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+    throw new VivaApiError("amountCents must be a positive integer", 400);
+  }
+
+  const basic = btoa(`${cfg.merchantId}:${cfg.apiKey}`);
+  let res: Response;
+  let text: string;
+  try {
+    res = await timedFetch(
+      fetchFn,
+      `${cfg.legacyBase}/api/transactions/${initialTransactionId.toLowerCase()}`,
+      {
+        method: "POST",
+        headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: input.amountCents,
+          customerTrns: input.customerTrns,
+          // Same source as the first payment, or Viva charges the default source.
+          sourceCode: cfg.sourceCode,
+          merchantTrns: input.merchantTrns,
+          tipAmount: 0,
+          currencyCode: "978",
+        }),
+      },
+      30000,
+    );
+    text = await res.text();
+  } catch (err) {
+    return { kind: "unknown", reason: err instanceof Error ? err.name : "network" };
+  }
+
+  if (res.status === 401 || res.status === 403) return { kind: "rejected", status: res.status };
+  if (res.status >= 500) return { kind: "unknown", reason: `http_${res.status}` };
+
+  let body: Record<string, unknown> | null = null;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed as Record<string, unknown>;
+  } catch {
+    body = null;
+  }
+  if (!body) return res.ok ? { kind: "unknown", reason: "unreadable_response" } : { kind: "rejected", status: res.status };
+
+  const txId = body.TransactionId;
+  if (isTransactionId(txId)) {
+    return {
+      kind: "transaction",
+      transactionId: txId.toLowerCase(),
+      statusId: typeof body.StatusId === "string" ? body.StatusId : null,
+      success: body.Success === true,
+    };
+  }
+
+  const errorCode = typeof body.ErrorCode === "number" ? body.ErrorCode : null;
+  // A refusal can arrive as HTTP 200 or as HTTP 4xx: either way the bank said no.
+  if (body.Success === false || (errorCode !== null && errorCode !== 0)) {
+    return {
+      kind: "declined",
+      errorCode,
+      errorText: typeof body.ErrorText === "string" ? body.ErrorText.slice(0, 120) : null,
+    };
+  }
+  return res.ok ? { kind: "unknown", reason: "unrecognised_response" } : { kind: "rejected", status: res.status };
 }

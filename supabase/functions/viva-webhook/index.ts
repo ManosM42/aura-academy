@@ -136,8 +136,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ ok: true, ignored: "event type not used" });
   }
 
-  const eventOrderCode = data.OrderCode == null ? "" : String(data.OrderCode);
-  if (!isTransactionId(data.TransactionId) || !/^\d{6,20}$/.test(eventOrderCode)) {
+  // Payments created from an order carry an OrderCode; a renewal charge may not.
+  const rawOrderCode = data.OrderCode == null ? "" : String(data.OrderCode);
+  const eventOrderCode = rawOrderCode === "0" ? "" : rawOrderCode;
+  if (!isTransactionId(data.TransactionId) || (eventOrderCode !== "" && !/^\d{6,20}$/.test(eventOrderCode))) {
     console.error("Relevant Viva event with a malformed payload, type", eventType);
     return json({ error: "malformed event" }, 400);
   }
@@ -191,7 +193,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // The notification and Viva must agree on which order this is.
-    if (tx.orderCode !== eventOrderCode) {
+    if (eventOrderCode !== "" && tx.orderCode !== null && tx.orderCode !== eventOrderCode) {
       await finish("ignored", "order_code_differs_from_viva");
       await alertAdmins(admin, "Πρόβλημα πληρωμής Viva", "Η ειδοποίηση δεν ταιριάζει με τα στοιχεία της Viva. Δεν έγινε ενεργοποίηση.", {
         transaction_id: transactionId, kind: "order_code_mismatch",
@@ -201,10 +203,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     let outcome: Outcome;
 
+    // Is this one of OUR renewal charges? (matched by the reference we sent, not by order code)
+    const kind = tx.merchantTrns
+      ? await rpc<string | null>(admin, "viva_order_kind", { p_environment: cfg.env, p_merchant_trns: tx.merchantTrns })
+      : null;
+
     if (eventType === EVENT_PAYMENT_CREATED) {
-      outcome = await handlePayment(admin, cfg, tx);
+      outcome = kind === "renewal" ? await handleRenewalPayment(admin, cfg, tx) : await handlePayment(admin, cfg, tx);
     } else if (eventType === EVENT_FAILED) {
-      outcome = await handleFailure(admin, cfg, tx);
+      outcome = kind === "renewal" ? await handleRenewalFailure(admin, cfg, tx) : await handleFailure(admin, cfg, tx);
     } else {
       outcome = await handleReversal(admin, cfg, tx, data);
     }
@@ -224,6 +231,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 async function handlePayment(admin: AdminClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Outcome> {
   // Not final yet: ask Viva to send it again later.
   if (tx.statusId !== "F") throw new TransientError(`transaction status is ${tx.statusId}, not F`);
+
+  // A first payment always comes from one of our orders, so it must have an order code.
+  if (tx.orderCode === null) {
+    await alertAdmins(admin, "Πρόβλημα πληρωμής Viva", "Πληρωμή χωρίς κωδικό παραγγελίας που δεν αντιστοιχεί σε ανανέωση. Δεν έγινε ενεργοποίηση. Έλεγξε τη συναλλαγή στη Viva.", {
+      transaction_id: tx.transactionId, kind: "order_code_missing",
+    });
+    return { status: "ignored", result: "order_code_missing" };
+  }
 
   if (tx.currencyCode !== null && tx.currencyCode !== EUR_ISO_NUMERIC) {
     await alertAdmins(admin, "Πρόβλημα πληρωμής Viva", "Η πληρωμή δεν είναι σε EUR. Δεν έγινε ενεργοποίηση.", {
@@ -292,12 +307,73 @@ async function handleFailure(admin: AdminClient, cfg: VivaConfig, tx: VivaTransa
   // Viva says the customer may retry and still succeed. If it is already
   // successful, the 1796 event is the one that counts.
   if (tx.statusId === "F") return { status: "ignored", result: "actually_succeeded" };
+  if (tx.orderCode === null) return { status: "ignored", result: "failure_without_order" };
 
   const r = await rpc<{ result: string }>(admin, "viva_record_failure", {
     p_environment: cfg.env,
     p_order_code: tx.orderCode,
     p_merchant_trns: tx.merchantTrns,
     p_reason: `viva_status_${tx.statusId}`,
+  });
+  return { status: r.result === "failure_recorded" ? "processed" : "ignored", result: r.result };
+}
+
+/* ------------------------ renewals (merchant-initiated) ------------------------ */
+
+async function handleRenewalPayment(admin: AdminClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Outcome> {
+  if (tx.statusId !== "F") throw new TransientError(`renewal status is ${tx.statusId}, not F`);
+
+  if (tx.currencyCode !== null && tx.currencyCode !== EUR_ISO_NUMERIC) {
+    await alertAdmins(admin, "Πρόβλημα ανανέωσης Viva", "Η πληρωμή ανανέωσης δεν είναι σε EUR. Δεν έγινε ενεργοποίηση.", {
+      transaction_id: tx.transactionId, kind: "currency_mismatch",
+    });
+    return { status: "ignored", result: "currency_mismatch" };
+  }
+
+  const r = await rpc<{ result: string; order_id?: string; user_id?: string }>(admin, "viva_apply_renewal", {
+    p_environment: cfg.env,
+    p_merchant_trns: tx.merchantTrns,
+    p_transaction_id: tx.transactionId,
+    p_amount_cents: tx.amountCents,
+    p_paid_at: tx.insDate,
+  });
+
+  switch (r.result) {
+    case "renewed":
+    case "already_processed":
+      return { status: "processed", result: r.result };
+
+    case "duplicate_payment":
+      await alertAdmins(admin, "Διπλή χρέωση ανανέωσης Viva", "Ο πελάτης χρεώθηκε δύο φορές για την ίδια ανανέωση. Η δεύτερη πληρωμή καταγράφηκε, δεν δόθηκε τίποτα. Χρειάζεται επιστροφή.", {
+        order_id: r.order_id ?? null, transaction_id: tx.transactionId, kind: "duplicate_payment",
+      });
+      return { status: "processed", result: r.result };
+
+    case "paid_but_not_active":
+      await alertAdmins(admin, "Πληρωμή ανανέωσης για ανενεργή συνδρομή", "Έγινε χρέωση ανανέωσης αλλά η συνδρομή δεν ήταν ενεργή. Η πληρωμή καταγράφηκε, δεν άλλαξε η συνδρομή. Χρειάζεται επιστροφή ή έλεγχος.", {
+        order_id: r.order_id ?? null, user_id: r.user_id ?? null, transaction_id: tx.transactionId, kind: "paid_but_not_active",
+      });
+      return { status: "processed", result: r.result };
+
+    default:
+      await alertAdmins(admin, "Πρόβλημα ανανέωσης Viva", `Η πληρωμή ανανέωσης δεν ταιριάζει με την παραγγελία μας (${r.result}). Δεν έγινε ενεργοποίηση. Έλεγξε τη συναλλαγή στη Viva.`, {
+        transaction_id: tx.transactionId, kind: r.result,
+      });
+      return { status: "ignored", result: r.result };
+  }
+}
+
+async function handleRenewalFailure(admin: AdminClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Outcome> {
+  if (tx.statusId === "F") return { status: "ignored", result: "actually_succeeded" };
+
+  const orderId = tx.merchantTrns;
+  if (!orderId) return { status: "ignored", result: "renewal_without_reference" };
+
+  const r = await rpc<{ result: string }>(admin, "viva_fail_renewal", {
+    p_environment: cfg.env,
+    p_order_id: orderId,
+    p_reason: `viva_status_${tx.statusId}`,
+    p_counts: true,
   });
   return { status: r.result === "failure_recorded" ? "processed" : "ignored", result: r.result };
 }
