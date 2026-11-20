@@ -27,6 +27,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { CookieConsentProvider } from "@/lib/cookieConsent";
 import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
 import AccessGate from "@/components/aura/AccessGate";
+import AuraWidget from "@/components/aura/AuraWidget";
 
 /* ------------------------------------------------------------------ */
 /* Structured data (JSON-LD)                                           */
@@ -230,6 +231,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
         <CookieConsentProvider>
+        <AuraWidget />
           <CallProvider>
             <AuraIntro />
 
