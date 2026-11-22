@@ -19,7 +19,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildMail, buildTestMail, classify, type Extras, type Mail, type WebhookPayload } from "./templates.ts";
 
-const RECIPIENTS = (Deno.env.get("NOTIFY_EMAILS") ?? "redhost@gmail.com")
+const RECIPIENTS = (Deno.env.get("NOTIFY_EMAILS") ?? "manosmark42@gmail.com")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
