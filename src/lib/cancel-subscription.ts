@@ -34,7 +34,7 @@ export async function cancelMySubscription(): Promise<CancelSubscriptionResult> 
   }
 
   if (data?.error) throw new Error(data.error);
-  if (!data?.subscription) throw new Error("Το Stripe δεν επέστρεψε κατάσταση συνδρομής.");
+  if (!data?.subscription) throw new Error("Δεν επιστράφηκε η κατάσταση της συνδρομής.");
 
   return data.subscription;
 }

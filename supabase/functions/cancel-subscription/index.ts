@@ -58,7 +58,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-  if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
+  if (!supabaseUrl || !anonKey || !serviceKey) {
     console.error("Missing environment configuration", {
       stripeKey: Boolean(stripeKey),
       supabaseUrl: Boolean(supabaseUrl),
@@ -90,7 +90,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false },
   });
-  const stripe = new Stripe(stripeKey);
 
   try {
     // 2. Βρίσκουμε ΤΗ ΔΙΚΗ ΤΟΥ πιο πρόσφατη γραμμή συνδρομής — ποτέ κάτι
@@ -135,6 +134,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (!row?.stripe_subscription_id) {
       return json({ error: "Δεν βρέθηκε συνδρομή για ακύρωση." }, 404);
     }
+
+    if (!stripeKey) {
+      console.error("STRIPE_SECRET_KEY is not set");
+      return json({ error: "Server misconfigured" }, 500);
+    }
+    const stripe = new Stripe(stripeKey);
 
     if (NON_CANCELLABLE_STATUSES.has(row.status)) {
       return json({ error: "Η συνδρομή δεν είναι ενεργή." }, 409);

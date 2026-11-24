@@ -223,7 +223,7 @@ export default function Footer() {
             <Lock className="size-4 text-aura-white/80" />
             <span>Secure checkout, powered by</span>
             <span className="chrome-text text-lg font-extrabold tracking-tight drop-shadow-[0_0_14px_rgba(220,226,235,0.4)]">
-              stripe
+              viva.com
             </span>
           </div>
 

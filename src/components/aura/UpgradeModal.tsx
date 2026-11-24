@@ -334,7 +334,7 @@ export default function UpgradeModal({ plan, open, onClose, onUpgraded }: Upgrad
                               this period. Prices include VAT. Cancel any time.
                             </Detail>
                             <Detail icon={<ShieldCheck className="size-4" />}>
-                              Secure payment by Stripe. If the payment fails, nothing changes on your account.
+                              Secure payment. If the payment fails, nothing changes on your account.
                             </Detail>
                           </ul>
                         </section>

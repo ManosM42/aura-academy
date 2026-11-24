@@ -21,7 +21,7 @@ const PUBLIC_LINKS: NavItem[] = [
   { to: "/online-seminars", label: "Online Seminars" },
   { to: "/gallery", label: "Gallery" },
   { to: "/book", label: "Order Book" },
-  { to: "/ai", label: "AI Assistant DEMO" },
+  { to: "/ai", label: "AURA AI demo" },
 ];
 
 function UserAvatar({
@@ -125,7 +125,7 @@ export function Navbar() {
       { to: "/gallery", label: "Gallery" },
       { to: "/book", label: "Order Book" },
       { to: "/find-job", label: "Find Job" },
-      { to: "/ai", label: "AI Assistant DEMO" },
+      { to: "/ai", label: "AURA AI demo" },
 
 
       ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),

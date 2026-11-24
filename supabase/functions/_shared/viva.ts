@@ -165,7 +165,7 @@ export interface CreateOrderInput {
   merchantTrns: string;
   /** Shown to the customer on Viva's page. */
   customerTrns: string;
-  customer: { email: string; fullName?: string | null; requestLang?: string };
+  customer: { email: string; fullName?: string | null; phone?: string | null; requestLang?: string };
   /** First payment of a subscription: asks for consent to later merchant-initiated charges. */
   allowRecurring: boolean;
   paymentTimeoutSeconds?: number;
@@ -189,6 +189,7 @@ export async function createPaymentOrder(
     customer: {
       email: input.customer.email,
       ...(input.customer.fullName ? { fullName: input.customer.fullName } : {}),
+      ...(input.customer.phone ? { phone: input.customer.phone } : {}),
       requestLang: input.customer.requestLang ?? "el-GR",
     },
     paymentTimeout: input.paymentTimeoutSeconds ?? 1800,

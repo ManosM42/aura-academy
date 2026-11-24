@@ -35,6 +35,7 @@ import { invalidatePlans } from "@/lib/usePlans";
 import { formatEuro } from "@/lib/plans";
 import { seo } from "@/lib/seo";
 import { ErrorState, LoadingSkeleton, LockedState } from "@/components/aura/States";
+import VivaAdminSection from "@/components/aura/admin/VivaAdminSection";
 
 export const Route = createFileRoute("/admin/plans-and-users")({
   head: () =>
@@ -338,6 +339,7 @@ function Dashboard() {
             ["#plans", "Πλάνα"],
             ["#income", "Έσοδα"],
             ["#users", "Χρήστες"],
+            ["#viva", "Viva"],
           ].map(([href, label]) => (
             <a key={href} href={href} className="pu-chip">
               {label}
@@ -359,6 +361,7 @@ function Dashboard() {
       <PlansSection plans={plans} onChange={(row) => setPlans((list) => (list ?? []).map((p) => (p.id === row.id ? row : p)))} />
       <IncomeSection plans={plans} payments={payments} users={users} vat={vat} onVat={setVat} />
       <UsersSection plans={plans} users={users} />
+      <VivaAdminSection />
     </div>
   );
 }
@@ -700,9 +703,9 @@ function IncomeSection({
           right={<VatControl vat={vat} onVat={onVat} />}
         />
         <p className="mt-4 max-w-3xl text-sm leading-relaxed text-white/50">
-          Υπολογίζονται από τις πραγματικές πληρωμές του Stripe (μείον επιστροφές). Οι τιμές θεωρούνται{" "}
+          Υπολογίζονται από τις πραγματικές πληρωμές (Stripe και Viva, μείον επιστροφές). Οι τιμές θεωρούνται{" "}
           <strong className="text-white/80">με ΦΠΑ {vat}%</strong>, άρα ΦΠΑ = τζίρος × {vat}/{100 + vat}.
-          Το «καθαρό» είναι ο τζίρος χωρίς ΦΠΑ, πριν από προμήθειες Stripe και έξοδα.
+          Το «καθαρό» είναι ο τζίρος χωρίς ΦΠΑ, πριν από προμήθειες πληρωμών και έξοδα.
         </p>
       </Reveal>
 
@@ -717,7 +720,7 @@ function IncomeSection({
 
       {totalCount === 0 && (
         <Banner tone="info">
-          Δεν υπάρχουν καταγεγραμμένες πληρωμές ακόμη. Πάτα «Συγχρονισμός με Stripe» για να φέρεις το ιστορικό.
+          Δεν υπάρχουν καταγεγραμμένες πληρωμές ακόμη. Οι πληρωμές Viva εμφανίζονται αυτόματα· για το ιστορικό του Stripe πάτα «Συγχρονισμός με Stripe».
         </Banner>
       )}
 
@@ -770,7 +773,7 @@ function IncomeSection({
         <Reveal>
           <MoneyTable
             title="3 · Καθαρό (τζίρος − ΦΠΑ)"
-            subtitle="Έσοδα χωρίς ΦΠΑ, πριν από προμήθειες Stripe"
+            subtitle="Έσοδα χωρίς ΦΠΑ, πριν από προμήθειες πληρωμών"
             rows={rows.map((r) => ({
               label: r.label,
               cells: gross(r.key).map((c) => c - vatOf(c, vat)) as Cells,

@@ -129,6 +129,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .maybeSingle();
     if (existing) return json({ error: "Υπάρχει ήδη ενεργή συνδρομή." }, 409);
 
+    // 5b. The customer's personal details (asked in the checkout form). They are
+    //     required, kept for the admin, and copied onto the order for the record.
+    const { data: profile } = await admin
+      .from("billing_profiles")
+      .select("full_name, phone, address_line1, address_line2, city, postal_code, country, wants_invoice, company_name, vat_number, tax_office")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!profile) {
+      return json({ error: "Συμπλήρωσε πρώτα τα στοιχεία σου.", code: "billing_profile_required" }, 400);
+    }
+
     // 6. Housekeeping + double-click protection.
     const now = Date.now();
     await admin
@@ -175,6 +186,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         currency: "eur",
         status: "pending",
         environment: cfg.env,
+        customer: { ...profile, email: user.email },
       })
       .select("id")
       .single();
@@ -184,8 +196,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     // 8. Ask Viva for a payment order (amount = the database price).
-    const { data: profile } = await admin.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-
     let orderCode: string;
     try {
       const created = await createPaymentOrder(cfg, {
@@ -194,7 +204,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         customerTrns: `AURA ${String(plan.name)} - μηνιαία συνδρομή`,
         customer: {
           email: user.email,
-          fullName: (profile?.full_name as string | null | undefined) ?? null,
+          fullName: (profile.full_name as string | null | undefined) ?? null,
+          phone: (profile.phone as string | null | undefined) ?? null,
           requestLang: "el-GR",
         },
         allowRecurring: true,

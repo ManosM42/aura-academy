@@ -27,6 +27,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { CookieConsentProvider } from "@/lib/cookieConsent";
 import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
 import AccessGate from "@/components/aura/AccessGate";
+import { readVivaReturnParams } from "@/lib/viva-return";
 import AuraWidget from "@/components/aura/AuraWidget";
 
 /* ------------------------------------------------------------------ */
@@ -226,6 +227,17 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // Viva sends customers back to the "Success" / "Failure" URL set in the Viva
+  // dashboard (it may be /pricing or any other page) with ?t=..&s=..&eventId=..
+  // Wherever they land, forward them to the page that confirms the payment.
+  useEffect(() => {
+    const here = window.location;
+    if (here.pathname.startsWith("/checkout/return")) return;
+    if (readVivaReturnParams(here.search)) {
+      window.location.replace(`/checkout/return${here.search}`);
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
       await db
         .from("book_orders")
         .update({
-          status: "failed",
+          status: "cancelled",
         })
         .eq("id", orderId)
         .eq("status", "pending");
@@ -252,7 +252,7 @@ Deno.serve(async (req) => {
 
       await db
         .from("book_orders")
-        .update({ status: "failed" })
+        .update({ status: "cancelled" })
         .eq("id", orderId);
 
       // Never redirect if we cannot match the payment to our order.
@@ -279,7 +279,7 @@ Deno.serve(async (req) => {
     if (orderId) {
       await db
         .from("book_orders")
-        .update({ status: "failed" })
+        .update({ status: "cancelled" })
         .eq("id", orderId)
         .eq("status", "pending");
     }

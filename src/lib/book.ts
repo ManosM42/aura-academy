@@ -112,9 +112,10 @@ export async function getBookSettings(): Promise<BookSettings | null> {
 
 export function createBookCheckout(input: ShippingInput) {
   return invoke<{
-    clientSecret: string;
+    /** Viva's secure payment page: the customer is sent here to pay. */
+    redirectUrl: string;
     orderId: string;
-    /** Final amount Stripe will charge (member price + shipping), from the server. */
+    /** Final amount to be charged (member price + shipping), decided by the server. */
     totalCents: number;
     unitPriceCents?: number;
     discountPercent?: number;

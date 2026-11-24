@@ -18,6 +18,9 @@
 //
 // Deploy WITH JWT verification (the default).
 import Stripe from "npm:stripe@^18";
+import { loadVivaConfig, VivaConfigError } from "../_shared/viva.ts";
+import { runVivaUpgrade } from "../_shared/viva-upgrade.ts";
+import type { RpcClient } from "../_shared/viva-process.ts";
 import { createClient } from "npm:@supabase/supabase-js@^2";
 import { invoicePaymentIntentId, recordInvoice, syncSubscription } from "../_shared/billing.ts";
 
@@ -94,7 +97,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-  if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
+  if (!supabaseUrl || !anonKey || !serviceKey) {
     console.error("Missing environment configuration");
     return json({ error: "Server misconfigured" }, 500);
   }
@@ -122,7 +125,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (userError || !user) return json({ error: "Unauthorized" }, 401);
 
   const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const stripe = new Stripe(stripeKey);
+  // Only the Stripe path needs the key (checked right before it is used).
+  const stripe = new Stripe(stripeKey ?? "sk_not_configured");
 
   let invoiceId: string | null = null;
   let paymentTaken = false;
@@ -131,7 +135,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ---- 2. the user's current ACTIVE subscription -------------------------
     const { data: subRow, error: subError } = await admin
       .from("subscriptions")
-      .select("stripe_subscription_id, plan_id, status")
+      .select("stripe_subscription_id, plan_id, status, provider, current_period_end")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: false })
@@ -142,7 +146,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.error("subscription lookup failed", subError.message);
       return json({ error: "Your subscription could not be loaded." }, 500);
     }
-    if (!subRow || !subRow.stripe_subscription_id) {
+    if (!subRow || (!subRow.stripe_subscription_id && subRow.provider !== "viva")) {
       return json({ error: "No active subscription found to upgrade." }, 404);
     }
 
@@ -177,6 +181,40 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const currency = String(targetPlan.currency ?? "eur").toLowerCase();
     const targetName = String(targetPlan.name);
     const currentName = String(currentPlan?.name ?? currentPlanId);
+
+    // ---- 3b. Viva subscription: same rules, charged to the saved card --------
+    if (subRow.provider === "viva") {
+      let vivaCfg;
+      try {
+        vivaCfg = loadVivaConfig((name) => Deno.env.get(name));
+      } catch (err) {
+        console.error("Viva configuration problem:", err instanceof VivaConfigError ? err.message : "unknown");
+        return json({ error: "Server misconfigured" }, 500);
+      }
+      if (!subRow.current_period_end) return json({ error: "Your billing period could not be read. Please contact us." }, 409);
+      const currentAmountViva = Number(currentPlan?.price_cents);
+      if (!Number.isInteger(currentAmountViva)) return json({ error: "The current price of your subscription was not found." }, 409);
+
+      const result = await runVivaUpgrade({
+        client: admin as unknown as RpcClient,
+        cfg: vivaCfg,
+        userId: user.id,
+        currentPlanId,
+        targetPlanId,
+        currentPlanName: currentName,
+        targetPlanName: targetName,
+        currentAmountCents: currentAmountViva,
+        newAmountCents: newAmount,
+        periodEnd: String(subRow.current_period_end),
+        previewOnly,
+      });
+      return json(result.body, result.status);
+    }
+
+    if (!stripeKey) {
+      console.error("STRIPE_SECRET_KEY is not set");
+      return json({ error: "Server misconfigured" }, 500);
+    }
 
     // ---- 4. the live Stripe subscription ------------------------------------
     const sub = await stripe.subscriptions.retrieve(String(subRow.stripe_subscription_id), {

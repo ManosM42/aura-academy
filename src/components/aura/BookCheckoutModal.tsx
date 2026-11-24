@@ -11,6 +11,7 @@ import {
   formatMoney,
   type BookSettings,
 } from "@/lib/book";
+import { isVivaCheckoutUrl } from "@/lib/create-viva-checkout";
 import { CHROME_FILL, ChromeCTA, ChromeText, EASE, fieldClass } from "@/components/aura/chrome";
 import { MemberBadge } from "@/components/aura/DiscountPrice";
 import { applyPercent } from "@/lib/discounts";
@@ -111,23 +112,24 @@ export default function BookCheckoutModal({
     if (busy) return;
     setError(null);
     setBusy(true);
+    let redirecting = false;
     try {
       const res = await createBookCheckout({ quantity, ...form });
       setOrderId(res.orderId);
       setServerQuote({ total: res.totalCents, percent: res.discountPercent ?? 0 });
-      
-      // If the response returns a redirect URL (Viva Checkout), navigate directly or move to pay step
-      if (res.checkoutUrl) {
-        window.location.assign(res.checkoutUrl);
-        return;
-      }
 
-      setStep("pay");
-      panelRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+      // Viva's payment page cannot be embedded: send the customer there. They come back to
+      // /checkout/return, which confirms the payment with Viva before showing anything.
+      if (!res.redirectUrl || !isVivaCheckoutUrl(res.redirectUrl)) {
+        throw new Error("Δεν δημιουργήθηκε σελίδα πληρωμής. Δοκίμασε ξανά.");
+      }
+      redirecting = true;
+      window.location.assign(res.redirectUrl);
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setBusy(false);
+      // Keep the button disabled while the browser is leaving for Viva.
+      if (!redirecting) setBusy(false);
     }
   }
 
@@ -138,8 +140,8 @@ export default function BookCheckoutModal({
     setError(null);
     try {
       const res = await createBookCheckout({ quantity, ...form });
-      if (res.checkoutUrl) {
-        window.location.assign(res.checkoutUrl);
+      if (res.redirectUrl && isVivaCheckoutUrl(res.redirectUrl)) {
+        window.location.assign(res.redirectUrl);
       } else {
         throw new Error("Δεν βρέθηκε σύνδεση πληρωμής Viva.");
       }

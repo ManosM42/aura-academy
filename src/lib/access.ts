@@ -20,6 +20,10 @@ export const PUBLIC_PATHS = [
   "/ourteam",
   "/login",
   "/checkout",
+  // Anyone can buy these without a plan: the book and the seminars.
+  "/book",
+  "/seminars",
+  "/online-seminars",
 ];
 
 export function isPublicPath(pathname: string): boolean {

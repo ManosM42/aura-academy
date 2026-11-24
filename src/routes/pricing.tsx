@@ -111,7 +111,7 @@ const FAQ = [
   },
   {
     q: "Πώς γίνεται η χρέωση;",
-    a: "Η συνδρομή είναι μηνιαία και η πληρωμή γίνεται με ασφάλεια μέσω Stripe. Ξεκινάς από τη σελίδα checkout αφού συνδεθείς.",
+    a: "Η συνδρομή είναι μηνιαία και η πληρωμή γίνεται με ασφάλεια μέσω Viva.com. Ξεκινάς από τη σελίδα checkout αφού συνδεθείς.",
   },
   {
     q: "Σε ποιες εκπτώσεις έχω πρόσβαση;",
@@ -199,7 +199,7 @@ function PricingPage() {
             <div className="pp-trust grid gap-px overflow-hidden rounded-2xl sm:grid-cols-3">
               {[
                 { icon: Undo2, t: "Ακύρωση ανά πάσα στιγμή", d: "Χωρίς δέσμευση και χωρίς κρυφές χρεώσεις." },
-                { icon: ShieldCheck, t: "Ασφαλής πληρωμή", d: "Οι πληρωμές γίνονται μέσω Stripe." },
+                { icon: ShieldCheck, t: "Ασφαλής πληρωμή", d: "Οι πληρωμές γίνονται μέσω Viva.com." },
                 { icon: Zap, t: "Γρήγορη έναρξη", d: "Πρόσβαση μόλις ολοκληρωθεί η πληρωμή." },
               ].map(({ icon: Icon, t, d }) => (
                 <div key={t} className="pp-trust-item flex flex-col items-center gap-3 px-6 py-8 text-center">
