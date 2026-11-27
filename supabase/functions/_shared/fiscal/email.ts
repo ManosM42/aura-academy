@@ -91,10 +91,10 @@ export function retryDelaySeconds(attempt: number): number {
 }
 
 const ESCAPE: Record<string, string> = {
-  "&": "&",
-  "<": "<",
-  ">": ">",
-  '"': """,
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
   "'": "&#39;",
 };
 

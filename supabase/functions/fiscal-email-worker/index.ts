@@ -264,7 +264,7 @@ function escapeHtmlText(value: string): string {
     .replace(/&/g, "&")
     .replace(/</g, "<")
     .replace(/>/g, ">")
-    .replace(/"/g, """)
+    .replace(/"/g, '""')
     .replace(/'/g, "&#39;");
 }
 

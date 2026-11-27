@@ -35,7 +35,7 @@ import {
   queueEmailDelivery,
   recordAttempt,
   type FiscalDocumentRow,
-} from "../_shared/fiscal/db.ts";
+} from "../_shared/fiscal/repo.ts";
 import {
   buildGreekCaseData,
   formatReceiptMoment,
