@@ -1,12 +1,21 @@
+// supabase/functions/_shared/fiscal/repo.ts
 // Database access for the fiscal tables. One place that knows the column names from
 // the 20261127190000_fiscal_foundation.sql migration, so Edge Functions don't duplicate SQL.
-
 import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
 import type {
+  FiscalAttemptOutcome,
   FiscalDocumentStatus,
   FiscalEnvironment,
+  FiscalErrorKind,
   FiscalReceiptKind,
 } from "./types.ts";
+
+const ATTEMPT_MESSAGE_MAX = 2000;
+const ATTEMPT_EXCERPT_MAX = 4000;
+const EMAIL_ERROR_MAX = 1000;
+
+/** Lease length in seconds for a claimed email. Assumed default; must match the worker's send timeout. */
+export const EMAIL_LEASE_SECONDS = 300;
 
 export interface FiscalDocumentRow {
   id: string;
@@ -21,6 +30,7 @@ export interface FiscalDocumentRow {
   amount_minor: string;
   status: FiscalDocumentStatus;
   ft_receipt_identification: string | null;
+  ft_mark: string | null;
   signed_at: string | null;
   payment_transaction_id: string | null;
   payment_order_code: string | null;
@@ -51,9 +61,9 @@ export interface CreateDocumentInput {
 
 /**
  * Inserts a fiscal_documents row, or returns the existing one for the same
- * (environment, merchant_id, receipt_reference). Relies on the unique constraint
- * in the migration, so concurrent callers (webhook retries, worker retries) cannot
- * create two documents for the same reference.
+ * (environment, merchant_id, receipt_reference). Relies on the unique constraint in the
+ * migration, so concurrent callers (webhook retries, worker retries) cannot create two
+ * documents for the same reference.
  */
 export async function getOrCreateDocument(
   db: SupabaseClient,
@@ -66,7 +76,6 @@ export async function getOrCreateDocument(
     .eq("merchant_id", input.merchantId)
     .eq("receipt_reference", input.receiptReference)
     .maybeSingle();
-
   if (selectErr) throw new Error(`fiscal_documents select failed: ${selectErr.message}`);
   if (existing) return { row: existing as FiscalDocumentRow, created: false };
 
@@ -118,13 +127,17 @@ export async function getDocumentById(db: SupabaseClient, id: string): Promise<F
   return (data as FiscalDocumentRow | null) ?? null;
 }
 
-/** Marks the document "submitting". No-op (returns false) if it is not currently pending or unknown. */
+/**
+ * Moves a pending document to submitting. Returns false when it is not pending.
+ * Unknown and unverified documents are deliberately NOT claimable. They need reconciliation
+ * against Viva before anything is sent again.
+ */
 export async function claimDocumentForSubmission(db: SupabaseClient, id: string): Promise<boolean> {
   const { data, error } = await db
     .from("fiscal_documents")
     .update({ status: "submitting" })
     .eq("id", id)
-    .in("status", ["pending", "unknown"])
+    .eq("status", "pending")
     .select("id");
   if (error) throw new Error(`claim document failed: ${error.message}`);
   return (data?.length ?? 0) > 0;
@@ -132,71 +145,80 @@ export async function claimDocumentForSubmission(db: SupabaseClient, id: string)
 
 export interface SignedUpdate {
   ftReceiptIdentification: string;
+  ftMark: string;
   ftState: string | null;
   ftSignatures: unknown;
   transmissionIndicator: string | null;
   signedAtIso: string;
 }
 
-export async function markDocumentSigned(db: SupabaseClient, id: string, update: SignedUpdate): Promise<void> {
-  const { error } = await db
+/** Marks a submitting document as signed. Throws if the row is no longer submitting. */
+export async function markDocumentSigned(
+  db: SupabaseClient,
+  id: string,
+  update: SignedUpdate,
+): Promise<void> {
+  const { data, error } = await db
     .from("fiscal_documents")
     .update({
       status: "signed",
       ft_receipt_identification: update.ftReceiptIdentification,
+      ft_mark: update.ftMark,
       ft_state: update.ftState,
       ft_signatures: update.ftSignatures,
       transmission_indicator: update.transmissionIndicator,
       signed_at: update.signedAtIso,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("status", "submitting")
+    .select("id");
   if (error) throw new Error(`mark document signed failed: ${error.message}`);
+  if ((data?.length ?? 0) === 0) throw new Error(`document ${id} was not submitting; signed update rejected`);
 }
 
-export async function markDocumentStatus(
+/** Moves a submitting document to rejected, unknown or unverified. */
+export async function markDocumentOutcome(
   db: SupabaseClient,
   id: string,
-  status: "rejected" | "unknown" | "pending",
+  status: Extract<FiscalDocumentStatus, "rejected" | "unknown" | "unverified">,
 ): Promise<void> {
-  const { error } = await db.from("fiscal_documents").update({ status }).eq("id", id);
+  const { data, error } = await db
+    .from("fiscal_documents")
+    .update({ status })
+    .eq("id", id)
+    .eq("status", "submitting")
+    .select("id");
   if (error) throw new Error(`mark document ${status} failed: ${error.message}`);
+  if ((data?.length ?? 0) === 0) throw new Error(`document ${id} was not submitting; ${status} update rejected`);
 }
 
 export interface RecordAttemptInput {
   documentId: string;
   requestSha256: string;
+  startedAtIso: string;
+  finishedAtIso: string;
   httpStatus: number | null;
-  outcome: "signed" | "rejected" | "unknown" | "not_sent";
-  errorKind?: "timeout" | "network" | "http" | "parse" | "auth" | "config" | null;
+  outcome: FiscalAttemptOutcome;
+  errorKind?: FiscalErrorKind | null;
   errorMessage?: string | null;
   responseExcerpt?: string | null;
-  finishedAtIso: string;
 }
 
-/** Inserts the next attempt row for a document. attempt_no is computed from the current max. */
-export async function recordAttempt(db: SupabaseClient, input: RecordAttemptInput): Promise<void> {
-  const { data: last, error: lastErr } = await db
-    .from("fiscal_attempts")
-    .select("attempt_no")
-    .eq("document_id", input.documentId)
-    .order("attempt_no", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (lastErr) throw new Error(`read last attempt failed: ${lastErr.message}`);
-
-  const nextAttemptNo = (last?.attempt_no ?? 0) + 1;
-  const { error } = await db.from("fiscal_attempts").insert({
-    document_id: input.documentId,
-    attempt_no: nextAttemptNo,
-    request_sha256: input.requestSha256,
-    finished_at: input.finishedAtIso,
-    http_status: input.httpStatus,
-    outcome: input.outcome,
-    error_kind: input.errorKind ?? null,
-    error_message: input.errorMessage ?? null,
-    response_excerpt: input.responseExcerpt ?? null,
+/** Writes one attempt row. The attempt number is assigned inside fiscal_record_attempt under a row lock. */
+export async function recordAttempt(db: SupabaseClient, input: RecordAttemptInput): Promise<number> {
+  const { data, error } = await db.rpc("fiscal_record_attempt", {
+    p_document_id: input.documentId,
+    p_request_sha256: input.requestSha256,
+    p_started_at: input.startedAtIso,
+    p_finished_at: input.finishedAtIso,
+    p_http_status: input.httpStatus,
+    p_outcome: input.outcome,
+    p_error_kind: input.errorKind ?? null,
+    p_error_message: input.errorMessage?.slice(0, ATTEMPT_MESSAGE_MAX) ?? null,
+    p_response_excerpt: input.responseExcerpt?.slice(0, ATTEMPT_EXCERPT_MAX) ?? null,
   });
-  if (error) throw new Error(`insert attempt failed: ${error.message}`);
+  if (error) throw new Error(`fiscal_record_attempt failed: ${error.message}`);
+  return Number(data);
 }
 
 export async function appendAuditLog(
@@ -290,24 +312,32 @@ export interface EmailDeliveryRow {
   next_attempt_at: string;
   provider_message_id: string | null;
   last_error: string | null;
+  /** Set on rows returned by claimDueEmails. Required for every completion, failure or abort call. */
+  lock_token: string | null;
 }
 
-/** Idempotency key: stable for a given document + recipient, so retries never duplicate. */
+/**
+ * Idempotency key for the first delivery of a document to a recipient. Manual resends get
+ * their key from fiscal_request_email_resend, so this function is never used for a resend.
+ */
 export function emailIdempotencyKey(documentId: string, recipient: string): string {
-  return `fiscal-doc:${documentId}:${recipient.toLowerCase()}`;
+  return `fiscal-doc:${documentId}:${recipient.trim().toLowerCase()}:0`;
 }
 
+/** Queues the first email for a signed document. Idempotent: a repeat call returns the existing row. */
 export async function queueEmailDelivery(
   db: SupabaseClient,
   documentId: string,
   recipient: string,
 ): Promise<EmailDeliveryRow> {
+  const normalized = recipient.trim().toLowerCase();
+  const key = emailIdempotencyKey(documentId, normalized);
   const { data, error } = await db
     .from("fiscal_email_deliveries")
     .insert({
       document_id: documentId,
-      recipient,
-      idempotency_key: emailIdempotencyKey(documentId, recipient),
+      recipient: normalized,
+      idempotency_key: key,
     })
     .select("*")
     .single();
@@ -316,8 +346,7 @@ export async function queueEmailDelivery(
     const { data: existing, error: selErr } = await db
       .from("fiscal_email_deliveries")
       .select("*")
-      .eq("document_id", documentId)
-      .eq("recipient", recipient)
+      .eq("idempotency_key", key)
       .single();
     if (selErr) throw new Error(`re-select queued email failed: ${selErr.message}`);
     return existing as EmailDeliveryRow;
@@ -326,41 +355,91 @@ export async function queueEmailDelivery(
   return data as EmailDeliveryRow;
 }
 
-/** Wraps the fiscal_claim_due_emails() RPC from the migration. */
+/**
+ * Manual resend. Calls fiscal_request_email_resend, the only resend path. The RPC checks that
+ * the document is fully signed, refuses while a delivery is queued or sending, creates a new
+ * delivery with a fresh idempotency key, and writes the audit row. Returns the new delivery id.
+ */
+export async function requestEmailResend(
+  db: SupabaseClient,
+  documentId: string,
+  actorId: string,
+  recipient: string | null,
+): Promise<string> {
+  const { data, error } = await db.rpc("fiscal_request_email_resend", {
+    p_document_id: documentId,
+    p_recipient: recipient,
+    p_actor: actorId,
+  });
+  if (error) throw new Error(`fiscal_request_email_resend failed: ${error.message}`);
+  if (typeof data !== "string") throw new Error("fiscal_request_email_resend returned no delivery id");
+  return data;
+}
+
+/**
+ * Claims due deliveries with a lease. Passes both arguments by name so PostgreSQL resolves
+ * the two-argument overload. The one-argument overload is never called.
+ */
 export async function claimDueEmails(db: SupabaseClient, limit: number): Promise<EmailDeliveryRow[]> {
-  const { data, error } = await db.rpc("fiscal_claim_due_emails", { p_limit: limit });
+  const { data, error } = await db.rpc("fiscal_claim_due_emails", {
+    p_limit: limit,
+    p_lock_seconds: EMAIL_LEASE_SECONDS,
+  });
   if (error) throw new Error(`claim due emails failed: ${error.message}`);
   return (data as EmailDeliveryRow[]) ?? [];
 }
 
-export async function markEmailSent(db: SupabaseClient, id: string, providerMessageId: string): Promise<void> {
-  const { error } = await db
-    .from("fiscal_email_deliveries")
-    .update({ status: "sent", provider_message_id: providerMessageId, sent_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(`mark email sent failed: ${error.message}`);
-}
-
-export async function markEmailFailedOrDead(
+/** Marks a claimed delivery as sent. Rejected by the RPC if the lock token no longer matches. */
+export async function markEmailSent(
   db: SupabaseClient,
   id: string,
-  attempts: number,
-  maxAttempts: number,
-  nextAttemptAtIso: string,
-  lastError: string,
+  lockToken: string,
+  providerMessageId: string,
 ): Promise<void> {
-  const { error } = await db
-    .from("fiscal_email_deliveries")
-    .update({
-      status: attempts >= maxAttempts ? "dead" : "failed",
-      next_attempt_at: nextAttemptAtIso,
-      last_error: lastError.slice(0, 1000),
-    })
-    .eq("id", id);
-  if (error) throw new Error(`mark email failed/dead failed: ${error.message}`);
+  const { error } = await db.rpc("fiscal_complete_email_delivery", {
+    p_id: id,
+    p_lock_token: lockToken,
+    p_provider_message_id: providerMessageId,
+  });
+  if (error) throw new Error(`fiscal_complete_email_delivery failed: ${error.message}`);
 }
 
-/** Resets a dead or failed email to queued, for the admin "resend" action. */
+/**
+ * Records a failed send for a claimed delivery. The RPC decides between failed and dead
+ * from the attempt count. Rejected if the lock token no longer matches.
+ */
+export async function markEmailFailed(
+  db: SupabaseClient,
+  id: string,
+  lockToken: string,
+  lastError: string,
+  retrySeconds: number,
+): Promise<void> {
+  const { error } = await db.rpc("fiscal_fail_email_delivery", {
+    p_id: id,
+    p_lock_token: lockToken,
+    p_error: lastError.slice(0, EMAIL_ERROR_MAX),
+    p_retry_seconds: Math.max(0, Math.floor(retrySeconds)),
+  });
+  if (error) throw new Error(`fiscal_fail_email_delivery failed: ${error.message}`);
+}
+
+/** Releases a claimed delivery without a send attempt. Rejected if the lock token no longer matches. */
+export async function abortEmailDelivery(
+  db: SupabaseClient,
+  id: string,
+  lockToken: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await db.rpc("fiscal_abort_email_delivery", {
+    p_id: id,
+    p_lock_token: lockToken,
+    p_reason: reason.slice(0, EMAIL_ERROR_MAX),
+  });
+  if (error) throw new Error(`fiscal_abort_email_delivery failed: ${error.message}`);
+}
+
+/** Resets a failed or dead email to queued, for the admin retry action. Only touches unlocked rows. */
 export async function resetEmailForRetry(db: SupabaseClient, id: string): Promise<boolean> {
   const { data, error } = await db
     .from("fiscal_email_deliveries")
@@ -372,14 +451,17 @@ export async function resetEmailForRetry(db: SupabaseClient, id: string): Promis
   return (data?.length ?? 0) > 0;
 }
 
-/** Resets a rejected or unknown document back to pending, for the admin "retry" action. */
-export async function resetDocumentForRetry(db: SupabaseClient, id: string): Promise<boolean> {
+/**
+ * Resets a rejected document to pending for a new attempt. Unknown and unverified documents
+ * are NOT reset here. They need reconciliation with Viva first.
+ */
+export async function resetRejectedDocument(db: SupabaseClient, id: string): Promise<boolean> {
   const { data, error } = await db
     .from("fiscal_documents")
     .update({ status: "pending" })
     .eq("id", id)
-    .in("status", ["rejected", "unknown"])
+    .eq("status", "rejected")
     .select("id");
-  if (error) throw new Error(`reset document for retry failed: ${error.message}`);
+  if (error) throw new Error(`reset rejected document failed: ${error.message}`);
   return (data?.length ?? 0) > 0;
 }
