@@ -1,0 +1,1737 @@
+=== FILE: src/lib/plans.ts ===
+// src/lib/plans.ts
+//
+// The REAL plans (names, features, prices) now live in the database table
+// `public.plans` and are edited from /admin/plans-and-users.
+// The list below is only the fallback used if the database cannot be reached,
+// and the shape/types every page shares.
+export type PlanId = "low" | "mid" | "high";
+
+export interface AuraPlan {
+  id: PlanId;
+  name: string;
+  slogan: string;
+  tagline: string;
+  badge?: string;
+  priceLabel: string;
+  amountCents: number;
+  currency: "eur";
+  interval: "month";
+  /** Deprecated: prices are no longer configured in Stripe. Kept so old code compiles. */
+  stripePriceId?: string;
+  features: string[];
+  highlight: boolean;
+}
+
+/** 2499 -> "24,99€" */
+export function formatEuro(cents: number): string {
+  const euros = cents / 100;
+  const text = Number.isInteger(euros)
+    ? String(euros)
+    : euros.toFixed(2).replace(".", ",");
+  return `${text}€`;
+}
+
+export const AURA_DEFAULT_PLANS: AuraPlan[] = [
+  {
+    id: "low",
+    name: "AURA BASIC",
+    slogan: "ENTER THE AURA SYSTEM.",
+    tagline:
+      "Η πρώτη επαφή με την εκπαιδευτική φιλοσοφία και τη μεθοδολογία της AURA. Για barbers που θέλουν να αποκτήσουν πρόσβαση σε επαγγελματική γνώση και να ξεκινήσουν την εξέλιξή τους.",
+    priceLabel: "24,99€",
+    amountCents: 2499,
+    currency: "eur",
+    interval: "month",
+    features: [
+      "Μηνιαία εκπαιδευτικά videos",
+      "AURA Social Access",
+      "Πρόσβαση στο Review System",
+      "AURA Find Job – πρόσβαση σε επαγγελματικές ευκαιρίες",
+      "Δυνατότητα ακύρωσης ανά πάσα στιγμή",
+    ],
+    highlight: false,
+  },
+  {
+    id: "mid",
+    name: "AURA PRO",
+    slogan: "MASTER YOUR CRAFT.",
+    tagline:
+      "Ένα ολοκληρωμένο εκπαιδευτικό επίπεδο για barbers που θέλουν να αναπτύξουν την τεχνική τους, να διευρύνουν τις γνώσεις τους και να εξελίξουν την επαγγελματική τους ταυτότητα.",
+    badge: "ΔΗΜΟΦΙΛΕΣ",
+    priceLabel: "49,99€",
+    amountCents: 4999,
+    currency: "eur",
+    interval: "month",
+    features: [
+      "Όλα τα προνόμια του AURA BASIC",
+      "Προχωρημένα εκπαιδευτικά videos κουρεμάτων",
+      "Πρόσβαση στο AURA Certification",
+      "50% έκπτωση στο AURA Professional Hair Method E-book",
+      "25% έκπτωση στο αυθεντικό φυσικό AURA Professional Hair Method Book με QR Codes",
+      "10% έκπτωση στα προϊόντα FORZA BRAVA",
+      "Δυνατότητα ακύρωσης ανά πάσα στιγμή",
+    ],
+    highlight: true,
+  },
+  {
+    id: "high",
+    name: "AURA ELITE",
+    slogan: "DON’T JUST LEARN. EVOLVE.",
+    tagline:
+      "Το ανώτερο επίπεδο εκπαίδευσης της AURA. Μια αποκλειστική εμπειρία που συνδυάζει εξειδικευμένη εκπαίδευση, προσωπική καθοδήγηση, αξιολόγηση και επαγγελματική εξέλιξη.",
+    priceLabel: "79,99€",
+    amountCents: 7999,
+    currency: "eur",
+    interval: "month",
+    features: [
+      "Όλα τα προνόμια του AURA PRO",
+      "Προσωπικό AURA Portfolio",
+      "Προσωπική αξιολόγηση κουρεμάτων από εκπαιδευτή AURA",
+      "Έως 4 προσωπικές αξιολογήσεις τον μήνα",
+      "Αναλυτικό feedback και προτάσεις βελτίωσης",
+      "AURA Personal Progress Tracking",
+      "Αποκλειστικά ELITE εκπαιδευτικά μαθήματα",
+      "AURA Elite Challenges – μηνιαίες εκπαιδευτικές προκλήσεις",
+      "Early Access – πρώτοι στα νέα εκπαιδευτικά videos πριν από τη δημοσίευσή τους",
+      "Αποκλειστική ιδιωτική κοινότητα AURA ELITE",
+      "VIP Community Status",
+      "Προτεραιότητα στο Support",
+      "Πρόσβαση δημοσίευσης εργασιών στην Ακαδημία",
+      "50% έκπτωση στο φυσικό AURA Professional Hair Method Book",
+      "25% έκπτωση στα AURA Online Seminars",
+      "10% έκπτωση στα προϊόντα FORZA BRAVA",
+      "Δυνατότητα ακύρωσης ανά πάσα στιγμή",
+    ],
+    highlight: false,
+  },
+];
+
+/** Backward compatible name: still the static defaults. Prefer usePlans(). */
+export const AURA_PLANS = AURA_DEFAULT_PLANS;
+
+/* ------------------------------------------------------------------ */
+/* Live plans (filled by usePlans from the database)                   */
+/* ------------------------------------------------------------------ */
+
+let livePlans: AuraPlan[] | null = null;
+const listeners = new Set<() => void>();
+
+export function setLivePlans(next: AuraPlan[] | null): void {
+  livePlans = next;
+  listeners.forEach((l) => l());
+}
+
+export function getLivePlans(): AuraPlan[] {
+  return livePlans ?? AURA_DEFAULT_PLANS;
+}
+
+export function subscribePlans(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function isPlanId(value: unknown): value is PlanId {
+  return value === "low" || value === "mid" || value === "high";
+}
+
+/** Live (admin-edited) plan if loaded, otherwise the default one. */
+export function getPlan(id: string | undefined | null): AuraPlan | undefined {
+  if (!isPlanId(id)) return undefined;
+  return (
+    getLivePlans().find((plan) => plan.id === id) ??
+    AURA_DEFAULT_PLANS.find((plan) => plan.id === id)
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/roles.ts ===
+// src/lib/roles.ts
+// Ιεραρχία ρόλων AURA — τα κλειδιά ταιριάζουν 1:1 με το UserRole enum
+// του public.profiles.role. Μεγαλύτερος βαθμός = περισσότερα δικαιώματα.
+export const ROLE_RANK = {
+  student: 10,
+  educator: 20,
+  senior_educator: 30,
+  content_manager: 30,
+  operations: 35,
+  admin: 40,
+  super_admin: 50,
+} as const;
+
+export type KnownRole = keyof typeof ROLE_RANK;
+
+/** Ελάχιστος βαθμός για τα εργαλεία του team (Review Queue). */
+export const STAFF_RANK = ROLE_RANK.educator;
+/** Ελάχιστος βαθμός για Admin Panel & Inbox. */
+export const ADMIN_RANK = ROLE_RANK.admin;
+
+/** Άγνωστος, κενός ή null ρόλος → 0. Fail closed. */
+export function roleRank(role: string | null | undefined): number {
+  if (!role) return 0;
+  const key = role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return key in ROLE_RANK ? ROLE_RANK[key as KnownRole] : 0;
+}
+
+/** Educator και πάνω. */
+export function isStaffRole(role: string | null | undefined): boolean {
+  return roleRank(role) >= STAFF_RANK;
+}
+
+/** Admin και πάνω — Admin Panel και Inbox. */
+export function isAdminRole(role: string | null | undefined): boolean {
+  return roleRank(role) >= ADMIN_RANK;
+}
+
+/** Ρητό κατώφλι, όταν θέλεις κάτι ενδιάμεσο. */
+export function hasAtLeastRole(role: string | null | undefined, minimum: KnownRole): boolean {
+  return roleRank(role) >= ROLE_RANK[minimum];
+}
+export const CONTENT_ROLES = [
+  "content_manager",
+  "operations",
+  "admin",
+  "super_admin",
+] as const;
+
+export type ContentRole = (typeof CONTENT_ROLES)[number];
+
+export function isContentRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const key = role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+  return (CONTENT_ROLES as readonly string[]).includes(key);
+}
+=== END FILE ===
+
+=== FILE: src/lib/seo.ts ===
+// src/lib/seo.ts
+export const SITE_URL = (
+  (import.meta.env.VITE_SITE_URL as string | undefined) ?? "https://www.aura-academy.com"
+).replace(/\/$/, "");
+
+export const SITE_NAME = "AURA Academy";
+
+export const DEFAULT_TITLE = "AURA Academy | Professional Barber Education & Seminars";
+
+export const DEFAULT_DESCRIPTION =
+  "Learn precision haircutting and clean fades at AURA Academy. Barber seminars led by founder Theopistos, professional education for barbers, and the AURA book.";
+
+export const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.jpg`; // 1200x630
+
+interface SeoOptions {
+  title?: string; // page title WITHOUT the brand, e.g. "Seminars"
+  description?: string;
+  path?: string; // e.g. "/seminars"
+  image?: string;
+  type?: "website" | "article" | "book";
+  noindex?: boolean;
+}
+
+/** Use in any route: head: () => seo({ title: "Seminars", path: "/seminars", description: "..." }) */
+export function seo({
+  title,
+  description = DEFAULT_DESCRIPTION,
+  path = "/",
+  image = DEFAULT_OG_IMAGE,
+  type = "website",
+  noindex = false,
+}: SeoOptions = {}) {
+  const fullTitle = title ? `${title} | ${SITE_NAME}` : DEFAULT_TITLE;
+  const url = `${SITE_URL}${path === "/" ? "" : path}`;
+
+  return {
+    meta: [
+      { title: fullTitle },
+      { name: "description", content: description },
+      { property: "og:title", content: fullTitle },
+      { property: "og:description", content: description },
+      { property: "og:url", content: url },
+      { property: "og:type", content: type },
+      { property: "og:image", content: image },
+      { name: "twitter:title", content: fullTitle },
+      { name: "twitter:description", content: description },
+      { name: "twitter:image", content: image },
+      ...(noindex ? [{ name: "robots", content: "noindex, nofollow" }] : []),
+    ],
+    links: [{ rel: "canonical", href: url }],
+  };
+}
+=== END FILE ===
+
+=== FILE: src/lib/useAsync.ts ===
+import { useEffect, useState } from "react";
+
+export interface AsyncState<T> {
+  data?: T;
+  error?: string;
+  loading: boolean;
+}
+
+export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): AsyncState<T> {
+  const [state, setState] = useState<AsyncState<T>>({ loading: true });
+
+  useEffect(() => {
+    let active = true;
+    setState({ loading: true });
+    fn()
+      .then((data) => active && setState({ data, loading: false }))
+      .catch((e) =>
+        active &&
+        setState({ error: e?.message ?? String(e), loading: false }),
+      );
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return state;
+}
+=== END FILE ===
+
+=== FILE: src/lib/utils.ts ===
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
+=== END FILE ===
+
+=== FILE: src/lib/visemes.ts ===
+export type Viseme = { open: number; width: number };
+
+export const CLOSED: Viseme = { open: 0, width: 1 };
+const SMALL: Viseme = { open: 0.22, width: 1 };
+const A: Viseme = { open: 1, width: 1 };
+const E: Viseme = { open: 0.62, width: 1.05 };
+const I: Viseme = { open: 0.32, width: 1.08 };
+const O: Viseme = { open: 0.72, width: 0.55 };
+const U: Viseme = { open: 0.4, width: 0.45 };
+const FV: Viseme = { open: 0.12, width: 1 };
+
+const MAP: Record<string, Viseme> = {
+  α: A, a: A,
+  ε: E, e: E,
+  η: I, ι: I, υ: I, i: I, y: I,
+  ο: O, ω: O, o: O,
+  u: U,
+  μ: CLOSED, π: CLOSED, m: CLOSED, p: CLOSED, b: CLOSED,
+  φ: FV, β: FV, f: FV, v: FV,
+};
+
+// πρώτο γράμμα χωρίς τόνο· το μήκος του κειμένου μένει ίδιο (σημαντικό για το charIndex)
+const base = (ch: string) =>
+  (ch.toLowerCase().normalize("NFD")[0] ?? ch).replace("ς", "σ");
+
+/** Ένα viseme ανά χαρακτήρα του κειμένου (ίδια ευρετηρίαση με το charIndex). */
+export function visemesForText(text: string): Viseme[] {
+  const out: Viseme[] = new Array(text.length);
+  for (let i = 0; i < text.length; i++) {
+    if (out[i]) continue;
+    const c = base(text[i]);
+    const n = i + 1 < text.length ? base(text[i + 1]) : "";
+    if (c === "ο" && n === "υ") {
+      out[i] = U;
+      out[i + 1] = U;
+      continue;
+    }
+    out[i] = /\p{L}/u.test(c) ? (MAP[c] ?? SMALL) : CLOSED;
+  }
+  return out;
+}
+=== END FILE ===
+
+=== FILE: src/router.tsx ===
+import { QueryClient } from "@tanstack/react-query";
+import { createRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
+
+export const getRouter = () => {
+  const queryClient = new QueryClient();
+
+  const router = createRouter({
+    routeTree,
+    context: { queryClient },
+    scrollRestoration: true,
+    defaultPreloadStaleTime: 0,
+  });
+
+  return router;
+};
+
+=== END FILE ===
+
+=== FILE: src/routes/admin.courses.$courseId.tsx ===
+// src/routes/admin.courses.$courseId.tsx
+import { useCallback, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import VideoEntryForm from "@/components/aura/VideoEntryForm";
+import type { VideoUploadMeta } from "@/components/aura/VideoDropzone";
+import {
+  clearCourseVideo,
+  deleteCourse,
+  getCourseForEdit,
+  setCourseVideo,
+  updateCourse,
+  type CourseInput,
+} from "@/lib/courses";
+import { getMyProfile } from "@/lib/queries";
+import { isContentRole } from "@/lib/roles";
+import { useAsync } from "@/lib/useAsync";
+
+export const Route = createFileRoute("/admin/courses/$courseId")({
+  head: () => ({ meta: [{ title: "AURA — Επεξεργασία Video" }] }),
+  component: EditCoursePage,
+});
+
+function EditCoursePage() {
+  const { courseId } = Route.useParams();
+  const navigate = useNavigate();
+
+  const [reloadToken, setReloadToken] = useState(0);
+  const load = useCallback(async () => {
+    const profile = await getMyProfile();
+    if (!isContentRole(profile.role)) {
+      throw new Error("Η επεξεργασία video απαιτεί ρόλο content manager και πάνω.");
+    }
+    return getCourseForEdit(courseId);
+  }, [courseId]);
+
+  const { data, error, loading } = useAsync(load, [courseId, reloadToken]);
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const handleSave = useCallback(
+    async (input: CourseInput) => {
+      if (!data) return;
+      setSaving(true);
+      setSaveError(null);
+      setNotice(null);
+      try {
+        await updateCourse(courseId, input, data.course.slug, data.course.status);
+        setNotice("Αποθηκεύτηκε.");
+        setReloadToken((n) => n + 1);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Η αποθήκευση απέτυχε.");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [courseId, data],
+  );
+
+  const handleVideoUploaded = useCallback(
+    async (path: string, durationSeconds: number | null, meta: VideoUploadMeta) => {
+      setSaveError(null);
+      try {
+        await setCourseVideo(courseId, {
+          path,
+          durationSeconds,
+          storageProvider: meta.storageProvider,
+          sizeBytes: meta.sizeBytes,
+          mimeType: meta.mimeType,
+          originalFilename: meta.originalFilename,
+          uploadedAt: meta.uploadedAt,
+        });
+        setNotice("Το βίντεο αποθηκεύτηκε.");
+        setReloadToken((n) => n + 1);
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Η αποθήκευση του βίντεο απέτυχε.");
+      }
+    },
+    [courseId],
+  );
+
+  const handleVideoCleared = useCallback(async () => {
+    setSaveError(null);
+    try {
+      await clearCourseVideo(courseId);
+      setReloadToken((n) => n + 1);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Η διαγραφή του βίντεο απέτυχε.");
+    }
+  }, [courseId]);
+
+  const handleDelete = useCallback(async () => {
+    if (typeof window !== "undefined") {
+      const ok = window.confirm("Το video θα διαγραφεί οριστικά. Συνέχεια;");
+      if (!ok) return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await deleteCourse(courseId);
+      await navigate({ to: "/admin/courses", replace: true });
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Η διαγραφή απέτυχε.");
+      setSaving(false);
+    }
+  }, [courseId, navigate]);
+
+  if (loading) {
+    return (
+      <main className="mx-auto max-w-3xl px-5 pb-28 pt-32">
+        <div className="h-8 w-56 animate-pulse rounded bg-white/10" />
+        <div className="mt-10 h-64 animate-pulse rounded-2xl bg-white/[0.04]" />
+      </main>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <main className="mx-auto max-w-lg px-5 pb-28 pt-32 text-center">
+        <h1 className="text-2xl font-semibold text-neutral-100">Δεν φορτώθηκε</h1>
+        <p className="mt-4 text-sm text-red-400" role="alert">
+          {error instanceof Error ? error.message : "Άγνωστο σφάλμα."}
+        </p>
+        <Link
+          to="/admin/courses"
+          className="mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200"
+        >
+          ← VIDEOS
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl px-5 pb-28 pt-28 sm:pt-32">
+      <Link
+        to="/admin/courses"
+        className="text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200"
+      >
+        ← VIDEOS
+      </Link>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100">
+        {data.course.title}
+      </h1>
+      <p className="mt-2 text-[10px] uppercase tracking-[0.3em] text-neutral-500">
+        /courses/{data.course.slug}
+      </p>
+
+      <div className="mt-12">
+        <VideoEntryForm
+          key={`${data.course.id}-${reloadToken}`}
+          course={data.course}
+          saving={saving}
+          error={saveError}
+          notice={notice}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onVideoUploaded={handleVideoUploaded}
+          onVideoCleared={handleVideoCleared}
+          videoPath={data.course.video_path}
+          courseId={data.course.id}
+        />
+      </div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/admin.courses.new.tsx ===
+// src/routes/admin.courses.new.tsx
+import { useCallback, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import VideoEntryForm from "@/components/aura/VideoEntryForm";
+import type { VideoUploadMeta } from "@/components/aura/VideoDropzone";
+import { createCourse, setCourseVideo, type CourseInput } from "@/lib/courses";
+import { getMyProfile } from "@/lib/queries";
+import { isContentRole } from "@/lib/roles";
+import { useAsync } from "@/lib/useAsync";
+
+export const Route = createFileRoute("/admin/courses/new")({
+  head: () => ({ meta: [{ title: "AURA — Νέο Video" }] }),
+  component: NewCoursePage,
+});
+
+function NewCoursePage() {
+  const navigate = useNavigate();
+  const { data: profile, error: profileError, loading } = useAsync(getMyProfile, []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [videoPath, setVideoPath] = useState<string | null>(null);
+
+  const handleSave = useCallback(
+    async (input: CourseInput) => {
+      setSaving(true);
+      setError(null);
+      try {
+        const course = await createCourse(input);
+        setCreatedId(course.id);
+        setSaving(false);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Η αποθήκευση απέτυχε.");
+        setSaving(false);
+      }
+    },
+    [],
+  );
+
+  const handleVideoUploaded = useCallback(
+    async (path: string, durationSeconds: number | null, meta: VideoUploadMeta) => {
+      setVideoPath(path);
+      if (!createdId) return;
+      try {
+        await setCourseVideo(createdId, {
+          path,
+          durationSeconds,
+          storageProvider: meta.storageProvider,
+          sizeBytes: meta.sizeBytes,
+          mimeType: meta.mimeType,
+          originalFilename: meta.originalFilename,
+          uploadedAt: meta.uploadedAt,
+        });
+        await navigate({
+          to: "/admin/courses/$courseId",
+          params: { courseId: createdId },
+          replace: true,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Η αποθήκευση του βίντεο απέτυχε.");
+      }
+    },
+    [createdId, navigate],
+  );
+
+  if (loading) {
+    return (
+      <main className="mx-auto max-w-3xl px-5 pb-28 pt-32">
+        <div className="h-8 w-56 animate-pulse rounded bg-white/10" />
+      </main>
+    );
+  }
+
+  if (profileError || !profile || !isContentRole(profile.role)) {
+    return (
+      <main className="mx-auto max-w-lg px-5 pb-28 pt-32 text-center">
+        <h1 className="text-2xl font-semibold text-neutral-100">Χωρίς πρόσβαση</h1>
+        <p className="mt-4 text-sm text-neutral-400">
+          Η δημιουργία video απαιτεί ρόλο content manager και πάνω.
+        </p>
+        <Link
+          to="/dashboard"
+          className="mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200"
+        >
+          ← DASHBOARD
+        </Link>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl px-5 pb-28 pt-28 sm:pt-32">
+      <Link
+        to="/admin/courses"
+        className="text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200"
+      >
+        ← VIDEOS
+      </Link>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100">Νέο video</h1>
+
+      <div className="mt-12">
+        <VideoEntryForm
+          course={null}
+          saving={saving}
+          error={error}
+          notice={
+            createdId && !videoPath
+              ? "Το video δημιουργήθηκε — ανέβασε τώρα το αρχείο βίντεο."
+              : null
+          }
+          onSave={handleSave}
+          onVideoUploaded={handleVideoUploaded}
+          onVideoCleared={() => setVideoPath(null)}
+          videoPath={videoPath}
+          courseId={createdId}
+        />
+      </div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/ai.tsx ===
+import { createFileRoute } from "@tanstack/react-router";
+import AuraAI from "@/components/aura/AuraAI";
+
+export const Route = createFileRoute("/ai")({ component: AuraAI });
+=== END FILE ===
+
+=== FILE: src/routes/cookie-policy.tsx ===
+// src/routes/cookie-policy.tsx
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/cookie-policy")({
+  component: CookiePolicyPage,
+  head: () => ({
+    meta: [
+      { title: "Πολιτική Cookies — AURA" },
+      { name: "description", content: "Πολιτική cookies της AURA." },
+    ],
+  }),
+});
+
+function CookiePolicyPage() {
+  return (
+    <main className="mx-auto max-w-3xl px-5 pb-24 pt-32 sm:px-8">
+      <p className="text-[10px] font-extralight uppercase tracking-[0.4em] text-neutral-500">
+        Νομικά
+      </p>
+      <h1 className="mt-3 text-2xl font-extralight tracking-wide text-neutral-100 sm:text-3xl">
+        Πολιτική Cookies
+      </h1>
+
+      <div className="mt-8 space-y-8 text-sm font-extralight leading-relaxed text-neutral-300">
+        <section>
+          <h2 className="text-xs font-normal uppercase tracking-[0.3em] text-neutral-100">
+            Τι είναι τα cookies
+          </h2>
+          <p className="mt-3">
+            Τα cookies είναι μικρά αρχεία κειμένου που αποθηκεύονται στη συσκευή σας όταν
+            επισκέπτεστε έναν ιστότοπο, ώστε να θυμάται τις προτιμήσεις σας και να λειτουργεί σωστά.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xs font-normal uppercase tracking-[0.3em] text-neutral-100">
+            Απολύτως απαραίτητα cookies
+          </h2>
+          <p className="mt-3">
+            Είναι απαραίτητα για τη λειτουργία της πλατφόρμας AURA και δεν μπορούν να
+            απενεργοποιηθούν — π.χ. cookies σύνδεσης/ταυτοποίησης χρήστη και το cookie που θυμάται
+            την επιλογή σας για αποδοχή ή απόρριψη cookies.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xs font-normal uppercase tracking-[0.3em] text-neutral-100">
+            Λειτουργικά cookies
+          </h2>
+          <p className="mt-3">
+            Χρησιμοποιούνται π.χ. για την απομνημόνευση της γλώσσας που έχετε επιλέξει μέσω του
+            εργαλείου μετάφρασης σελίδας.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xs font-normal uppercase tracking-[0.3em] text-neutral-100">
+            Cookies στατιστικών
+          </h2>
+          <p className="mt-3">
+            Εφόσον τα αποδεχτείτε, ενδέχεται να χρησιμοποιηθούν για την κατανόηση του τρόπου χρήσης
+            της πλατφόρμας. Με «Απόρριψη», αυτά δεν ενεργοποιούνται.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-xs font-normal uppercase tracking-[0.3em] text-neutral-100">
+            Αλλαγή της επιλογής σας
+          </h2>
+          <p className="mt-3">
+            Διαγράφοντας τα cookies του browser για αυτόν τον ιστότοπο, η καρτέλα επιλογής θα
+            εμφανιστεί ξανά.
+          </p>
+        </section>
+      </div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/index.tsx ===
+import { createFileRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import ChromeCursor from "@/components/aura/ChromeCursor";
+import Hero from "@/components/aura/Hero";
+import SkillTree from "@/components/aura/SkillTree";
+import PhysicalBook from "@/components/aura/PhysicalBook";
+import Seminars from "@/components/aura/Seminars";
+import Certification from "@/components/aura/Certification";
+import Footer from "@/components/aura/Footer";
+import OurTeam from "@/components/aura/OurTeam";
+import GalleryTeaser from "@/components/aura/GalleryTeaser";
+import { seo } from "@/lib/seo";
+import PromoPopup from "@/components/aura/PromoPopup";
+
+export const Route = createFileRoute("/")({
+  head: () =>
+    seo({
+      path: "/",
+      // Uses the default title: "AURA Academy | Professional Barber Education & Seminars"
+      description:
+        "Learn precision haircutting and clean fades at AURA Academy. Barber seminars led by founder Theopistos, professional education for barbers, and the AURA book.",
+    }),
+  component: Index,
+});
+
+/**
+ * Smooth scroll-triggered fade-in. It only changes opacity (and, optionally, a small
+ * upward move) once per section and never touches layout, so it cannot affect scrolling.
+ * y = 0 -> pure fade, used for sections that measure their own scroll position.
+ */
+function Reveal({ children, y = 0 }: { children: ReactNode; y?: number }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={reduce ? false : { opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+      transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function Index() {
+  return (
+    // overflow-x-clip (not -hidden): hides sideways overflow WITHOUT turning these wrappers
+    // into scroll containers, which is what makes scrolling "lock" on a section.
+    // The <main> landmark lives in __root.tsx, so this is a plain div.
+    <div className="relative min-h-screen w-full overflow-x-clip bg-aura-bg text-aura-text antialiased">
+      <div className="aura-grain" aria-hidden />
+      <ChromeCursor />
+      <PromoPopup />
+
+      <div className="w-full overflow-x-clip">
+        <Hero />
+        <Reveal>
+          <SkillTree />
+        </Reveal>
+        <Reveal y={24}>
+          <OurTeam />
+        </Reveal>
+        <Reveal>
+          <PhysicalBook />
+        </Reveal>
+        <Reveal>
+          <Seminars />
+        </Reveal>
+        <Reveal>
+          <GalleryTeaser />
+        </Reveal>
+        <Reveal y={24}>
+          <Certification />
+        </Reveal>
+      </div>
+
+      <Reveal>
+        <Footer />
+      </Reveal>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/portfolios.$slug.tsx ===
+// src/routes/portfolios.$slug.tsx  ->  /portfolios/:slug
+import { createFileRoute } from "@tanstack/react-router";
+import PortfolioProfilePage from "@/components/aura/portfolio/PortfolioProfilePage";
+
+export const Route = createFileRoute("/portfolios/$slug")({
+  component: function PortfolioRoute() {
+    const { slug } = Route.useParams();
+    return <PortfolioProfilePage slug={slug} />;
+  },
+});
+=== END FILE ===
+
+=== FILE: src/routes/portfolios.create.tsx ===
+// src/routes/portfolios.create.tsx  ->  /portfolios/create  (create AND edit)
+import { createFileRoute } from "@tanstack/react-router";
+import PortfolioCreatePage from "@/components/aura/portfolio/PortfolioCreatePage";
+
+export const Route = createFileRoute("/portfolios/create")({
+  component: PortfolioCreatePage,
+});
+=== END FILE ===
+
+=== FILE: src/routes/portfolios.index.tsx ===
+// src/routes/portfolios.index.tsx  ->  /portfolios
+import { createFileRoute } from "@tanstack/react-router";
+import PortfolioBoardPage from "@/components/aura/portfolio/PortfolioBoardPage";
+
+export const Route = createFileRoute("/portfolios/")({
+  component: PortfolioBoardPage,
+});
+=== END FILE ===
+
+=== FILE: src/routes/README.md ===
+# Routes
+
+TanStack Start uses **file-based routing**. Every `.tsx` file in this directory
+defines a route. Do **not** create `src/pages/`, `src/routes/_app/index.tsx`, or
+`app/layout.tsx` — those are Next.js / Remix conventions. The only root layout
+is `src/routes/__root.tsx`.
+
+## Conventions
+
+| File | URL |
+| --- | --- |
+| `index.tsx` | `/` |
+| `about.tsx` | `/about` |
+| `users/index.tsx` | `/users` |
+| `users/$id.tsx` | `/users/:id` (dynamic — bare `$`, no curly braces) |
+| `posts/{-$category}.tsx` | `/posts/:category?` (optional segment) |
+| `files/$.tsx` | `/files/*` (splat — read via `_splat` param, never `*`) |
+| `_layout.tsx` | layout route (renders children via `<Outlet />`) |
+| `__root.tsx` | app shell — wraps every page; preserve `<Outlet />` |
+
+`routeTree.gen.ts` is auto-generated. Don't edit it by hand.
+
+=== END FILE ===
+
+=== FILE: src/routes/review/haircuts/haircut.tsx ===
+import { createFileRoute, redirect } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/review/haircuts/haircut")({
+  beforeLoad: () => {
+    throw redirect({ to: "/review/haircuts" });
+  },
+});
+=== END FILE ===
+
+=== FILE: src/server.ts ===
+import "./lib/error-capture";
+
+import { consumeLastCapturedError } from "./lib/error-capture";
+import { renderErrorPage } from "./lib/error-page";
+
+type ServerEntry = {
+  fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
+};
+
+let serverEntryPromise: Promise<ServerEntry> | undefined;
+
+async function getServerEntry(): Promise<ServerEntry> {
+  if (!serverEntryPromise) {
+    serverEntryPromise = import("@tanstack/react-start/server-entry").then(
+      (m) => (m.default ?? m) as ServerEntry,
+    );
+  }
+  return serverEntryPromise;
+}
+
+// h3 swallows in-handler throws into a normal 500 Response with body
+// {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
+async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+  if (response.status < 500) return response;
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return response;
+
+  const body = await response.clone().text();
+  if (!isH3SwallowedErrorBody(body)) return response;
+
+  console.error(consumeLastCapturedError() ?? new Error(`h3 swallowed SSR error: ${body}`));
+  return new Response(renderErrorPage(), {
+    status: 500,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+function isH3SwallowedErrorBody(body: string): boolean {
+  try {
+    const payload = JSON.parse(body) as { unhandled?: unknown; message?: unknown };
+    return payload.unhandled === true && payload.message === "HTTPError";
+  } catch {
+    return false;
+  }
+}
+
+export default {
+  async fetch(request: Request, env: unknown, ctx: unknown) {
+    try {
+      const handler = await getServerEntry();
+      const response = await handler.fetch(request, env, ctx);
+      return await normalizeCatastrophicSsrResponse(response);
+    } catch (error) {
+      console.error(error);
+      return new Response(renderErrorPage(), {
+        status: 500,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+  },
+};
+
+=== END FILE ===
+
+=== FILE: src/start.ts ===
+import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
+
+import { renderErrorPage } from "./lib/error-page";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+
+const errorMiddleware = createMiddleware().server(async ({ next }) => {
+  try {
+    return await next();
+  } catch (error) {
+    if (error != null && typeof error === "object" && "statusCode" in error) {
+      throw error;
+    }
+    console.error(error);
+    return new Response(renderErrorPage(), {
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+});
+
+// Start installs this automatically when src/start.ts is absent; defining the
+// file opts out, so re-add it explicitly to keep server functions protected
+// from cross-site requests.
+const csrfMiddleware = createCsrfMiddleware({
+  filter: (ctx) => ctx.handlerType === "serverFn",
+});
+
+export const startInstance = createStart(() => ({
+  functionMiddleware: [attachSupabaseAuth],
+  requestMiddleware: [errorMiddleware, csrfMiddleware],
+}));
+
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/auth.ts ===
+// supabase/functions/_shared/auth.ts
+//
+// Every course-file Edge Function needs to answer two questions before
+// touching B2 or the database:
+//   1. Who is calling? (verify the Supabase JWT they sent)
+//   2. Are they allowed to do this? (content role for writes; enrolled/
+//      plan-eligible OR content role for reads)
+// This file answers both, once, so each function just calls it instead
+// of re-implementing JWT/role checks.
+
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@^2";
+
+const CONTENT_ROLES = new Set([
+  "content_manager",
+  "operations",
+  "admin",
+  "super_admin",
+]);
+
+export interface AuthedCaller {
+  userId: string;
+  role: string | null;
+  isContentRole: boolean;
+}
+
+export interface AuthResult {
+  ok: true;
+  caller: AuthedCaller;
+  /** Service-role client — bypasses RLS. Use deliberately, only for the
+   *  exact rows this function is meant to touch. */
+  admin: SupabaseClient;
+}
+
+export interface AuthFailure {
+  ok: false;
+  status: number;
+  error: string;
+}
+
+/**
+ * Verifies the caller's bearer token against Supabase Auth, loads their
+ * profile role, and returns a service-role client for the function to use
+ * for the actual DB work (service role is required because course_files
+ * SELECT/write RLS is staff-only, and we need to check/serve student
+ * access to individual objects ourselves — see user_can_access_course).
+ */
+export async function authenticateCaller(req: Request): Promise<AuthResult | AuthFailure> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing Supabase environment configuration for auth check");
+    return { ok: false, status: 500, error: "Server misconfigured" };
+  }
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return { ok: false, status: 401, error: "Missing bearer token" };
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  if (userError || !userData?.user) {
+    return { ok: false, status: 401, error: "Invalid or expired session" };
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  });
+
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", userData.user.id)
+    .maybeSingle();
+  if (profileError) {
+    console.error("Failed to load caller profile", profileError);
+    return { ok: false, status: 500, error: "Could not verify permissions" };
+  }
+
+  const role = (profile as { role?: string } | null)?.role ?? null;
+
+  return {
+    ok: true,
+    admin,
+    caller: {
+      userId: userData.user.id,
+      role,
+      isContentRole: role != null && CONTENT_ROLES.has(role),
+    },
+  };
+}
+
+/** For upload/delete: only content_manager/operations/admin/super_admin. */
+export function requireContentRole(result: AuthResult): AuthFailure | null {
+  if (!result.caller.isContentRole) {
+    return { ok: false, status: 403, error: "Requires content manager permissions" };
+  }
+  return null;
+}
+
+/**
+ * For read/preview: content roles always pass; everyone else needs
+ * public.user_can_access_course(userId, courseId) — enrolled + plan
+ * check, same rule the RLS policies use, re-verified here explicitly
+ * because this function runs with the service role and RLS doesn't apply.
+ */
+export async function requireCourseAccess(
+  result: AuthResult,
+  courseId: string,
+): Promise<AuthFailure | null> {
+  if (result.caller.isContentRole) return null;
+
+  const { data, error } = await result.admin.rpc("user_can_access_course", {
+    p_user_id: result.caller.userId,
+    p_course_id: courseId,
+  });
+  if (error) {
+    console.error("user_can_access_course check failed", error);
+    return { ok: false, status: 500, error: "Could not verify course access" };
+  }
+  if (!data) {
+    return { ok: false, status: 403, error: "Not enrolled in this course" };
+  }
+  return null;
+}
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/b2.ts ===
+// supabase/functions/_shared/b2.ts
+//
+// One place that knows how to talk to Backblaze B2. Every course-file
+// Edge Function imports this instead of touching the AWS SDK directly,
+// so the credential handling and key-sanitization logic exists exactly
+// once.
+//
+// B2_KEY_ID / B2_APPLICATION_KEY / B2_ENDPOINT / B2_REGION / B2_BUCKET_NAME
+// are read from Deno.env — Supabase Edge Function secrets — and NEVER
+// returned to a client, logged, or embedded in a response body.
+
+import { S3Client } from "npm:@aws-sdk/client-s3@^3";
+
+export interface B2Config {
+  endpoint: string;
+  region: string;
+  bucket: string;
+  keyId: string;
+  applicationKey: string;
+}
+
+export function loadB2Config(): B2Config | null {
+  const endpoint = Deno.env.get("B2_ENDPOINT");
+  const region = Deno.env.get("B2_REGION");
+  const bucket = Deno.env.get("B2_BUCKET_NAME");
+  const keyId = Deno.env.get("B2_KEY_ID");
+  const applicationKey = Deno.env.get("B2_APPLICATION_KEY");
+
+  if (!endpoint || !region || !bucket || !keyId || !applicationKey) {
+    return null;
+  }
+  return { endpoint, region, bucket, keyId, applicationKey };
+}
+
+export function b2Client(config: B2Config): S3Client {
+  return new S3Client({
+    endpoint: config.endpoint,
+    region: config.region,
+    credentials: {
+      accessKeyId: config.keyId,
+      secretAccessKey: config.applicationKey,
+    },
+    // B2's S3-compatible API is virtual-host style per bucket like AWS,
+    // but path-style is the documented/reliable option for B2 specifically.
+    forcePathStyle: true,
+  });
+}
+
+// ---- object keys ---------------------------------------------------
+
+export type CourseFileKind = "video" | "thumbnail" | "document" | "image" | "resource";
+
+const KIND_SEGMENT: Record<CourseFileKind, string> = {
+  video: "video",
+  thumbnail: "thumbnail",
+  document: "documents",
+  image: "images",
+  resource: "resources",
+};
+
+/** Strips path separators and anything that isn't safe in an object key. */
+export function sanitizeFilename(name: string): string {
+  const base = name.split(/[\\/]/).pop() ?? "file";
+  const cleaned = base
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[.-]+|[.-]+$/g, "");
+  return (cleaned || "file").slice(0, 150);
+}
+
+/**
+ * Builds `courses/{courseId}/lessons/{lessonSegment}/{kindSegment}/{uuid}-{safeFilename}`
+ * (or `courses/{courseId}/thumbnail/{uuid}-{safeFilename}` for course-level
+ * thumbnails, or `courses/{courseId}/resources/{uuid}-{safeFilename}` for
+ * course-level resources — those two kinds have no lesson).
+ *
+ * `courseId` and `lessonSegment` MUST already be validated as UUIDs (or, for
+ * lessonSegment, a server-minted upload id — see course-file-init-upload)
+ * by the caller before this runs. This function only sanitizes the
+ * filename; it does not validate ids, so it must never receive raw,
+ * unchecked path segments from a request body.
+ */
+export function buildObjectKey(params: {
+  courseId: string;
+  lessonSegment?: string | null;
+  kind: CourseFileKind;
+  filename: string;
+}): string {
+  const uuid = crypto.randomUUID();
+  const safeName = sanitizeFilename(params.filename);
+  const kindSegment = KIND_SEGMENT[params.kind];
+
+  if (params.kind === "thumbnail" || params.kind === "resource") {
+    return `courses/${params.courseId}/${kindSegment}/${uuid}-${safeName}`;
+  }
+
+  if (!params.lessonSegment) {
+    throw new Error(`kind "${params.kind}" requires a lessonSegment`);
+  }
+  return `courses/${params.courseId}/lessons/${params.lessonSegment}/${kindSegment}/${uuid}-${safeName}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+
+// ---- upload sizing ---------------------------------------------------
+
+/** B2/S3 multipart parts must be >=5MB (except the last one). */
+export const MULTIPART_PART_SIZE_BYTES = 64 * 1024 * 1024; // 64MB
+/** Below this, a single PutObject presigned URL is simpler than multipart. */
+export const SINGLE_PUT_THRESHOLD_BYTES = 32 * 1024 * 1024; // 32MB
+/** S3 multipart hard cap. 20GB / 64MB ≈ 320 parts, nowhere near this. */
+export const MAX_MULTIPART_PARTS = 10_000;
+
+export const PRESIGN_TTL_SECONDS = {
+  upload: 60 * 60, // 1h per part URL — generous for slow uplinks on huge files
+  download: 4 * 60 * 60, // matches courses.ts SIGNED_URL_TTL_SECONDS
+} as const;
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/cors.ts ===
+// supabase/functions/_shared/cors.ts
+// Shared CORS handling for all edge functions.
+// Allow-list based (never "*"), because these endpoints act on behalf of signed-in users.
+
+/** Always allowed. Edit this list when you add a domain. */
+const DEFAULT_ORIGINS = [
+  "https://theauramethod.site",
+  "https://www.theauramethod.site",
+];
+
+/** Local development: any port on localhost / 127.0.0.1. */
+const LOCAL_DEV = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i;
+
+const ALLOW_HEADERS = [
+  "authorization",
+  "apikey",
+  "x-client-info",
+  "content-type",
+  "accept",
+  "accept-language",
+  "x-supabase-api-version",
+  "x-retry-count",
+  "traceparent",
+  "tracestate",
+  "baggage",
+].join(", ");
+
+const ALLOW_METHODS = "GET, POST, PUT, DELETE, OPTIONS";
+
+function normalize(value: string): string {
+  return value.trim().replace(/\/+$/, "").toLowerCase();
+}
+
+/**
+ * Exact origins plus optional wildcard patterns.
+ * Env vars (both optional):
+ *   PUBLIC_SITE_URL   = https://theauramethod.site
+ *   ALLOWED_ORIGINS   = https://a.com,https://b.com,*.vercel.app
+ */
+function buildAllowList(): { exact: Set<string>; wildcards: string[] } {
+  const exact = new Set<string>(DEFAULT_ORIGINS.map(normalize));
+  const wildcards: string[] = [];
+
+  const site = Deno.env.get("PUBLIC_SITE_URL");
+  if (site) exact.add(normalize(site));
+
+  const extra = Deno.env.get("ALLOWED_ORIGINS");
+  if (extra) {
+    for (const raw of extra.split(",")) {
+      const item = normalize(raw);
+      if (!item) continue;
+      if (item.includes("*")) {
+        // "*.vercel.app" or "https://*.vercel.app"
+        wildcards.push(item.replace(/^https?:\/\//, "").replace(/^\*\./, ""));
+      } else {
+        exact.add(item);
+      }
+    }
+  }
+
+  return { exact, wildcards };
+}
+
+export function isAllowedOrigin(origin: string | null): origin is string {
+  if (!origin) return false;
+  const o = normalize(origin);
+
+  if (LOCAL_DEV.test(o)) return true;
+
+  const { exact, wildcards } = buildAllowList();
+  if (exact.has(o)) return true;
+
+  // Wildcard subdomains: https only.
+  if (o.startsWith("https://")) {
+    const host = o.slice("https://".length);
+    return wildcards.some((suffix) => host.endsWith(`.${suffix}`));
+  }
+  return false;
+}
+
+/**
+ * Headers for a response to `origin`.
+ * Unknown origin -> NO Allow-Origin header, so the browser blocks it.
+ */
+export function corsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": ALLOW_HEADERS,
+    "Access-Control-Allow-Methods": ALLOW_METHODS,
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+
+  if (isAllowedOrigin(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
+/** Answers a CORS preflight, or returns null when the request is not one. */
+export function preflight(req: Request): Response | null {
+  if (req.method !== "OPTIONS") return null;
+
+  const origin = req.headers.get("Origin");
+  if (!isAllowedOrigin(origin)) {
+    return new Response(null, { status: 403, headers: { Vary: "Origin" } });
+  }
+  return new Response(null, { status: 204, headers: corsHeaders(origin) });
+}
+
+/** JSON response that always carries CORS headers, including errors. */
+export function json(
+  body: unknown,
+  status: number,
+  origin: string | null,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders(origin),
+      "Content-Type": "application/json",
+      ...extraHeaders,
+    },
+  });
+}
+
+/**
+ * Wrap a handler so that:
+ *  - preflight is answered automatically
+ *  - every response (including thrown errors) has CORS headers
+ *
+ *   Deno.serve(withCors(async (req, origin) => json({ ok: true }, 200, origin)));
+ */
+export function withCors(
+  handler: (req: Request, origin: string | null) => Promise<Response> | Response,
+): (req: Request) => Promise<Response> {
+  return async (req: Request) => {
+    const pre = preflight(req);
+    if (pre) return pre;
+
+    const origin = req.headers.get("Origin");
+    try {
+      const res = await handler(req, origin);
+
+      // Make sure CORS headers are present even if the handler built its own Response.
+      const headers = new Headers(res.headers);
+      for (const [k, v] of Object.entries(corsHeaders(origin))) {
+        if (!headers.has(k)) headers.set(k, v);
+      }
+      return new Response(res.body, { status: res.status, headers });
+    } catch (err) {
+      console.error("[edge function error]", err);
+      return json({ error: "Internal server error" }, 500, origin);
+    }
+  };
+}
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/discount.ts ===
+// supabase/functions/_shared/discount.ts
+//
+// Server-side member pricing. The browser only DISPLAYS discounts; the amount
+// that Stripe charges is always decided here, from the caller's verified JWT
+// and public.aura_quote() (see aura-discounts.sql).
+
+// deno-lint-ignore no-explicit-any
+type AnyClient = any;
+
+export interface Quote {
+  userId: string | null;
+  plan: string | null;
+  percent: number;
+  listCents: number;
+  finalCents: number;
+}
+
+/** The user id behind the Authorization header, or null for guests / anon key. */
+export async function callerUserId(req: Request, db: AnyClient): Promise<string | null> {
+  const header = req.headers.get("Authorization") ?? "";
+  if (!header.startsWith("Bearer ")) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+
+  // The plain anon/publishable key is not a user token: getUser() rejects it,
+  // which is exactly what we want (guest = no discount).
+  const { data, error } = await db.auth.getUser(token);
+  if (error || !data?.user) return null;
+  return data.user.id as string;
+}
+
+/**
+ * Price for this caller. `product` is 'book' or 'online_seminar'.
+ * Throws if the database cannot answer, so we never silently charge a
+ * different price than the one the member was promised.
+ */
+export async function quoteForCaller(
+  req: Request,
+  db: AnyClient,
+  product: "book" | "online_seminar",
+  listCents: number,
+): Promise<Quote> {
+  const userId = await callerUserId(req, db);
+  if (!userId) {
+    return { userId: null, plan: null, percent: 0, listCents, finalCents: listCents };
+  }
+
+  const { data, error } = await db.rpc("aura_quote", {
+    p_user: userId,
+    p_product: product,
+    p_list_cents: listCents,
+  });
+  if (error || !data) throw new Error(`aura_quote failed: ${error?.message ?? "no data"}`);
+
+  const q = data as { plan: string | null; percent: number; final_cents: number };
+  return {
+    userId,
+    plan: q.plan ?? null,
+    percent: Number(q.percent) || 0,
+    listCents,
+    finalCents: Number(q.final_cents),
+  };
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/course-file-abort-upload/index.ts ===
+// supabase/functions/course-file-abort-upload/index.ts
+//
+// Called when an upload fails, the user cancels, or the browser gives up
+// retrying. Cleans up on the B2 side (aborts the multipart upload / best
+// -effort deletes a partial single-PUT object) and removes the pending
+// course_files row so it doesn't show up as a ghost "uploading forever"
+// entry.
+import { AbortMultipartUploadCommand, DeleteObjectCommand } from "npm:@aws-sdk/client-s3@^3";
+import { json, preflight } from "../_shared/cors.ts";
+import { authenticateCaller, requireContentRole } from "../_shared/auth.ts";
+import { b2Client, isUuid, loadB2Config } from "../_shared/b2.ts";
+
+interface AbortBody {
+  fileId?: unknown;
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  const pf = preflight(req);
+  if (pf) return pf;
+  const origin = req.headers.get("Origin");
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+
+  const b2Config = loadB2Config();
+  if (!b2Config) {
+    console.error("Missing B2 environment configuration");
+    return json({ error: "Server misconfigured" }, 500, origin);
+  }
+
+  const auth = await authenticateCaller(req);
+  if (!auth.ok) return json({ error: auth.error }, auth.status, origin);
+  const roleError = requireContentRole(auth);
+  if (roleError) return json({ error: roleError.error }, roleError.status, origin);
+
+  let body: AbortBody;
+  try {
+    body = JSON.parse(await req.text());
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400, origin);
+  }
+  if (!isUuid(body.fileId)) return json({ error: "Invalid fileId" }, 400, origin);
+
+  const { data: row, error: rowError } = await auth.admin
+    .from("course_files")
+    .select("id, b2_object_key, b2_upload_id, upload_status")
+    .eq("id", body.fileId)
+    .maybeSingle();
+  if (rowError) {
+    console.error("course_files lookup failed", rowError);
+    return json({ error: "Could not load upload record" }, 500, origin);
+  }
+  if (!row) return json({ ok: true }, 200, origin); // already gone — nothing to abort
+
+  const record = row as {
+    id: string;
+    b2_object_key: string;
+    b2_upload_id: string | null;
+    upload_status: string;
+  };
+
+  // Never abort/delete an already-finished upload through this endpoint —
+  // that's what course-file-delete is for.
+  if (record.upload_status === "ready" || record.upload_status === "uploaded") {
+    return json({ error: "This file has already finished uploading" }, 400, origin);
+  }
+
+  const s3 = b2Client(b2Config);
+  try {
+    if (record.b2_upload_id) {
+      await s3
+        .send(
+          new AbortMultipartUploadCommand({
+            Bucket: b2Config.bucket,
+            Key: record.b2_object_key,
+            UploadId: record.b2_upload_id,
+          }),
+        )
+        .catch((err) => console.warn("AbortMultipartUpload (non-fatal)", err));
+    } else {
+      // Single-PUT mode: the browser may or may not have actually sent
+      // bytes yet. Best-effort delete; B2 doesn't error on a missing key.
+      await s3
+        .send(new DeleteObjectCommand({ Bucket: b2Config.bucket, Key: record.b2_object_key }))
+        .catch((err) => console.warn("DeleteObject cleanup (non-fatal)", err));
+    }
+  } catch (err) {
+    console.error("B2 abort-upload cleanup failed", err);
+    // Fall through — we still remove the DB row so the UI doesn't get stuck.
+  }
+
+  const { error: deleteError } = await auth.admin
+    .from("course_files")
+    .delete()
+    .eq("id", record.id);
+  if (deleteError) {
+    console.error("Could not delete aborted course_files row", deleteError);
+    return json({ error: "Could not clean up upload record" }, 500, origin);
+  }
+
+  return json({ ok: true }, 200, origin);
+});
+=== END FILE ===
+
+=== FILE: supabase/functions/course-file-complete-upload/index.ts ===
+// supabase/functions/course-file-complete-upload/index.ts
+//
+// Step 2 of 2. Called after the browser has PUT the file (or every part)
+// directly to B2. Confirms with B2 that the object really exists
+// (HeadObject) before marking the row "ready" — we never trust the
+// browser's word alone that an upload succeeded.
+import {
+  CompleteMultipartUploadCommand,
+  HeadObjectCommand,
+} from "npm:@aws-sdk/client-s3@^3";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
+import { json, preflight } from "../_shared/cors.ts";
+import { authenticateCaller, requireContentRole } from "../_shared/auth.ts";
+import { b2Client, isUuid, loadB2Config } from "../_shared/b2.ts";
+
+interface CompleteBody {
+  fileId?: unknown;
+  parts?: unknown; // [{ partNumber: number, etag: string }] — multipart only
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  const pf = preflight(req);
+  if (pf) return pf;
+  const origin = req.headers.get("Origin");
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+
+  const b2Config = loadB2Config();
+  if (!b2Config) {
+    console.error("Missing B2 environment configuration");
+    return json({ error: "Server misconfigured" }, 500, origin);
+  }
+
+  const auth = await authenticateCaller(req);
+  if (!auth.ok) return json({ error: auth.error }, auth.status, origin);
+  const roleError = requireContentRole(auth);
+  if (roleError) return json({ error: roleError.error }, roleError.status, origin);
+
+  let body: CompleteBody;
+  try {
+    body = JSON.parse(await req.text());
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400, origin);
+  }
+
+  const { fileId, parts } = body;
+  if (!isUuid(fileId)) return json({ error: "Invalid fileId" }, 400, origin);
+
+  const { data: row, error: rowError } = await auth.admin
+    .from("course_files")
+    .select("id, b2_object_key, b2_upload_id, upload_status")
+    .eq("id", fileId)
+    .maybeSingle();
+  if (rowError) {
+    console.error("course_files lookup failed", rowError);
+    return json({ error: "Could not load upload record" }, 500, origin);
+  }
+  if (!row) return json({ error: "Upload not found" }, 404, origin);
+
+  const record = row as {
+    id: string;
+    b2_object_key: string;
+    b2_upload_id: string | null;
+    upload_status: string;
+  };
+
+  // Idempotent: retried "complete" call after a flaky response just
+  // returns the already-finalized row instead of erroring.
+  if (record.upload_status === "ready" || record.upload_status === "uploaded") {
+    return json({ file: await loadFullRow(auth.admin, record.id) }, 200, origin);
+  }
+
+  const s3 = b2Client(b2Config);
+
+  try {
+    if (record.b2_upload_id) {
+      if (!Array.isArray(parts) || parts.length === 0) {
+        return json({ error: "Missing parts for multipart completion" }, 400, origin);
+      }
+      const cleanParts = parts
+        .map((p) =>
+          p && typeof p === "object"
+            ? {
+                PartNumber: Number((p as Record<string, unknown>).partNumber),
+                ETag: String((p as Record<string, unknown>).etag ?? ""),
+              }
+            : null,
+        )
+        .filter(
+          (p): p is { PartNumber: number; ETag: string } =>
+            p !== null && Number.isFinite(p.PartNumber) && p.ETag.length > 0,
+        )
+        .sort((a, b) => a.PartNumber - b.PartNumber);
+
+      if (cleanParts.length === 0) {
+        return json({ error: "No valid parts supplied" }, 400, origin);
+      }
+
+      await s3.send(
+        new CompleteMultipartUploadCommand({
+          Bucket: b2Config.bucket,
+          Key: record.b2_object_key,
+          UploadId: record.b2_upload_id,
+          MultipartUpload: { Parts: cleanParts },
+        }),
+      );
+    }
+
+    const head = await s3.send(
+      new HeadObjectCommand({ Bucket: b2Config.bucket, Key: record.b2_object_key }),
+    );
+
+    const { error: updateError } = await auth.admin
+      .from("course_files")
+      .update({
+        upload_status: "ready",
+        b2_upload_id: null,
+        file_size_bytes: head.ContentLength ?? undefined,
+      })
+      .eq("id", record.id);
+    if (updateError) {
+      console.error("Could not mark course_files row ready", updateError);
+      return json({ error: "Upload finished but could not be recorded" }, 500, origin);
+    }
+
+    return json({ file: await loadFullRow(auth.admin, record.id) }, 200, origin);
+  } catch (err) {
+    console.error("B2 complete-upload failed", err);
+    await auth.admin
+      .from("course_files")
+      .update({ upload_status: "failed" })
+      .eq("id", record.id);
+    return json({ error: "Could not finalize upload with storage provider" }, 502, origin);
+  }
+});
+
+async function loadFullRow(admin: SupabaseClient, id: string) {
+  const { data } = await admin
+    .from("course_files")
+    .select(
+      "id, course_id, lesson_id, kind, b2_object_key, original_filename, mime_type, file_size_bytes, upload_status, updated_at",
+    )
+    .eq("id", id)
+    .maybeSingle();
+  return data;
+}
+=== END FILE ===
+

@@ -1,0 +1,1157 @@
+=== FILE: src/routes/lesson.$lessonId.tsx ===
+import { useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  getLesson,
+  getLessonProgress,
+  saveLessonProgress,
+} from "@/lib/queries";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+
+export const Route = createFileRoute("/lesson/$lessonId")({
+  component: LessonPage,
+});
+
+function LessonPage() {
+  const { lessonId } = Route.useParams();
+  const lesson = useAsync(() => getLesson(lessonId), [lessonId]);
+  const progress = useAsync(() => getLessonProgress(lessonId), [lessonId]);
+
+  const [notes, setNotes] = useState("");
+  const [completed, setCompleted] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (progress.data) {
+      setNotes(progress.data.notes ?? "");
+      setCompleted(progress.data.completed);
+    }
+  }, [progress.data]);
+
+  async function handleSave(markComplete: boolean) {
+    setSaving(true);
+    try {
+      await saveLessonProgress(lessonId, {
+        notes,
+        completed: markComplete || completed,
+      });
+      if (markComplete) setCompleted(true);
+      setSavedAt(new Date().toLocaleTimeString("el-GR"));
+    } catch (e) {
+      alert("Αποτυχία αποθήκευσης: " + (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto min-h-screen max-w-4xl px-6 py-12 text-white">
+      {lesson.loading && <LoadingSkeleton rows={3} />}
+      {lesson.error && <ErrorState message={lesson.error} />}
+
+      {lesson.data && (
+        <>
+          <header className="mb-6">
+            <p className="text-xs uppercase tracking-[0.3em] text-white/40">
+              {lesson.data.type}
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold">{lesson.data.title}</h1>
+            {lesson.data.objective && (
+              <p className="mt-2 text-sm text-white/60">
+                {lesson.data.objective}
+              </p>
+            )}
+          </header>
+
+          {lesson.data.video_url ? (
+            <div className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+              <video
+                src={lesson.data.video_url}
+                controls
+                className="h-full w-full"
+              />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/50">
+              Δεν υπάρχει βίντεο για αυτό το μάθημα.
+            </div>
+          )}
+
+          {lesson.data.resources.length > 0 && (
+            <section className="mt-6">
+              <h2 className="mb-2 text-sm font-medium text-white/70">
+                Resources
+              </h2>
+              <ul className="space-y-1">
+                {lesson.data.resources.map((r, i) => (
+                  <li key={i}>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-white/80 underline decoration-white/30 underline-offset-4 hover:text-white"
+                    >
+                      {r.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {lesson.data.transcript && (
+            <details className="mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-5">
+              <summary className="cursor-pointer text-sm font-medium text-white/70">
+                Transcript
+              </summary>
+              <p className="mt-3 whitespace-pre-wrap text-sm text-white/60">
+                {lesson.data.transcript}
+              </p>
+            </details>
+          )}
+
+          <section className="mt-6">
+            <h2 className="mb-2 text-sm font-medium text-white/70">
+              Οι σημειώσεις μου
+            </h2>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={4}
+              placeholder="Κράτα σημειώσεις για αυτό το μάθημα…"
+              className="w-full rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white/90 outline-none focus:border-white/30"
+            />
+          </section>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => handleSave(false)}
+              disabled={saving}
+              className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              {saving ? "Αποθήκευση…" : "Αποθήκευση σημειώσεων"}
+            </button>
+            <button
+              onClick={() => handleSave(true)}
+              disabled={saving || completed}
+              className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            >
+              {completed ? "✓ Ολοκληρωμένο" : "Σήμανση ως ολοκληρωμένο"}
+            </button>
+            {savedAt && (
+              <span className="text-xs text-white/40">
+                Αποθηκεύτηκε {savedAt}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-10">
+            <Link
+              to="/dashboard"
+              className="text-xs text-white/50 transition hover:text-white/80"
+            >
+              ← Πίσω στο Dashboard
+            </Link>
+          </div>
+        </>
+      )}
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/book-DN8DL8gW.js ===
+import{t as e}from"./supabase-DXn9ZPwL.js";import{t}from"./createLucideIcon-Dz5w4CtK.js";var n=t(`truck`,[[`path`,{d:`M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2`,key:`wrbu53`}],[`path`,{d:`M15 18H9`,key:`1lyqi6`}],[`path`,{d:`M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14`,key:`lysw3i`}],[`circle`,{cx:`17`,cy:`18`,r:`2`,key:`332jqn`}],[`circle`,{cx:`7`,cy:`18`,r:`2`,key:`19iecd`}]]);function r(e,t=`eur`){return new Intl.NumberFormat(`el-GR`,{style:`currency`,currency:t.toUpperCase()}).format(e/100)}var i={invalid_input:`Please check your details and try again.`,sold_out:`Sorry, there are not enough copies left.`,book_unavailable:`The book is not available for ordering right now.`,not_found:`We could not find this order.`,server_error:`Something went wrong on our side. Please try again.`};async function a(t,n){let{data:r,error:a}=await e.functions.invoke(t,{body:n});if(a){let e=a.context;if(e&&typeof e.json==`function`)try{let t=await e.json();if(t?.error)throw Error(i[t.error]??t.error)}catch(e){if(e instanceof Error&&e.message)throw e}throw Error(a.message||`Request failed.`)}let o=r;if(o?.error)throw Error(i[o.error]??o.error);return r}async function o(){let{data:t,error:n}=await e.from(`book_settings`).select(`*`).eq(`id`,1).maybeSingle();if(n)throw Error(n.message);return t??null}function s(e){return a(`create-book-checkout`,e)}function c(e){return a(`confirm-book-order`,{orderId:e})}async function l(t){let{data:n,error:r}=await e.from(`book_settings`).upsert({id:1,...t}).select(`*`).single();if(r)throw Error(r.message);return n}async function u(){let{data:t,error:n}=await e.from(`book_orders`).select(`*`).order(`created_at`,{ascending:!1});if(n)throw Error(n.message);return t??[]}async function d(t,n){let{data:r,error:i}=await e.from(`book_orders`).update(n).eq(`id`,t).select(`*`).single();if(i)throw Error(i.message);return r}export{o as a,n as c,u as i,s as n,d as o,r,l as s,c as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/messages-CXx8ZzPc.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/messages-BVXzCx_l.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/useNavigate-BR9bgUfC.js","assets/react-D9fOyxUn.js","assets/proxy-ftrNcNdG.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/useAuth-B1WX5JkE.js","assets/queries-B7Arqryn.js","assets/roles-D-HGCJsI.js","assets/createLucideIcon-Dz5w4CtK.js","assets/arrow-left-Brxe6F5I.js","assets/loader-circle-DdNdnF6-.js","assets/phone-CFEnp_vY.js","assets/send-ClGHcKrI.js","assets/shield-check-Djau1VnD.js","assets/video-Bh1cdfCM.js","assets/messagingQueries-DN5myh0K.js","assets/States-BulpY35p.js"])))=>i.map(i=>d[i]);
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{n as r,t as i}from"./lazyRouteComponent-CNoRSiag.js";import{t as a}from"./supabase-DXn9ZPwL.js";import{t as o}from"./useAuth-B1WX5JkE.js";import{t as s}from"./createLucideIcon-Dz5w4CtK.js";import{t as c}from"./phone-CFEnp_vY.js";import{t as l}from"./video-Bh1cdfCM.js";import{t as u}from"./preload-helper-Czpn1I53.js";var ee=s(`mic-off`,[[`path`,{d:`M12 19v3`,key:`npa21l`}],[`path`,{d:`M15 9.34V5a3 3 0 0 0-5.68-1.33`,key:`1gzdoj`}],[`path`,{d:`M16.95 16.95A7 7 0 0 1 5 12v-2`,key:`cqa7eg`}],[`path`,{d:`M18.89 13.23A7 7 0 0 0 19 12v-2`,key:`16hl24`}],[`path`,{d:`m2 2 20 20`,key:`1ooewy`}],[`path`,{d:`M9 9v3a3 3 0 0 0 5.12 2.12`,key:`r2i35w`}]]),te=s(`mic`,[[`path`,{d:`M12 19v3`,key:`npa21l`}],[`path`,{d:`M19 10v2a7 7 0 0 1-14 0v-2`,key:`1vc78b`}],[`rect`,{x:`9`,y:`2`,width:`6`,height:`13`,rx:`3`,key:`s6n7sd`}]]),d=s(`phone-off`,[[`path`,{d:`M10.1 13.9a14 14 0 0 0 3.732 2.668 1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2 18 18 0 0 1-12.728-5.272`,key:`1wngk7`}],[`path`,{d:`M22 2 2 22`,key:`y4kqgn`}],[`path`,{d:`M4.76 13.582A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 .244.473`,key:`10hv5p`}]]),f=s(`video-off`,[[`path`,{d:`M10.66 6H14a2 2 0 0 1 2 2v2.5l5.248-3.062A.5.5 0 0 1 22 7.87v8.196`,key:`w8jjjt`}],[`path`,{d:`M16 16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2`,key:`1xawa7`}],[`path`,{d:`m2 2 20 20`,key:`1ooewy`}]]),p=e(n(),1);async function m(e){let{data:t,error:n}=await a.from(`call_logs`).select(`*`).eq(`conversation_id`,e).order(`created_at`,{ascending:!0}).limit(100);return n?[]:t??[]}function h(e){let t=Math.max(0,Math.floor(e)),n=Math.floor(t/3600),r=Math.floor(t%3600/60),i=t%60,a=String(r).padStart(n>0?2:1,`0`),o=String(i).padStart(2,`0`);return n>0?`${n}:${a}:${o}`:`${a}:${o}`}function g(e,t){let n=e.kind===`video`?`Βιντεοκλήση`:`Ηχητική κλήση`,r=e.caller_id===t;return e.answered_at?e.ended_at?{label:`${n} · ${h((new Date(e.ended_at).getTime()-new Date(e.answered_at).getTime())/1e3)}`,missed:!1}:{label:`${n} σε εξέλιξη`,missed:!1}:e.status===`declined`?{label:r?`Η κλήση απορρίφθηκε`:`Απέρριψες την κλήση`,missed:!1}:e.status===`ringing`&&Date.now()-new Date(e.created_at).getTime()<6e4?{label:`${n}…`,missed:!1}:{label:r?`Δεν απάντησε`:`Αναπάντητη κλήση`,missed:!r}}var _=t(),v=(0,p.createContext)({busy:!1,startCall:async()=>{}}),y=()=>(0,p.useContext)(v),ne=45e3,b=[{urls:`stun:stun.l.google.com:19302`}];function re(){if(typeof crypto<`u`&&typeof crypto.randomUUID==`function`)return crypto.randomUUID();let e=new Uint8Array(16);crypto.getRandomValues(e),e[6]=e[6]&15|64,e[8]=e[8]&63|128;let t=[...e].map(e=>e.toString(16).padStart(2,`0`)).join(``);return`${t.slice(0,8)}-${t.slice(8,12)}-${t.slice(12,16)}-${t.slice(16,20)}-${t.slice(20)}`}async function ie(){try{let{data:e,error:t}=await a.functions.invoke(`get-ice-servers`);if(!t&&e?.iceServers)return e.iceServers}catch{}return b}function x(e,t=8e3){return new Promise((n,r)=>{let i=setTimeout(()=>r(Error(`subscribe timeout`)),t);e.subscribe(e=>{e===`SUBSCRIBED`&&(clearTimeout(i),n()),(e===`CHANNEL_ERROR`||e===`TIMED_OUT`||e===`CLOSED`)&&(clearTimeout(i),r(Error(e)))})})}async function ae(e,t){let n;for(let r of[!0,!1]){let i=a.channel(e,{config:{private:r}});t(i);try{return await x(i),i}catch(e){n=e,a.removeChannel(i)}}throw n}function S({children:e}){let{profile:t}=o(),n=t?.id,[r,i]=(0,p.useState)(null),[s,u]=(0,p.useState)(`idle`),[m,g]=(0,p.useState)(!1),[y,b]=(0,p.useState)(!1),[x,S]=(0,p.useState)(null),[C,w]=(0,p.useState)(null),[T,E]=(0,p.useState)(0),[D,O]=(0,p.useState)(null),k=(0,p.useRef)(null),A=(0,p.useRef)(`idle`),j=(0,p.useRef)(null),M=(0,p.useRef)(null),N=(0,p.useRef)(null),P=(0,p.useRef)([]),F=(0,p.useRef)(null),I=(0,p.useRef)(null),L=(0,p.useRef)(null),R=(0,p.useRef)(null),z=(0,p.useRef)(!1),B=(0,p.useRef)(null),V=(0,p.useRef)(null),H=e=>{A.current=e,u(e)},U=(0,p.useCallback)(e=>{O(e),I.current&&clearTimeout(I.current),I.current=setTimeout(()=>O(null),6e3)},[]),W=(0,p.useCallback)(()=>{F.current&&clearTimeout(F.current),F.current=null,L.current&&clearInterval(L.current),L.current=null,R.current&&clearTimeout(R.current),R.current=null,z.current=!1,N.current?.getTracks().forEach(e=>e.stop()),N.current=null,j.current?.close(),j.current=null,M.current&&a.removeChannel(M.current),M.current=null,P.current=[],k.current=null,i(null),S(null),w(null),g(!1),b(!1),E(0),H(`idle`)},[]);(0,p.useEffect)(()=>{B.current&&(B.current.srcObject=x)},[x,s]),(0,p.useEffect)(()=>{V.current&&(V.current.srcObject=C)},[C,s]),(0,p.useEffect)(()=>{if(s!==`connected`)return;let e=setInterval(()=>E(e=>e+1),1e3);return()=>clearInterval(e)},[s]);let G=!!r&&s===`ringing`,K=r?.direction===`in`;(0,p.useEffect)(()=>{if(!G)return;let e=null;try{e=new(window.AudioContext||window.webkitAudioContext)}catch{return}let t=()=>{if(e)try{let t=e.createOscillator(),n=e.createGain();t.frequency.value=K?880:440,n.gain.value=.05,t.connect(n),n.connect(e.destination),t.start(),t.stop(e.currentTime+.4)}catch{}};t();let n=setInterval(()=>{t(),K&&navigator.vibrate&&navigator.vibrate([300,150,300])},1500);return()=>{clearInterval(n),e?.close().catch(()=>{})}},[G,K]);let q=(0,p.useCallback)(async(e=`ended`)=>{let t=k.current;if(!t)return;let n=A.current===`connected`||A.current===`connecting`?`ended`:t.direction===`out`?e===`missed`?`missed`:`cancelled`:`ended`;await a.from(`call_logs`).update({status:n,ended_at:new Date().toISOString()}).eq(`id`,t.id).is(`ended_at`,null),M.current?.send({type:`broadcast`,event:`hangup`,payload:{}}),setTimeout(W,80)},[W]),J=(0,p.useCallback)(async(e,t)=>{let n=await navigator.mediaDevices.getUserMedia({audio:!0,video:e.kind===`video`&&{facingMode:`user`}});N.current=n,S(n);let r=new RTCPeerConnection({iceServers:await ie()});j.current=r,n.getTracks().forEach(e=>r.addTrack(e,n));let i=new MediaStream;r.ontrack=e=>{e.streams[0]?.getTracks().forEach(e=>{i.getTracks().includes(e)||i.addTrack(e)}),w(new MediaStream(i.getTracks()))};let a=()=>{R.current&&clearTimeout(R.current),R.current=null,H(`connected`)},o=()=>{R.current||=setTimeout(()=>{A.current!==`connected`&&(U(`Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.`),q(`ended`))},25e3)};r.oniceconnectionstatechange=()=>{console.log(`[call] ice:`,r.iceConnectionState),(r.iceConnectionState===`connected`||r.iceConnectionState===`completed`)&&a()},r.onconnectionstatechange=()=>{console.log(`[call] pc:`,r.connectionState),r.connectionState===`connected`&&a(),r.connectionState===`failed`&&(U(`Η σύνδεση απέτυχε.`),q(`ended`))};let s=(e,t={})=>M.current?.send({type:`broadcast`,event:e,payload:t});r.onicecandidate=e=>{e.candidate&&s(`ice`,{c:e.candidate.toJSON()})};let c=async()=>{for(let e of P.current)await r.addIceCandidate(e).catch(()=>{});P.current=[]};return M.current=await ae(`call:${e.id}`,e=>{e.on(`broadcast`,{event:`ready`},async()=>{if(!t||(console.log(`[call] got ready`),F.current&&clearTimeout(F.current),F.current=null,A.current===`ringing`&&H(`connecting`),o(),r.remoteDescription))return;if(r.localDescription){s(`offer`,{sdp:r.localDescription});return}if(z.current)return;z.current=!0;let e=await r.createOffer();await r.setLocalDescription(e),s(`offer`,{sdp:e})}).on(`broadcast`,{event:`offer`},async({payload:e})=>{if(r.remoteDescription)return;console.log(`[call] got offer`),L.current&&clearInterval(L.current),L.current=null,await r.setRemoteDescription(e.sdp),await c();let t=await r.createAnswer();await r.setLocalDescription(t),s(`answer`,{sdp:t})}).on(`broadcast`,{event:`answer`},async({payload:e})=>{r.remoteDescription||(console.log(`[call] got answer`),await r.setRemoteDescription(e.sdp),await c())}).on(`broadcast`,{event:`ice`},async({payload:e})=>{r.remoteDescription?await r.addIceCandidate(e.c).catch(()=>{}):P.current.push(e.c)}).on(`broadcast`,{event:`hangup`},()=>W()).on(`broadcast`,{event:`decline`},()=>W())}),s},[W,q,U]),Y=e=>{let t=e?.name;return t===`NotAllowedError`?`Επίτρεψε μικρόφωνο/κάμερα στον browser.`:t===`NotFoundError`?`Δεν βρέθηκε μικρόφωνο/κάμερα.`:window.isSecureContext?`Η κλήση απέτυχε. Δοκίμασε ξανά.`:`Οι κλήσεις θέλουν HTTPS.`},X=(0,p.useCallback)(async(e,n,r)=>{if(!t||k.current)return;let o=re(),s={id:o,conversationId:n,kind:r,peer:e,direction:`out`};k.current=s,i(s),H(`ringing`);try{let{error:i}=await a.from(`call_logs`).insert({id:o,conversation_id:n,caller_id:t.id,callee_id:e.id,kind:r});if(i)throw i;await J(s,!0),F.current=setTimeout(()=>{A.current===`ringing`&&q(`missed`)},ne)}catch(e){console.error(`startCall failed`,e),U(Y(e)),await a.from(`call_logs`).update({status:`cancelled`,ended_at:new Date().toISOString()}).eq(`id`,o),W()}},[t,J,q,W,U]);(0,p.useEffect)(()=>{if(!n)return;let e=async e=>{if(k.current||e.status!==`ringing`||e.ended_at||Date.now()-new Date(e.created_at).getTime()>6e4)return;let t=`Χρήστης`,n=null;try{let{data:r}=await a.from(`profiles`).select(`full_name, avatar_url`).eq(`id`,e.caller_id).maybeSingle();r&&(t=r.full_name??t,n=r.avatar_url??null)}catch{}if(k.current)return;let r={id:e.id,conversationId:e.conversation_id,kind:e.kind,peer:{id:e.caller_id,name:t,avatar:n},direction:`in`};k.current=r,i(r),H(`ringing`),navigator.vibrate&&navigator.vibrate([300,150,300])},t=a.channel(`incoming-calls:${n}`).on(`postgres_changes`,{event:`INSERT`,schema:`public`,table:`call_logs`,filter:`callee_id=eq.${n}`},t=>void e(t.new)).subscribe();return(async()=>{let t=new Date(Date.now()-45e3).toISOString(),{data:r}=await a.from(`call_logs`).select(`*`).eq(`callee_id`,n).eq(`status`,`ringing`).is(`ended_at`,null).gte(`created_at`,t).order(`created_at`,{ascending:!1}).limit(1);r?.[0]&&e(r[0])})(),()=>{a.removeChannel(t)}},[n]);let Z=r?.id;(0,p.useEffect)(()=>{if(!Z)return;let e=a.channel(`call-status:${Z}`).on(`postgres_changes`,{event:`UPDATE`,schema:`public`,table:`call_logs`,filter:`id=eq.${Z}`},e=>{e.new.ended_at&&k.current?.id===Z&&W()}).subscribe();return()=>{a.removeChannel(e)}},[Z,W]);let oe=async()=>{let e=k.current;if(e){H(`connecting`);try{let t=await J(e,!1);await a.from(`call_logs`).update({status:`answered`,answered_at:new Date().toISOString()}).eq(`id`,e.id);let n=0,r=()=>{console.log(`[call] send ready`),t(`ready`)};r(),L.current=setInterval(()=>{if(j.current?.remoteDescription||++n>25){L.current&&clearInterval(L.current),L.current=null;return}r()},1e3),R.current=setTimeout(()=>{A.current!==`connected`&&(U(`Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.`),q(`ended`))},25e3)}catch(e){console.error(`accept failed`,e),U(Y(e)),await q(`ended`)}}},se=async()=>{let e=k.current;e&&(await a.from(`call_logs`).update({status:`declined`,ended_at:new Date().toISOString()}).eq(`id`,e.id),W())},ce=()=>{let e=!m;N.current?.getAudioTracks().forEach(t=>t.enabled=!e),g(e)},le=()=>{let e=!y;N.current?.getVideoTracks().forEach(t=>t.enabled=!e),b(e)},ue=(0,p.useMemo)(()=>({busy:!!r,startCall:X}),[r,X]),Q=r?.direction===`in`&&s===`ringing`,$=r?.kind===`video`;return(0,_.jsxs)(v.Provider,{value:ue,children:[e,D&&(0,_.jsx)(`div`,{className:`fixed left-1/2 top-4 z-[120] -translate-x-1/2 rounded-full bg-red-500/90 px-4 py-2 text-sm text-white shadow-lg`,children:D}),r&&(0,_.jsxs)(`div`,{className:`fixed inset-0 z-[100] flex flex-col bg-[#070707] text-white`,children:[(0,_.jsx)(`video`,{ref:V,autoPlay:!0,playsInline:!0,className:`absolute inset-0 h-full w-full object-cover ${$&&s===`connected`?``:`invisible`}`}),(!$||s!==`connected`)&&(0,_.jsxs)(`div`,{className:`relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-6`,children:[r.peer.avatar?(0,_.jsx)(`img`,{src:r.peer.avatar,alt:``,className:`h-28 w-28 rounded-full object-cover ring-1 ring-white/20`}):(0,_.jsx)(`div`,{className:`flex h-28 w-28 items-center justify-center rounded-full bg-white/10 text-3xl font-semibold`,children:r.peer.name.charAt(0).toUpperCase()}),(0,_.jsx)(`p`,{className:`text-xl font-medium`,children:r.peer.name}),(0,_.jsx)(`p`,{className:`text-sm text-white/50`,children:s===`connected`?h(T):s===`connecting`?`Σύνδεση…`:Q?$?`Εισερχόμενη βιντεοκλήση`:`Εισερχόμενη κλήση`:`Καλεί…`})]}),$&&s===`connected`&&(0,_.jsxs)(`p`,{className:`absolute left-0 right-0 top-6 z-10 text-center text-sm text-white/80 [text-shadow:0_1px_4px_rgba(0,0,0,.6)]`,children:[r.peer.name,` · `,h(T)]}),$&&x&&(0,_.jsx)(`video`,{ref:B,autoPlay:!0,playsInline:!0,muted:!0,className:`absolute right-4 top-4 z-20 h-36 w-24 -scale-x-100 rounded-xl bg-black object-cover ring-1 ring-white/20`}),(0,_.jsx)(`div`,{className:`relative z-10 flex items-center justify-center gap-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6`,children:Q?(0,_.jsxs)(_.Fragment,{children:[(0,_.jsx)(`button`,{onClick:se,"aria-label":`Απόρριψη`,className:`flex h-16 w-16 items-center justify-center rounded-full bg-red-500`,children:(0,_.jsx)(d,{size:26})}),(0,_.jsx)(`button`,{onClick:oe,"aria-label":`Απάντηση`,className:`flex h-16 w-16 items-center justify-center rounded-full bg-green-500`,children:$?(0,_.jsx)(l,{size:26}):(0,_.jsx)(c,{size:26})})]}):(0,_.jsxs)(_.Fragment,{children:[(0,_.jsx)(`button`,{onClick:ce,"aria-label":`Σίγαση`,className:`flex h-14 w-14 items-center justify-center rounded-full ${m?`bg-white text-black`:`bg-white/15`}`,children:m?(0,_.jsx)(ee,{size:22}):(0,_.jsx)(te,{size:22})}),$&&(0,_.jsx)(`button`,{onClick:le,"aria-label":`Κάμερα`,className:`flex h-14 w-14 items-center justify-center rounded-full ${y?`bg-white text-black`:`bg-white/15`}`,children:y?(0,_.jsx)(f,{size:22}):(0,_.jsx)(l,{size:22})}),(0,_.jsx)(`button`,{onClick:()=>q(`ended`),"aria-label":`Τερματισμός`,className:`flex h-16 w-16 items-center justify-center rounded-full bg-red-500`,children:(0,_.jsx)(d,{size:26})})]})})]})]})}var C=r(`/messages`)({component:i(()=>u(()=>import(`./messages-BVXzCx_l.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19])),`component`),validateSearch:e=>({with:typeof e.with==`string`?e.with:void 0})});export{m as a,g as i,S as n,y as r,C as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/States-BulpY35p.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";var t=e();function n({rows:e=3}){return(0,t.jsx)(`div`,{className:`space-y-4`,"aria-busy":`true`,"aria-label":`Φόρτωση`,children:Array.from({length:e}).map((e,n)=>(0,t.jsx)(`div`,{className:`h-24 w-full animate-pulse rounded-xl bg-white/5`},n))})}function r({message:e,onRetry:n}){return(0,t.jsxs)(`div`,{role:`alert`,className:`rounded-xl border border-red-500/30 bg-red-500/5 p-6 text-center`,children:[(0,t.jsx)(`p`,{className:`text-sm text-red-300`,children:`Κάτι πήγε στραβά`}),(0,t.jsx)(`p`,{className:`mt-1 text-xs text-white/60`,children:e}),n&&(0,t.jsx)(`button`,{onClick:n,className:`mt-4 rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40`,children:`Δοκίμασε ξανά`})]})}function i({title:e,hint:n,action:r}){return(0,t.jsxs)(`div`,{className:`rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center`,children:[(0,t.jsx)(`p`,{className:`text-sm text-white/80`,children:e}),n&&(0,t.jsx)(`p`,{className:`mt-1 text-xs text-white/50`,children:n}),r&&(0,t.jsx)(`div`,{className:`mt-4 flex justify-center`,children:r})]})}function a({reason:e}){return(0,t.jsxs)(`div`,{className:`rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center`,children:[(0,t.jsx)(`p`,{className:`text-sm text-white/70`,children:`🔒 Κλειδωμένο`}),(0,t.jsx)(`p`,{className:`mt-1 text-xs text-white/50`,children:e})]})}export{a as i,r as n,n as r,i as t};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/ChromeButton-CActtrBI.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/ChromeButton-CActtrBI.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+/**
+* Primary: dark surface + chrome border + reflective hover sweep.
+* Secondary: transparent + minimal silver border.
+* No filled brand colors — monochrome only.
+*/
+var ChromeButton = (0, import_react.forwardRef)(({ variant = "primary", className = "", children, ...props }, ref) => {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+		ref,
+		className: `font-aura relative inline-flex items-center justify-center rounded-full px-7 py-3 text-sm font-medium tracking-wide transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 disabled:opacity-50 ${variant === "primary" ? "btn-sweep bg-aura-surface text-aura-white border border-white/15 hover:-translate-y-0.5 hover:border-white/40 hover:shadow-[0_0_28px_-6px_rgba(255,255,255,0.22)]" : "bg-transparent text-aura-text-secondary border border-white/10 hover:-translate-y-0.5 hover:text-aura-white hover:border-white/25"} ${className}`,
+		...props,
+		children
+	});
+});
+ChromeButton.displayName = "ChromeButton";
+//#endregion
+export { ChromeButton as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/onlineSeminars-BIk1PE2V.mjs ===
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/onlineSeminars-BIk1PE2V.js
+function formatPrice(cents, currency = "eur") {
+	return new Intl.NumberFormat("el-GR", {
+		style: "currency",
+		currency: currency.toUpperCase()
+	}).format(cents / 100);
+}
+async function getPublicOnlineSeminars() {
+	const { data, error } = await supabase.from("online_seminars_public").select("*").gte("starts_at", (/* @__PURE__ */ new Date()).toISOString()).order("starts_at", { ascending: true });
+	if (error) throw error;
+	return data ?? [];
+}
+async function getAdminOnlineSeminars() {
+	const { data, error } = await supabase.from("online_seminars").select("*").order("starts_at", { ascending: false });
+	if (error) throw error;
+	return data ?? [];
+}
+async function saveOnlineSeminar(input, id) {
+	const { error } = await (id ? supabase.from("online_seminars").update(input).eq("id", id) : supabase.from("online_seminars").insert(input));
+	if (error) throw error;
+}
+async function setOnlineSeminarPublished(id, published) {
+	const { error } = await supabase.from("online_seminars").update({ published }).eq("id", id);
+	if (error) throw error;
+}
+async function deleteOnlineSeminar(id) {
+	const { error } = await supabase.from("online_seminars").delete().eq("id", id);
+	if (error) throw error;
+}
+async function getOnlineBookings() {
+	const { data, error } = await supabase.from("online_seminar_bookings").select("*, online_seminars(title, starts_at)").order("created_at", { ascending: false });
+	if (error) throw error;
+	return data ?? [];
+}
+async function setOnlineBookingStatus(id, status) {
+	const { error } = await supabase.from("online_seminar_bookings").update({
+		status,
+		paid_at: status === "paid" ? (/* @__PURE__ */ new Date()).toISOString() : null
+	}).eq("id", id);
+	if (error) throw error;
+}
+async function startOnlineCheckout(p) {
+	const url = supabase.supabaseUrl;
+	const key = supabase.supabaseKey;
+	let res;
+	try {
+		res = await fetch(`${url}/functions/v1/create-online-checkout`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				apikey: key,
+				Authorization: `[REDACTED]`
+			},
+			body: JSON.stringify(p)
+		});
+	} catch {
+		throw new Error("network_error");
+	}
+	const data = await res.json().catch(() => ({}));
+	if (!res.ok || !data?.clientSecret) {
+		console.error("create-online-checkout:", res.status, data);
+		throw new Error(data?.error ?? "server_error");
+	}
+	return data;
+}
+/** Polls until the Stripe webhook has marked the booking as paid. */
+async function waitForPaid(sessionId, tries = 12, delayMs = 1500) {
+	for (let i = 0; i < tries; i++) {
+		const { data } = await supabase.rpc("get_online_booking_status", { p_session: sessionId });
+		if (data === "paid") return true;
+		await new Promise((r) => setTimeout(r, delayMs));
+	}
+	return false;
+}
+//#endregion
+export { getPublicOnlineSeminars as a, setOnlineSeminarPublished as c, getOnlineBookings as i, startOnlineCheckout as l, formatPrice as n, saveOnlineSeminar as o, getAdminOnlineSeminars as r, setOnlineBookingStatus as s, deleteOnlineSeminar as t, waitForPaid as u };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/States-CTtcXN7r.mjs ===
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/States-CTtcXN7r.js
+var import_jsx_runtime = require_jsx_runtime();
+function LoadingSkeleton({ rows = 3 }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "space-y-4",
+		"aria-busy": "true",
+		"aria-label": "Φόρτωση",
+		children: Array.from({ length: rows }).map((_, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-24 w-full animate-pulse rounded-xl bg-white/5" }, i))
+	});
+}
+function ErrorState({ message, onRetry }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		role: "alert",
+		className: "rounded-xl border border-red-500/30 bg-red-500/5 p-6 text-center",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-sm text-red-300",
+				children: "Κάτι πήγε στραβά"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-1 text-xs text-white/60",
+				children: message
+			}),
+			onRetry && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				onClick: onRetry,
+				className: "mt-4 rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+				children: "Δοκίμασε ξανά"
+			})
+		]
+	});
+}
+function EmptyState({ title, hint, action }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-sm text-white/80",
+				children: title
+			}),
+			hint && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-1 text-xs text-white/50",
+				children: hint
+			}),
+			action && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-4 flex justify-center",
+				children: action
+			})
+		]
+	});
+}
+function LockedState({ reason }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "text-sm text-white/70",
+			children: "🔒 Κλειδωμένο"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "mt-1 text-xs text-white/50",
+			children: reason
+		})]
+	});
+}
+//#endregion
+export { LockedState as i, ErrorState as n, LoadingSkeleton as r, EmptyState as t };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/ChromeButton.tsx ===
+import { forwardRef } from "react";
+
+type Variant = "primary" | "secondary";
+
+interface ChromeButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: Variant;
+}
+
+/**
+ * Primary: dark surface + chrome border + reflective hover sweep.
+ * Secondary: transparent + minimal silver border.
+ * No filled brand colors — monochrome only.
+ */
+const ChromeButton = forwardRef<HTMLButtonElement, ChromeButtonProps>(
+  ({ variant = "primary", className = "", children, ...props }, ref) => {
+    const base =
+      "font-aura relative inline-flex items-center justify-center rounded-full px-7 py-3 text-sm font-medium tracking-wide transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 disabled:opacity-50";
+
+    const styles =
+      variant === "primary"
+        ? "btn-sweep bg-aura-surface text-aura-white border border-white/15 hover:-translate-y-0.5 hover:border-white/40 hover:shadow-[0_0_28px_-6px_rgba(255,255,255,0.22)]"
+        : "bg-transparent text-aura-text-secondary border border-white/10 hover:-translate-y-0.5 hover:text-aura-white hover:border-white/25";
+
+    return (
+      <button ref={ref} className={`${base} ${styles} ${className}`} {...props}>
+        {children}
+      </button>
+    );
+  }
+);
+
+ChromeButton.displayName = "ChromeButton";
+export default ChromeButton;
+=== END FILE ===
+
+=== FILE: src/components/aura/OnlineUsersPanel.tsx ===
+// src/components/aura/OnlineUsersPanel.tsx
+import { useMemo, useState } from "react";
+import { Circle, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
+import { useOnlinePresence, type PresenceUser } from "@/lib/usePresence";
+import { isAdminRole } from "@/lib/roles";
+import UserProfileModal from "@/components/aura/UserProfileModal";
+
+export default function OnlineUsersPanel() {
+  const { profile } = useAuth();
+  const onlineUsers = useOnlinePresence(
+    profile
+      ? {
+          id: profile.id,
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url,
+          role: profile.role,
+        }
+      : null,
+  );
+  const [openUserId, setOpenUserId] = useState<string | null>(null);
+
+  const { admins, students } = useMemo(() => {
+    const admins = onlineUsers.filter((u) => isAdminRole(u.role));
+    const students = onlineUsers.filter((u) => !isAdminRole(u.role));
+    return { admins, students };
+  }, [onlineUsers]);
+
+  return (
+    <>
+      {/* Visibility/positioning is now owned by the parent (desktop sticky sidebar vs.
+          mobile drag panel) — this component just fills whatever box it's placed in. */}
+      <aside className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl">
+        <div className="border-b border-white/10 px-5 py-4">
+          <p className="text-xs uppercase tracking-[0.25em] text-white/50">
+            Online τώρα
+          </p>
+          <p className="mt-1 text-sm text-white/40">
+            {onlineUsers.length} συνδεδεμένοι
+          </p>
+        </div>
+
+        <div className="flex-1 space-y-6 overflow-y-auto px-3 py-4">
+          {admins.length > 0 && (
+            <div>
+              <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+                Admins
+              </p>
+              <div className="space-y-1">
+                {admins.map((u) => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isAdmin
+                    onClick={() => setOpenUserId(u.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
+              Μαθητές
+            </p>
+            <div className="space-y-1">
+              {students.length === 0 && (
+                <p className="px-2 text-xs text-white/30">Κανείς online.</p>
+              )}
+              {students.map((u) => (
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  isAdmin={false}
+                  onClick={() => setOpenUserId(u.id)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {openUserId && (
+        <UserProfileModal
+          userId={openUserId}
+          onClose={() => setOpenUserId(null)}
+        />
+      )}
+    </>
+  );
+}
+
+function UserRow({
+  user,
+  isAdmin,
+  onClick,
+}: {
+  user: PresenceUser;
+  isAdmin: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/[0.06]"
+    >
+      <div className="relative shrink-0">
+        {user.avatar_url ? (
+          <img
+            src={user.avatar_url}
+            alt=""
+            className="h-9 w-9 rounded-full object-cover ring-1 ring-white/15"
+          />
+        ) : (
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white/70">
+            {user.full_name?.[0]?.toUpperCase() ?? "?"}
+          </div>
+        )}
+        <Circle
+          size={10}
+          className="absolute -bottom-0.5 -right-0.5 rounded-full fill-emerald-400 text-emerald-400 ring-2 ring-[#070707]"
+        />
+      </div>
+      <span className="min-w-0 flex-1 truncate text-sm text-white/85">
+        {user.full_name ?? "Χρήστης"}
+      </span>
+      {isAdmin && <ShieldCheck size={15} className="shrink-0 text-white/70" />}
+    </button>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/PromoPopup.tsx ===
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowUpRight, X } from "lucide-react";
+import forza from "@/assets/forza.jpeg";
+
+const DELAY_MS = 10_000;
+const STORAGE_KEY = "aura-promo-seen";
+
+export default function PromoPopup() {
+  const [open, setOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
+
+  const close = useCallback(() => setOpen(false), []);
+
+  // Show once, 10 seconds after the page loads (once per browser session).
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(STORAGE_KEY)) return;
+    } catch {
+      /* storage unavailable: just show it */
+    }
+    const timer = window.setTimeout(() => {
+      setOpen(true);
+      try {
+        sessionStorage.setItem(STORAGE_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+    }, DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  // While open: Esc closes, page scroll is locked, focus moves into the dialog.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialogRef.current?.focus();
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, close]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="promo-backdrop"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduce ? 0 : 0.7, ease: [0.22, 1, 0.36, 1] }}
+          onClick={close}
+        >
+          {/* Chrome gradient border */}
+          <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="promo-title"
+            aria-describedby="promo-desc"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            initial={reduce ? false : { opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: reduce ? 0 : 0.9, ease: [0.22, 1, 0.36, 1] }}
+            className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-gradient-to-br from-white/70 via-white/10 to-white/50 p-px shadow-[0_0_90px_rgba(210,218,230,0.2),0_30px_80px_rgba(0,0,0,0.7)] outline-none"
+          >
+            <div className="relative grid overflow-hidden rounded-[calc(1.5rem-1px)] bg-aura-bg2 md:grid-cols-[1fr_1.1fr]">
+              {/* Top chrome highlight + ambient glow */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-white/80 to-transparent"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(210,218,230,0.16),transparent_65%)] blur-2xl"
+              />
+
+              {/* Image */}
+              <div className="relative min-h-[15rem] md:min-h-[28rem]">
+                <img
+                  src={forza}
+                  alt="Forza Brava hair products"
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 bg-gradient-to-t from-aura-bg2 via-transparent to-black/20 md:bg-gradient-to-r md:from-transparent md:via-transparent md:to-aura-bg2"
+                />
+                <div className="font-aura absolute left-4 top-4 rounded-full border border-white/30 bg-black/50 px-3.5 py-1.5 text-xs font-bold tracking-[0.2em] text-aura-white shadow-[0_0_24px_rgba(220,226,235,0.35)] backdrop-blur-md">
+                  10% OFF
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="font-aura relative flex flex-col justify-center gap-6 p-8 text-center md:p-10 md:text-left">
+                <button
+                  type="button"
+                  onClick={close}
+                  aria-label="Close"
+                  className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-full border border-white/10 text-aura-text-secondary transition-all duration-300 hover:border-white/40 hover:text-aura-white hover:shadow-[0_0_22px_rgba(220,226,235,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                >
+                  <X className="size-4" />
+                </button>
+
+                <h2
+                  id="promo-title"
+                  className="chrome-text text-3xl font-extrabold leading-[1.1] tracking-tight drop-shadow-[0_0_24px_rgba(220,226,235,0.3)] md:text-4xl"
+                >
+                  Get 10% off Forza Brava hair products
+                </h2>
+
+                <p
+                  id="promo-desc"
+                  className="mx-auto max-w-sm text-sm leading-relaxed text-aura-text-secondary md:mx-0"
+                >
+                  Included with every AURA Pro and Elite plan. Choose your plan and the discount
+                  is yours.
+                </p>
+
+                <div className="flex flex-col items-center gap-3 md:items-start">
+                  <Link
+                    to="/pricing"
+                    onClick={close}
+                    className="group relative inline-flex w-full items-center justify-center gap-2 overflow-hidden rounded-full border border-white/40 bg-gradient-to-b from-white/95 to-white/70 px-8 py-3.5 text-sm font-bold tracking-[0.25em] text-black shadow-[0_0_34px_rgba(220,226,235,0.35)] transition-all duration-300 hover:shadow-[0_0_52px_rgba(220,226,235,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 sm:w-auto"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 -skew-x-12 bg-white/70 opacity-0 blur-md transition-all duration-700 group-hover:left-[130%] group-hover:opacity-100"
+                    />
+                    <span className="relative">GET NOW</span>
+                    <ArrowUpRight className="relative size-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={close}
+                    className="rounded-full px-3 py-1.5 text-xs text-aura-text-muted transition-colors duration-300 hover:text-aura-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  >
+                    No thanks
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/States.tsx ===
+import type { ReactNode } from "react";
+
+export function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="space-y-4" aria-busy="true" aria-label="Φόρτωση">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="h-24 w-full animate-pulse rounded-xl bg-white/5"
+        />
+      ))}
+    </div>
+  );
+}
+
+export function ErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="rounded-xl border border-red-500/30 bg-red-500/5 p-6 text-center"
+    >
+      <p className="text-sm text-red-300">Κάτι πήγε στραβά</p>
+      <p className="mt-1 text-xs text-white/60">{message}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="mt-4 rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+        >
+          Δοκίμασε ξανά
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function EmptyState({
+  title,
+  hint,
+  action,
+}: {
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center">
+      <p className="text-sm text-white/80">{title}</p>
+      {hint && <p className="mt-1 text-xs text-white/50">{hint}</p>}
+      {action && <div className="mt-4 flex justify-center">{action}</div>}
+    </div>
+  );
+}
+
+export function LockedState({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-10 text-center">
+      <p className="text-sm text-white/70">🔒 Κλειδωμένο</p>
+      <p className="mt-1 text-xs text-white/50">{reason}</p>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/StoriesBar.tsx ===
+import { useState } from "react";
+import { Plus } from "lucide-react";
+import { useAsync } from "@/lib/useAsync";
+import { getActiveStories } from "@/lib/queries";
+import CreateStoryModal from "@/components/aura/CreateStoryModal";
+import StoryViewer from "@/components/aura/StoryViewer";
+
+export default function StoriesBar({
+  currentUserId,
+  currentUserAvatar,
+  currentUserName,
+}: {
+  currentUserId: string;
+  currentUserAvatar: string | null;
+  currentUserName: string | null;
+}) {
+  const stories = useAsync(getActiveStories, []);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewerGroupIndex, setViewerGroupIndex] = useState<number | null>(null);
+
+  const groups = stories.data ?? [];
+  const myGroup = groups.find((g) => g.author.id === currentUserId);
+
+  return (
+    <div className="mb-2">
+      <div className="scrollbar-none flex gap-4 overflow-x-auto pb-2">
+        {/* Your Story */}
+        <div className="flex shrink-0 flex-col items-center gap-1">
+          <button
+            onClick={() =>
+              myGroup
+                ? setViewerGroupIndex(groups.indexOf(myGroup))
+                : setCreateOpen(true)
+            }
+            className="relative"
+          >
+            <div
+              className={`h-16 w-16 rounded-full p-[2px] ${
+                myGroup && !myGroup.allViewed
+                  ? "bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600"
+                  : "bg-white/15"
+              }`}
+            >
+              <div className="h-full w-full rounded-full bg-[#070707] p-[2px]">
+                {currentUserAvatar ? (
+                  <img src={currentUserAvatar} className="h-full w-full rounded-full object-cover" alt="" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+                    {currentUserName?.[0]?.toUpperCase() ?? "A"}
+                  </div>
+                )}
+              </div>
+            </div>
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                setCreateOpen(true);
+              }}
+              className="absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#070707] bg-white text-black"
+            >
+              <Plus size={12} strokeWidth={3} />
+            </span>
+          </button>
+          <span className="max-w-[64px] truncate text-[11px] text-white/70">Εσύ</span>
+        </div>
+
+        {/* Everyone else */}
+        {groups
+          .filter((g) => g.author.id !== currentUserId)
+          .map((g) => (
+            <div key={g.author.id} className="flex shrink-0 flex-col items-center gap-1">
+              <button onClick={() => setViewerGroupIndex(groups.indexOf(g))}>
+                <div
+                  className={`h-16 w-16 rounded-full p-[2px] ${
+                    g.allViewed
+                      ? "bg-white/15"
+                      : "bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600"
+                  }`}
+                >
+                  <div className="h-full w-full rounded-full bg-[#070707] p-[2px]">
+                    {g.author.avatar_url ? (
+                      <img src={g.author.avatar_url} className="h-full w-full rounded-full object-cover" alt="" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">
+                        {g.author.full_name?.[0]?.toUpperCase() ?? "A"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+              <span className="max-w-[64px] truncate text-[11px] text-white/70">
+                {g.author.full_name ?? "Χρήστης"}
+              </span>
+            </div>
+          ))}
+      </div>
+
+      <CreateStoryModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => stories.reload?.()}
+      />
+
+      {viewerGroupIndex !== null && groups.length > 0 && (
+        <StoryViewer
+          groups={groups}
+          startGroupIndex={viewerGroupIndex}
+          currentUserId={currentUserId}
+          onClose={() => {
+            setViewerGroupIndex(null);
+            stories.reload?.();
+          }}
+          onDeleted={() => stories.reload?.()}
+        />
+      )}
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/hooks/useAuth.tsx ===
+// src/hooks/useAuth.tsx
+import { useCallback, useEffect, useState } from "react";
+import type { Session, User } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import type { PlanId } from "@/lib/plans";
+
+interface AuthState {
+  session: Session | null;
+  user: User | null;
+  loading: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
+  /** Το planId ταξιδεύει στο callback URL — προαιρετικό, ώστε οι
+   *  υπάρχοντες callers να δουλεύουν χωρίς αλλαγή. */
+  signInWithGoogle: (planId?: PlanId) => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+/**
+ * Παρακολουθεί το Supabase session. Μόνο client-side — η εφαρμογή διαβάζει
+ * το auth στον browser, όχι σε SSR.
+ */
+export function useAuth(): AuthState {
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (mounted) setLoading(false);
+      });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (!mounted) return;
+      setSession(next);
+      setUser(next?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    // Αν είναι ενεργή η επιβεβαίωση email, δεν υπάρχει ακόμα session.
+    return { needsConfirmation: !data.session };
+  }, []);
+
+  const signInWithGoogle = useCallback(async (planId?: PlanId) => {
+    const origin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : ((import.meta.env["VITE_SITE_URL"] as string | undefined) ??
+          "http://localhost:3000");
+
+    // Το Supabase διατηρεί τα query params του redirectTo, οπότε το
+    // /auth/callback ξέρει το πακέτο ακόμα κι όταν το localStorage είναι
+    // άδειο, έχει λήξει, ή γράφτηκε σε άλλο origin (preview iframe).
+    const callback = new URL("/auth/callback", origin);
+    if (planId) callback.searchParams.set("plan", planId);
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: callback.toString(),
+        queryParams: { prompt: "select_account" },
+      },
+    });
+    if (error) throw error;
+    // Full-page redirect στη Google — δεν χρειάζεται τοπικό navigate.
+  }, []);
+
+  const signOut = useCallback(async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+  }, []);
+
+  return { session, user, loading, signIn, signUp, signInWithGoogle, signOut };
+}
+=== END FILE ===
+
+=== FILE: src/routes/find-job.tsx ===
+// src/routes/find-job.tsx
+import { lazy, Suspense, useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
+import { sb } from "@/lib/jobs";
+import JobsLocked from "@/components/aura/jobs/JobsLocked";
+
+// The listings UI only downloads for users who are allowed to see it.
+const FindJob = lazy(() => import("@/components/aura/jobs/FindJob"));
+
+export const Route = createFileRoute("/find-job")({
+  head: () => ({ meta: [{ title: "Find Job with ΛURΛ" }] }),
+  component: FindJobPage,
+});
+
+type Gate =
+  | { status: "loading" }
+  | { status: "signed-out" }
+  | { status: "locked" }
+  | { status: "ok"; id: string; name: string; email: string };
+
+function Spinner() {
+  return (
+    <div className="fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60">
+      <Loader2 className="size-6 animate-spin" aria-label="Loading" />
+    </div>
+  );
+}
+
+function FindJobPage() {
+  const [gate, setGate] = useState<Gate>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const check = async () => {
+      const { data } = await sb.auth.getSession();
+      const user = data.session?.user;
+      if (cancelled) return;
+      if (!user) {
+        setGate({ status: "signed-out" });
+        return;
+      }
+
+      // Server-side truth: any active paid plan (or admin). The same function the RLS policy uses.
+      const { data: allowed, error } = await sb.rpc("has_paid_plan");
+      if (cancelled) return;
+      if (error || allowed !== true) {
+        setGate({ status: "locked" });
+        return;
+      }
+
+      const meta = (user.user_metadata ?? {}) as { full_name?: string; name?: string };
+      const email = user.email ?? "";
+      setGate({
+        status: "ok",
+        id: user.id,
+        email,
+        name: meta.full_name || meta.name || email.split("@")[0] || "Student",
+      });
+    };
+
+    void check();
+
+    // Re-check on login / logout / token refresh (e.g. a plan was upgraded in another tab).
+    const { data: sub } = sb.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") void check();
+    });
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (gate.status === "loading") return <Spinner />;
+  if (gate.status === "signed-out") return <JobsLocked signedOut />;
+  if (gate.status === "locked") return <JobsLocked />;
+
+  return (
+    <Suspense fallback={<Spinner />}>
+      <FindJob key={gate.id} applicant={{ name: gate.name, email: gate.email }} />
+    </Suspense>
+  );
+}
+=== END FILE ===
+
+=== FILE: supabase/functions/send-push/index.ts ===
+// Deploy: supabase functions deploy send-push --no-verify-jwt
+// Secrets: WEBHOOK_SECRET, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
+//
+// Called by the database webhook on every new row of admin_notifications.
+// Sends a Web Push to every browser registered by an admin / operations user.
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import webpush from "npm:web-push@3.6.7";
+
+const MOD_ROLES = ["admin", "super_admin", "operations"];
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+Deno.serve(async (req) => {
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  const secret = Deno.env.get("WEBHOOK_SECRET");
+  if (!secret || req.headers.get("x-webhook-secret") !== secret) {
+    return json({ error: "unauthorized" }, 401);
+  }
+
+  const pub = Deno.env.get("VAPID_PUBLIC_KEY");
+  const priv = Deno.env.get("VAPID_PRIVATE_KEY");
+  const subject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@example.com";
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!pub || !priv || !url || !serviceKey) return json({ error: "server_misconfigured" }, 500);
+
+  try {
+    const payload = await req.json();
+    const rec = (payload.record ?? payload) as {
+      id?: string;
+      type?: string;
+      title?: string;
+      body?: string;
+      url?: string | null;
+    };
+
+    webpush.setVapidDetails(subject, pub, priv);
+    const db = createClient(url, serviceKey, { auth: { persistSession: false } });
+
+    const { data: mods } = await db.from("profiles").select("id").in("role", MOD_ROLES);
+    const ids = (mods ?? []).map((m: { id: string }) => m.id);
+    if (ids.length === 0) return json({ sent: 0, removed: 0 });
+
+    const { data: subs } = await db
+      .from("push_subscriptions")
+      .select("id, endpoint, p256dh, auth")
+      .in("user_id", ids);
+
+    const message = JSON.stringify({
+      id: rec.id,
+      tag: rec.type,
+      title: rec.title ?? "AURA",
+      body: rec.body ?? "",
+      url: rec.url ?? "/admin",
+    });
+
+    let sent = 0;
+    const dead: string[] = [];
+    await Promise.allSettled(
+      (subs ?? []).map(async (s: { id: string; endpoint: string; p256dh: string; auth: string }) => {
+        try {
+          await webpush.sendNotification(
+            { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+            message,
+            { TTL: 60 * 60 },
+          );
+          sent++;
+        } catch (err) {
+          const code = (err as { statusCode?: number }).statusCode;
+          // 404 / 410 = the browser unsubscribed: clean it up
+          if (code === 404 || code === 410) dead.push(s.id);
+          else console.error("push failed", code, (err as Error).message);
+        }
+      }),
+    );
+
+    if (dead.length) await db.from("push_subscriptions").delete().in("id", dead);
+    return json({ sent, removed: dead.length });
+  } catch (e) {
+    console.error("send-push failed:", e);
+    return json({ error: "server_error", detail: String((e as Error)?.message ?? e) }, 500);
+  }
+});
+=== END FILE ===
+

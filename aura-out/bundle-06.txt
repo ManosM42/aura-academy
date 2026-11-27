@@ -1,0 +1,411 @@
+=== FILE: supabase/functions/cancel-subscription/index.ts ===
+// supabase/functions/cancel-subscription/index.ts
+// Σταματάει τη συνδρομή "στο τέλος της τρέχουσας περιόδου" (Stripe
+// cancel_at_period_end), ΠΟΤΕ άμεσο cancel. Ο χρήστης κρατάει πρόσβαση
+// μέχρι να λήξει ό,τι έχει ήδη πληρώσει και απλώς δεν χρεώνεται ξανά.
+//
+// ΠΡΟΣΟΧΗ ΑΣΦΑΛΕΙΑΣ: δεν δεχόμαστε ΠΟΤΕ subscriptionId από το request body.
+// Το βρίσκουμε ΜΟΝΟΙ ΜΑΣ από τη γραμμή του authenticated χρήστη στη βάση,
+// ώστε να μην μπορεί κανείς να ακυρώσει τη συνδρομή κάποιου άλλου.
+import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+// Δεν ακυρώνουμε γραμμές που είναι ήδη σε τελική κατάσταση.
+const NON_CANCELLABLE_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+/**
+ * current_period_end ζει σε διαφορετικό μέρος ανάλογα με το Stripe API
+ * version — ίδια λογική με το verify-checkout-session.
+ */
+type PeriodBearing = { current_period_end?: number | null };
+
+function resolvePeriodEnd(sub: Stripe.Subscription): string | null {
+  const item = sub.items?.data?.[0] as
+    | (Stripe.SubscriptionItem & PeriodBearing)
+    | undefined;
+  const fromItem = item?.current_period_end;
+  const fromSub = (sub as unknown as PeriodBearing).current_period_end;
+  const seconds =
+    typeof fromItem === "number"
+      ? fromItem
+      : typeof fromSub === "number"
+        ? fromSub
+        : null;
+  return seconds ? new Date(seconds * 1000).toISOString() : null;
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: CORS_HEADERS });
+  }
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing environment configuration", {
+      stripeKey: Boolean(stripeKey),
+      supabaseUrl: Boolean(supabaseUrl),
+      anonKey: Boolean(anonKey),
+      serviceKey: Boolean(serviceKey),
+    });
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  // 1. Ταυτοποίηση χρήστη — ΠΡΙΝ αγγίξουμε οτιδήποτε σχετικό με Stripe.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) {
+    console.error("Missing bearer token");
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user) {
+    console.error("getUser failed", userError?.message ?? "no user");
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false },
+  });
+
+  try {
+    // 2. Βρίσκουμε ΤΗ ΔΙΚΗ ΤΟΥ πιο πρόσφατη γραμμή συνδρομής — ποτέ κάτι
+    //    που να έρχεται από το request.
+    const { data: row, error: rowError } = await admin
+      .from("subscriptions")
+      .select("id, status, provider, stripe_subscription_id, cancel_at_period_end")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (rowError) {
+      console.error("subscriptions lookup failed", rowError.message);
+      return json({ error: "Δεν ήταν δυνατή η ανάγνωση της συνδρομής." }, 500);
+    }
+
+    // Viva subscription: nothing to call at the provider. Cancelling = we stop
+    // charging; the member keeps access until the period they paid for ends.
+    if (row?.provider === "viva") {
+      if (NON_CANCELLABLE_STATUSES.has(row.status)) {
+        return json({ error: "Η συνδρομή δεν είναι ενεργή." }, 409);
+      }
+      const { data: result, error: cancelError } = await admin.rpc("viva_request_cancel", { p_user: user.id });
+      if (cancelError) {
+        console.error("viva_request_cancel failed", cancelError.message);
+        return json({ error: "Η ακύρωση απέτυχε. Δοκίμασε ξανά." }, 500);
+      }
+      const out = (result ?? {}) as { result?: string; status?: string; current_period_end?: string | null };
+      if (out.result === "no_subscription") return json({ error: "Δεν βρέθηκε συνδρομή για ακύρωση." }, 404);
+      if (out.result === "not_active") return json({ error: "Η συνδρομή δεν είναι ενεργή." }, 409);
+      return json({
+        success: true,
+        subscription: {
+          status: out.status ?? "active",
+          currentPeriodEnd: out.current_period_end ?? null,
+          cancelAtPeriodEnd: true,
+        },
+      });
+    }
+
+    if (!row?.stripe_subscription_id) {
+      return json({ error: "Δεν βρέθηκε συνδρομή για ακύρωση." }, 404);
+    }
+
+    if (!stripeKey) {
+      console.error("STRIPE_SECRET_KEY is not set");
+      return json({ error: "Server misconfigured" }, 500);
+    }
+    const stripe = new Stripe(stripeKey);
+
+    if (NON_CANCELLABLE_STATUSES.has(row.status)) {
+      return json({ error: "Η συνδρομή δεν είναι ενεργή." }, 409);
+    }
+
+    // 3. Ήδη προγραμματισμένη για ακύρωση — idempotent, δεν ξαναχτυπάμε Stripe.
+    if (row.cancel_at_period_end) {
+      const current = await stripe.subscriptions.retrieve(
+        row.stripe_subscription_id,
+      );
+      return json({
+        success: true,
+        subscription: {
+          status: current.status,
+          currentPeriodEnd: resolvePeriodEnd(current),
+          cancelAtPeriodEnd: true,
+        },
+      });
+    }
+
+    // 4. Το Stripe είναι η πηγή αλήθειας: cancel_at_period_end = true.
+    //    ΔΕΝ κάνουμε immediate cancel — ο χρήστης κρατάει πρόσβαση μέχρι
+    //    το τέλος της τρέχουσας, ήδη πληρωμένης, περιόδου.
+    const updated = await stripe.subscriptions.update(
+      row.stripe_subscription_id,
+      { cancel_at_period_end: true },
+    );
+
+    // 5. Συγχρονισμός της γραμμής μας με ό,τι επιβεβαίωσε το Stripe.
+    //    Ίδιο upsert-shape με το webhook — όποιο τρέξει δεύτερο απλώς
+    //    ξαναγράφει τα ίδια δεδομένα, άρα δεν υπάρχει race condition.
+    const { error: updateError } = await admin
+      .from("subscriptions")
+      .update({
+        status: updated.status,
+        current_period_end: resolvePeriodEnd(updated),
+        cancel_at_period_end: updated.cancel_at_period_end ?? true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", user.id)
+      .eq("stripe_subscription_id", row.stripe_subscription_id);
+
+    if (updateError) {
+      // Το Stripe ήδη το έκανε — απλώς δεν προλάβαμε να το γράψουμε.
+      // Ο webhook (customer.subscription.updated) θα το συμπληρώσει.
+      console.error("subscriptions update failed", updateError.message);
+    }
+
+    return json({
+      success: true,
+      subscription: {
+        status: updated.status,
+        currentPeriodEnd: resolvePeriodEnd(updated),
+        cancelAtPeriodEnd: updated.cancel_at_period_end ?? true,
+      },
+    });
+  } catch (error) {
+    console.error("cancel-subscription failed", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `Η ακύρωση απέτυχε: ${message}` }, 500);
+  }
+});
+=== END FILE ===
+
+=== FILE: supabase/functions/notify-admin-email/index.ts ===
+// supabase/functions/notify-admin-email/index.ts
+//
+// Στέλνει email στους admins (μέσω Resend) όταν:
+//   • πουλιέται βιβλίο (παραγγελία γίνεται "paid")
+//   • γίνεται κράτηση σεμιναρίου επί τόπου
+//   • πληρώνεται κράτηση online σεμιναρίου
+//   • έρχεται νέο μήνυμα / ραντεβού στο Inbox
+//
+// Το καλούν τα triggers της βάσης (δες email-notifications.sql). Δεν το καλεί ποτέ ο browser.
+//
+// Secrets:
+//   RESEND_API_KEY        (υποχρεωτικό)  το κλειδί από το resend.com (ξεκινά με re_)
+//   EMAIL_WEBHOOK_SECRET  (υποχρεωτικό)  ίδιο με το «email_webhook_secret» του Vault
+//   EMAIL_FROM            (προτείνεται)  π.χ. "AURA <notifications@το-domain-σου.gr>"
+//   NOTIFY_EMAILS         (προαιρετικό)  default: kalaganist@gmail.com,redhost@gmail.com
+//   SITE_URL              (προαιρετικό)  π.χ. https://το-domain-σου.gr  (για τα κουμπιά «Άνοιγμα στο Admin»)
+//   BOOK_ORDERS_TABLE     (προαιρετικό)  default: book_orders
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildMail, buildTestMail, classify, type Extras, type Mail, type WebhookPayload } from "./templates.ts";
+
+const RECIPIENTS = (Deno.env.get("NOTIFY_EMAILS") ?? "manosmark42@gmail.com")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const BOOK_TABLE = Deno.env.get("BOOK_ORDERS_TABLE") ?? "book_orders";
+const FROM = Deno.env.get("EMAIL_FROM") ?? "AURA <onboarding@resend.dev>";
+const SITE_URL = Deno.env.get("SITE_URL") ?? "";
+
+const json = (status: number, body: unknown) =>
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Resend                                                              */
+/* ------------------------------------------------------------------ */
+
+type SendResult = { ok: boolean; status: number; id?: string; error?: string };
+
+async function resendCall(apiKey: string, mail: Mail, to: string[], idemKey?: string): Promise<SendResult> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: {
+        Authorization: `[REDACTED]`,
+        "Content-Type": "application/json",
+        // ίδιο γεγονός δύο φορές => ένα email (ισχύει 24 ώρες)
+        ...(idemKey ? { "Idempotency-Key": idemKey.slice(0, 250) } : {}),
+      },
+      body: JSON.stringify({
+        from: FROM,
+        to,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        ...(mail.replyTo ? { reply_to: mail.replyTo } : {}),
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string };
+    if (res.ok) return { ok: true, status: res.status, id: data.id };
+    return { ok: false, status: res.status, error: data.message ?? data.name ?? `HTTP ${res.status}` };
+  } catch (e) {
+    return { ok: false, status: 0, error: String(e) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function sendWithRetry(apiKey: string, mail: Mail, to: string[], idemKey?: string): Promise<SendResult> {
+  let r = await resendCall(apiKey, mail, to, idemKey);
+  if (!r.ok && (r.status === 0 || r.status === 429 || r.status >= 500)) {
+    await sleep(1200); // το Resend δέχεται ~2 αιτήματα/δευτερόλεπτο
+    r = await resendCall(apiKey, mail, to, idemKey);
+  }
+  return r;
+}
+
+type Delivery = { sent: string[]; failed: { to: string; error?: string }[] };
+
+async function deliver(apiKey: string, mail: Mail, keyBase?: string): Promise<Delivery> {
+  // 1) ένα αίτημα για όλους τους παραλήπτες
+  const all = await sendWithRetry(apiKey, mail, RECIPIENTS, keyBase ? `${keyBase}:all` : undefined);
+  if (all.ok) return { sent: RECIPIENTS, failed: [] };
+
+  // 2) Αν το Resend αρνείται (π.χ. domain χωρίς επαλήθευση => επιτρέπει μόνο το email του λογαριασμού),
+  //    στέλνουμε ένα-ένα, ώστε όποιος επιτρέπεται να πάρει το email.
+  if (all.status === 400 || all.status === 403 || all.status === 422) {
+    console.error(
+      `Resend απέρριψε την ομαδική αποστολή (${all.status}): ${all.error}. ` +
+        "Επαλήθευσε domain στο resend.com/domains και βάλε EMAIL_FROM με διεύθυνση από αυτό.",
+    );
+    const sent: string[] = [];
+    const failed: { to: string; error?: string }[] = [];
+    for (const to of RECIPIENTS) {
+      await sleep(600);
+      const r = await sendWithRetry(apiKey, mail, [to], keyBase ? `${keyBase}:${to}` : undefined);
+      if (r.ok) sent.push(to);
+      else failed.push({ to, error: r.error });
+    }
+    return { sent, failed };
+  }
+
+  return { sent: [], failed: [{ to: RECIPIENTS.join(", "), error: all.error }] };
+}
+
+/* ------------------------------------------------------------------ */
+/* Επιπλέον στοιχεία από τη βάση                                        */
+/* ------------------------------------------------------------------ */
+
+async function loadExtras(kind: string, record: Record<string, unknown>): Promise<Extras> {
+  const extras: Extras = { siteUrl: SITE_URL };
+  if (kind !== "online_seminar_paid") return extras;
+
+  try {
+    const url = Deno.env.get("SUPABASE_URL");
+    const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const seminarId = String(record.seminar_id ?? "");
+    if (!url || !key || !seminarId) return extras;
+
+    const admin = createClient(url, key);
+    const [sem, paid] = await Promise.all([
+      admin.from("online_seminars").select("title, starts_at, duration_minutes, capacity").eq("id", seminarId).maybeSingle(),
+      admin
+        .from("online_seminar_bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("seminar_id", seminarId)
+        .eq("status", "paid"),
+    ]);
+    extras.seminar = sem.data ?? null;
+    extras.paidCount = paid.count ?? null;
+  } catch (e) {
+    console.error("loadExtras:", e); // δεν είναι κρίσιμο: το email θα σταλεί και χωρίς αυτά
+  }
+  return extras;
+}
+
+/* ------------------------------------------------------------------ */
+/* Handler                                                             */
+/* ------------------------------------------------------------------ */
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== "POST") return json(405, { error: "method_not_allowed" });
+
+  const expected = Deno.env.get("EMAIL_WEBHOOK_SECRET");
+  if (!expected) {
+    console.error("Λείπει το EMAIL_WEBHOOK_SECRET");
+    return json(500, { error: "not_configured" });
+  }
+  if (!safeEqual(req.headers.get("x-webhook-secret") ?? "", expected)) {
+    return json(401, { error: "unauthorized" });
+  }
+
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  if (!apiKey) {
+    console.error("Λείπει το RESEND_API_KEY");
+    return json(500, { error: "missing_resend_key" });
+  }
+
+  let payload: (WebhookPayload & { test?: boolean }) | null = null;
+  try {
+    payload = await req.json();
+  } catch {
+    return json(400, { error: "invalid_json" });
+  }
+  if (!payload || typeof payload !== "object") return json(400, { error: "invalid_payload" });
+
+  // Δοκιμαστικό email: curl ... -d '{"test":true}'
+  if (payload.test === true) {
+    const result = await deliver(apiKey, buildTestMail(RECIPIENTS, SITE_URL));
+    return json(result.sent.length ? 200 : 502, { ok: result.sent.length > 0, ...result });
+  }
+
+  const kind = classify(payload, { bookTable: BOOK_TABLE });
+  if (!kind) return json(200, { ok: true, skipped: true });
+
+  const extras = await loadExtras(kind, payload.record ?? {});
+  const mail = buildMail(kind, payload, extras);
+  const idem = `${payload.table}:${String(payload.record?.id ?? "")}:${kind}`;
+
+  const result = await deliver(apiKey, mail, idem);
+  if (result.failed.length) console.error(`notify-admin-email (${kind}): αποτυχία για`, JSON.stringify(result.failed));
+  else console.log(`notify-admin-email (${kind}): στάλθηκε σε ${result.sent.join(", ")}`);
+
+  return json(result.sent.length ? 200 : 502, { ok: result.sent.length > 0, kind, ...result });
+});
+=== END FILE ===
+
+=== FILE: .output/public/assets/academy.index-SW8mJI0Y.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./useNavigate-BR9bgUfC.js";import{t as i}from"./AnimatePresence-ClHpx5iG.js";import{t as a}from"./use-reduced-motion-CNAPwhZE.js";import{t as o}from"./react-D9fOyxUn.js";import{t as s}from"./supabase-DXn9ZPwL.js";import{D as c,I as l,O as u,a as d,i as f,n as p,o as m,r as h,s as g,t as _,y as v}from"./queries-B7Arqryn.js";import{t as y}from"./useAuth-B1WX5JkE.js";import{n as b}from"./roles-D-HGCJsI.js";import{t as x}from"./createLucideIcon-Dz5w4CtK.js";import{t as S}from"./check-l8y3aT-v.js";import{t as C}from"./chevron-down-CMzGfsmT.js";import{t as w}from"./circle-CSxX3fzC.js";import{t as T}from"./crown-QxIH2HsF.js";import{t as E}from"./images-BKsLEZPR.js";import{t as D}from"./instagram-DKDIOVOj.js";import{t as O}from"./loader-circle-DdNdnF6-.js";import{t as k}from"./lock-DHD2dW60.js";import{t as A}from"./map-pin-BnQggz49.js";import{t as ee}from"./message-circle-DpgrN90q.js";import{n as te,t as j}from"./trash-2-DU4LXWLE.js";import{t as ne}from"./plus-qBfxbRGB.js";import{t as M}from"./send-ClGHcKrI.js";import{t as N}from"./shield-check-Djau1VnD.js";import{t as re}from"./sparkles-gf6_8K8H.js";import{t as P}from"./x-DCxPHqh1.js";import{i as F,r as I}from"./messagingQueries-DN5myh0K.js";import{t as L}from"./useAsync-CZJ1G06G.js";import{n as R,r as z,t as B}from"./States-BulpY35p.js";import{a as V,i as ie,o as ae,t as H}from"./chrome-DYZby3h2.js";var U=x(`ban`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`path`,{d:`M4.929 4.929 19.07 19.071`,key:`196cmz`}]]),oe=x(`camera`,[[`path`,{d:`M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z`,key:`18u6gg`}],[`circle`,{cx:`12`,cy:`13`,r:`3`,key:`1vg3eu`}]]),W=x(`heart`,[[`path`,{d:`M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5`,key:`mvr1a0`}]]),G=x(`image-plus`,[[`path`,{d:`M16 5h6`,key:`1vod17`}],[`path`,{d:`M19 2v6`,key:`4bpg5p`}],[`path`,{d:`M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5`,key:`1ue2ih`}],[`path`,{d:`m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21`,key:`1xmnt7`}],[`circle`,{cx:`9`,cy:`9`,r:`2`,key:`af1f0g`}]]),se=x(`music-2`,[[`circle`,{cx:`8`,cy:`18`,r:`4`,key:`1fc0mg`}],[`path`,{d:`M12 18V2l7 4`,key:`g04rme`}]]),K=x(`shield-off`,[[`path`,{d:`m2 2 20 20`,key:`1ooewy`}],[`path`,{d:`M5 5a1 1 0 0 0-1 1v7c0 5 3.5 7.5 7.67 8.94a1 1 0 0 0 .67.01c2.35-.82 4.48-1.97 5.9-3.71`,key:`1jlk70`}],[`path`,{d:`M9.309 3.652A12.252 12.252 0 0 0 11.24 2.28a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1v7a9.784 9.784 0 0 1-.08 1.264`,key:`18rp1v`}]]),ce=x(`type`,[[`path`,{d:`M12 4v16`,key:`1654pz`}],[`path`,{d:`M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2`,key:`e0r10z`}],[`path`,{d:`M9 20h6`,key:`s66wpe`}]]),q=x(`volume-2`,[[`path`,{d:`M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z`,key:`uqj9uw`}],[`path`,{d:`M16 9a5 5 0 0 1 0 6`,key:`1q6k2b`}],[`path`,{d:`M19.364 18.364a9 9 0 0 0 0-12.728`,key:`ijwkga`}]]),J=x(`volume-x`,[[`path`,{d:`M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z`,key:`uqj9uw`}],[`line`,{x1:`22`,x2:`16`,y1:`9`,y2:`15`,key:`1ewh16`}],[`line`,{x1:`16`,x2:`22`,y1:`9`,y2:`15`,key:`5ykzw1`}]]),Y=e(n(),1),X=t(),Z={student:`Student`,educator:`Educator`,senior_educator:`Senior Educator`,content_manager:`Content Manager`,operations:`Operations`,admin:`Admin`,super_admin:`Super Admin`};function le(e){return e?e.split(` `).map(e=>e[0]).slice(0,2).join(``).toUpperCase():`?`}function ue(e){let t=Date.now()-new Date(e).getTime(),n=Math.floor(t/6e4);if(n<1)return`τώρα`;if(n<60)return`${n}λ`;let r=Math.floor(n/60);if(r<24)return`${r}ω`;let i=Math.floor(r/24);return i<7?`${i}μ`:new Date(e).toLocaleDateString(`el-GR`)}function de({url:e,name:t,size:n=44,ring:r=`ring-white/15`}){return e?(0,X.jsx)(`img`,{src:e,alt:t??``,style:{width:n,height:n},className:`shrink-0 rounded-full object-cover ring-2 ${r}`}):(0,X.jsx)(`div`,{style:{width:n,height:n},className:`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-neutral-700 to-neutral-900 text-xs font-semibold text-neutral-200 ring-2 ${r}`,children:le(t??null)})}function fe({post:e,currentUserId:t,currentUserRole:n,onChanged:r}){let[i,a]=(0,Y.useState)(!1),[o,s]=(0,Y.useState)(``),[u,d]=(0,Y.useState)(!1),p=e.likes.some(e=>e.user_id===t),m=e.author?c(e.author.role):!1,h=e.author?.id===t||c(n);async function g(){d(!0);try{await l(e.id,p),r()}finally{d(!1)}}async function v(){if(o.trim()){d(!0);try{await _(e.id,o.trim()),s(``),r()}finally{d(!1)}}}async function y(){if(confirm(`Διαγραφή αυτής της ανάρτησης;`)){d(!0);try{await f(e.id),r()}finally{d(!1)}}}return(0,X.jsxs)(`article`,{className:`group relative overflow-hidden rounded-2xl border p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]`,style:{background:`linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 100%)`,borderImage:`linear-gradient(135deg, rgba(220,220,225,0.35), rgba(255,255,255,0.04) 40%, rgba(180,180,190,0.18) 100%) 1`,borderWidth:1,borderStyle:`solid`},children:[(0,X.jsx)(`div`,{className:`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent`}),(0,X.jsxs)(`header`,{className:`flex items-start gap-3.5`,children:[(0,X.jsx)(de,{url:e.author?.avatar_url,name:e.author?.full_name,ring:m?`ring-amber-400/40`:`ring-white/12`}),(0,X.jsxs)(`div`,{className:`min-w-0 flex-1`,children:[(0,X.jsxs)(`div`,{className:`flex flex-wrap items-center gap-2`,children:[(0,X.jsx)(`span`,{className:`text-[15px] font-semibold tracking-tight text-white`,children:e.author?.full_name??`Άγνωστος`}),m&&(0,X.jsxs)(`span`,{title:Z[e.author?.role??``]??`Staff`,className:`flex items-center gap-1 rounded-full border border-amber-400/40 bg-gradient-to-b from-amber-300/20 to-amber-500/10 px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-amber-300 shadow-[0_0_12px_-4px_rgba(251,191,36,0.6)]`,children:[(0,X.jsx)(T,{size:11,className:`fill-amber-300 text-amber-300`}),Z[e.author?.role??``]??`Staff`]})]}),(0,X.jsx)(`p`,{className:`mt-0.5 text-xs text-neutral-500`,children:ue(e.created_at)})]}),h&&(0,X.jsx)(`button`,{onClick:y,disabled:u,title:`Διαγραφή`,className:`rounded-lg p-1.5 text-neutral-500 opacity-0 transition hover:bg-white/10 hover:text-rose-300 disabled:opacity-30 group-hover:opacity-100`,children:(0,X.jsx)(j,{size:15})})]}),(0,X.jsx)(`p`,{className:`mt-4 whitespace-pre-wrap text-[14.5px] leading-relaxed text-neutral-200`,children:e.content}),e.image_url&&(0,X.jsx)(`div`,{className:`mt-4 overflow-hidden rounded-xl ring-1 ring-white/10`,children:(0,X.jsx)(`img`,{src:e.image_url,alt:``,className:`max-h-[520px] w-full object-cover`})}),(0,X.jsxs)(`div`,{className:`mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4`,children:[(0,X.jsxs)(`button`,{onClick:g,disabled:u,className:`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition disabled:opacity-50 ${p?`border-rose-400/40 bg-rose-500/10 text-rose-300`:`border-white/10 bg-white/[0.02] text-neutral-400 hover:border-white/20 hover:text-white`}`,children:[(0,X.jsx)(W,{size:14,className:p?`fill-rose-400`:``}),e.likes.length>0?e.likes.length:`Like`]}),(0,X.jsxs)(`button`,{onClick:()=>a(e=>!e),className:`flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3.5 py-1.5 text-xs font-medium text-neutral-400 transition hover:border-white/20 hover:text-white`,children:[(0,X.jsx)(ee,{size:14}),e.comments.length>0?e.comments.length:`Σχόλιο`]})]}),i&&(0,X.jsxs)(`div`,{className:`mt-4 space-y-3 border-t border-white/[0.06] pt-4`,children:[e.comments.slice().sort((e,t)=>new Date(e.created_at).getTime()-new Date(t.created_at).getTime()).map(e=>(0,X.jsxs)(`div`,{className:`flex items-start gap-2.5`,children:[(0,X.jsx)(de,{url:e.author?.avatar_url,name:e.author?.full_name,size:30,ring:e.author&&c(e.author.role)?`ring-amber-400/30`:`ring-white/10`}),(0,X.jsxs)(`div`,{className:`min-w-0 flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-2.5`,children:[(0,X.jsxs)(`div`,{className:`flex items-center gap-1.5`,children:[(0,X.jsx)(`p`,{className:`text-xs font-semibold text-neutral-200`,children:e.author?.full_name??`Άγνωστος`}),e.author&&c(e.author.role)&&(0,X.jsx)(T,{size:10,className:`fill-amber-300 text-amber-300`})]}),(0,X.jsx)(`p`,{className:`mt-0.5 text-sm text-neutral-300`,children:e.content})]})]},e.id)),(0,X.jsxs)(`div`,{className:`flex items-center gap-2 pt-1`,children:[(0,X.jsx)(`input`,{value:o,onChange:e=>s(e.target.value),onKeyDown:e=>e.key===`Enter`&&v(),placeholder:`Γράψε ένα σχόλιο…`,className:`w-full rounded-full border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none transition focus:border-white/30`}),(0,X.jsx)(`button`,{onClick:v,disabled:u||!o.trim(),className:`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-neutral-100 to-neutral-300 text-black shadow-[0_2px_8px_-2px_rgba(255,255,255,0.3)] transition hover:brightness-110 disabled:opacity-30`,children:(0,X.jsx)(M,{size:15})})]})]})]})}var pe=`academy-online-users`;function me(e){let[t,n]=(0,Y.useState)([]);return(0,Y.useEffect)(()=>{if(!e){n([]);return}let t=s.channel(pe,{config:{presence:{key:e.id}}});return t.on(`presence`,{event:`sync`},()=>{let e=t.presenceState(),r=Object.values(e).map(e=>e[0]).filter(Boolean);n(r)}),t.subscribe(async n=>{n===`SUBSCRIBED`&&await t.track({id:e.id,full_name:e.full_name,avatar_url:e.avatar_url,role:e.role})}),()=>{s.removeChannel(t)}},[e?.id,e?.full_name,e?.avatar_url,e?.role]),t}function he({userId:e,onClose:t}){let n=r(),[a,s]=(0,Y.useState)(null),[c,l]=(0,Y.useState)(!0),[u,d]=(0,Y.useState)(null),[f,p]=(0,Y.useState)(!1);(0,Y.useEffect)(()=>{let t=!1;return l(!0),F(e).then(e=>{t||s(e)}).catch(e=>{t||d(e.message)}).finally(()=>{t||l(!1)}),()=>{t=!0}},[e]);async function m(){p(!0),d(null);try{let r=await I(e);t(),n({to:`/messages`,search:{with:r}})}catch(e){d(e.message)}finally{p(!1)}}return(0,X.jsx)(i,{children:(0,X.jsx)(o.div,{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},className:`fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm`,onClick:t,children:(0,X.jsxs)(o.div,{initial:{opacity:0,y:20,scale:.97},animate:{opacity:1,y:0,scale:1},exit:{opacity:0,y:10,scale:.97},transition:{duration:.25,ease:[.16,1,.3,1]},onClick:e=>e.stopPropagation(),className:`relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-[#111] to-[#070707] shadow-[0_20px_60px_rgba(0,0,0,0.6)]`,children:[(0,X.jsx)(`button`,{onClick:t,className:`absolute right-3 top-3 z-10 rounded-full bg-black/50 p-1.5 text-white/70 transition hover:bg-white hover:text-black`,children:(0,X.jsx)(P,{size:15})}),c&&(0,X.jsx)(`div`,{className:`flex h-64 items-center justify-center`,children:(0,X.jsx)(O,{className:`animate-spin text-white/50`})}),u&&!c&&!a&&(0,X.jsx)(`p`,{className:`p-6 text-sm text-rose-400`,children:u}),a&&!c&&(0,X.jsxs)(`div`,{children:[(0,X.jsx)(`div`,{className:`h-20 bg-gradient-to-r from-white/10 via-white/5 to-transparent`}),(0,X.jsxs)(`div`,{className:`-mt-10 px-6 pb-6`,children:[a.avatar_url?(0,X.jsx)(`img`,{src:a.avatar_url,alt:``,className:`h-20 w-20 rounded-full object-cover ring-4 ring-[#0a0a0a]`}):(0,X.jsx)(`div`,{className:`flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-xl font-semibold text-white/80 ring-4 ring-[#0a0a0a]`,children:a.full_name?.[0]?.toUpperCase()??`?`}),(0,X.jsxs)(`div`,{className:`mt-3 flex items-center gap-2`,children:[(0,X.jsx)(`h2`,{className:`text-lg font-semibold text-white`,children:a.full_name??`Χρήστης`}),b(a.role)&&(0,X.jsx)(N,{size:16,className:`text-white/70`})]}),a.headline&&(0,X.jsx)(`p`,{className:`mt-0.5 text-sm text-white/50`,children:a.headline}),(0,X.jsxs)(`div`,{className:`mt-3 flex flex-wrap gap-3 text-xs text-white/40`,children:[a.city&&(0,X.jsxs)(`span`,{className:`flex items-center gap-1`,children:[(0,X.jsx)(A,{size:12}),` `,a.city]}),a.instagram&&(0,X.jsxs)(`span`,{className:`flex items-center gap-1`,children:[(0,X.jsx)(D,{size:12}),` `,a.instagram]})]}),a.bio&&(0,X.jsx)(`p`,{className:`mt-4 whitespace-pre-line text-sm leading-relaxed text-white/70`,children:a.bio}),u&&(0,X.jsx)(`p`,{className:`mt-3 text-xs text-rose-400`,children:u}),(0,X.jsxs)(`button`,{onClick:m,disabled:f,className:`mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-black transition hover:bg-white/90 disabled:opacity-50`,children:[f?(0,X.jsx)(O,{size:14,className:`animate-spin`}):(0,X.jsx)(ee,{size:14}),`Στείλε μήνυμα`]})]})]})]})})})}function ge(){let{profile:e}=y(),t=me(e?{id:e.id,full_name:e.full_name,avatar_url:e.avatar_url,role:e.role}:null),[n,r]=(0,Y.useState)(null),{admins:i,students:a}=(0,Y.useMemo)(()=>({admins:t.filter(e=>b(e.role)),students:t.filter(e=>!b(e.role))}),[t]);return(0,X.jsxs)(X.Fragment,{children:[(0,X.jsxs)(`aside`,{className:`flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl`,children:[(0,X.jsxs)(`div`,{className:`border-b border-white/10 px-5 py-4`,children:[(0,X.jsx)(`p`,{className:`text-xs uppercase tracking-[0.25em] text-white/50`,children:`Online τώρα`}),(0,X.jsxs)(`p`,{className:`mt-1 text-sm text-white/40`,children:[t.length,` συνδεδεμένοι`]})]}),(0,X.jsxs)(`div`,{className:`flex-1 space-y-6 overflow-y-auto px-3 py-4`,children:[i.length>0&&(0,X.jsxs)(`div`,{children:[(0,X.jsx)(`p`,{className:`mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40`,children:`Admins`}),(0,X.jsx)(`div`,{className:`space-y-1`,children:i.map(e=>(0,X.jsx)(_e,{user:e,isAdmin:!0,onClick:()=>r(e.id)},e.id))})]}),(0,X.jsxs)(`div`,{children:[(0,X.jsx)(`p`,{className:`mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40`,children:`Μαθητές`}),(0,X.jsxs)(`div`,{className:`space-y-1`,children:[a.length===0&&(0,X.jsx)(`p`,{className:`px-2 text-xs text-white/30`,children:`Κανείς online.`}),a.map(e=>(0,X.jsx)(_e,{user:e,isAdmin:!1,onClick:()=>r(e.id)},e.id))]})]})]})]}),n&&(0,X.jsx)(he,{userId:n,onClose:()=>r(null)})]})}function _e({user:e,isAdmin:t,onClick:n}){return(0,X.jsxs)(`button`,{onClick:n,className:`flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/[0.06]`,children:[(0,X.jsxs)(`div`,{className:`relative shrink-0`,children:[e.avatar_url?(0,X.jsx)(`img`,{src:e.avatar_url,alt:``,className:`h-9 w-9 rounded-full object-cover ring-1 ring-white/15`}):(0,X.jsx)(`div`,{className:`flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white/70`,children:e.full_name?.[0]?.toUpperCase()??`?`}),(0,X.jsx)(w,{size:10,className:`absolute -bottom-0.5 -right-0.5 rounded-full fill-emerald-400 text-emerald-400 ring-2 ring-[#070707]`})]}),(0,X.jsx)(`span`,{className:`min-w-0 flex-1 truncate text-sm text-white/85`,children:e.full_name??`Χρήστης`}),t&&(0,X.jsx)(N,{size:15,className:`shrink-0 text-white/70`})]})}function ve(){if(typeof crypto<`u`&&crypto.randomUUID)try{return crypto.randomUUID()}catch{}return`${Date.now()}-${Math.random().toString(36).slice(2,10)}`}var ye=[{name:`Κανονικό`,css:`none`},{name:`Clarendon`,css:`contrast(1.2) saturate(1.35) brightness(1.05)`},{name:`Ζωηρό`,css:`saturate(1.6) contrast(1.1)`},{name:`Θερμό`,css:`sepia(0.25) saturate(1.3) brightness(1.05)`},{name:`Ψυχρό`,css:`hue-rotate(-10deg) saturate(1.15) brightness(1.02)`},{name:`Noir`,css:`grayscale(1) contrast(1.15)`},{name:`Ξεθωριασμένο`,css:`contrast(0.9) brightness(1.1) saturate(0.75)`}],be=[`#ffffff`,`#000000`,`#ef4444`,`#eab308`,`#22c55e`,`#3b82f6`,`#ec4899`],xe=[`#ffffff`,`#000000`,`#ef4444`,`#eab308`,`#22c55e`,`#3b82f6`,`#ec4899`];function Se({open:e,onClose:t,onCreated:n}){let[r,a]=(0,Y.useState)(null),[s,c]=(0,Y.useState)(null),[l,u]=(0,Y.useState)(!1),[d,f]=(0,Y.useState)(null),[p,m]=(0,Y.useState)(null),[g,_]=(0,Y.useState)(ye[0]),[v,y]=(0,Y.useState)([]),[b,x]=(0,Y.useState)(``),[C,w]=(0,Y.useState)(be[0]),[T,D]=(0,Y.useState)(!1),[k,A]=(0,Y.useState)([]),[ee,ne]=(0,Y.useState)(xe[0]),[M,N]=(0,Y.useState)(6),F=(0,Y.useRef)(null),I=(0,Y.useRef)(!1),[L,R]=(0,Y.useState)(null),[z,B]=(0,Y.useState)(``),V=(0,Y.useRef)(null),ie=(0,Y.useRef)(null),ae=(0,Y.useRef)(null),H=(0,Y.useRef)(null),U=(0,Y.useRef)(null),W=r?.type.startsWith(`video/`)??!1;function G(){a(null),s&&URL.revokeObjectURL(s),c(null),m(null),_(ye[0]),y([]),x(``),D(!1),A([]),R(null),B(``),f(null),u(!1)}function K(e){f(null),a(e),s&&URL.revokeObjectURL(s),c(e?URL.createObjectURL(e):null)}(0,Y.useEffect)(()=>{if(!H.current||!U.current)return;let e=H.current,t=U.current,n=()=>{t.width=e.clientWidth,t.height=e.clientHeight,q()};n();let r=new ResizeObserver(n);return r.observe(e),()=>r.disconnect()},[s]);function q(){let e=U.current;if(!e)return;let t=e.getContext(`2d`);if(t){t.clearRect(0,0,e.width,e.height);for(let n of k)J(t,n,e.width,e.height)}}function J(e,t,n,r){if(!(t.points.length<2)){e.strokeStyle=t.color,e.lineWidth=t.width,e.lineCap=`round`,e.lineJoin=`round`,e.beginPath(),e.moveTo(t.points[0].x*n,t.points[0].y*r);for(let i of t.points.slice(1))e.lineTo(i.x*n,i.y*r);e.stroke()}}(0,Y.useEffect)(()=>{q()},[k]);function Z(e){let t=H.current;if(!t)return{x:0,y:0};let n=t.getBoundingClientRect();return{x:(e.clientX-n.left)/n.width,y:(e.clientY-n.top)/n.height}}function le(e){if(p!==`draw`)return;I.current=!0;let t=Z(e);F.current={color:ee,width:M/200,points:[t]}}function ue(e){if(!I.current||!F.current)return;let t=Z(e);F.current.points.push(t);let n=U.current,r=n?.getContext(`2d`);n&&r&&(q(),J(r,F.current,n.width,n.height))}function de(){F.current&&F.current.points.length>1&&A(e=>[...e,F.current]),F.current=null,I.current=!1}function fe(e,t){if(p===`draw`)return;t.stopPropagation();let n=H.current;if(!n)return;let r=t=>{let r=n.getBoundingClientRect(),i=Math.min(1,Math.max(0,(t.clientX-r.left)/r.width)),a=Math.min(1,Math.max(0,(t.clientY-r.top)/r.height));y(t=>t.map(t=>t.id===e?{...t,xPct:i,yPct:a}:t))},i=()=>{window.removeEventListener(`pointermove`,r),window.removeEventListener(`pointerup`,i)};window.addEventListener(`pointermove`,r),window.addEventListener(`pointerup`,i)}function pe(){if(!b.trim()){m(null);return}y(e=>[...e,{id:ve(),text:b.trim(),xPct:.5,yPct:.5,color:C,fontSize:32,background:T}]),x(``),D(!1),m(null)}function me(e){y(t=>t.filter(t=>t.id!==e))}async function he(){let e=new Image;e.crossOrigin=`anonymous`,e.src=s,await new Promise((t,n)=>{e.onload=t,e.onerror=n});let t=1080,n=1920,r=document.createElement(`canvas`);r.width=t,r.height=n;let i=r.getContext(`2d`);i.fillStyle=`#000`,i.fillRect(0,0,t,n);let a=Math.min(t/e.width,n/e.height),o=e.width*a,c=e.height*a,l=(t-o)/2,u=(n-c)/2;i.filter=g.css,i.drawImage(e,l,u,o,c),i.filter=`none`;for(let e of k)J(i,{...e,width:e.width*n},t,n);for(let e of v){let r=e.fontSize/360*n;i.font=`700 ${r}px sans-serif`,i.textAlign=`center`,i.textBaseline=`middle`;let a=e.xPct*t,o=e.yPct*n;if(e.background){let t=i.measureText(e.text),n=r*.4,s=r*.3;i.fillStyle=`rgba(0,0,0,0.55)`,i.fillRect(a-t.width/2-n,o-r/2-s,t.width+n*2,r+s*2)}i.fillStyle=e.color,i.fillText(e.text,a,o)}return new Promise((e,t)=>{r.toBlob(n=>n?e(n):t(Error(`Αποτυχία εξαγωγής εικόνας.`)),`image/jpeg`,.92)})}async function ge(){if(r){u(!0),f(null);try{let e;if(W)e=r;else{let t=await he();e=new File([t],`story.jpg`,{type:`image/jpeg`})}let i=L?{file:L,title:z||L.name}:null;await h(e,i),G(),n(),t()}catch(e){f(e.message)}finally{u(!1)}}}return(0,X.jsx)(i,{children:e&&(0,X.jsx)(o.div,{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},className:`fixed inset-0 z-[70] flex items-center justify-center bg-black`,children:s?(0,X.jsxs)(o.div,{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},className:`relative flex h-full w-full max-w-md flex-col bg-black sm:h-[92vh] sm:rounded-2xl sm:overflow-hidden`,children:[(0,X.jsxs)(`div`,{className:`z-20 flex items-center justify-between px-3 pt-4`,children:[(0,X.jsx)(`button`,{onClick:()=>{G()},className:`rounded-full bg-black/40 p-2 text-white hover:bg-black/60`,children:(0,X.jsx)(P,{size:20})}),(0,X.jsxs)(`div`,{className:`flex gap-2`,children:[(0,X.jsx)(Ce,{icon:(0,X.jsx)(ce,{size:18}),active:p===`text`,onClick:()=>m(p===`text`?null:`text`),disabled:W}),(0,X.jsx)(Ce,{icon:(0,X.jsx)(te,{size:18}),active:p===`draw`,onClick:()=>m(p===`draw`?null:`draw`),disabled:W}),(0,X.jsx)(Ce,{icon:(0,X.jsx)(se,{size:18}),active:p===`music`,onClick:()=>m(p===`music`?null:`music`)}),(0,X.jsx)(Ce,{icon:(0,X.jsx)(re,{size:18}),active:p===`filters`,onClick:()=>m(p===`filters`?null:`filters`),disabled:W})]}),(0,X.jsx)(`div`,{className:`w-9`})]}),W&&(0,X.jsx)(`p`,{className:`z-20 px-4 pt-2 text-center text-[11px] text-white/40`,children:`Κείμενο, σχέδιο και φίλτρα είναι διαθέσιμα μόνο για φωτογραφίες.`}),(0,X.jsx)(`div`,{className:`relative flex flex-1 items-center justify-center overflow-hidden`,children:(0,X.jsxs)(`div`,{ref:H,className:`relative aspect-[9/16] max-h-full w-full max-w-sm overflow-hidden bg-black touch-none`,onPointerDown:le,onPointerMove:ue,onPointerUp:de,onPointerLeave:de,children:[W?(0,X.jsx)(`video`,{src:s,className:`h-full w-full object-contain`,style:{filter:g.css},autoPlay:!0,loop:!0,muted:!0,playsInline:!0}):(0,X.jsx)(`img`,{src:s,className:`h-full w-full object-contain`,style:{filter:g.css},alt:``}),(0,X.jsx)(`canvas`,{ref:U,className:`pointer-events-none absolute inset-0 h-full w-full`}),v.map(e=>(0,X.jsxs)(`div`,{onPointerDown:t=>fe(e.id,t),className:`group absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none px-1`,style:{left:`${e.xPct*100}%`,top:`${e.yPct*100}%`},children:[(0,X.jsx)(`span`,{className:`whitespace-nowrap font-bold`,style:{color:e.color,fontSize:e.fontSize,background:e.background?`rgba(0,0,0,0.55)`:`transparent`,padding:e.background?`4px 10px`:0,borderRadius:e.background?8:0},children:e.text}),(0,X.jsx)(`button`,{onClick:t=>{t.stopPropagation(),me(e.id)},className:`absolute -right-2 -top-2 hidden rounded-full bg-white p-0.5 text-black group-hover:block`,children:(0,X.jsx)(P,{size:10})})]},e.id)),L&&p!==`music`&&(0,X.jsxs)(`div`,{className:`absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white backdrop-blur`,children:[(0,X.jsx)(se,{size:12}),(0,X.jsx)(`span`,{className:`max-w-[140px] truncate`,children:z||L.name})]})]})}),(0,X.jsxs)(`div`,{className:`z-20 bg-gradient-to-t from-black via-black/95 to-transparent px-4 pb-6 pt-3`,children:[p===`text`&&(0,X.jsxs)(`div`,{className:`space-y-3`,children:[(0,X.jsx)(`input`,{autoFocus:!0,value:b,onChange:e=>x(e.target.value),placeholder:`Πρόσθεσε κείμενο…`,className:`w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-white outline-none placeholder:text-white/40`}),(0,X.jsxs)(`div`,{className:`flex items-center justify-center gap-2`,children:[be.map(e=>(0,X.jsx)(`button`,{onClick:()=>w(e),className:`h-6 w-6 rounded-full ring-2 ${C===e?`ring-white`:`ring-transparent`}`,style:{backgroundColor:e}},e)),(0,X.jsx)(`button`,{onClick:()=>D(e=>!e),className:`ml-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${T?`border-white bg-white text-black`:`border-white/30 text-white/70`}`,children:`Aa`})]}),(0,X.jsxs)(`button`,{onClick:pe,className:`mx-auto flex items-center gap-1 rounded-full bg-white px-5 py-2 text-xs font-bold uppercase text-black`,children:[(0,X.jsx)(S,{size:14}),` Ολοκλήρωση`]})]}),p===`draw`&&(0,X.jsxs)(`div`,{className:`space-y-3`,children:[(0,X.jsx)(`div`,{className:`flex items-center justify-center gap-2`,children:xe.map(e=>(0,X.jsx)(`button`,{onClick:()=>ne(e),className:`h-6 w-6 rounded-full ring-2 ${ee===e?`ring-white`:`ring-transparent`}`,style:{backgroundColor:e}},e))}),(0,X.jsx)(`input`,{type:`range`,min:2,max:24,value:M,onChange:e=>N(Number(e.target.value)),className:`w-full accent-white`}),(0,X.jsxs)(`div`,{className:`flex justify-center gap-3`,children:[(0,X.jsxs)(`button`,{onClick:()=>A(e=>e.slice(0,-1)),disabled:k.length===0,className:`flex items-center gap-1 rounded-full border border-white/25 px-4 py-1.5 text-[11px] text-white/80 disabled:opacity-30`,children:[(0,X.jsx)(j,{size:12}),` Αναίρεση`]}),(0,X.jsxs)(`button`,{onClick:()=>m(null),className:`flex items-center gap-1 rounded-full bg-white px-5 py-1.5 text-[11px] font-bold uppercase text-black`,children:[(0,X.jsx)(S,{size:12}),` Έτοιμο`]})]})]}),p===`filters`&&(0,X.jsx)(`div`,{className:`scrollbar-none flex gap-3 overflow-x-auto pb-1`,children:ye.map(e=>(0,X.jsxs)(`button`,{onClick:()=>_(e),className:`flex shrink-0 flex-col items-center gap-1`,children:[(0,X.jsx)(`div`,{className:`h-14 w-14 overflow-hidden rounded-lg border-2 ${g.name===e.name?`border-white`:`border-white/20`}`,style:{filter:e.css},children:s&&!W&&(0,X.jsx)(`img`,{src:s,className:`h-full w-full object-cover`,alt:``})}),(0,X.jsx)(`span`,{className:`text-[10px] text-white/70`,children:e.name})]},e.name))}),p===`music`&&(0,X.jsxs)(`div`,{className:`space-y-3`,children:[(0,X.jsx)(`p`,{className:`text-center text-[11px] text-white/50`,children:`Ανέβασε δικό σου κομμάτι — δεν υποστηρίζεται αναζήτηση σε κατάλογο τραγουδιών.`}),L?(0,X.jsxs)(`div`,{className:`flex items-center justify-between rounded-lg border border-white/15 bg-white/[0.05] px-3 py-2`,children:[(0,X.jsx)(`input`,{value:z,onChange:e=>B(e.target.value),placeholder:L.name,className:`flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/40`}),(0,X.jsx)(`button`,{onClick:()=>{R(null),B(``)},className:`ml-2 text-white/50 hover:text-white`,children:(0,X.jsx)(P,{size:14})})]}):(0,X.jsxs)(`button`,{onClick:()=>ae.current?.click(),className:`mx-auto flex items-center gap-2 rounded-full border border-white/25 px-5 py-2 text-xs font-bold uppercase text-white/80 hover:border-white/50`,children:[(0,X.jsx)(se,{size:14}),` Επιλογή αρχείου ήχου`]}),(0,X.jsx)(`input`,{ref:ae,type:`file`,accept:`audio/*`,className:`hidden`,onChange:e=>{let t=e.target.files?.[0]??null;R(t),t&&B(t.name.replace(/\.[^.]+$/,``))}}),(0,X.jsx)(`div`,{className:`flex justify-center`,children:(0,X.jsx)(`button`,{onClick:()=>m(null),className:`rounded-full bg-white px-5 py-1.5 text-[11px] font-bold uppercase text-black`,children:`Έτοιμο`})})]}),p===null&&(0,X.jsxs)(X.Fragment,{children:[d&&(0,X.jsx)(`p`,{className:`mb-2 text-center text-xs text-rose-400`,children:d}),(0,X.jsxs)(`button`,{onClick:ge,disabled:l,className:`flex w-full items-center justify-center gap-2 rounded-full bg-white py-3 text-xs font-bold uppercase tracking-wider text-black transition hover:bg-white/90 disabled:opacity-40`,children:[l&&(0,X.jsx)(O,{size:14,className:`animate-spin`}),`Το Story σου`]})]})]})]}):(0,X.jsxs)(o.div,{initial:{opacity:0,scale:.95},animate:{opacity:1,scale:1},exit:{opacity:0,scale:.95},className:`relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0a0a0a] p-6 shadow-2xl`,children:[(0,X.jsx)(`button`,{onClick:()=>{G(),t()},className:`absolute right-4 top-4 rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white`,children:(0,X.jsx)(P,{size:16})}),(0,X.jsx)(`h2`,{className:`mb-5 text-sm font-bold uppercase tracking-[0.2em] text-white`,children:`Νέο Story`}),(0,X.jsxs)(`div`,{className:`grid grid-cols-2 gap-3`,children:[(0,X.jsxs)(`button`,{onClick:()=>V.current?.click(),className:`flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] py-8 text-white/80 transition hover:border-white/40 hover:bg-white/[0.08] hover:text-white`,children:[(0,X.jsx)(oe,{size:22}),(0,X.jsx)(`span`,{className:`text-xs font-medium`,children:`Κάμερα`})]}),(0,X.jsxs)(`button`,{onClick:()=>ie.current?.click(),className:`flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] py-8 text-white/80 transition hover:border-white/40 hover:bg-white/[0.08] hover:text-white`,children:[(0,X.jsx)(E,{size:22}),(0,X.jsx)(`span`,{className:`text-xs font-medium`,children:`Βιβλιοθήκη`})]}),(0,X.jsx)(`input`,{ref:V,type:`file`,accept:`image/*,video/*`,capture:`environment`,className:`hidden`,onChange:e=>K(e.target.files?.[0]??null)}),(0,X.jsx)(`input`,{ref:ie,type:`file`,accept:`image/*,video/*`,className:`hidden`,onChange:e=>K(e.target.files?.[0]??null)})]})]})})})}function Ce({icon:e,active:t,onClick:n,disabled:r}){return(0,X.jsx)(`button`,{onClick:n,disabled:r,className:`rounded-full p-2 transition ${t?`bg-white text-black`:`bg-black/40 text-white hover:bg-black/60`} disabled:opacity-30`,children:e})}var we=5e3;function Te({groups:e,startGroupIndex:t,currentUserId:n,onClose:r,onDeleted:a}){let[s,c]=(0,Y.useState)(t),[l,f]=(0,Y.useState)(0),[p,m]=(0,Y.useState)(0),[h,g]=(0,Y.useState)(!1),[_,v]=(0,Y.useState)(!1),y=(0,Y.useRef)(null),b=(0,Y.useRef)(null),x=(0,Y.useRef)(),S=(0,Y.useRef)(0),C=(0,Y.useRef)(new Set),w=e[s],T=w?.stories[l];function E(){w&&(l<w.stories.length-1?f(e=>e+1):s<e.length-1?(c(e=>e+1),f(0)):r())}function D(){if(l>0)f(e=>e-1);else if(s>0){let t=e[s-1];c(e=>e-1),f(t.stories.length-1)}}(0,Y.useEffect)(()=>{if(!T||(C.current.has(T.id)||(C.current.add(T.id),u(T.id).catch(()=>{})),m(0),S.current=performance.now(),b.current&&(b.current.pause(),b.current.currentTime=0,T.audio_url&&(b.current.src=T.audio_url,b.current.muted=_,b.current.loop=!0,b.current.play().catch(()=>{}))),T.media_type===`video`))return;function e(t){if(h){S.current=t-p/100*we,x.current=requestAnimationFrame(e);return}let n=t-S.current,r=Math.min(100,n/we*100);if(m(r),r>=100){E();return}x.current=requestAnimationFrame(e)}return x.current=requestAnimationFrame(e),()=>{x.current&&cancelAnimationFrame(x.current)}},[T?.id,h]),(0,Y.useEffect)(()=>()=>{b.current?.pause()},[]),(0,Y.useEffect)(()=>{function e(e){e.key===`Escape`&&r(),e.key===`ArrowRight`&&E(),e.key===`ArrowLeft`&&D()}return window.addEventListener(`keydown`,e),()=>window.removeEventListener(`keydown`,e)},[s,l]);function O(){v(e=>{let t=!e;return b.current&&(b.current.muted=t),y.current&&(y.current.muted=t),t})}async function k(){T&&(await d(T.id),a(),E())}if(!w||!T)return null;let A=w.author.id===n;return(0,X.jsx)(i,{children:(0,X.jsx)(o.div,{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},className:`fixed inset-0 z-[80] flex items-center justify-center bg-black`,children:(0,X.jsxs)(o.div,{drag:`y`,dragConstraints:{top:0,bottom:0},dragElastic:.6,onDragEnd:(e,t)=>{t.offset.y>100&&r()},className:`relative h-full w-full max-w-md overflow-hidden bg-black sm:h-[92vh] sm:rounded-2xl`,children:[(0,X.jsx)(`div`,{className:`absolute inset-x-0 top-0 z-10 flex gap-1 p-2`,children:w.stories.map((e,t)=>(0,X.jsx)(`div`,{className:`h-0.5 flex-1 overflow-hidden rounded-full bg-white/30`,children:(0,X.jsx)(`div`,{className:`h-full bg-white`,style:{width:t<l?`100%`:t===l?`${p}%`:`0%`}})},e.id))}),(0,X.jsxs)(`div`,{className:`absolute inset-x-0 top-4 z-10 flex items-center justify-between px-3`,children:[(0,X.jsxs)(`div`,{className:`flex items-center gap-2`,children:[w.author.avatar_url?(0,X.jsx)(`img`,{src:w.author.avatar_url,className:`h-8 w-8 rounded-full object-cover ring-1 ring-white/30`,alt:``}):(0,X.jsx)(`div`,{className:`flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-semibold text-white`,children:w.author.full_name?.[0]?.toUpperCase()??`A`}),(0,X.jsx)(`span`,{className:`text-sm font-semibold text-white drop-shadow`,children:w.author.full_name??`Χρήστης`})]}),(0,X.jsxs)(`div`,{className:`flex items-center gap-1`,children:[(T.audio_url||T.media_type===`video`)&&(0,X.jsx)(`button`,{onClick:O,className:`rounded-full p-2 text-white/80 hover:bg-white/10 hover:text-white`,children:_?(0,X.jsx)(J,{size:18}):(0,X.jsx)(q,{size:18})}),A&&(0,X.jsx)(`button`,{onClick:k,className:`rounded-full p-2 text-white/80 hover:bg-white/10 hover:text-white`,children:(0,X.jsx)(j,{size:18})}),(0,X.jsx)(`button`,{onClick:r,className:`rounded-full p-2 text-white/80 hover:bg-white/10 hover:text-white`,children:(0,X.jsx)(P,{size:20})})]})]}),(0,X.jsx)(`div`,{className:`flex h-full w-full items-center justify-center`,children:T.media_type===`video`?(0,X.jsx)(`video`,{ref:y,src:T.media_url,className:`h-full w-full object-contain`,autoPlay:!0,muted:_,playsInline:!0,onTimeUpdate:e=>{let t=e.currentTarget;t.duration&&m(t.currentTime/t.duration*100)},onEnded:E}):(0,X.jsx)(`img`,{src:T.media_url,className:`h-full w-full object-contain`,alt:``})}),(0,X.jsx)(`audio`,{ref:b,className:`hidden`}),T.audio_title&&(0,X.jsxs)(`div`,{className:`absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white backdrop-blur`,children:[`🎵 `,(0,X.jsx)(`span`,{className:`max-w-[160px] truncate`,children:T.audio_title})]}),(0,X.jsx)(`button`,{"aria-label":`Previous`,onClick:D,onMouseDown:()=>g(!0),onMouseUp:()=>g(!1),onTouchStart:()=>g(!0),onTouchEnd:()=>g(!1),className:`absolute inset-y-0 left-0 z-[5] w-1/3`}),(0,X.jsx)(`button`,{"aria-label":`Next`,onClick:E,onMouseDown:()=>g(!0),onMouseUp:()=>g(!1),onTouchStart:()=>g(!0),onTouchEnd:()=>g(!1),className:`absolute inset-y-0 right-0 z-[5] w-2/3`})]})})})}function Ee({currentUserId:e,currentUserAvatar:t,currentUserName:n}){let r=L(g,[]),[i,a]=(0,Y.useState)(!1),[o,s]=(0,Y.useState)(null),c=r.data??[],l=c.find(t=>t.author.id===e);return(0,X.jsxs)(`div`,{className:`mb-2`,children:[(0,X.jsxs)(`div`,{className:`scrollbar-none flex gap-4 overflow-x-auto pb-2`,children:[(0,X.jsxs)(`div`,{className:`flex shrink-0 flex-col items-center gap-1`,children:[(0,X.jsxs)(`button`,{onClick:()=>l?s(c.indexOf(l)):a(!0),className:`relative`,children:[(0,X.jsx)(`div`,{className:`h-16 w-16 rounded-full p-[2px] ${l&&!l.allViewed?`bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600`:`bg-white/15`}`,children:(0,X.jsx)(`div`,{className:`h-full w-full rounded-full bg-[#070707] p-[2px]`,children:t?(0,X.jsx)(`img`,{src:t,className:`h-full w-full rounded-full object-cover`,alt:``}):(0,X.jsx)(`div`,{className:`flex h-full w-full items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white`,children:n?.[0]?.toUpperCase()??`A`})})}),(0,X.jsx)(`span`,{onClick:e=>{e.stopPropagation(),a(!0)},className:`absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full border-2 border-[#070707] bg-white text-black`,children:(0,X.jsx)(ne,{size:12,strokeWidth:3})})]}),(0,X.jsx)(`span`,{className:`max-w-[64px] truncate text-[11px] text-white/70`,children:`Εσύ`})]}),c.filter(t=>t.author.id!==e).map(e=>(0,X.jsxs)(`div`,{className:`flex shrink-0 flex-col items-center gap-1`,children:[(0,X.jsx)(`button`,{onClick:()=>s(c.indexOf(e)),children:(0,X.jsx)(`div`,{className:`h-16 w-16 rounded-full p-[2px] ${e.allViewed?`bg-white/15`:`bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600`}`,children:(0,X.jsx)(`div`,{className:`h-full w-full rounded-full bg-[#070707] p-[2px]`,children:e.author.avatar_url?(0,X.jsx)(`img`,{src:e.author.avatar_url,className:`h-full w-full rounded-full object-cover`,alt:``}):(0,X.jsx)(`div`,{className:`flex h-full w-full items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white`,children:e.author.full_name?.[0]?.toUpperCase()??`A`})})})}),(0,X.jsx)(`span`,{className:`max-w-[64px] truncate text-[11px] text-white/70`,children:e.author.full_name??`Χρήστης`})]},e.author.id))]}),(0,X.jsx)(Se,{open:i,onClose:()=>a(!1),onCreated:()=>r.reload?.()}),o!==null&&c.length>0&&(0,X.jsx)(Te,{groups:c,startGroupIndex:o,currentUserId:e,onClose:()=>{s(null),r.reload?.()},onDeleted:()=>r.reload?.()})]})}var De=`academy_posts`,Oe=[`admin`,`super_admin`,`operations`],ke=e=>!!e&&Oe.includes(e),Ae={POSTING_BANNED:`Η δημοσίευση έχει απενεργοποιηθεί για τον λογαριασμό σου.`,CANNOT_BAN_SELF:`Δεν μπορείς να αποκλείσεις τον εαυτό σου.`,CANNOT_BAN_MODERATOR:`Δεν μπορείς να αποκλείσεις άλλον διαχειριστή.`,USER_NOT_FOUND:`Ο χρήστης δεν βρέθηκε.`,FORBIDDEN:`Δεν έχεις δικαίωμα για αυτή την ενέργεια.`};function Q(e){let t=e instanceof Error?e.message:String(e);for(let e of Object.keys(Ae))if(t.includes(e))return Ae[e];return t}async function je(e){let{data:t,error:n}=await s.from(`profiles`).select(`posting_banned, posting_ban_reason`).eq(`id`,e).maybeSingle();if(n||!t)return{banned:!1,reason:null};let r=t;return{banned:!!r.posting_banned,reason:r.posting_ban_reason??null}}async function Me(){let{data:e,error:t}=await s.from(`profiles`).select(`id, full_name, avatar_url, posting_ban_reason, posting_banned_at`).eq(`posting_banned`,!0).order(`posting_banned_at`,{ascending:!1});if(t)throw Error(Q(Error(t.message)));return(e??[]).map(e=>{let t=e;return{id:t.id,full_name:t.full_name,avatar_url:t.avatar_url,reason:t.posting_ban_reason,banned_at:t.posting_banned_at}})}async function Ne(e,t,n){let{error:r}=await s.rpc(`set_posting_ban`,{p_user:e,p_banned:t,p_reason:n?.trim()||null});if(r)throw Error(Q(Error(r.message)))}async function Pe(e){let{data:t,error:n}=await s.from(De).delete().eq(`id`,e).select(`id`);if(n)throw Error(Q(Error(n.message)));if(!t||t.length===0)throw Error(`Δεν ήταν δυνατή η διαγραφή (δεν έχεις δικαίωμα).`)}function Fe(e){let t=e,n=t.author_id??t.user_id??t.profile_id??t.created_by??t.author?.id;return typeof n==`string`?n:null}var Ie=6,Le=2e3,Re=10;function ze(){let[e,t]=(0,Y.useState)(!1),[n,r]=(0,Y.useState)(()=>typeof window<`u`&&window.innerWidth<1024);return(0,Y.useEffect)(()=>{let e=()=>r(window.innerWidth<1024);return window.addEventListener(`resize`,e,{passive:!0}),()=>window.removeEventListener(`resize`,e)},[]),(0,X.jsxs)(o.div,{drag:n?`x`:!1,dragConstraints:{left:0,right:0},dragElastic:.2,onDragEnd:(e,{offset:r,velocity:i})=>{n&&(r.x<-40||i.x<-400?t(!0):(r.x>40||i.x>400)&&t(!1))},animate:n?{x:e?0:`calc(100% - 36px)`}:{x:0},transition:{type:`spring`,bounce:.1,duration:.4},style:n?{willChange:`transform`}:void 0,className:n?`fixed bottom-0 right-0 top-28 z-50 flex w-[85vw] max-w-sm flex-row`:`sticky top-36 hidden w-80 shrink-0 lg:flex`,children:[n&&(0,X.jsx)(`button`,{type:`button`,"aria-label":e?`Close online users`:`Open online users`,onClick:()=>t(e=>!e),className:`flex w-9 shrink-0 cursor-grab items-center justify-center rounded-l-2xl border-y border-l border-white/20 bg-[#0a0a0b] shadow-[-8px_0_20px_rgba(0,0,0,0.6)] outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-white/60`,children:(0,X.jsxs)(`span`,{className:`flex flex-col gap-1.5`,children:[(0,X.jsx)(`span`,{className:`h-6 w-1 rounded-full`,style:{backgroundImage:`linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)`}}),(0,X.jsx)(`span`,{className:`h-6 w-1 rounded-full`,style:{backgroundImage:`linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)`}})]})}),(0,X.jsx)(`div`,{className:n?`flex-1 overflow-y-auto border-y border-white/10 bg-[#070707] shadow-2xl`:`w-full`,children:(0,X.jsx)(ge,{})})]})}function Be(){let e=a(),t=L(v,[]),n=L(m,[]),r=t.data,i=ke(r?.role),[s,c]=(0,Y.useState)({banned:!1,reason:null}),[l,u]=(0,Y.useState)([]),[d,f]=(0,Y.useState)(Ie),p=(0,Y.useRef)(null);(0,Y.useEffect)(()=>{if(!r?.id)return;let e=!0;return je(r.id).then(t=>e&&c(t)),()=>{e=!1}},[r?.id]);let h=(0,Y.useCallback)(async()=>{try{u(await Me())}catch{}},[]);(0,Y.useEffect)(()=>{i&&h()},[i,h]);let g=(0,Y.useMemo)(()=>new Set(l.map(e=>e.id)),[l]),_=n.data?.length??0;(0,Y.useEffect)(()=>{let e=p.current;if(!e||d>=_)return;let t=new IntersectionObserver(e=>{e[0]?.isIntersecting&&f(e=>e+Ie)},{rootMargin:`600px 0px`});return t.observe(e),()=>t.disconnect()},[d,_]);let y=(0,Y.useCallback)(()=>n.reload?.(),[n]);return(0,X.jsxs)(`main`,{className:`relative min-h-screen w-full overflow-x-hidden bg-[#070707] px-4 py-28 text-white selection:bg-white selection:text-black sm:px-6 sm:py-36 md:px-10`,children:[(0,X.jsx)(o.div,{"aria-hidden":!0,className:`pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(1000px,130%)] -translate-x-1/2 -tran
+[TRUNCATED: file is 54921 bytes, first 40960 included]
+=== END FILE ===
+

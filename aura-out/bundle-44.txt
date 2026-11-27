@@ -1,0 +1,1298 @@
+=== FILE: .output/server/_ssr/pricing-CSvcL4gD.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { C as ShieldCheck, Dt as ChevronDown, Ot as Check, f as Undo2, n as X, t as Zap } from "../_libs/lucide-react.mjs";
+import { a as useTransform, c as useScroll, r as useReducedMotion } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+import { t as AURA_PLANS } from "./plans-sHsWJraA.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { i as setCheckoutIntent } from "./checkout-intent-Cw-r21JH.mjs";
+import { r as useSubscription } from "./useSubscription-CNKMk-yc.mjs";
+import { t as ChromeCursor } from "./ChromeCursor-BJgZMGhf.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/pricing-CSvcL4gD.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var EASE$1 = [
+	.22,
+	1,
+	.36,
+	1
+];
+var COLLAPSED = 7;
+function PlanCard({ plan, index, hasAccess, loading, onSelect }) {
+	const [open, setOpen] = (0, import_react.useState)(false);
+	const ref = (0, import_react.useRef)(null);
+	const list = open ? plan.features : plan.features.slice(0, COLLAPSED);
+	const hidden = plan.features.length - COLLAPSED;
+	const short = plan.name.replace("AURA ", "");
+	function onMove(e) {
+		const el = ref.current;
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+		el.style.setProperty("--my", `${e.clientY - r.top}px`);
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+		initial: {
+			opacity: 0,
+			y: 56,
+			filter: "blur(8px)"
+		},
+		whileInView: {
+			opacity: 1,
+			y: 0,
+			filter: "blur(0px)"
+		},
+		viewport: {
+			once: true,
+			margin: "0px 0px -12% 0px"
+		},
+		transition: {
+			duration: .95,
+			ease: EASE$1,
+			delay: index * .12
+		},
+		className: plan.highlight ? "lg:-my-5" : "",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+			ref,
+			onMouseMove: onMove,
+			className: `pr-wrap ${plan.highlight ? "pr-wrap-hi" : ""}`,
+			"aria-labelledby": `plan-${plan.id}`,
+			children: [plan.highlight && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "pr-border",
+				"aria-hidden": true
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "pr-card",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "pr-spot",
+					"aria-hidden": true
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "relative flex flex-1 flex-col",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "flex min-h-7 items-center",
+							children: plan.badge ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "pr-badge",
+								children: plan.badge
+							}) : null
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+							id: `plan-${plan.id}`,
+							className: "pr-name mt-3 text-2xl font-bold tracking-[0.12em]",
+							children: plan.name
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/70",
+							children: plan.slogan
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-4 text-sm leading-relaxed text-white/55",
+							children: plan.tagline
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mt-7 border-y border-white/[0.07] py-6",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-[10px] uppercase tracking-[0.35em] text-white/35",
+								children: "Monthly subscription"
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+								className: "mt-2 flex items-baseline gap-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "pr-price",
+									children: plan.priceLabel
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "text-xs uppercase tracking-[0.25em] text-white/45",
+									children: "/ Μήνα"
+								})]
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-6 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/40",
+							children: "Περιλαμβάνει"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+							className: "mt-4 space-y-3",
+							children: list.map((feature) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+								className: "flex items-start gap-3 text-sm leading-snug text-white/75",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "pr-check",
+									"aria-hidden": true,
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, {
+										className: "size-3",
+										strokeWidth: 3
+									})
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: feature })]
+							}, feature))
+						}),
+						hidden > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							onClick: () => setOpen((o) => !o),
+							"aria-expanded": open,
+							className: "pr-more mt-4",
+							children: [open ? "Λιγότερα" : `+ ${hidden} ακόμη προνόμια`, /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronDown, { className: `size-3.5 transition-transform ${open ? "rotate-180" : ""}` })]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mt-auto pt-8",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+								type: "button",
+								variant: plan.highlight ? "primary" : "secondary",
+								className: "w-full",
+								disabled: loading,
+								onClick: () => onSelect(plan.id),
+								children: hasAccess ? "ΕΧΕΙΣ ΠΡΟΣΒΑΣΗ" : `ΞΕΚΙΝΑ ΜΕ ${short}`
+							})
+						})
+					]
+				})]
+			})]
+		})
+	});
+}
+function PricingCards() {
+	const navigate = useNavigate();
+	const { session } = useAuth();
+	const { hasAccess, loading } = useSubscription(session?.user.id);
+	function handleSelect(planId) {
+		if (!session) {
+			setCheckoutIntent(planId);
+			navigate({
+				to: "/login",
+				search: { plan: planId }
+			});
+			return;
+		}
+		if (hasAccess) {
+			navigate({ to: "/academy" });
+			return;
+		}
+		navigate({
+			to: "/checkout",
+			search: { plan: planId }
+		});
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: css$1 }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6",
+		children: AURA_PLANS.map((plan, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PlanCard, {
+			plan,
+			index: i,
+			hasAccess,
+			loading,
+			onSelect: handleSelect
+		}, plan.id))
+	})] });
+}
+var css$1 = `
+@keyframes pr-spin { to { transform: rotate(360deg); } }
+@keyframes pr-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.pr-wrap {
+  position: relative; height: 100%; padding: 1px; border-radius: 1.4rem; overflow: hidden; isolation: isolate;
+  background: rgba(255,255,255,.09);
+  transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s, background .5s;
+}
+.pr-wrap:hover { transform: translateY(-6px); background: rgba(255,255,255,.22); box-shadow: 0 34px 90px -34px rgba(220,228,240,.3); }
+.pr-wrap-hi { background: rgba(255,255,255,.1); box-shadow: 0 0 90px -30px rgba(232,236,242,.5); }
+.pr-wrap-hi:hover { background: rgba(255,255,255,.1); }
+.pr-border {
+  position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.98) 74%, rgba(255,255,255,0) 90%, transparent 100%);
+  animation: pr-spin 7s linear infinite;
+}
+.pr-card {
+  position: relative; display: flex; flex-direction: column; height: 100%; padding: 2rem; overflow: hidden;
+  border-radius: calc(1.4rem - 1px);
+  background: linear-gradient(180deg, rgba(22,23,29,.96), rgba(8,9,12,.98));
+}
+.pr-wrap-hi .pr-card { background: linear-gradient(180deg, rgba(28,29,36,.97), rgba(9,10,13,.99)); }
+.pr-spot {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,.08), transparent 60%);
+}
+.pr-name, .pr-price {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 25%, #9ca3af 45%, #ffffff 60%, #8b93a1 80%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pr-shimmer 7s linear infinite;
+}
+.pr-price { font-size: 3.2rem; line-height: 1; font-weight: 700; letter-spacing: -.02em; }
+.pr-badge {
+  border-radius: 9999px; padding: .3rem .8rem; font-size: 10px; letter-spacing: .3em; color: #f1f5f9;
+  border: 1px solid rgba(232,236,242,.45); background: rgba(255,255,255,.07); box-shadow: 0 0 20px -4px rgba(232,236,242,.55);
+}
+.pr-check {
+  display: grid; place-items: center; flex-shrink: 0; width: 1.15rem; height: 1.15rem; margin-top: .15rem; border-radius: 9999px;
+  color: #f1f5f9; border: 1px solid rgba(232,236,242,.4); background: rgba(255,255,255,.06); box-shadow: 0 0 12px -2px rgba(232,236,242,.5);
+}
+.pr-more {
+  display: inline-flex; width: fit-content; align-items: center; gap: .4rem; font-size: 11px; letter-spacing: .2em;
+  text-transform: uppercase; color: rgba(255,255,255,.6); transition: color .2s, text-shadow .2s;
+}
+.pr-more:hover { color: #fff; text-shadow: 0 0 14px rgba(232,236,242,.7); }
+@media (prefers-reduced-motion: reduce) { .pr-border, .pr-name, .pr-price { animation: none !important; } }
+`;
+var EASE = [
+	.22,
+	1,
+	.36,
+	1
+];
+function Reveal({ children, delay = 0 }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+		initial: {
+			opacity: 0,
+			y: 44,
+			filter: "blur(8px)"
+		},
+		whileInView: {
+			opacity: 1,
+			y: 0,
+			filter: "blur(0px)"
+		},
+		viewport: {
+			once: true,
+			margin: "0px 0px -10% 0px"
+		},
+		transition: {
+			duration: .95,
+			ease: EASE,
+			delay
+		},
+		children
+	});
+}
+var GROUPS = [
+	{
+		title: "Εκπαίδευση",
+		rows: [
+			{
+				label: "Μηνιαία εκπαιδευτικά videos",
+				values: [
+					true,
+					true,
+					true
+				]
+			},
+			{
+				label: "Προχωρημένα videos κουρεμάτων",
+				values: [
+					false,
+					true,
+					true
+				]
+			},
+			{
+				label: "Αποκλειστικά ELITE μαθήματα",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "AURA Certification",
+				values: [
+					false,
+					true,
+					true
+				]
+			},
+			{
+				label: "AURA Elite Challenges",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "Early Access σε νέα videos",
+				values: [
+					false,
+					false,
+					true
+				]
+			}
+		]
+	},
+	{
+		title: "Αξιολόγηση & εξέλιξη",
+		rows: [
+			{
+				label: "Review System",
+				values: [
+					true,
+					true,
+					true
+				]
+			},
+			{
+				label: "Προσωπικό AURA Portfolio",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "Προσωπική αξιολόγηση από εκπαιδευτή",
+				values: [
+					false,
+					false,
+					"Έως 4 / μήνα"
+				]
+			},
+			{
+				label: "Αναλυτικό feedback & προτάσεις",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "Personal Progress Tracking",
+				values: [
+					false,
+					false,
+					true
+				]
+			}
+		]
+	},
+	{
+		title: "Κοινότητα & καριέρα",
+		rows: [
+			{
+				label: "AURA Social Access",
+				values: [
+					true,
+					true,
+					true
+				]
+			},
+			{
+				label: "AURA Find Job",
+				values: [
+					true,
+					true,
+					true
+				]
+			},
+			{
+				label: "Ιδιωτική κοινότητα ELITE",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "VIP Community Status",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "Δημοσίευση εργασιών στην Ακαδημία",
+				values: [
+					false,
+					false,
+					true
+				]
+			},
+			{
+				label: "Προτεραιότητα στο Support",
+				values: [
+					false,
+					false,
+					true
+				]
+			}
+		]
+	},
+	{
+		title: "Εκπτώσεις",
+		rows: [
+			{
+				label: "E-book AURA Professional Hair Method",
+				values: [
+					false,
+					"50%",
+					"50%"
+				]
+			},
+			{
+				label: "Φυσικό AURA Hair Method Book",
+				values: [
+					false,
+					"25%",
+					"50%"
+				]
+			},
+			{
+				label: "AURA Online Seminars",
+				values: [
+					false,
+					false,
+					"25%"
+				]
+			},
+			{
+				label: "Προϊόντα FORZA BRAVA",
+				values: [
+					false,
+					"10%",
+					"10%"
+				]
+			}
+		]
+	},
+	{
+		title: "Ευελιξία",
+		rows: [{
+			label: "Ακύρωση ανά πάσα στιγμή",
+			values: [
+				true,
+				true,
+				true
+			]
+		}]
+	}
+];
+function CellView({ v }) {
+	if (v === true) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: "pp-tick",
+		role: "img",
+		"aria-label": "Περιλαμβάνεται",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, {
+			className: "size-3.5",
+			strokeWidth: 3
+		})
+	});
+	if (v === false) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: "pp-cross",
+		role: "img",
+		"aria-label": "Δεν περιλαμβάνεται",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-3.5" })
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: "pp-val",
+		children: v
+	});
+}
+var FAQ = [
+	{
+		q: "Μπορώ να ακυρώσω τη συνδρομή μου;",
+		a: "Ναι. Όλα τα πλάνα έχουν δυνατότητα ακύρωσης ανά πάσα στιγμή, χωρίς δέσμευση."
+	},
+	{
+		q: "Πώς γίνεται η χρέωση;",
+		a: "Η συνδρομή είναι μηνιαία και η πληρωμή γίνεται με ασφάλεια μέσω Stripe. Ξεκινάς από τη σελίδα checkout αφού συνδεθείς."
+	},
+	{
+		q: "Σε ποιες εκπτώσεις έχω πρόσβαση;",
+		a: "Το PRO δίνει 50% στο E-book, 25% στο φυσικό βιβλίο και 10% στα FORZA BRAVA. Το ELITE προσθέτει 50% στο φυσικό βιβλίο και 25% στα Online Seminars."
+	}
+];
+function Hero() {
+	const ref = (0, import_react.useRef)(null);
+	const reduce = useReducedMotion();
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start start", "end start"]
+	});
+	const y = useTransform(scrollYProgress, [0, 1], [0, reduce ? 0 : 140]);
+	const opacity = useTransform(scrollYProgress, [0, .9], [1, 0]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		ref,
+		className: "relative px-5 pb-20 pt-10 text-center sm:pb-28",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "pp-ring",
+			"aria-hidden": true
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			style: {
+				y,
+				opacity
+			},
+			className: "relative mx-auto max-w-3xl",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
+					initial: {
+						opacity: 0,
+						y: 16
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					transition: {
+						duration: .8,
+						ease: EASE
+					},
+					className: "chrome-text text-[11px] font-semibold uppercase tracking-[0.5em]",
+					children: "Aura Academy · Πλάνα"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.h1, {
+					initial: {
+						opacity: 0,
+						y: 28,
+						filter: "blur(10px)"
+					},
+					animate: {
+						opacity: 1,
+						y: 0,
+						filter: "blur(0px)"
+					},
+					transition: {
+						duration: 1.1,
+						ease: EASE,
+						delay: .15
+					},
+					className: "pp-title mt-6 text-4xl font-bold tracking-tight sm:text-6xl",
+					children: "Διάλεξε το επίπεδό σου"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.p, {
+					initial: {
+						opacity: 0,
+						y: 20
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					transition: {
+						duration: 1,
+						ease: EASE,
+						delay: .35
+					},
+					className: "mx-auto mt-6 max-w-xl text-sm leading-relaxed text-white/55 sm:text-base",
+					children: "Τρία επίπεδα εκπαίδευσης για barbers που θέλουν να εξελιχθούν. Ξεκίνα από εκεί που σου ταιριάζει και ακύρωσε ανά πάσα στιγμή."
+				})
+			]
+		})]
+	});
+}
+function PricingPage() {
+	const reduce = useReducedMotion();
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "pp-root relative min-h-screen w-full overflow-x-clip bg-aura-bg pt-28 text-white sm:pt-32",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: css }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "aura-grain",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeCursor, {}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "hero-atmosphere absolute inset-0",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "pp-grid absolute inset-0",
+				"aria-hidden": true
+			}),
+			!reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				className: "pp-orb left-[4%] top-[8%] h-80 w-80",
+				animate: {
+					y: [
+						0,
+						-34,
+						0
+					],
+					x: [
+						0,
+						18,
+						0
+					]
+				},
+				transition: {
+					duration: 15,
+					repeat: Infinity,
+					ease: "easeInOut"
+				},
+				"aria-hidden": true
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				className: "pp-orb right-[3%] top-[48%] h-[26rem] w-[26rem]",
+				animate: {
+					y: [
+						0,
+						30,
+						0
+					],
+					x: [
+						0,
+						-22,
+						0
+					]
+				},
+				transition: {
+					duration: 19,
+					repeat: Infinity,
+					ease: "easeInOut"
+				},
+				"aria-hidden": true
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative z-10",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Hero, {}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+						id: "plans",
+						className: "mx-auto max-w-6xl scroll-mt-28 px-5 pb-24 sm:px-8",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PricingCards, {})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+						className: "mx-auto max-w-5xl px-5 pb-28 sm:px-8",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reveal, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "pp-trust grid gap-px overflow-hidden rounded-2xl sm:grid-cols-3",
+							children: [
+								{
+									icon: Undo2,
+									t: "Ακύρωση ανά πάσα στιγμή",
+									d: "Χωρίς δέσμευση και χωρίς κρυφές χρεώσεις."
+								},
+								{
+									icon: ShieldCheck,
+									t: "Ασφαλής πληρωμή",
+									d: "Οι πληρωμές γίνονται μέσω Stripe."
+								},
+								{
+									icon: Zap,
+									t: "Γρήγορη έναρξη",
+									d: "Πρόσβαση μόλις ολοκληρωθεί η πληρωμή."
+								}
+							].map(({ icon: Icon, t, d }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "pp-trust-item flex flex-col items-center gap-3 px-6 py-8 text-center",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "pp-icon",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { className: "size-5 text-white/85" })
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+										className: "text-sm font-semibold tracking-wide",
+										children: t
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-xs leading-relaxed text-white/50",
+										children: d
+									})
+								]
+							}, t))
+						}) })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "mx-auto max-w-5xl px-5 pb-28 sm:px-8",
+						"aria-labelledby": "compare-title",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reveal, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mb-10 text-center",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "chrome-text text-[11px] font-semibold uppercase tracking-[0.5em]",
+									children: "Σύγκριση"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+									id: "compare-title",
+									className: "pp-title mt-4 text-3xl font-bold tracking-tight sm:text-5xl",
+									children: "Τι περιλαμβάνει το κάθε πλάνο"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "mx-auto mt-4 max-w-xl text-sm text-white/50",
+									children: "Δες με μια ματιά τι κερδίζεις σε κάθε επίπεδο."
+								})
+							]
+						}) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reveal, {
+							delay: .1,
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "pp-table-wrap",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", {
+									className: "pp-table w-full min-w-[680px] border-collapse text-left",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("caption", {
+											className: "sr-only",
+											children: "Σύγκριση των πλάνων AURA Basic, Pro και Elite"
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+											scope: "col",
+											className: "pp-th-label",
+											children: "Προνόμιο"
+										}), AURA_PLANS.map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("th", {
+											scope: "col",
+											className: `pp-th ${p.highlight ? "pp-col-hi" : ""}`,
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: "block text-xs font-bold tracking-[0.2em]",
+												children: p.name
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+												className: "mt-1 block text-[11px] font-normal text-white/50",
+												children: [p.priceLabel, " / μήνα"]
+											})]
+										}, p.id))] }) }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("tbody", { children: GROUPS.map((g) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(GroupRows, {
+											title: g.title,
+											rows: g.rows
+										}, g.title)) })
+									]
+								})
+							})
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "mx-auto max-w-3xl px-5 pb-28 sm:px-8",
+						"aria-labelledby": "faq-title",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reveal, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							id: "faq-title",
+							className: "pp-title mb-8 text-center text-3xl font-bold tracking-tight sm:text-4xl",
+							children: "Συχνές ερωτήσεις"
+						}) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "space-y-3",
+							children: FAQ.map((f, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reveal, {
+								delay: i * .08,
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", {
+									className: "pp-faq group",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("summary", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: f.q }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "pp-plus",
+										"aria-hidden": true
+									})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "px-6 pb-6 text-sm leading-relaxed text-white/60",
+										children: f.a
+									})]
+								})
+							}, f.q))
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+						className: "mx-auto max-w-3xl px-5 pb-32 text-center sm:px-8",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reveal, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "pp-cta px-6 py-14 sm:px-12",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+									className: "pp-title text-3xl font-bold tracking-tight sm:text-5xl",
+									children: "Ξεκίνα την εξέλιξή σου"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "mx-auto mt-5 max-w-md text-sm leading-relaxed text-white/55",
+									children: "Διάλεξε το πλάνο σου και μπες στο AURA system."
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "mt-8 flex justify-center",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+										type: "button",
+										onClick: () => document.getElementById("plans")?.scrollIntoView({ behavior: "smooth" }),
+										children: "ΔΕΣ ΤΑ ΠΛΑΝΑ"
+									})
+								})
+							]
+						}) })
+					})
+				]
+			})
+		]
+	});
+}
+function GroupRows({ title, rows }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+		colSpan: 4,
+		scope: "colgroup",
+		className: "pp-group",
+		children: title
+	}) }), rows.map((r) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", {
+		className: "pp-row",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+			scope: "row",
+			className: "pp-label",
+			children: r.label
+		}), r.values.map((v, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+			className: `pp-cell ${AURA_PLANS[i]?.highlight ? "pp-col-hi" : ""}`,
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CellView, { v })
+		}, i))]
+	}, r.label))] });
+}
+var css = `
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+@keyframes pp-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes pp-pulse { 0%,100% { opacity: .5; } 50% { opacity: .95; } }
+
+.pp-grid {
+  background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 50% at 50% 18%, #000 15%, transparent 75%);
+          mask-image: radial-gradient(ellipse 75% 50% at 50% 18%, #000 15%, transparent 75%);
+  pointer-events: none;
+}
+.pp-orb { position: absolute; border-radius: 9999px; pointer-events: none; filter: blur(46px);
+  background: radial-gradient(circle at 35% 30%, rgba(232,236,242,.15), rgba(160,168,180,.05) 45%, transparent 70%); }
+.pp-ring {
+  position: absolute; left: 50%; top: 50%; width: min(640px, 90vw); aspect-ratio: 1; transform: translate(-50%, -52%);
+  border-radius: 9999px; pointer-events: none; opacity: .55;
+  background: conic-gradient(from 0deg, transparent 0 60%, rgba(232,236,242,.35) 80%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  animation: pp-spin 20s linear infinite;
+}
+.pp-title {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 22%, #9ca3af 42%, #ffffff 58%, #8b93a1 78%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pp-shimmer 7s linear infinite;
+}
+
+.pp-trust { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08); }
+.pp-trust-item { background: linear-gradient(180deg, rgba(20,21,27,.95), rgba(9,10,13,.97)); }
+.pp-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.16); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.14), rgba(255,255,255,.02));
+  box-shadow: 0 0 28px -8px rgba(232,236,242,.5); }
+
+.pp-table-wrap { overflow-x: auto; border-radius: 1.2rem; border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(180deg, rgba(20,21,27,.94), rgba(9,10,13,.97)); box-shadow: 0 30px 80px -40px rgba(0,0,0,.9); }
+.pp-th-label, .pp-th { padding: 1.4rem 1rem; font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.45); border-bottom: 1px solid rgba(255,255,255,.1); }
+.pp-th { text-align: center; color: #f1f5f9; }
+.pp-th-label { position: sticky; left: 0; z-index: 2; background: rgba(14,15,19,.98); }
+.pp-col-hi { background: linear-gradient(180deg, rgba(232,236,242,.08), rgba(232,236,242,.03)); }
+.pp-group { padding: 1.1rem 1rem .6rem; text-align: left; font-size: 10px; letter-spacing: .4em; text-transform: uppercase; color: rgba(255,255,255,.4);
+  background: rgba(255,255,255,.025); }
+.pp-label { position: sticky; left: 0; z-index: 1; padding: .95rem 1rem; text-align: left; font-size: 13px; font-weight: 400; color: rgba(255,255,255,.8);
+  background: rgba(12,13,17,.98); border-top: 1px solid rgba(255,255,255,.05); }
+.pp-cell { padding: .85rem 1rem; text-align: center; border-top: 1px solid rgba(255,255,255,.05); }
+.pp-row { transition: background .25s; }
+.pp-row:hover .pp-cell, .pp-row:hover .pp-label { background-color: rgba(255,255,255,.035); }
+.pp-tick { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; color: #f8fafc;
+  border: 1px solid rgba(232,236,242,.5); background: rgba(255,255,255,.08); box-shadow: 0 0 16px -2px rgba(232,236,242,.6); }
+.pp-cross { display: inline-grid; place-items: center; width: 24px; height: 24px; color: rgba(255,255,255,.25); }
+.pp-val { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #f1f5f9; text-shadow: 0 0 14px rgba(232,236,242,.5); }
+
+.pp-faq { border-radius: 1rem; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(180deg, rgba(20,21,27,.92), rgba(9,10,13,.95)); transition: border-color .3s; }
+.pp-faq:hover, .pp-faq[open] { border-color: rgba(232,236,242,.3); }
+.pp-faq summary { display: flex; cursor: pointer; list-style: none; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.5rem; font-size: 14px; font-weight: 500; }
+.pp-faq summary::-webkit-details-marker { display: none; }
+.pp-plus { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
+.pp-plus::before, .pp-plus::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; background: #e8ecf2; transition: transform .3s; }
+.pp-plus::after { transform: rotate(90deg); }
+.pp-faq[open] .pp-plus::after { transform: rotate(0deg); }
+
+.pp-cta { position: relative; overflow: hidden; border-radius: 1.6rem; border: 1px solid rgba(255,255,255,.12);
+  background: radial-gradient(70% 90% at 50% 0%, rgba(232,236,242,.12), transparent 70%), linear-gradient(180deg, rgba(22,23,29,.95), rgba(9,10,13,.97)); }
+
+@media (prefers-reduced-motion: reduce) { .pp-ring, .pp-title { animation: none !important; } }
+`;
+//#endregion
+export { PricingPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/VideoEntryForm-DlDeTruc.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { f as getStepVideoUrl, h as removeCourseVideo, i as MAX_VIDEO_DURATION_SECONDS, m as readVideoDuration, n as COURSE_CATEGORIES, r as MAX_VIDEO_BYTES, t as ALLOWED_VIDEO_TYPES, v as uploadCourseVideo } from "./courses-A6CEttdz.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/VideoEntryForm-DlDeTruc.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function formatBytes(bytes) {
+	if (bytes < 1048576) return `${Math.round(bytes / 1024)} KB`;
+	if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+	return `${(bytes / 1073741824).toFixed(2)} GB`;
+}
+function VideoDropzone({ courseId, lessonId = null, videoPath, onUploaded, onCleared, disabled = false, label = "ΒΙΝΤΕΟ ΒΗΜΑΤΟΣ" }) {
+	const inputRef = (0, import_react.useRef)(null);
+	const [dragging, setDragging] = (0, import_react.useState)(false);
+	const [uploading, setUploading] = (0, import_react.useState)(false);
+	const [ratio, setRatio] = (0, import_react.useState)(0);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [previewUrl, setPreviewUrl] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		if (!videoPath) {
+			setPreviewUrl(null);
+			return;
+		}
+		getStepVideoUrl(videoPath, courseId).then((url) => {
+			if (!cancelled) setPreviewUrl(url);
+		}).catch(() => {
+			if (!cancelled) setPreviewUrl(null);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [videoPath, courseId]);
+	const handleFile = (0, import_react.useCallback)(async (file) => {
+		setError(null);
+		if (!ALLOWED_VIDEO_TYPES.includes(file.type)) {
+			setError("Δεκτά μόνο mp4, mov ή webm.");
+			return;
+		}
+		if (file.size > 53687091200) {
+			setError(`Το αρχείο είναι ${formatBytes(file.size)} — το όριο είναι ${Math.round(MAX_VIDEO_BYTES / 1073741824)}GB.`);
+			return;
+		}
+		const duration = await readVideoDuration(file);
+		if (duration !== null && duration > 3600) {
+			setError(`Το βίντεο διαρκεί ${Math.round(duration / 60)} λεπτά — το όριο είναι ${MAX_VIDEO_DURATION_SECONDS / 60} λεπτά.`);
+			return;
+		}
+		setUploading(true);
+		setRatio(0);
+		try {
+			const result = await uploadCourseVideo(courseId, file, setRatio, lessonId);
+			onUploaded(result.path, result.durationSeconds, {
+				sizeBytes: result.sizeBytes,
+				mimeType: result.mimeType,
+				originalFilename: result.originalFilename,
+				uploadedAt: result.uploadedAt,
+				storageProvider: result.storageProvider
+			});
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Το upload απέτυχε.");
+		} finally {
+			setUploading(false);
+		}
+	}, [
+		courseId,
+		lessonId,
+		onUploaded
+	]);
+	const handleRemove = (0, import_react.useCallback)(async () => {
+		if (!videoPath) return;
+		setError(null);
+		try {
+			await removeCourseVideo(videoPath, courseId);
+		} catch (err) {
+			console.error("Αποτυχία διαγραφής βίντεο:", err);
+		}
+		onCleared();
+	}, [
+		videoPath,
+		courseId,
+		onCleared
+	]);
+	const busy = uploading || disabled;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "space-y-3",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[10px] uppercase tracking-[0.4em] text-neutral-500",
+				children: label
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+				mode: "wait",
+				children: videoPath ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+					initial: {
+						opacity: 0,
+						y: 8
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					exit: {
+						opacity: 0,
+						y: -8
+					},
+					transition: { duration: .25 },
+					className: "overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent",
+					children: [previewUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+						src: previewUrl,
+						controls: true,
+						preload: "metadata",
+						className: "aspect-video w-full bg-black"
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "flex aspect-video w-full items-center justify-center bg-black text-xs uppercase tracking-[0.3em] text-neutral-500",
+						children: "ΦΟΡΤΩΣΗ PREVIEW…"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex items-center justify-between gap-3 px-4 py-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "truncate text-xs text-neutral-400",
+							children: videoPath
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: () => void handleRemove(),
+							disabled: busy,
+							className: "shrink-0 rounded-full border border-white/15 px-4 py-1.5 text-[10px] uppercase tracking-[0.3em] text-neutral-300 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:opacity-40",
+							children: "ΑΦΑΙΡΕΣΗ"
+						})]
+					})]
+				}, "preview") : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+					initial: {
+						opacity: 0,
+						y: 8
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					exit: {
+						opacity: 0,
+						y: -8
+					},
+					transition: { duration: .25 },
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+						type: "button",
+						disabled: busy,
+						onClick: () => inputRef.current?.click(),
+						onDragOver: (event) => {
+							event.preventDefault();
+							if (!busy) setDragging(true);
+						},
+						onDragLeave: () => setDragging(false),
+						onDrop: (event) => {
+							event.preventDefault();
+							setDragging(false);
+							if (busy) return;
+							const file = event.dataTransfer.files?.[0];
+							if (file) handleFile(file);
+						},
+						className: [
+							"group relative flex w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center transition",
+							dragging ? "border-white/60 bg-white/[0.08]" : "border-white/15 bg-white/[0.02] hover:border-white/35 hover:bg-white/[0.05]",
+							busy ? "cursor-wait opacity-60" : "cursor-pointer"
+						].join(" "),
+						"aria-label": "Ανέβασε βίντεο βήματος",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-xs uppercase tracking-[0.4em] text-neutral-300",
+								children: uploading ? "ΑΝΕΒΑΙΝΕΙ…" : "DROP MP4 ΕΔΩ"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "text-[11px] text-neutral-500",
+								children: [
+									"ή κάνε κλικ για επιλογή — mp4 / mov / webm, έως",
+									" ",
+									Math.round(MAX_VIDEO_BYTES / 1073741824),
+									"GB, έως",
+									" ",
+									MAX_VIDEO_DURATION_SECONDS / 60,
+									"′"
+								]
+							}),
+							uploading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "mt-3 block h-px w-56 overflow-hidden bg-white/10",
+								role: "progressbar",
+								"aria-label": "Πρόοδος ανεβάσματος",
+								"aria-valuemin": 0,
+								"aria-valuemax": 100,
+								"aria-valuenow": Math.round(ratio * 100),
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "block h-full bg-gradient-to-r from-neutral-500 via-white to-neutral-500 transition-all duration-200",
+									style: { width: `${Math.round(ratio * 100)}%` }
+								})
+							}) : null
+						]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						ref: inputRef,
+						type: "file",
+						accept: "video/mp4,video/quicktime,video/webm",
+						className: "sr-only",
+						onChange: (event) => {
+							const file = event.target.files?.[0];
+							event.target.value = "";
+							if (file) handleFile(file);
+						}
+					})]
+				}, "dropzone")
+			}),
+			error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-xs text-red-400",
+				role: "alert",
+				children: error
+			}) : null
+		]
+	});
+}
+var LEVELS = [
+	{
+		key: "foundation",
+		label: "Foundation"
+	},
+	{
+		key: "professional",
+		label: "Professional"
+	},
+	{
+		key: "advanced",
+		label: "Advanced"
+	},
+	{
+		key: "master",
+		label: "Master"
+	},
+	{
+		key: "educator",
+		label: "Educator"
+	}
+];
+var PLAN_CHOICES = [{
+	key: "low",
+	label: "ALL"
+}, {
+	key: "limited",
+	label: "LIMITED"
+}];
+function VideoEntryForm({ course, saving, error, notice, onSave, onDelete, onVideoUploaded, onVideoCleared, videoPath, courseId }) {
+	const [title, setTitle] = (0, import_react.useState)(course?.title ?? "");
+	const [summary, setSummary] = (0, import_react.useState)(course?.summary ?? "");
+	const [category, setCategory] = (0, import_react.useState)(course?.category ?? "graduation");
+	const [level, setLevel] = (0, import_react.useState)(course?.level ?? "foundation");
+	const [requiredPlan, setRequiredPlan] = (0, import_react.useState)(course?.required_plan ?? "low");
+	const [status, setStatus] = (0, import_react.useState)(course?.status ?? "draft");
+	const handleSubmit = (0, import_react.useCallback)((e) => {
+		e.preventDefault();
+		onSave({
+			title,
+			summary,
+			category,
+			level,
+			requiredPlan,
+			status
+		});
+	}, [
+		title,
+		summary,
+		category,
+		level,
+		requiredPlan,
+		status,
+		onSave
+	]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.form, {
+		initial: {
+			opacity: 0,
+			y: 12
+		},
+		animate: {
+			opacity: 1,
+			y: 0
+		},
+		transition: { duration: .4 },
+		onSubmit: handleSubmit,
+		className: "space-y-8",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Τίτλος"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+				value: title,
+				onChange: (e) => setTitle(e.target.value),
+				required: true,
+				placeholder: "π.χ. Graduation Bob — Βασική Τεχνική",
+				className: "mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-neutral-100 outline-none transition focus:border-white/30"
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Κατηγορία"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2 flex flex-wrap gap-2",
+				children: COURSE_CATEGORIES.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => setCategory(c.key),
+					className: `rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${category === c.key ? "border-white/60 bg-white/10 text-white" : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"}`,
+					children: c.label
+				}, c.key))
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Επίπεδο"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2 flex flex-wrap gap-2",
+				children: LEVELS.map((l) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => setLevel(l.key),
+					className: `rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${level === l.key ? "border-white/60 bg-white/10 text-white" : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"}`,
+					children: l.label
+				}, l.key))
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Περιγραφή"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+				value: summary,
+				onChange: (e) => setSummary(e.target.value),
+				rows: 4,
+				placeholder: "Σύντομη περιγραφή του βίντεο…",
+				className: "mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-neutral-100 outline-none transition focus:border-white/30"
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Πλάνο πρόσβασης"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2 flex flex-wrap gap-2",
+				children: PLAN_CHOICES.map((choice) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => setRequiredPlan(choice.key),
+					className: `rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${requiredPlan === choice.key ? "border-white/60 bg-white/10 text-white" : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"}`,
+					children: choice.label
+				}, choice.key))
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Βίντεο"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2",
+				children: courseId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VideoDropzone, {
+					courseId,
+					videoPath,
+					onUploaded: onVideoUploaded,
+					onCleared: onVideoCleared,
+					disabled: saving
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-xs text-neutral-500",
+					children: "Αποθήκευσε πρώτα τον τίτλο για να ξεκλειδώσει το upload βίντεο."
+				})
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				className: "block text-[10px] uppercase tracking-[0.35em] text-neutral-500",
+				children: "Κατάσταση"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-2 flex flex-wrap gap-2",
+				children: [
+					{
+						key: "draft",
+						label: "Πρόχειρο"
+					},
+					{
+						key: "published",
+						label: "Δημοσιευμένο"
+					},
+					{
+						key: "archived",
+						label: "Αρχειοθετημένο"
+					}
+				].map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => setStatus(s.key),
+					className: `rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${status === s.key ? "border-white/60 bg-white/10 text-white" : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"}`,
+					children: s.label
+				}, s.key))
+			})] }),
+			error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400",
+				children: error
+			}) : null,
+			notice ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm text-neutral-300",
+				children: notice
+			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap items-center gap-4 pt-2",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+					type: "submit",
+					disabled: saving,
+					children: saving ? "ΑΠΟΘΗΚΕΥΣΗ…" : "ΑΠΟΘΗΚΕΥΣΗ"
+				}), onDelete ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: onDelete,
+					disabled: saving,
+					className: "text-[11px] uppercase tracking-[0.3em] text-red-400/80 transition hover:text-red-400",
+					children: "Διαγραφή"
+				}) : null]
+			})
+		]
+	});
+}
+//#endregion
+export { VideoEntryForm as t };
+
+=== END FILE ===
+

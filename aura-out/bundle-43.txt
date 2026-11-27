@@ -1,0 +1,1178 @@
+=== FILE: src/components/aura/AdminOnlineSeminars.tsx ===
+import { useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { BadgeCheck, Globe, Mail, Pencil, Phone, Plus, Trash2, Eye, EyeOff, X, Users } from "lucide-react";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import {
+  deleteOnlineSeminar,
+  formatPrice,
+  getAdminOnlineSeminars,
+  getOnlineBookings,
+  saveOnlineSeminar,
+  setOnlineBookingStatus,
+  setOnlineSeminarPublished,
+  type OnlineBooking,
+  type OnlineSeminar,
+} from "@/lib/onlineSeminars";
+
+const chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+const inputCls =
+  "w-full rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-white/40 focus:ring-2 focus:ring-white/10";
+const labelCls = "mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500";
+
+type FormState = {
+  title: string;
+  description: string;
+  starts_at: string; // datetime-local
+  duration_minutes: string;
+  price: string; // euros
+  capacity: string;
+  published: boolean;
+};
+
+const empty: FormState = {
+  title: "",
+  description: "",
+  starts_at: "",
+  duration_minutes: "90",
+  price: "",
+  capacity: "",
+  published: true,
+};
+
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function AdminOnlineSeminars() {
+  const [reload, setReload] = useState(0);
+  const seminars = useAsync(getAdminOnlineSeminars, [reload]);
+  const bookings = useAsync(getOnlineBookings, [reload]);
+
+  const [editing, setEditing] = useState<OnlineSeminar | null>(null);
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<FormState>(empty);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"paid" | "all">("paid");
+
+  const refresh = () => setReload((n) => n + 1);
+
+  function openNew() {
+    setEditing(null);
+    setForm(empty);
+    setOpen(true);
+  }
+  function openEdit(s: OnlineSeminar) {
+    setEditing(s);
+    setForm({
+      title: s.title,
+      description: s.description,
+      starts_at: toLocalInput(s.starts_at),
+      duration_minutes: String(s.duration_minutes),
+      price: (s.price_cents / 100).toString(),
+      capacity: s.capacity?.toString() ?? "",
+      published: s.published,
+    });
+    setOpen(true);
+  }
+
+  const valid =
+    form.title.trim().length >= 3 && form.starts_at && Number(form.price) >= 0 && form.price !== "" &&
+    Number(form.duration_minutes) > 0;
+
+  async function submit() {
+    if (!valid || saving) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      await saveOnlineSeminar(
+        {
+          title: form.title.trim(),
+          description: form.description.trim(),
+          starts_at: new Date(form.starts_at).toISOString(),
+          duration_minutes: Number(form.duration_minutes),
+          price_cents: Math.round(Number(form.price) * 100),
+          currency: "eur",
+          capacity: form.capacity ? Number(form.capacity) : null,
+          published: form.published,
+        },
+        editing?.id,
+      );
+      setOpen(false);
+      setMsg(editing ? "Το σεμινάριο ενημερώθηκε." : "Το σεμινάριο δημιουργήθηκε.");
+      refresh();
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function togglePublish(s: OnlineSeminar) {
+    try {
+      await setOnlineSeminarPublished(s.id, !s.published);
+      refresh();
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    }
+  }
+
+  async function changeBooking(b: OnlineBooking, status: OnlineBooking["status"]) {
+    const text =
+      status === "paid"
+        ? `Μαρκάρισμα του ${b.full_name} ως πληρωμένου;`
+        : `Αναίρεση πληρωμής για τον ${b.full_name};`;
+    if (!window.confirm(text)) return;
+    try {
+      await setOnlineBookingStatus(b.id, status);
+      setMsg(status === "paid" ? `Ο ${b.full_name} μαρκαρίστηκε ως πληρωμένος.` : "Η πληρωμή αναιρέθηκε.");
+      refresh();
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    }
+  }
+
+  async function remove(s: OnlineSeminar) {
+    if (!window.confirm(`Διαγραφή "${s.title}" και όλων των κρατήσεών του;`)) return;
+    try {
+      await deleteOnlineSeminar(s.id);
+      refresh();
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    }
+  }
+
+  const rows: OnlineBooking[] = (bookings.data ?? []).filter((b) => filter === "all" || b.status === "paid");
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 px-1">
+        <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/60">
+          <span className="size-1.5 rounded-full bg-white/60" />
+          Online Σεμινάρια
+        </h2>
+        <motion.button
+          type="button"
+          onClick={openNew}
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
+          className="group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-5 py-2.5 text-sm font-semibold text-black shadow-[0_0_24px_rgba(255,255,255,0.2)] transition-shadow before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 hover:shadow-[0_0_40px_rgba(255,255,255,0.4)] hover:before:translate-x-[300%]"
+        >
+          <Plus className="relative size-4" />
+          <span className="relative">Νέο online σεμινάριο</span>
+        </motion.button>
+      </div>
+
+      {msg && (
+        <div role="status" className="rounded-2xl border border-white/10 bg-zinc-950/80 p-4 text-sm text-zinc-300">
+          {msg}
+        </div>
+      )}
+
+      {seminars.loading && <LoadingSkeleton rows={2} />}
+      {seminars.error && <ErrorState message={seminars.error} />}
+
+      {seminars.data && (
+        <div className="grid gap-4 md:grid-cols-2">
+          {seminars.data.length === 0 && (
+            <p className="px-1 text-sm text-white/40">Δεν υπάρχουν online σεμινάρια ακόμη.</p>
+          )}
+          {seminars.data.map((s) => {
+            const paid = (bookings.data ?? []).filter((b) => b.seminar_id === s.id && b.status === "paid").length;
+            return (
+              <motion.div
+                key={s.id}
+                whileHover={{ y: -3 }}
+                className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-5 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors hover:border-white/30"
+              >
+                <div className="absolute -right-10 -top-10 size-32 rounded-full bg-white/[0.06] blur-[60px]" />
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-10 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition group-hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                        <Globe className="size-5" />
+                      </div>
+                      <h3 className={`text-lg font-bold ${chromeText}`}>{s.title}</h3>
+                    </div>
+                    <span
+                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                        s.published
+                          ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                          : "border-white/15 bg-white/5 text-zinc-400"
+                      }`}
+                    >
+                      {s.published ? "Ορατό" : "Πρόχειρο"}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm text-zinc-400">
+                    {new Date(s.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })} ·{" "}
+                    {s.duration_minutes}′ · {formatPrice(s.price_cents, s.currency)}
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-500">
+                    <Users className="size-3.5" />
+                    {paid}
+                    {s.capacity ? ` / ${s.capacity}` : ""} πληρωμένες κρατήσεις
+                  </p>
+                  <div className="mt-4 flex gap-2">
+                    <IconBtn onClick={() => openEdit(s)} label="Επεξεργασία">
+                      <Pencil className="size-3.5" />
+                    </IconBtn>
+                    <IconBtn onClick={() => togglePublish(s)} label={s.published ? "Απόκρυψη" : "Δημοσίευση"}>
+                      {s.published ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    </IconBtn>
+                    <IconBtn onClick={() => remove(s)} label="Διαγραφή">
+                      <Trash2 className="size-3.5" />
+                    </IconBtn>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Attendees */}
+      <div className="space-y-3 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+          <h3 className="text-sm font-semibold text-white">Συμμετέχοντες</h3>
+          <div className="inline-flex rounded-full border border-white/15 bg-black/60 p-1 text-xs">
+            {(["paid", "all"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`rounded-full px-4 py-1.5 font-medium transition ${
+                  filter === f ? "bg-gradient-to-b from-zinc-100 to-zinc-400 text-black" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                {f === "paid" ? "Πληρωμένοι" : "Όλοι"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {bookings.loading && <LoadingSkeleton rows={3} />}
+        {bookings.error && <ErrorState message={bookings.error} />}
+
+        {bookings.data && (
+          <div className="overflow-x-auto rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+            <table className="w-full min-w-[820px] text-left text-sm">
+              <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-white/50">
+                <tr>
+                  {["Όνομα", "Σεμινάριο", "Email", "Τηλέφωνο", "Status", ""].map((h) => (
+                    <th key={h} className="p-4 font-semibold">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {rows.map((b) => (
+                  <tr key={b.id} className="transition-colors hover:bg-white/[0.02]">
+                    <td className="p-4 font-medium text-white/90">{b.full_name}</td>
+                    <td className="p-4 text-white/60">{b.online_seminars?.title ?? "—"}</td>
+                    <td className="p-4 font-mono text-xs text-white/70">{b.email}</td>
+                    <td className="p-4">
+                      <a href={`tel:${b.phone}`} className="inline-flex items-center gap-1.5 font-mono text-xs text-white/70 hover:text-white">
+                        <Phone className="size-3" />
+                        {b.phone}
+                      </a>
+                    </td>
+                    <td className="p-4">
+                      <span
+                        className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                          b.status === "paid"
+                            ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                            : b.status === "pending"
+                              ? "border-amber-500/30 bg-amber-500/15 text-amber-300"
+                              : "border-red-500/30 bg-red-500/15 text-red-300"
+                        }`}
+                      >
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                      {b.status === "paid" ? (
+                        <button
+                          type="button"
+                          onClick={() => changeBooking(b, "pending")}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/60 transition hover:border-white/40 hover:text-white"
+                        >
+                          Αναίρεση
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => changeBooking(b, "paid")}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-400 hover:text-black"
+                        >
+                          <BadgeCheck className="size-3.5" /> Πληρώθηκε
+                        </button>
+                      )}
+                      <a
+                        href={`mailto:${b.email}?subject=${encodeURIComponent(
+                          `AURA online σεμινάριο: ${b.online_seminars?.title ?? ""}`,
+                        )}&body=${encodeURIComponent(`Γεια σου ${b.full_name},\n\n`)}`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white hover:text-black"
+                      >
+                        <Mail className="size-3.5" /> Επικοινωνία
+                      </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-white/40">
+                      Καμία κράτηση ακόμη.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Create / edit modal */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
+            onClick={() => setOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.97 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-black to-zinc-950 p-6 shadow-[0_0_90px_-30px_rgba(255,255,255,0.25)] sm:p-8"
+            >
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Κλείσιμο"
+                className="absolute right-4 top-4 text-zinc-500 transition hover:text-white"
+              >
+                <X className="size-5" />
+              </button>
+              <h3 className={`text-xl font-bold ${chromeText}`}>
+                {editing ? "Επεξεργασία σεμιναρίου" : "Νέο online σεμινάριο"}
+              </h3>
+
+              <div className="mt-6 space-y-4">
+                <label className="block">
+                  <span className={labelCls}>Τίτλος</span>
+                  <input className={inputCls} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="π.χ. Master Fades Live" />
+                </label>
+                <label className="block">
+                  <span className={labelCls}>Περιγραφή</span>
+                  <textarea rows={4} className={`${inputCls} resize-none`} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Τι θα μάθουν οι συμμετέχοντες…" />
+                </label>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <span className={labelCls}>Ημερομηνία & ώρα</span>
+                    <input type="datetime-local" className={`${inputCls} [color-scheme:dark]`} value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className={labelCls}>Διάρκεια (λεπτά)</span>
+                    <input type="number" min={15} className={inputCls} value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} />
+                  </label>
+                  <label className="block">
+                    <span className={labelCls}>Τιμή (€)</span>
+                    <input type="number" min={0} step="0.01" className={inputCls} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="49" />
+                  </label>
+                  <label className="block">
+                    <span className={labelCls}>Μέγ. θέσεις (προαιρετικό)</span>
+                    <input type="number" min={1} className={inputCls} value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
+                  </label>
+                </div>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-sm text-zinc-300">
+                  <input type="checkbox" className="size-4 accent-white" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} />
+                  Ορατό στη δημόσια σελίδα
+                </label>
+              </div>
+
+              <button
+                type="button"
+                disabled={!valid || saving}
+                onClick={submit}
+                className="mt-6 w-full rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-6 py-3 text-sm font-semibold text-black shadow-[0_0_24px_rgba(255,255,255,0.2)] transition enabled:hover:shadow-[0_0_40px_rgba(255,255,255,0.4)] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? "Αποθήκευση…" : "Αποθήκευση"}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
+  );
+}
+
+function IconBtn({ onClick, label, children }: { onClick: () => void; label: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-white/40 hover:bg-white/15"
+    >
+      {children}
+      {label}
+    </button>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/Navbar.tsx ===
+// src/components/aura/Navbar.tsx
+import { useEffect, useMemo, useState } from "react";
+import { Link, useRouter } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "motion/react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/useAuth";
+import { isAdminRole, isStaffRole } from "@/lib/roles";
+import logo from "@/assets/logo.jpg";
+
+interface NavItem {
+  to: string;
+  label: string;
+}
+
+const PUBLIC_LINKS: NavItem[] = [
+  { to: "/about", label: "About" },
+  { to: "/contact", label: "Contact" },
+  { to: "/method", label: "Method" },
+  { to: "/pricing", label: "Pricing" },
+  { to: "/seminars", label: "Book Your Seminars" },
+  { to: "/online-seminars", label: "Online Seminars" },
+  { to: "/gallery", label: "Gallery" },
+  { to: "/book", label: "Order Book" },
+  { to: "/ai", label: "AURA AI demo" },
+];
+
+function UserAvatar({
+  src,
+  alt,
+  size = "h-9 w-9",
+}: {
+  src?: string | null;
+  alt?: string | null;
+  size?: string;
+}) {
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setError(false);
+  }, [src]);
+
+  const initials =
+    (alt || "?")
+      .trim()
+      .split(" ")
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
+
+  if (!src || error) {
+    return (
+      <span
+        className={`flex ${size} items-center justify-center rounded-full border border-white/20 bg-white/10 text-xs font-medium text-white/80 shadow-[0_0_12px_rgba(255,255,255,0.1)] transition-transform duration-300 group-hover:scale-105 group-hover:border-white/50`}
+      >
+        {initials}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt || "Avatar"}
+      onError={() => setError(true)}
+      className={`${size} rounded-full border border-white/20 object-cover shadow-[0_0_12px_rgba(255,255,255,0.1)] transition-transform duration-300 group-hover:scale-105 group-hover:border-white/50`}
+    />
+  );
+}
+
+export function Navbar() {
+  const router = useRouter();
+  const { session, profile, user: authUser } = useAuth();
+  const user = authUser ?? session?.user ?? null;
+  const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  const pathname = router.state.location.pathname;
+  const role = profile?.role ?? null;
+  const staff = isStaffRole(role);
+  const admin = isAdminRole(role);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = open ? "hidden" : "";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    setOpen(false);
+    router.navigate({ to: "/" });
+  }
+
+  const links: NavItem[] = useMemo(() => {
+    if (!user) return PUBLIC_LINKS;
+    return [
+      { to: "/dashboard", label: "Dashboard" },
+      { to: "/courses", label: "Courses" },
+      { to: "/academy", label: "Academy" },
+      { to: "/elite", label: "Elite Community" },
+      { to: "/messages", label: "Messages" },
+      { to: "/portfolios", label: "Portfolios" },
+      { to: "/seminars", label: "Book Your Seminars" },
+      { to: "/online-seminars", label: "Online Seminars" },
+      { to: "/gallery", label: "Gallery" },
+      { to: "/book", label: "Order Book" },
+      { to: "/find-job", label: "Find Job" },
+      { to: "/ai", label: "AURA AI demo" },
+
+
+      ...(staff ? [{ to: "/review", label: "Review Queue" }] : []),
+      ...(admin
+        ? [
+            { to: "/admin", label: "Admin Panel" },
+            { to: "/admin/inbox", label: "Inbox" },
+          ]
+        : []),
+    ];
+  }, [user, staff, admin]);
+
+  const avatarSrc =
+    profile?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    null;
+
+  const displayName = profile?.full_name || user?.email || "";
+
+  const isActive = (to: string) =>
+    pathname === to || pathname.startsWith(`${to}/`);
+
+  return (
+    <>
+      <header
+        className={[
+          "fixed inset-x-0 top-0 z-50 transition-all duration-300",
+          scrolled
+            ? "border-b border-white/10 bg-black/80 backdrop-blur-md"
+            : "border-b border-transparent bg-transparent",
+        ].join(" ")}
+      >
+        <nav
+          aria-label="Main Navigation"
+          className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8"
+        >
+          {/* Brand Logo */}
+          <Link
+            to="/"
+            className="flex items-center gap-3.5 group notranslate"
+            aria-label="Home"
+          >
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-white/10 blur-sm opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <img
+                src={logo}
+                alt="AURA"
+                aria-hidden
+                className="relative h-11 w-11 rounded-full border border-white/20 object-cover shadow-[0_0_15px_rgba(255,255,255,0.08)] transition-transform duration-300 group-hover:scale-105"
+              />
+            </div>
+
+            <div className="flex flex-col justify-center">
+              <span className="inline-block origin-left scale-x-125 text-base font-extralight tracking-[0.45em] text-neutral-100 leading-none">
+                ΛURΛ
+              </span>
+              <span className="inline-block origin-left scale-x-110 text-[9px] font-extralight tracking-[0.35em] text-neutral-400 uppercase mt-1 leading-none">
+                HAIR METHOD
+              </span>
+            </div>
+          </Link>
+
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-3">
+            
+
+            {user ? (
+              <Link
+                to="/profile"
+                className="group relative flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                aria-label="View Profile"
+              >
+                <UserAvatar src={avatarSrc} alt={displayName} size="h-9 w-9" />
+              </Link>
+            ) : (
+              <Link
+                to="/pricing"
+                className="hidden rounded-full border border-white/20 px-5 py-2 text-[10px] font-extralight uppercase tracking-[0.35em] text-neutral-100 transition-all duration-300 scale-x-105 hover:-translate-y-0.5 hover:border-white/45 hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.35)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 sm:inline-flex"
+              >
+                Start
+              </Link>
+            )}
+
+            {/* Hamburger Button (Mobile & Desktop) */}
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-label={open ? "Close Menu" : "Open Menu"}
+              aria-expanded={open}
+              aria-controls="aura-nav-panel"
+              className="chrome-surface group flex h-10 w-10 items-center justify-center rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            >
+              <span
+                aria-hidden
+                className="flex flex-col items-center justify-center gap-[5px]"
+              >
+                <span
+                  className={[
+                    "block h-[1.5px] w-4 bg-neutral-900 transition-transform duration-300",
+                    open ? "translate-y-[6.5px] rotate-45" : "",
+                  ].join(" ")}
+                />
+                <span
+                  className={[
+                    "block h-[1.5px] w-4 bg-neutral-900 transition-opacity duration-200",
+                    open ? "opacity-0" : "opacity-100",
+                  ].join(" ")}
+                />
+                <span
+                  className={[
+                    "block h-[1.5px] w-4 bg-neutral-900 transition-transform duration-300",
+                    open ? "-translate-y-[6.5px] -rotate-45" : "",
+                  ].join(" ")}
+                />
+              </span>
+            </button>
+          </div>
+        </nav>
+      </header>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.button
+              type="button"
+              aria-label="Close Menu"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 cursor-default bg-black/60 backdrop-blur-sm"
+            />
+
+            <motion.aside
+              id="aura-nav-panel"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{
+                type: "tween",
+                duration: 0.35,
+                ease: [0.22, 1, 0.36, 1],
+              }}
+              className="fixed inset-y-0 right-0 z-50 flex w-full max-w-sm flex-col overflow-y-auto border-l border-white/10 bg-[#050505] px-6 py-6"
+            >
+              <div className="flex items-center justify-between">
+                <span className="inline-block scale-x-110 origin-left text-[10px] font-extralight uppercase tracking-[0.4em] text-neutral-500">
+                  Menu
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close Menu"
+                  className="chrome-surface flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Profile Card */}
+              {user && (
+                <Link
+                  to="/profile"
+                  onClick={() => setOpen(false)}
+                  className="mt-6 flex items-center gap-4 rounded-2xl border border-white/10 bg-[#0A0A0A] p-4 transition-colors hover:border-white/25"
+                >
+                  <UserAvatar
+                    src={avatarSrc}
+                    alt={displayName}
+                    size="h-11 w-11"
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-extralight text-neutral-100">
+                      {displayName || "My Profile"}
+                    </span>
+                    <span className="block text-[10px] font-extralight uppercase tracking-[0.2em] text-neutral-500">
+                      View Profile
+                    </span>
+                  </span>
+                </Link>
+              )}
+
+              {/* Navigation Links inside Drawer */}
+              <ul className="mt-6 flex-1 space-y-1">
+                {links.map((item) => (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      onClick={() => setOpen(false)}
+                      aria-current={isActive(item.to) ? "page" : undefined}
+                      className={[
+                        "group flex items-center justify-between rounded-xl px-4 py-3.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+                        isActive(item.to)
+                          ? "bg-white/[0.06] text-white font-normal"
+                          : "text-neutral-400 hover:bg-white/[0.04] hover:text-neutral-100",
+                      ].join(" ")}
+                    >
+                      <span className="inline-block scale-x-110 origin-left text-xs font-extralight uppercase tracking-[0.3em]">
+                        {item.label}
+                      </span>
+                      <span
+                        aria-hidden
+                        className="text-neutral-600 transition-transform duration-300 group-hover:translate-x-1"
+                      >
+                        →
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-6 border-t border-white/10 pt-5">
+                {user ? (
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="w-full rounded-full border border-white/15 px-5 py-3 text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-300 transition-colors hover:border-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                  >
+                    Sign Out
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <Link
+                      to="/pricing"
+                      onClick={() => setOpen(false)}
+                      className="block rounded-full border border-white/25 px-5 py-3 text-center text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-100 transition-colors hover:border-white/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    >
+                      Start Now
+                    </Link>
+                    <Link
+                      to="/login"
+                      onClick={() => setOpen(false)}
+                      className="block px-5 py-2 text-center text-[10px] font-extralight uppercase tracking-[0.35em] text-neutral-500 transition-colors hover:text-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                    >
+                      Sign In
+                    </Link>
+                  </div>
+                )}
+                <p className="mt-5 text-center text-[9px] font-extralight uppercase tracking-[0.35em] text-neutral-600">
+                  The operating system for the modern barber.
+                </p>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/onlineSeminars.ts ===
+
+import { supabase } from "@/lib/supabase";
+
+export type OnlineSeminar = {
+  id: string;
+  title: string;
+  description: string;
+  starts_at: string;
+  duration_minutes: number;
+  price_cents: number;
+  currency: string;
+  capacity: number | null;
+  published: boolean;
+  created_at: string;
+};
+
+export type PublicOnlineSeminar = Omit<
+  OnlineSeminar,
+  "published" | "created_at"
+> & { taken: number };
+
+export type OnlineBooking = {
+  id: string;
+  seminar_id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  status: "pending" | "paid" | "failed" | "refunded";
+  amount_cents: number | null;
+  /** Price before the member discount. Null for older bookings. */
+  list_price_cents?: number | null;
+  discount_percent?: number | null;
+  paid_at: string | null;
+  created_at: string;
+  online_seminars: { title: string; starts_at: string } | null;
+};
+
+export type SeminarInput = Omit<OnlineSeminar, "id" | "created_at">;
+
+export function formatPrice(cents: number, currency = "eur") {
+  return new Intl.NumberFormat("el-GR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
+}
+
+export async function getPublicOnlineSeminars(): Promise<PublicOnlineSeminar[]> {
+  const { data, error } = await supabase
+    .from("online_seminars_public")
+    .select("*")
+    .gte("starts_at", new Date().toISOString())
+    .order("starts_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as PublicOnlineSeminar[];
+}
+
+export async function getAdminOnlineSeminars(): Promise<OnlineSeminar[]> {
+  const { data, error } = await supabase
+    .from("online_seminars")
+    .select("*")
+    .order("starts_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as OnlineSeminar[];
+}
+
+export async function saveOnlineSeminar(input: SeminarInput, id?: string) {
+  const query = id
+    ? supabase.from("online_seminars").update(input).eq("id", id)
+    : supabase.from("online_seminars").insert(input);
+
+  const { error } = await query;
+  if (error) throw error;
+}
+
+export async function setOnlineSeminarPublished(
+  id: string,
+  published: boolean,
+) {
+  const { error } = await supabase
+    .from("online_seminars")
+    .update({ published })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function deleteOnlineSeminar(id: string) {
+  const { error } = await supabase
+    .from("online_seminars")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+export async function getOnlineBookings(): Promise<OnlineBooking[]> {
+  const { data, error } = await supabase
+    .from("online_seminar_bookings")
+    .select("*, online_seminars(title, starts_at)")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as OnlineBooking[];
+}
+
+export async function setOnlineBookingStatus(
+  id: string,
+  status: OnlineBooking["status"],
+) {
+  const { error } = await supabase
+    .from("online_seminar_bookings")
+    .update({
+      status,
+      paid_at: status === "paid" ? new Date().toISOString() : null,
+    })
+    .eq("id", id);
+
+  if (error) throw error;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Viva.com Smart Checkout                                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface OnlineCheckoutResult {
+  /** Viva hosted Smart Checkout URL. */
+  redirectUrl: string;
+  /** Internal AURA booking ID. Used to check payment status after checkout. */
+  bookingId: string;
+  amountCents: number;
+  listPriceCents: number;
+  discountPercent: number;
+  currency: "EUR";
+  provider: "viva";
+}
+
+/**
+ * Only allow redirects to the official Viva Smart Checkout hosts.
+ * This prevents an unexpected URL from the Edge Function being trusted.
+ */
+function isValidVivaCheckoutUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+
+  try {
+    const url = new URL(value);
+
+    const allowedHosts = [
+      "demo.vivapayments.com",
+      "www.vivapayments.com",
+    ];
+
+    return (
+      url.protocol === "https:" &&
+      allowedHosts.includes(url.hostname) &&
+      url.pathname === "/web/checkout" &&
+      /^\d{6,20}$/.test(url.searchParams.get("ref") ?? "")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function startOnlineCheckout(p: {
+  seminarId: string;
+  fullName: string;
+  email: string;
+  phone: string;
+}): Promise<OnlineCheckoutResult> {
+  // Use the existing Supabase client configuration.
+  const url = (supabase as any).supabaseUrl as string;
+  const key = (supabase as any).supabaseKey as string;
+
+  if (!url || !key) {
+    throw new Error("supabase_config_missing");
+  }
+
+  // Send the authenticated user's token when available.
+  // The Edge Function verifies the user and calculates any member discount.
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+
+  if (sessionError) {
+    throw new Error("session_error");
+  }
+
+  const bearer = sessionData.session?.access_token ?? key;
+
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `${url}/functions/v1/create-online-checkout`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: key,
+          Authorization: `[REDACTED]`,
+        },
+        body: JSON.stringify({
+          seminarId: p.seminarId,
+          fullName: p.fullName.trim(),
+          email: p.email.trim(),
+          phone: p.phone.trim(),
+        }),
+      },
+    );
+  } catch {
+    throw new Error("network_error");
+  }
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    console.error("create-online-checkout failed:", response.status, data);
+    throw new Error(data?.error ?? "checkout_creation_failed");
+  }
+
+  if (
+    !data ||
+    !isValidVivaCheckoutUrl(data.redirectUrl) ||
+    typeof data.bookingId !== "string" ||
+    !data.bookingId ||
+    typeof data.amountCents !== "number" ||
+    typeof data.listPriceCents !== "number" ||
+    typeof data.discountPercent !== "number"
+  ) {
+    console.error("Invalid Viva checkout response:", data);
+    throw new Error("invalid_viva_checkout_response");
+  }
+
+  return {
+    redirectUrl: data.redirectUrl,
+    bookingId: data.bookingId,
+    amountCents: data.amountCents,
+    listPriceCents: data.listPriceCents,
+    discountPercent: data.discountPercent,
+    currency: "EUR",
+    provider: "viva",
+  };
+}
+
+/**
+ * Polls AURA until the Viva webhook marks this booking as paid.
+ *
+ * IMPORTANT:
+ * The get_online_booking_status RPC must accept p_booking_id
+ * and return the booking status. It must no longer search by Stripe session ID.
+ */
+export async function waitForPaid(
+  bookingId: string,
+  tries = 20,
+  delayMs = 2000,
+): Promise<boolean> {
+  if (!bookingId) {
+    throw new Error("booking_id_required");
+  }
+
+  for (let i = 0; i < tries; i++) {
+    const { data, error } = await supabase.rpc(
+      "get_online_booking_status",
+      { p_booking_id: bookingId },
+    );
+
+    if (error) {
+      console.error("get_online_booking_status failed:", error);
+      throw new Error("booking_status_check_failed");
+    }
+
+    if (data === "paid") return true;
+    if (data === "failed" || data === "refunded") return false;
+
+    if (i < tries - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return false;
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/confirm-book-order/index.ts ===
+// Deploy: supabase functions deploy confirm-book-order --no-verify-jwt
+// Secret:  STRIPE_SECRET_KEY
+//
+// Called by the browser after Stripe says the embedded checkout completed.
+// We NEVER trust the browser: the payment is re-checked directly with Stripe.
+// Idempotent: safe to call many times, stock is decremented only once.
+import Stripe from "https://esm.sh/stripe@16.12.0?target=deno";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage",
+  "Access-Control-Max-Age": "86400",
+};
+
+const reply = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: CORS });
+  if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
+
+  try {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    const url = Deno.env.get("SUPABASE_URL");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    if (!stripeKey || !url || !serviceKey) return reply({ error: "server_misconfigured" }, 500);
+
+    const stripe = new Stripe(stripeKey, { apiVersion: "2024-06-20" });
+    const db = createClient(url, serviceKey, { auth: { persistSession: false } });
+
+    const { orderId } = await req.json();
+    if (typeof orderId !== "string" || !UUID.test(orderId)) {
+      return reply({ error: "invalid_input" }, 400);
+    }
+
+    const { data: order } = await db
+      .from("book_orders")
+      .select("id, status, quantity, stripe_session_id")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (!order) return reply({ error: "not_found" }, 404);
+    if (order.status !== "pending") return reply({ status: order.status });
+    if (!order.stripe_session_id) return reply({ error: "no_session" }, 409);
+
+    const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
+    if (session.payment_status !== "paid") return reply({ status: "pending" });
+
+    // Only the first caller flips pending -> paid, so stock drops exactly once.
+    const { data: updated } = await db
+      .from("book_orders")
+      .update({ status: "paid", paid_at: new Date().toISOString() })
+      .eq("id", orderId)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+    if (updated) await db.rpc("decrement_book_stock", { p_qty: order.quantity });
+
+    return reply({ status: "paid" });
+  } catch (e) {
+    console.error("confirm-book-order failed:", e);
+    return reply({ error: "server_error", detail: String((e as Error)?.message ?? e) }, 500);
+  }
+});
+=== END FILE ===
+
+=== FILE: .output/public/assets/VideoEntryForm-CRQira0Y.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./AnimatePresence-ClHpx5iG.js";import{t as i}from"./react-D9fOyxUn.js";import{_ as a,d as o,m as s,n as c,p as l,r as u,t as d,v as f}from"./courses-LEqLhg7m.js";import{t as p}from"./ChromeButton-CdfVnEPs.js";var m=e(n(),1),h=t();function g(e){return e<1048576?`${Math.round(e/1024)} KB`:e<1073741824?`${(e/1048576).toFixed(1)} MB`:`${(e/1073741824).toFixed(2)} GB`}function _({courseId:e,lessonId:t=null,videoPath:n,onUploaded:f,onCleared:p,disabled:_=!1,label:v=`ΒΙΝΤΕΟ ΒΗΜΑΤΟΣ`}){let y=(0,m.useRef)(null),[b,x]=(0,m.useState)(!1),[S,C]=(0,m.useState)(!1),[w,T]=(0,m.useState)(0),[E,D]=(0,m.useState)(null),[O,k]=(0,m.useState)(null);(0,m.useEffect)(()=>{let t=!1;if(!n){k(null);return}return o(n,e).then(e=>{t||k(e)}).catch(()=>{t||k(null)}),()=>{t=!0}},[n,e]);let A=(0,m.useCallback)(async n=>{if(D(null),!d.includes(n.type)){D(`Δεκτά μόνο mp4, mov ή webm.`);return}if(n.size>53687091200){D(`Το αρχείο είναι ${g(n.size)} — το όριο είναι ${Math.round(c/1073741824)}GB.`);return}let r=await l(n);if(r!==null&&r>3600){D(`Το βίντεο διαρκεί ${Math.round(r/60)} λεπτά — το όριο είναι ${u/60} λεπτά.`);return}C(!0),T(0);try{let r=await a(e,n,T,t);f(r.path,r.durationSeconds,{sizeBytes:r.sizeBytes,mimeType:r.mimeType,originalFilename:r.originalFilename,uploadedAt:r.uploadedAt,storageProvider:r.storageProvider})}catch(e){D(e instanceof Error?e.message:`Το upload απέτυχε.`)}finally{C(!1)}},[e,t,f]),j=(0,m.useCallback)(async()=>{if(n){D(null);try{await s(n,e)}catch(e){console.error(`Αποτυχία διαγραφής βίντεο:`,e)}p()}},[n,e,p]),M=S||_;return(0,h.jsxs)(`div`,{className:`space-y-3`,children:[(0,h.jsx)(`p`,{className:`text-[10px] uppercase tracking-[0.4em] text-neutral-500`,children:v}),(0,h.jsx)(r,{mode:`wait`,children:n?(0,h.jsxs)(i.div,{initial:{opacity:0,y:8},animate:{opacity:1,y:0},exit:{opacity:0,y:-8},transition:{duration:.25},className:`overflow-hidden rounded-xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-transparent`,children:[O?(0,h.jsx)(`video`,{src:O,controls:!0,preload:`metadata`,className:`aspect-video w-full bg-black`}):(0,h.jsx)(`div`,{className:`flex aspect-video w-full items-center justify-center bg-black text-xs uppercase tracking-[0.3em] text-neutral-500`,children:`ΦΟΡΤΩΣΗ PREVIEW…`}),(0,h.jsxs)(`div`,{className:`flex items-center justify-between gap-3 px-4 py-3`,children:[(0,h.jsx)(`span`,{className:`truncate text-xs text-neutral-400`,children:n}),(0,h.jsx)(`button`,{type:`button`,onClick:()=>void j(),disabled:M,className:`shrink-0 rounded-full border border-white/15 px-4 py-1.5 text-[10px] uppercase tracking-[0.3em] text-neutral-300 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 disabled:opacity-40`,children:`ΑΦΑΙΡΕΣΗ`})]})]},`preview`):(0,h.jsxs)(i.div,{initial:{opacity:0,y:8},animate:{opacity:1,y:0},exit:{opacity:0,y:-8},transition:{duration:.25},children:[(0,h.jsxs)(`button`,{type:`button`,disabled:M,onClick:()=>y.current?.click(),onDragOver:e=>{e.preventDefault(),M||x(!0)},onDragLeave:()=>x(!1),onDrop:e=>{if(e.preventDefault(),x(!1),M)return;let t=e.dataTransfer.files?.[0];t&&A(t)},className:[`group relative flex w-full flex-col items-center justify-center gap-3 rounded-xl border border-dashed px-6 py-12 text-center transition`,b?`border-white/60 bg-white/[0.08]`:`border-white/15 bg-white/[0.02] hover:border-white/35 hover:bg-white/[0.05]`,M?`cursor-wait opacity-60`:`cursor-pointer`].join(` `),"aria-label":`Ανέβασε βίντεο βήματος`,children:[(0,h.jsx)(`span`,{className:`text-xs uppercase tracking-[0.4em] text-neutral-300`,children:S?`ΑΝΕΒΑΙΝΕΙ…`:`DROP MP4 ΕΔΩ`}),(0,h.jsxs)(`span`,{className:`text-[11px] text-neutral-500`,children:[`ή κάνε κλικ για επιλογή — mp4 / mov / webm, έως`,` `,Math.round(c/1073741824),`GB, έως`,` `,u/60,`′`]}),S?(0,h.jsx)(`span`,{className:`mt-3 block h-px w-56 overflow-hidden bg-white/10`,role:`progressbar`,"aria-label":`Πρόοδος ανεβάσματος`,"aria-valuemin":0,"aria-valuemax":100,"aria-valuenow":Math.round(w*100),children:(0,h.jsx)(`span`,{className:`block h-full bg-gradient-to-r from-neutral-500 via-white to-neutral-500 transition-all duration-200`,style:{width:`${Math.round(w*100)}%`}})}):null]}),(0,h.jsx)(`input`,{ref:y,type:`file`,accept:`video/mp4,video/quicktime,video/webm`,className:`sr-only`,onChange:e=>{let t=e.target.files?.[0];e.target.value=``,t&&A(t)}})]},`dropzone`)}),E?(0,h.jsx)(`p`,{className:`text-xs text-red-400`,role:`alert`,children:E}):null]})}var v=[{key:`foundation`,label:`Foundation`},{key:`professional`,label:`Professional`},{key:`advanced`,label:`Advanced`},{key:`master`,label:`Master`},{key:`educator`,label:`Educator`}],y=[{key:`low`,label:`ALL`},{key:`limited`,label:`LIMITED`}];function b({course:e,saving:t,error:n,notice:r,onSave:a,onDelete:o,onVideoUploaded:s,onVideoCleared:c,videoPath:l,courseId:u}){let[d,g]=(0,m.useState)(e?.title??``),[b,x]=(0,m.useState)(e?.summary??``),[S,C]=(0,m.useState)(e?.category??`graduation`),[w,T]=(0,m.useState)(e?.level??`foundation`),[E,D]=(0,m.useState)(e?.required_plan??`low`),[O,k]=(0,m.useState)(e?.status??`draft`),A=(0,m.useCallback)(e=>{e.preventDefault(),a({title:d,summary:b,category:S,level:w,requiredPlan:E,status:O})},[d,b,S,w,E,O,a]);return(0,h.jsxs)(i.form,{initial:{opacity:0,y:12},animate:{opacity:1,y:0},transition:{duration:.4},onSubmit:A,className:`space-y-8`,children:[(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Τίτλος`}),(0,h.jsx)(`input`,{value:d,onChange:e=>g(e.target.value),required:!0,placeholder:`π.χ. Graduation Bob — Βασική Τεχνική`,className:`mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-neutral-100 outline-none transition focus:border-white/30`})]}),(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Κατηγορία`}),(0,h.jsx)(`div`,{className:`mt-2 flex flex-wrap gap-2`,children:f.map(e=>(0,h.jsx)(`button`,{type:`button`,onClick:()=>C(e.key),className:`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${S===e.key?`border-white/60 bg-white/10 text-white`:`border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200`}`,children:e.label},e.key))})]}),(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Επίπεδο`}),(0,h.jsx)(`div`,{className:`mt-2 flex flex-wrap gap-2`,children:v.map(e=>(0,h.jsx)(`button`,{type:`button`,onClick:()=>T(e.key),className:`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${w===e.key?`border-white/60 bg-white/10 text-white`:`border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200`}`,children:e.label},e.key))})]}),(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Περιγραφή`}),(0,h.jsx)(`textarea`,{value:b,onChange:e=>x(e.target.value),rows:4,placeholder:`Σύντομη περιγραφή του βίντεο…`,className:`mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-neutral-100 outline-none transition focus:border-white/30`})]}),(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Πλάνο πρόσβασης`}),(0,h.jsx)(`div`,{className:`mt-2 flex flex-wrap gap-2`,children:y.map(e=>(0,h.jsx)(`button`,{type:`button`,onClick:()=>D(e.key),className:`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${E===e.key?`border-white/60 bg-white/10 text-white`:`border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200`}`,children:e.label},e.key))})]}),(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Βίντεο`}),(0,h.jsx)(`div`,{className:`mt-2`,children:u?(0,h.jsx)(_,{courseId:u,videoPath:l,onUploaded:s,onCleared:c,disabled:t}):(0,h.jsx)(`p`,{className:`rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-xs text-neutral-500`,children:`Αποθήκευσε πρώτα τον τίτλο για να ξεκλειδώσει το upload βίντεο.`})})]}),(0,h.jsxs)(`div`,{children:[(0,h.jsx)(`label`,{className:`block text-[10px] uppercase tracking-[0.35em] text-neutral-500`,children:`Κατάσταση`}),(0,h.jsx)(`div`,{className:`mt-2 flex flex-wrap gap-2`,children:[{key:`draft`,label:`Πρόχειρο`},{key:`published`,label:`Δημοσιευμένο`},{key:`archived`,label:`Αρχειοθετημένο`}].map(e=>(0,h.jsx)(`button`,{type:`button`,onClick:()=>k(e.key),className:`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${O===e.key?`border-white/60 bg-white/10 text-white`:`border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200`}`,children:e.label},e.key))})]}),n?(0,h.jsx)(`p`,{className:`rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400`,children:n}):null,r?(0,h.jsx)(`p`,{className:`rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm text-neutral-300`,children:r}):null,(0,h.jsxs)(`div`,{className:`flex flex-wrap items-center gap-4 pt-2`,children:[(0,h.jsx)(p,{type:`submit`,disabled:t,children:t?`ΑΠΟΘΗΚΕΥΣΗ…`:`ΑΠΟΘΗΚΕΥΣΗ`}),o?(0,h.jsx)(`button`,{type:`button`,onClick:o,disabled:t,className:`text-[11px] uppercase tracking-[0.3em] text-red-400/80 transition hover:text-red-400`,children:`Διαγραφή`}):null]})]})}export{b as t};
+=== END FILE ===
+

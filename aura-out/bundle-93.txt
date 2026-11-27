@@ -1,0 +1,2206 @@
+=== FILE: .output/server/_libs/lucide-react.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "./@stripe/react-stripe-js+[...].mjs";
+//#region node_modules/lucide-react/dist/esm/shared/src/utils/mergeClasses.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var mergeClasses = (...classes) => classes.filter((className, index, array) => {
+	return Boolean(className) && className.trim() !== "" && array.indexOf(className) === index;
+}).join(" ").trim();
+//#endregion
+//#region node_modules/lucide-react/dist/esm/shared/src/utils/toKebabCase.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var toKebabCase = (string) => string.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+//#endregion
+//#region node_modules/lucide-react/dist/esm/shared/src/utils/toCamelCase.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var toCamelCase = (string) => string.replace(/^([A-Z])|[\s-_]+(\w)/g, (match, p1, p2) => p2 ? p2.toUpperCase() : p1.toLowerCase());
+//#endregion
+//#region node_modules/lucide-react/dist/esm/shared/src/utils/toPascalCase.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var toPascalCase = (string) => {
+	const camelCase = toCamelCase(string);
+	return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
+};
+//#endregion
+//#region node_modules/lucide-react/dist/esm/defaultAttributes.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var defaultAttributes = {
+	xmlns: "http://www.w3.org/2000/svg",
+	width: 24,
+	height: 24,
+	viewBox: "0 0 24 24",
+	fill: "none",
+	stroke: "currentColor",
+	strokeWidth: 2,
+	strokeLinecap: "round",
+	strokeLinejoin: "round"
+};
+//#endregion
+//#region node_modules/lucide-react/dist/esm/shared/src/utils/hasA11yProp.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var hasA11yProp = (props) => {
+	for (const prop in props) if (prop.startsWith("aria-") || prop === "role" || prop === "title") return true;
+	return false;
+};
+//#endregion
+//#region node_modules/lucide-react/dist/esm/Icon.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Icon = (0, import_react.forwardRef)(({ color = "currentColor", size = 24, strokeWidth = 2, absoluteStrokeWidth, className = "", children, iconNode, ...rest }, ref) => (0, import_react.createElement)("svg", {
+	ref,
+	...defaultAttributes,
+	width: size,
+	height: size,
+	stroke: color,
+	strokeWidth: absoluteStrokeWidth ? Number(strokeWidth) * 24 / Number(size) : strokeWidth,
+	className: mergeClasses("lucide", className),
+	...!children && !hasA11yProp(rest) && { "aria-hidden": "true" },
+	...rest
+}, [...iconNode.map(([tag, attrs]) => (0, import_react.createElement)(tag, attrs)), ...Array.isArray(children) ? children : [children]]));
+//#endregion
+//#region node_modules/lucide-react/dist/esm/createLucideIcon.js
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var createLucideIcon = (iconName, iconNode) => {
+	const Component = (0, import_react.forwardRef)(({ className, ...props }, ref) => (0, import_react.createElement)(Icon, {
+		ref,
+		iconNode,
+		className: mergeClasses(`lucide-${toKebabCase(toPascalCase(iconName))}`, `lucide-${iconName}`, className),
+		...props
+	}));
+	Component.displayName = toPascalCase(iconName);
+	return Component;
+};
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Activity = createLucideIcon("activity", [["path", {
+	d: "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
+	key: "169zse"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ArrowDown = createLucideIcon("arrow-down", [["path", {
+	d: "M12 5v14",
+	key: "s699le"
+}], ["path", {
+	d: "m19 12-7 7-7-7",
+	key: "1idqje"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ArrowLeft = createLucideIcon("arrow-left", [["path", {
+	d: "m12 19-7-7 7-7",
+	key: "1l729n"
+}], ["path", {
+	d: "M19 12H5",
+	key: "x3x0zl"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ArrowRight = createLucideIcon("arrow-right", [["path", {
+	d: "M5 12h14",
+	key: "1ays0h"
+}], ["path", {
+	d: "m12 5 7 7-7 7",
+	key: "xquz4c"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Award = createLucideIcon("award", [["path", {
+	d: "m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526",
+	key: "1yiouv"
+}], ["circle", {
+	cx: "12",
+	cy: "8",
+	r: "6",
+	key: "1vp47v"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var BadgeCheck = createLucideIcon("badge-check", [["path", {
+	d: "M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z",
+	key: "3c2336"
+}], ["path", {
+	d: "m9 12 2 2 4-4",
+	key: "dzmm74"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Ban = createLucideIcon("ban", [["circle", {
+	cx: "12",
+	cy: "12",
+	r: "10",
+	key: "1mglay"
+}], ["path", {
+	d: "M4.929 4.929 19.07 19.071",
+	key: "196cmz"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var BellOff = createLucideIcon("bell-off", [
+	["path", {
+		d: "M10.268 21a2 2 0 0 0 3.464 0",
+		key: "vwvbt9"
+	}],
+	["path", {
+		d: "M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742",
+		key: "178tsu"
+	}],
+	["path", {
+		d: "m2 2 20 20",
+		key: "1ooewy"
+	}],
+	["path", {
+		d: "M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05",
+		key: "1hqiys"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var BellRing = createLucideIcon("bell-ring", [
+	["path", {
+		d: "M10.268 21a2 2 0 0 0 3.464 0",
+		key: "vwvbt9"
+	}],
+	["path", {
+		d: "M22 8c0-2.3-.8-4.3-2-6",
+		key: "5bb3ad"
+	}],
+	["path", {
+		d: "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+		key: "11g9vi"
+	}],
+	["path", {
+		d: "M4 2C2.8 3.7 2 5.7 2 8",
+		key: "tap9e0"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Bell = createLucideIcon("bell", [["path", {
+	d: "M10.268 21a2 2 0 0 0 3.464 0",
+	key: "vwvbt9"
+}], ["path", {
+	d: "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+	key: "11g9vi"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var BookOpen = createLucideIcon("book-open", [["path", {
+	d: "M12 7v14",
+	key: "1akyts"
+}], ["path", {
+	d: "M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z",
+	key: "ruj8y"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var CalendarCheck = createLucideIcon("calendar-check", [
+	["path", {
+		d: "M8 2v4",
+		key: "1cmpym"
+	}],
+	["path", {
+		d: "M16 2v4",
+		key: "4m81vk"
+	}],
+	["rect", {
+		width: "18",
+		height: "18",
+		x: "3",
+		y: "4",
+		rx: "2",
+		key: "1hopcy"
+	}],
+	["path", {
+		d: "M3 10h18",
+		key: "8toen8"
+	}],
+	["path", {
+		d: "m9 16 2 2 4-4",
+		key: "19s6y9"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Calendar = createLucideIcon("calendar", [
+	["path", {
+		d: "M8 2v4",
+		key: "1cmpym"
+	}],
+	["path", {
+		d: "M16 2v4",
+		key: "4m81vk"
+	}],
+	["rect", {
+		width: "18",
+		height: "18",
+		x: "3",
+		y: "4",
+		rx: "2",
+		key: "1hopcy"
+	}],
+	["path", {
+		d: "M3 10h18",
+		key: "8toen8"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Camera = createLucideIcon("camera", [["path", {
+	d: "M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z",
+	key: "18u6gg"
+}], ["circle", {
+	cx: "12",
+	cy: "13",
+	r: "3",
+	key: "1vg3eu"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Check = createLucideIcon("check", [["path", {
+	d: "M20 6 9 17l-5-5",
+	key: "1gmf2c"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ChevronDown = createLucideIcon("chevron-down", [["path", {
+	d: "m6 9 6 6 6-6",
+	key: "qrunsl"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ChevronLeft = createLucideIcon("chevron-left", [["path", {
+	d: "m15 18-6-6 6-6",
+	key: "1wnfg3"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ChevronRight = createLucideIcon("chevron-right", [["path", {
+	d: "m9 18 6-6-6-6",
+	key: "mthhwq"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var CircleAlert = createLucideIcon("circle-alert", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "10",
+		key: "1mglay"
+	}],
+	["line", {
+		x1: "12",
+		x2: "12",
+		y1: "8",
+		y2: "12",
+		key: "1pkeuh"
+	}],
+	["line", {
+		x1: "12",
+		x2: "12.01",
+		y1: "16",
+		y2: "16",
+		key: "4dfq90"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var CircleCheckBig = createLucideIcon("circle-check-big", [["path", {
+	d: "M21.801 10A10 10 0 1 1 17 3.335",
+	key: "yps3ct"
+}], ["path", {
+	d: "m9 11 3 3L22 4",
+	key: "1pflzl"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var CircleCheck = createLucideIcon("circle-check", [["circle", {
+	cx: "12",
+	cy: "12",
+	r: "10",
+	key: "1mglay"
+}], ["path", {
+	d: "m9 12 2 2 4-4",
+	key: "dzmm74"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Circle = createLucideIcon("circle", [["circle", {
+	cx: "12",
+	cy: "12",
+	r: "10",
+	key: "1mglay"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ClipboardCheck = createLucideIcon("clipboard-check", [
+	["rect", {
+		width: "8",
+		height: "4",
+		x: "8",
+		y: "2",
+		rx: "1",
+		ry: "1",
+		key: "tgr4d6"
+	}],
+	["path", {
+		d: "M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2",
+		key: "116196"
+	}],
+	["path", {
+		d: "m9 14 2 2 4-4",
+		key: "df797q"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Clock = createLucideIcon("clock", [["circle", {
+	cx: "12",
+	cy: "12",
+	r: "10",
+	key: "1mglay"
+}], ["path", {
+	d: "M12 6v6l4 2",
+	key: "mmk7yg"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Compass = createLucideIcon("compass", [["circle", {
+	cx: "12",
+	cy: "12",
+	r: "10",
+	key: "1mglay"
+}], ["path", {
+	d: "m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z",
+	key: "9ktpf1"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Copy = createLucideIcon("copy", [["rect", {
+	width: "14",
+	height: "14",
+	x: "8",
+	y: "8",
+	rx: "2",
+	ry: "2",
+	key: "17jyea"
+}], ["path", {
+	d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2",
+	key: "zix9uf"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Crown = createLucideIcon("crown", [["path", {
+	d: "M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z",
+	key: "1vdc57"
+}], ["path", {
+	d: "M5 21h14",
+	key: "11awu3"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Ellipsis = createLucideIcon("ellipsis", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "1",
+		key: "41hilf"
+	}],
+	["circle", {
+		cx: "19",
+		cy: "12",
+		r: "1",
+		key: "1wjl8i"
+	}],
+	["circle", {
+		cx: "5",
+		cy: "12",
+		r: "1",
+		key: "1pcz8c"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Euro = createLucideIcon("euro", [
+	["path", {
+		d: "M4 10h12",
+		key: "1y6xl8"
+	}],
+	["path", {
+		d: "M4 14h9",
+		key: "1loblj"
+	}],
+	["path", {
+		d: "M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2",
+		key: "1j6lzo"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Expand = createLucideIcon("expand", [
+	["path", {
+		d: "m15 15 6 6",
+		key: "1s409w"
+	}],
+	["path", {
+		d: "m15 9 6-6",
+		key: "ko1vev"
+	}],
+	["path", {
+		d: "M21 16v5h-5",
+		key: "1ck2sf"
+	}],
+	["path", {
+		d: "M21 8V3h-5",
+		key: "1qoq8a"
+	}],
+	["path", {
+		d: "M3 16v5h5",
+		key: "1t08am"
+	}],
+	["path", {
+		d: "m3 21 6-6",
+		key: "wwnumi"
+	}],
+	["path", {
+		d: "M3 8V3h5",
+		key: "1ln10m"
+	}],
+	["path", {
+		d: "M9 9 3 3",
+		key: "v551iv"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var EyeOff = createLucideIcon("eye-off", [
+	["path", {
+		d: "M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49",
+		key: "ct8e1f"
+	}],
+	["path", {
+		d: "M14.084 14.158a3 3 0 0 1-4.242-4.242",
+		key: "151rxh"
+	}],
+	["path", {
+		d: "M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143",
+		key: "13bj9a"
+	}],
+	["path", {
+		d: "m2 2 20 20",
+		key: "1ooewy"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Eye = createLucideIcon("eye", [["path", {
+	d: "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0",
+	key: "1nclc0"
+}], ["circle", {
+	cx: "12",
+	cy: "12",
+	r: "3",
+	key: "1v7zrd"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var FileCheck = createLucideIcon("file-check", [
+	["path", {
+		d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",
+		key: "1oefj6"
+	}],
+	["path", {
+		d: "M14 2v5a1 1 0 0 0 1 1h5",
+		key: "wfsgrz"
+	}],
+	["path", {
+		d: "m9 15 2 2 4-4",
+		key: "1grp1n"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var FileText = createLucideIcon("file-text", [
+	["path", {
+		d: "M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z",
+		key: "1oefj6"
+	}],
+	["path", {
+		d: "M14 2v5a1 1 0 0 0 1 1h5",
+		key: "wfsgrz"
+	}],
+	["path", {
+		d: "M10 9H8",
+		key: "b1mrlr"
+	}],
+	["path", {
+		d: "M16 13H8",
+		key: "t4e002"
+	}],
+	["path", {
+		d: "M16 17H8",
+		key: "z1uh3a"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Gem = createLucideIcon("gem", [
+	["path", {
+		d: "M10.5 3 8 9l4 13 4-13-2.5-6",
+		key: "b3dvk1"
+	}],
+	["path", {
+		d: "M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z",
+		key: "7w4byz"
+	}],
+	["path", {
+		d: "M2 9h20",
+		key: "16fsjt"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Globe = createLucideIcon("globe", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "10",
+		key: "1mglay"
+	}],
+	["path", {
+		d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20",
+		key: "13o1zl"
+	}],
+	["path", {
+		d: "M2 12h20",
+		key: "9i4pu4"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var GraduationCap = createLucideIcon("graduation-cap", [
+	["path", {
+		d: "M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z",
+		key: "j76jl0"
+	}],
+	["path", {
+		d: "M22 10v6",
+		key: "1lu8f3"
+	}],
+	["path", {
+		d: "M6 12.5V16a6 3 0 0 0 12 0v-3.5",
+		key: "1r8lef"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Hand = createLucideIcon("hand", [
+	["path", {
+		d: "M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2",
+		key: "1fvzgz"
+	}],
+	["path", {
+		d: "M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2",
+		key: "1kc0my"
+	}],
+	["path", {
+		d: "M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8",
+		key: "10h0bg"
+	}],
+	["path", {
+		d: "M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15",
+		key: "1s1gnw"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Heart = createLucideIcon("heart", [["path", {
+	d: "M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5",
+	key: "mvr1a0"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ImagePlus = createLucideIcon("image-plus", [
+	["path", {
+		d: "M16 5h6",
+		key: "1vod17"
+	}],
+	["path", {
+		d: "M19 2v6",
+		key: "4bpg5p"
+	}],
+	["path", {
+		d: "M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5",
+		key: "1ue2ih"
+	}],
+	["path", {
+		d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21",
+		key: "1xmnt7"
+	}],
+	["circle", {
+		cx: "9",
+		cy: "9",
+		r: "2",
+		key: "af1f0g"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Images = createLucideIcon("images", [
+	["path", {
+		d: "m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16",
+		key: "9kzy35"
+	}],
+	["path", {
+		d: "M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2",
+		key: "1t0f0t"
+	}],
+	["circle", {
+		cx: "13",
+		cy: "7",
+		r: "1",
+		fill: "currentColor",
+		key: "1obus6"
+	}],
+	["rect", {
+		x: "8",
+		y: "2",
+		width: "14",
+		height: "14",
+		rx: "2",
+		key: "1gvhby"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Inbox = createLucideIcon("inbox", [["polyline", {
+	points: "22 12 16 12 14 15 10 15 8 12 2 12",
+	key: "o97t9d"
+}], ["path", {
+	d: "M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
+	key: "oot6mr"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Instagram = createLucideIcon("instagram", [
+	["rect", {
+		width: "20",
+		height: "20",
+		x: "2",
+		y: "2",
+		rx: "5",
+		ry: "5",
+		key: "2e1cvw"
+	}],
+	["path", {
+		d: "M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z",
+		key: "9exkf1"
+	}],
+	["line", {
+		x1: "17.5",
+		x2: "17.51",
+		y1: "6.5",
+		y2: "6.5",
+		key: "r4j83e"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Layers = createLucideIcon("layers", [
+	["path", {
+		d: "M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z",
+		key: "zw3jo"
+	}],
+	["path", {
+		d: "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12",
+		key: "1wduqc"
+	}],
+	["path", {
+		d: "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
+		key: "kqbvx6"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Library = createLucideIcon("library", [
+	["path", {
+		d: "m16 6 4 14",
+		key: "ji33uf"
+	}],
+	["path", {
+		d: "M12 6v14",
+		key: "1n7gus"
+	}],
+	["path", {
+		d: "M8 8v12",
+		key: "1gg7y9"
+	}],
+	["path", {
+		d: "M4 4v16",
+		key: "6qkkli"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var LoaderCircle = createLucideIcon("loader-circle", [["path", {
+	d: "M21 12a9 9 0 1 1-6.219-8.56",
+	key: "13zald"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var LockOpen = createLucideIcon("lock-open", [["rect", {
+	width: "18",
+	height: "11",
+	x: "3",
+	y: "11",
+	rx: "2",
+	ry: "2",
+	key: "1w4ew1"
+}], ["path", {
+	d: "M7 11V7a5 5 0 0 1 9.9-1",
+	key: "1mm8w8"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Lock = createLucideIcon("lock", [["rect", {
+	width: "18",
+	height: "11",
+	x: "3",
+	y: "11",
+	rx: "2",
+	ry: "2",
+	key: "1w4ew1"
+}], ["path", {
+	d: "M7 11V7a5 5 0 0 1 10 0v4",
+	key: "fwvmzm"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Mail = createLucideIcon("mail", [["path", {
+	d: "m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7",
+	key: "132q7q"
+}], ["rect", {
+	x: "2",
+	y: "4",
+	width: "20",
+	height: "16",
+	rx: "2",
+	key: "izxlao"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var MapPin = createLucideIcon("map-pin", [["path", {
+	d: "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0",
+	key: "1r0f0z"
+}], ["circle", {
+	cx: "12",
+	cy: "10",
+	r: "3",
+	key: "ilqhr7"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Maximize = createLucideIcon("maximize", [
+	["path", {
+		d: "M8 3H5a2 2 0 0 0-2 2v3",
+		key: "1dcmit"
+	}],
+	["path", {
+		d: "M21 8V5a2 2 0 0 0-2-2h-3",
+		key: "1e4gt3"
+	}],
+	["path", {
+		d: "M3 16v3a2 2 0 0 0 2 2h3",
+		key: "wsl5sc"
+	}],
+	["path", {
+		d: "M16 21h3a2 2 0 0 0 2-2v-3",
+		key: "18trek"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var MessageCircle = createLucideIcon("message-circle", [["path", {
+	d: "M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719",
+	key: "1sd12s"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var MessageSquare = createLucideIcon("message-square", [["path", {
+	d: "M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z",
+	key: "18887p"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var MicOff = createLucideIcon("mic-off", [
+	["path", {
+		d: "M12 19v3",
+		key: "npa21l"
+	}],
+	["path", {
+		d: "M15 9.34V5a3 3 0 0 0-5.68-1.33",
+		key: "1gzdoj"
+	}],
+	["path", {
+		d: "M16.95 16.95A7 7 0 0 1 5 12v-2",
+		key: "cqa7eg"
+	}],
+	["path", {
+		d: "M18.89 13.23A7 7 0 0 0 19 12v-2",
+		key: "16hl24"
+	}],
+	["path", {
+		d: "m2 2 20 20",
+		key: "1ooewy"
+	}],
+	["path", {
+		d: "M9 9v3a3 3 0 0 0 5.12 2.12",
+		key: "r2i35w"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Mic = createLucideIcon("mic", [
+	["path", {
+		d: "M12 19v3",
+		key: "npa21l"
+	}],
+	["path", {
+		d: "M19 10v2a7 7 0 0 1-14 0v-2",
+		key: "1vc78b"
+	}],
+	["rect", {
+		x: "9",
+		y: "2",
+		width: "6",
+		height: "13",
+		rx: "3",
+		key: "s6n7sd"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Minimize = createLucideIcon("minimize", [
+	["path", {
+		d: "M8 3v3a2 2 0 0 1-2 2H3",
+		key: "hohbtr"
+	}],
+	["path", {
+		d: "M21 8h-3a2 2 0 0 1-2-2V3",
+		key: "5jw1f3"
+	}],
+	["path", {
+		d: "M3 16h3a2 2 0 0 1 2 2v3",
+		key: "198tvr"
+	}],
+	["path", {
+		d: "M16 21v-3a2 2 0 0 1 2-2h3",
+		key: "ph8mxp"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Minus = createLucideIcon("minus", [["path", {
+	d: "M5 12h14",
+	key: "1ays0h"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Music2 = createLucideIcon("music-2", [["circle", {
+	cx: "8",
+	cy: "18",
+	r: "4",
+	key: "1fc0mg"
+}], ["path", {
+	d: "M12 18V2l7 4",
+	key: "g04rme"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var PackageCheck = createLucideIcon("package-check", [
+	["path", {
+		d: "m16 16 2 2 4-4",
+		key: "gfu2re"
+	}],
+	["path", {
+		d: "M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14",
+		key: "e7tb2h"
+	}],
+	["path", {
+		d: "m7.5 4.27 9 5.15",
+		key: "1c824w"
+	}],
+	["polyline", {
+		points: "3.29 7 12 12 20.71 7",
+		key: "ousv84"
+	}],
+	["line", {
+		x1: "12",
+		x2: "12",
+		y1: "22",
+		y2: "12",
+		key: "a4e8g8"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Paperclip = createLucideIcon("paperclip", [["path", {
+	d: "m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551",
+	key: "1miecu"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Pencil = createLucideIcon("pencil", [["path", {
+	d: "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z",
+	key: "1a8usu"
+}], ["path", {
+	d: "m15 5 4 4",
+	key: "1mk7zo"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var PhoneMissed = createLucideIcon("phone-missed", [
+	["path", {
+		d: "m16 2 6 6",
+		key: "1gw87d"
+	}],
+	["path", {
+		d: "m22 2-6 6",
+		key: "6f0sa0"
+	}],
+	["path", {
+		d: "M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384",
+		key: "9njp5v"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var PhoneOff = createLucideIcon("phone-off", [
+	["path", {
+		d: "M10.1 13.9a14 14 0 0 0 3.732 2.668 1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2 18 18 0 0 1-12.728-5.272",
+		key: "1wngk7"
+	}],
+	["path", {
+		d: "M22 2 2 22",
+		key: "y4kqgn"
+	}],
+	["path", {
+		d: "M4.76 13.582A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 .244.473",
+		key: "10hv5p"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Phone = createLucideIcon("phone", [["path", {
+	d: "M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384",
+	key: "9njp5v"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Play = createLucideIcon("play", [["path", {
+	d: "M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z",
+	key: "10ikf1"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Plus = createLucideIcon("plus", [["path", {
+	d: "M5 12h14",
+	key: "1ays0h"
+}], ["path", {
+	d: "M12 5v14",
+	key: "s699le"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var RefreshCw = createLucideIcon("refresh-cw", [
+	["path", {
+		d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8",
+		key: "v9h5vc"
+	}],
+	["path", {
+		d: "M21 3v5h-5",
+		key: "1q7to0"
+	}],
+	["path", {
+		d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16",
+		key: "3uifl3"
+	}],
+	["path", {
+		d: "M8 16H3v5",
+		key: "1cv678"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Reply = createLucideIcon("reply", [["path", {
+	d: "M20 18v-2a4 4 0 0 0-4-4H4",
+	key: "5vmcpk"
+}], ["path", {
+	d: "m9 17-5-5 5-5",
+	key: "nvlc11"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Ruler = createLucideIcon("ruler", [
+	["path", {
+		d: "M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z",
+		key: "icamh8"
+	}],
+	["path", {
+		d: "m14.5 12.5 2-2",
+		key: "inckbg"
+	}],
+	["path", {
+		d: "m11.5 9.5 2-2",
+		key: "fmmyf7"
+	}],
+	["path", {
+		d: "m8.5 6.5 2-2",
+		key: "vc6u1g"
+	}],
+	["path", {
+		d: "m17.5 15.5 2-2",
+		key: "wo5hmg"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Save = createLucideIcon("save", [
+	["path", {
+		d: "M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z",
+		key: "1c8476"
+	}],
+	["path", {
+		d: "M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7",
+		key: "1ydtos"
+	}],
+	["path", {
+		d: "M7 3v4a1 1 0 0 0 1 1h7",
+		key: "t51u73"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Scissors = createLucideIcon("scissors", [
+	["circle", {
+		cx: "6",
+		cy: "6",
+		r: "3",
+		key: "1lh9wr"
+	}],
+	["path", {
+		d: "M8.12 8.12 12 12",
+		key: "1alkpv"
+	}],
+	["path", {
+		d: "M20 4 8.12 15.88",
+		key: "xgtan2"
+	}],
+	["circle", {
+		cx: "6",
+		cy: "18",
+		r: "3",
+		key: "fqmcym"
+	}],
+	["path", {
+		d: "M14.8 14.8 20 20",
+		key: "ptml3r"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Send = createLucideIcon("send", [["path", {
+	d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
+	key: "1ffxy3"
+}], ["path", {
+	d: "m21.854 2.147-10.94 10.939",
+	key: "12cjpa"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ShieldAlert = createLucideIcon("shield-alert", [
+	["path", {
+		d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+		key: "oel41y"
+	}],
+	["path", {
+		d: "M12 8v4",
+		key: "1got3b"
+	}],
+	["path", {
+		d: "M12 16h.01",
+		key: "1drbdi"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ShieldCheck = createLucideIcon("shield-check", [["path", {
+	d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+	key: "oel41y"
+}], ["path", {
+	d: "m9 12 2 2 4-4",
+	key: "dzmm74"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var ShieldOff = createLucideIcon("shield-off", [
+	["path", {
+		d: "m2 2 20 20",
+		key: "1ooewy"
+	}],
+	["path", {
+		d: "M5 5a1 1 0 0 0-1 1v7c0 5 3.5 7.5 7.67 8.94a1 1 0 0 0 .67.01c2.35-.82 4.48-1.97 5.9-3.71",
+		key: "1jlk70"
+	}],
+	["path", {
+		d: "M9.309 3.652A12.252 12.252 0 0 0 11.24 2.28a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1v7a9.784 9.784 0 0 1-.08 1.264",
+		key: "18rp1v"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Shield = createLucideIcon("shield", [["path", {
+	d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+	key: "oel41y"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Smile = createLucideIcon("smile", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "10",
+		key: "1mglay"
+	}],
+	["path", {
+		d: "M8 14s1.5 2 4 2 4-2 4-2",
+		key: "1y1vjs"
+	}],
+	["line", {
+		x1: "9",
+		x2: "9.01",
+		y1: "9",
+		y2: "9",
+		key: "yxxnd0"
+	}],
+	["line", {
+		x1: "15",
+		x2: "15.01",
+		y1: "9",
+		y2: "9",
+		key: "1p4y9e"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Sparkles = createLucideIcon("sparkles", [
+	["path", {
+		d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z",
+		key: "1s2grr"
+	}],
+	["path", {
+		d: "M20 2v4",
+		key: "1rf3ol"
+	}],
+	["path", {
+		d: "M22 4h-4",
+		key: "gwowj6"
+	}],
+	["circle", {
+		cx: "4",
+		cy: "20",
+		r: "2",
+		key: "6kqj1y"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var SquareCheckBig = createLucideIcon("square-check-big", [["path", {
+	d: "M21 10.656V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12.344",
+	key: "2acyp4"
+}], ["path", {
+	d: "m9 11 3 3L22 4",
+	key: "1pflzl"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Star = createLucideIcon("star", [["path", {
+	d: "M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z",
+	key: "r04s7s"
+}]]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var Trash2 = createLucideIcon("trash-2", [
+	["path", {
+		d: "M10 11v6",
+		key: "nco0om"
+	}],
+	["path", {
+		d: "M14 11v6",
+		key: "outv1u"
+	}],
+	["path", {
+		d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6",
+		key: "miytrc"
+	}],
+	["path", {
+		d: "M3 6h18",
+		key: "d0wm0j"
+	}],
+	["path", {
+		d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2",
+		key: "e791ji"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+var TriangleAlert = createLucideIcon("triangle-alert", [
+	["path", {
+		d: "m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3",
+		key: "wmoenq"
+	}],
+	["path", {
+		d: "M12 9v4",
+		key: "juzpu7"
+	}],
+	["path", {
+		d: "M12 17h.01",
+		key: "p32p05"
+	}]
+]);
+/**
+* @license lucide-react v0.575.0 - ISC
+*
+* This source code is licensed under the ISC license.
+* See the LICENSE file in the root directory of this source tree.
+*/
+
+[TRUNCATED: file is 48510 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: .output/server/_libs/motion.mjs ===
+import { l as motion$1 } from "./framer-motion+[...].mjs";
+//#region node_modules/motion/dist/es/react.mjs
+var motion = motion$1;
+//#endregion
+export { motion as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_libs/react+tanstack__react-query.mjs ===
+import { r as __toESM, t as __commonJSMin } from "../_runtime.mjs";
+import { r as require_react } from "./@stripe/react-stripe-js+[...].mjs";
+//#region node_modules/react/cjs/react-jsx-runtime.production.js
+/**
+* @license React
+* react-jsx-runtime.production.js
+*
+* Copyright (c) Meta Platforms, Inc. and affiliates.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+var require_react_jsx_runtime_production = /* @__PURE__ */ __commonJSMin(((exports) => {
+	var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
+	var REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
+	function jsxProd(type, config, maybeKey) {
+		var key = null;
+		void 0 !== maybeKey && (key = "" + maybeKey);
+		void 0 !== config.key && (key = "" + config.key);
+		if ("key" in config) {
+			maybeKey = {};
+			for (var propName in config) "key" !== propName && (maybeKey[propName] = config[propName]);
+		} else maybeKey = config;
+		config = maybeKey.ref;
+		return {
+			$$typeof: REACT_ELEMENT_TYPE,
+			type,
+			key,
+			ref: void 0 !== config ? config : null,
+			props: maybeKey
+		};
+	}
+	exports.Fragment = REACT_FRAGMENT_TYPE;
+	exports.jsx = jsxProd;
+	exports.jsxs = jsxProd;
+}));
+//#endregion
+//#region node_modules/react/jsx-runtime.js
+var require_jsx_runtime = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+	module.exports = require_react_jsx_runtime_production();
+}));
+//#endregion
+//#region node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js
+var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
+var import_jsx_runtime = require_jsx_runtime();
+var QueryClientContext = import_react.createContext(void 0);
+var QueryClientProvider = ({ client, children }) => {
+	import_react.useEffect(() => {
+		client.mount();
+		return () => {
+			client.unmount();
+		};
+	}, [client]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueryClientContext.Provider, {
+		value: client,
+		children
+	});
+};
+//#endregion
+export { require_jsx_runtime as n, QueryClientProvider as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_libs/stripe__stripe-js.mjs ===
+//#region node_modules/@stripe/stripe-js/dist/index.mjs
+var RELEASE_TRAIN = "basil";
+var runtimeVersionToUrlVersion = function runtimeVersionToUrlVersion(version) {
+	return version === 3 ? "v3" : version;
+};
+var ORIGIN = "https://js.stripe.com";
+var STRIPE_JS_URL = "".concat(ORIGIN, "/").concat(RELEASE_TRAIN, "/stripe.js");
+var V3_URL_REGEX = /^https:\/\/js\.stripe\.com\/v3\/?(\?.*)?$/;
+var STRIPE_JS_URL_REGEX = /^https:\/\/js\.stripe\.com\/(v3|[a-z]+)\/stripe\.js(\?.*)?$/;
+var EXISTING_SCRIPT_MESSAGE = "loadStripe.setLoadParameters was called but an existing Stripe.js script already exists in the document; existing script parameters will be used";
+var isStripeJSURL = function isStripeJSURL(url) {
+	return V3_URL_REGEX.test(url) || STRIPE_JS_URL_REGEX.test(url);
+};
+var findScript = function findScript() {
+	var scripts = document.querySelectorAll("script[src^=\"".concat(ORIGIN, "\"]"));
+	for (var i = 0; i < scripts.length; i++) {
+		var script = scripts[i];
+		if (!isStripeJSURL(script.src)) continue;
+		return script;
+	}
+	return null;
+};
+var injectScript = function injectScript(params) {
+	var queryString = params && !params.advancedFraudSignals ? "?advancedFraudSignals=false" : "";
+	var script = document.createElement("script");
+	script.src = "".concat(STRIPE_JS_URL).concat(queryString);
+	var headOrBody = document.head || document.body;
+	if (!headOrBody) throw new Error("Expected document.body not to be null. Stripe.js requires a <body> element.");
+	headOrBody.appendChild(script);
+	return script;
+};
+var registerWrapper = function registerWrapper(stripe, startTime) {
+	if (!stripe || !stripe._registerWrapper) return;
+	stripe._registerWrapper({
+		name: "stripe-js",
+		version: "7.10.0",
+		startTime
+	});
+};
+var stripePromise$1 = null;
+var onErrorListener = null;
+var onLoadListener = null;
+var onError = function onError(reject) {
+	return function(cause) {
+		reject(new Error("Failed to load Stripe.js", { cause }));
+	};
+};
+var onLoad = function onLoad(resolve, reject) {
+	return function() {
+		if (window.Stripe) resolve(window.Stripe);
+		else reject(/* @__PURE__ */ new Error("Stripe.js not available"));
+	};
+};
+var loadScript = function loadScript(params) {
+	if (stripePromise$1 !== null) return stripePromise$1;
+	stripePromise$1 = new Promise(function(resolve, reject) {
+		if (typeof window === "undefined" || typeof document === "undefined") {
+			resolve(null);
+			return;
+		}
+		if (window.Stripe && params) console.warn(EXISTING_SCRIPT_MESSAGE);
+		if (window.Stripe) {
+			resolve(window.Stripe);
+			return;
+		}
+		try {
+			var script = findScript();
+			if (script && params) console.warn(EXISTING_SCRIPT_MESSAGE);
+			else if (!script) script = injectScript(params);
+			else if (script && onLoadListener !== null && onErrorListener !== null) {
+				var _script$parentNode;
+				script.removeEventListener("load", onLoadListener);
+				script.removeEventListener("error", onErrorListener);
+				(_script$parentNode = script.parentNode) === null || _script$parentNode === void 0 || _script$parentNode.removeChild(script);
+				script = injectScript(params);
+			}
+			onLoadListener = onLoad(resolve, reject);
+			onErrorListener = onError(reject);
+			script.addEventListener("load", onLoadListener);
+			script.addEventListener("error", onErrorListener);
+		} catch (error) {
+			reject(error);
+			return;
+		}
+	});
+	return stripePromise$1["catch"](function(error) {
+		stripePromise$1 = null;
+		return Promise.reject(error);
+	});
+};
+var initStripe = function initStripe(maybeStripe, args, startTime) {
+	if (maybeStripe === null) return null;
+	var isTestKey = args[0].match(/^pk_test/);
+	var version = runtimeVersionToUrlVersion(maybeStripe.version);
+	var expectedVersion = RELEASE_TRAIN;
+	if (isTestKey && version !== expectedVersion) console.warn("Stripe.js@".concat(version, " was loaded on the page, but @stripe/stripe-js@").concat("7.10.0", " expected Stripe.js@").concat(expectedVersion, ". This may result in unexpected behavior. For more information, see https://docs.stripe.com/sdks/stripejs-versioning"));
+	var stripe = maybeStripe.apply(void 0, args);
+	registerWrapper(stripe, startTime);
+	return stripe;
+};
+var stripePromise;
+var loadCalled = false;
+var getStripePromise = function getStripePromise() {
+	if (stripePromise) return stripePromise;
+	stripePromise = loadScript(null)["catch"](function(error) {
+		stripePromise = null;
+		return Promise.reject(error);
+	});
+	return stripePromise;
+};
+Promise.resolve().then(function() {
+	return getStripePromise();
+})["catch"](function(error) {
+	if (!loadCalled) console.warn(error);
+});
+var loadStripe = function loadStripe() {
+	for (var _len = arguments.length, args = new Array(_len), _key = 0; _key < _len; _key++) args[_key] = arguments[_key];
+	loadCalled = true;
+	var startTime = Date.now();
+	return getStripePromise().then(function(maybeStripe) {
+		return initStripe(maybeStripe, args, startTime);
+	});
+};
+//#endregion
+export { loadStripe as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_libs/supabase__functions-js.mjs ===
+import { __awaiter } from "tslib";
+//#region node_modules/@supabase/functions-js/dist/module/helper.js
+var resolveFetch = (customFetch) => {
+	if (customFetch) return (...args) => customFetch(...args);
+	return (...args) => fetch(...args);
+};
+//#endregion
+//#region node_modules/@supabase/functions-js/dist/module/types.js
+/**
+* Base error for Supabase Edge Function invocations.
+*
+* @example
+* ```ts
+* import { FunctionsError } from '@supabase/functions-js'
+*
+* throw new FunctionsError('Unexpected error invoking function', 'FunctionsError', {
+*   requestId: 'abc123',
+* })
+* ```
+*/
+var FunctionsError = class extends Error {
+	constructor(message, name = "FunctionsError", context) {
+		super(message);
+		this.name = name;
+		this.context = context;
+	}
+	toJSON() {
+		return {
+			name: this.name,
+			message: this.message,
+			context: this.context
+		};
+	}
+};
+/**
+* Error thrown when the network request to an Edge Function fails.
+*
+* @example
+* ```ts
+* import { FunctionsFetchError } from '@supabase/functions-js'
+*
+* throw new FunctionsFetchError({ requestId: 'abc123' })
+* ```
+*/
+var FunctionsFetchError = class extends FunctionsError {
+	constructor(context) {
+		super("Failed to send a request to the Edge Function", "FunctionsFetchError", context);
+	}
+};
+/**
+* Error thrown when the Supabase relay cannot reach the Edge Function.
+*
+* @example
+* ```ts
+* import { FunctionsRelayError } from '@supabase/functions-js'
+*
+* throw new FunctionsRelayError({ region: 'us-east-1' })
+* ```
+*/
+var FunctionsRelayError = class extends FunctionsError {
+	constructor(context) {
+		super("Relay Error invoking the Edge Function", "FunctionsRelayError", context);
+	}
+};
+/**
+* Error thrown when the Edge Function returns a non-2xx status code.
+*
+* @example
+* ```ts
+* import { FunctionsHttpError } from '@supabase/functions-js'
+*
+* throw new FunctionsHttpError({ status: 500 })
+* ```
+*/
+var FunctionsHttpError = class extends FunctionsError {
+	constructor(context) {
+		super("Edge Function returned a non-2xx status code", "FunctionsHttpError", context);
+	}
+};
+var FunctionRegion;
+(function(FunctionRegion) {
+	FunctionRegion["Any"] = "any";
+	FunctionRegion["ApNortheast1"] = "ap-northeast-1";
+	FunctionRegion["ApNortheast2"] = "ap-northeast-2";
+	FunctionRegion["ApSouth1"] = "ap-south-1";
+	FunctionRegion["ApSoutheast1"] = "ap-southeast-1";
+	FunctionRegion["ApSoutheast2"] = "ap-southeast-2";
+	FunctionRegion["CaCentral1"] = "ca-central-1";
+	FunctionRegion["EuCentral1"] = "eu-central-1";
+	FunctionRegion["EuWest1"] = "eu-west-1";
+	FunctionRegion["EuWest2"] = "eu-west-2";
+	FunctionRegion["EuWest3"] = "eu-west-3";
+	FunctionRegion["SaEast1"] = "sa-east-1";
+	FunctionRegion["UsEast1"] = "us-east-1";
+	FunctionRegion["UsWest1"] = "us-west-1";
+	FunctionRegion["UsWest2"] = "us-west-2";
+})(FunctionRegion || (FunctionRegion = {}));
+//#endregion
+//#region node_modules/@supabase/functions-js/dist/module/FunctionsClient.js
+/**
+* Client for invoking Supabase Edge Functions.
+*/
+var FunctionsClient = class {
+	/**
+	* Creates a new Functions client bound to an Edge Functions URL.
+	*
+	* @example Using supabase-js (recommended)
+	* ```ts
+	* import { createClient } from '@supabase/supabase-js'
+	*
+	* const supabase = createClient('https://xyzcompany.supabase.co', 'your-publishable-key')
+	* const { data, error } = await supabase.functions.invoke('hello-world')
+	* ```
+	*
+	* @category Edge Functions
+	*
+	* @example Standalone import for bundle-sensitive environments
+	* ```ts
+	* import { FunctionsClient, FunctionRegion } from '@supabase/functions-js'
+	*
+	* const functions = new FunctionsClient('https://xyzcompany.supabase.co/functions/v1', {
+	*   headers: { apikey: '[REDACTED]' },
+	*   region: FunctionRegion.UsEast1,
+	* })
+	* ```
+	*/
+	constructor(url, { headers = {}, customFetch, region = FunctionRegion.Any } = {}) {
+		this.url = url;
+		this.headers = headers;
+		this.region = region;
+		this.fetch = resolveFetch(customFetch);
+	}
+	/**
+	* Updates the authorization header
+	* @param token - the new jwt token sent in the authorisation header
+	*
+	* @category Edge Functions
+	*
+	* @example Setting the authorization header
+	* ```ts
+	* functions.setAuth(session.access_token)
+	* ```
+	*/
+	setAuth(token) {
+		this.headers.Authorization = `[REDACTED]`;
+	}
+	/**
+	* Invokes a function
+	* @param functionName - The name of the Function to invoke.
+	* @param options - Options for invoking the Function.
+	* @example
+	* ```ts
+	* const { data, error } = await functions.invoke('hello-world', {
+	*   body: { name: 'Ada' },
+	* })
+	* ```
+	*
+	* @category Edge Functions
+	*
+	* @remarks
+	* - The API key is sent in the `apikey` header. The `Authorization` header is reserved
+	*   for the signed-in user's JWT (or a custom auth token) — when there is no session, a
+	*   new-format API key (`sb_publishable_…` / `sb_secret_…`) is not sent as a Bearer token.
+	* - Invoke params generally match the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) spec.
+	* - When you pass in a body to your function, we automatically attach the Content-Type header for `Blob`, `ArrayBuffer`, `File`, `FormData` and `String`. If it doesn't match any of these types we assume the payload is `json`, serialize it and attach the `Content-Type` header as `application/json`. You can override this behavior by passing in a `Content-Type` header of your own.
+	* - Responses are automatically parsed as `json`, `blob` and `form-data` depending on the `Content-Type` header sent by your function. Responses are parsed as `text` by default.
+	*
+	* @example Basic invocation
+	* ```js
+	* const { data, error } = await supabase.functions.invoke('hello', {
+	*   body: { foo: 'bar' }
+	* })
+	* ```
+	*
+	* @exampleDescription Error handling
+	* A `FunctionsHttpError` error is returned if your function throws an error, `FunctionsRelayError` if the Supabase Relay has an error processing your function and `FunctionsFetchError` if there is a network error in calling your function. Log the full error object so fields like `name`, `context`, and any structured body aren't hidden.
+	*
+	* @example Error handling
+	* ```js
+	* import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from "@supabase/supabase-js";
+	*
+	* const { data, error } = await supabase.functions.invoke('hello', {
+	*   headers: {
+	*     "my-custom-header": 'my-custom-header-value'
+	*   },
+	*   body: { foo: 'bar' }
+	* })
+	*
+	* if (error instanceof FunctionsHttpError) {
+	*   const errorMessage = await error.context.json()
+	*   console.error('Function returned an error', errorMessage)
+	* } else if (error instanceof FunctionsRelayError) {
+	*   console.error('Relay error:', error)
+	* } else if (error instanceof FunctionsFetchError) {
+	*   console.error('Fetch error:', error)
+	* }
+	* ```
+	*
+	* @exampleDescription Passing custom headers
+	* You can pass custom headers to your function. Note: supabase-js automatically passes the `Authorization` header with the signed in user's JWT.
+	*
+	* @example Passing custom headers
+	* ```js
+	* const { data, error } = await supabase.functions.invoke('hello', {
+	*   headers: {
+	*     "my-custom-header": 'my-custom-header-value'
+	*   },
+	*   body: { foo: 'bar' }
+	* })
+	* ```
+	*
+	* @exampleDescription Calling with DELETE HTTP verb
+	* You can also set the HTTP verb to `DELETE` when calling your Edge Function.
+	*
+	* @example Calling with DELETE HTTP verb
+	* ```js
+	* const { data, error } = await supabase.functions.invoke('hello', {
+	*   headers: {
+	*     "my-custom-header": 'my-custom-header-value'
+	*   },
+	*   body: { foo: 'bar' },
+	*   method: 'DELETE'
+	* })
+	* ```
+	*
+	* @exampleDescription Invoking a Function in the UsEast1 region
+	* Here are the available regions:
+	* - `FunctionRegion.Any`
+	* - `FunctionRegion.ApNortheast1`
+	* - `FunctionRegion.ApNortheast2`
+	* - `FunctionRegion.ApSouth1`
+	* - `FunctionRegion.ApSoutheast1`
+	* - `FunctionRegion.ApSoutheast2`
+	* - `FunctionRegion.CaCentral1`
+	* - `FunctionRegion.EuCentral1`
+	* - `FunctionRegion.EuWest1`
+	* - `FunctionRegion.EuWest2`
+	* - `FunctionRegion.EuWest3`
+	* - `FunctionRegion.SaEast1`
+	* - `FunctionRegion.UsEast1`
+	* - `FunctionRegion.UsWest1`
+	* - `FunctionRegion.UsWest2`
+	*
+	* @example Invoking a Function in the UsEast1 region
+	* ```js
+	* import { createClient, FunctionRegion } from '@supabase/supabase-js'
+	*
+	* const { data, error } = await supabase.functions.invoke('hello', {
+	*   body: { foo: 'bar' },
+	*   region: FunctionRegion.UsEast1
+	* })
+	* ```
+	*
+	* @exampleDescription Calling with GET HTTP verb
+	* You can also set the HTTP verb to `GET` when calling your Edge Function.
+	*
+	* @example Calling with GET HTTP verb
+	* ```js
+	* const { data, error } = await supabase.functions.invoke('hello', {
+	*   headers: {
+	*     "my-custom-header": 'my-custom-header-value'
+	*   },
+	*   method: 'GET'
+	* })
+	* ```
+	*
+	* @example Standalone client invoke
+	* ```ts
+	* const { data, error } = await functions.invoke('hello-world', {
+	*   body: { name: 'Ada' },
+	* })
+	* ```
+	*/
+	invoke(functionName_1) {
+		return __awaiter(this, arguments, void 0, function* (functionName, options = {}) {
+			var _a, _b;
+			let timeoutId;
+			let timeoutController;
+			let onAbort;
+			try {
+				const { headers, method, body: functionArgs, signal, timeout } = options;
+				let _headers = {};
+				let { region } = options;
+				if (!region) region = this.region;
+				const url = new URL(`${this.url}/${functionName}`);
+				if (region && region !== "any") {
+					_headers["x-region"] = region;
+					url.searchParams.set("forceFunctionRegion", region);
+				}
+				let body;
+				const hasContentTypeHeader = !!headers && Object.keys(headers).some((key) => key.toLowerCase() === "content-type");
+				if (functionArgs && !hasContentTypeHeader) if (typeof Blob !== "undefined" && functionArgs instanceof Blob || functionArgs instanceof ArrayBuffer) {
+					_headers["Content-Type"] = "application/octet-stream";
+					body = functionArgs;
+				} else if (typeof functionArgs === "string") {
+					_headers["Content-Type"] = "text/plain";
+					body = functionArgs;
+				} else if (typeof FormData !== "undefined" && functionArgs instanceof FormData) body = functionArgs;
+				else {
+					_headers["Content-Type"] = "application/json";
+					body = JSON.stringify(functionArgs);
+				}
+				else if (functionArgs && typeof functionArgs !== "string" && !(typeof Blob !== "undefined" && functionArgs instanceof Blob) && !(functionArgs instanceof ArrayBuffer) && !(typeof FormData !== "undefined" && functionArgs instanceof FormData)) body = JSON.stringify(functionArgs);
+				else body = functionArgs;
+				let effectiveSignal = signal;
+				if (timeout) {
+					timeoutController = new AbortController();
+					timeoutId = setTimeout(() => timeoutController.abort(), timeout);
+					if (signal) {
+						effectiveSignal = timeoutController.signal;
+						onAbort = () => timeoutController.abort();
+						signal.addEventListener("abort", onAbort);
+					} else effectiveSignal = timeoutController.signal;
+				}
+				const response = yield this.fetch(url.toString(), {
+					method: method || "POST",
+					headers: Object.assign(Object.assign(Object.assign({}, _headers), this.headers), headers),
+					body,
+					signal: effectiveSignal
+				}).catch((fetchError) => {
+					throw new FunctionsFetchError(fetchError);
+				});
+				const isRelayError = response.headers.get("x-relay-error");
+				if (isRelayError && isRelayError === "true") throw new FunctionsRelayError(response);
+				if (!response.ok) throw new FunctionsHttpError(response);
+				let responseType = ((_a = response.headers.get("Content-Type")) !== null && _a !== void 0 ? _a : "text/plain").split(";")[0].trim().toLowerCase();
+				let data;
+				if (responseType === "application/json") data = yield response.json();
+				else if (responseType === "application/octet-stream" || responseType === "application/pdf") data = yield response.blob();
+				else if (responseType === "text/event-stream") data = response;
+				else if (responseType === "multipart/form-data") data = yield response.formData();
+				else data = yield response.text();
+				return {
+					data,
+					error: null,
+					response
+				};
+			} catch (error) {
+				return {
+					data: null,
+					error,
+					response: error instanceof FunctionsHttpError || error instanceof FunctionsRelayError ? error.context : void 0
+				};
+			} finally {
+				if (timeoutId) clearTimeout(timeoutId);
+				if (onAbort) (_b = options.signal) === null || _b === void 0 || _b.removeEventListener("abort", onAbort);
+			}
+		});
+	}
+};
+//#endregion
+export { FunctionsClient as t };
+
+=== END FILE ===
+

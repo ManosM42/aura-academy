@@ -1,0 +1,1054 @@
+=== FILE: src/routes/courses.index.tsx ===
+// src/routes/courses.index.tsx
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import CourseCard from "@/components/aura/CourseCard";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { getCoursesPageData } from "@/lib/courses";
+import { COURSE_CATEGORIES } from "@/lib/courses.types";
+import { useAsync } from "@/lib/useAsync";
+import { BookOpen, Sparkles, AlertCircle } from "lucide-react";
+
+export const Route = createFileRoute("/courses/")({
+  head: () => ({ meta: [{ title: "AURA — Courses" }] }),
+  component: CoursesPage,
+});
+
+function CoursesPage() {
+  const { data, error, loading } = useAsync(getCoursesPageData, []);
+
+  const items = data?.items ?? [];
+  const unlocked = items.filter((item) => !item.locked).length;
+
+  return (
+    <main className="w-full min-h-screen overflow-x-hidden bg-[#070707] px-5 pb-28 pt-28 sm:pt-36 text-white selection:bg-white selection:text-black">
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="mx-auto max-w-6xl"
+      >
+        <header className="max-w-2xl">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/50 mb-3">
+            <span className="h-px w-8 bg-gradient-to-r from-white/60 to-transparent" />
+            AURA Curriculum
+          </div>
+          <h1 className="text-4xl font-extrabold uppercase tracking-tight sm:text-5xl text-white">
+            Η μέθοδος, <span className="chrome-type font-semibold">βίντεο βίντεο.</span>
+          </h1>
+          <p className="mt-5 text-sm leading-relaxed text-white/60 sm:text-base">
+            Τέσσερις κατηγορίες, ένα βίντεο τη φορά. Βρες την τεχνική που ψάχνεις και
+            δες τη ολόκληρη, στην οθόνη σου.
+          </p>
+        </header>
+
+        {data && !data.signedIn ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-10 flex flex-col items-start gap-4 rounded-2xl border border-white/20 bg-gradient-to-r from-white/[0.06] to-white/[0.02] p-6 sm:flex-row sm:items-center sm:justify-between backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.03)]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white">
+                <Sparkles className="size-5" />
+              </div>
+              <p className="text-sm text-white/90">
+                Συνδέσου για να δεις τα βίντεο του πλάνου σου.
+              </p>
+            </div>
+            <Link to="/login" className="w-full sm:w-auto">
+              <ChromeButton type="button" className="w-full sm:w-auto justify-center">
+                ΣΥΝΔΕΣΗ
+              </ChromeButton>
+            </Link>
+          </motion.div>
+        ) : null}
+
+        {data?.signedIn && items.length > 0 && unlocked === 0 ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-10 flex flex-col items-start gap-4 rounded-2xl border border-white/20 bg-gradient-to-r from-white/[0.06] to-white/[0.02] p-6 sm:flex-row sm:items-center sm:justify-between backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.03)]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl border border-white/20 bg-white/5 text-white">
+                <AlertCircle className="size-5" />
+              </div>
+              <p className="text-sm text-white/90">
+                Δεν έχεις ενεργό πλάνο που ξεκλειδώνει αυτά τα βίντεο.
+              </p>
+            </div>
+            <Link to="/pricing" className="w-full sm:w-auto">
+              <ChromeButton type="button" className="w-full sm:w-auto justify-center">
+                ΔΕΣ ΤΑ ΠΛΑΝΑ
+              </ChromeButton>
+            </Link>
+          </motion.div>
+        ) : null}
+
+        {loading ? (
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-64 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md"
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {error ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-14 rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-400"
+            role="alert"
+          >
+            {error instanceof Error ? error.message : String(error)}
+          </motion.div>
+        ) : null}
+
+        {data && items.length === 0 && !loading ? (
+          <div className="mt-14 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-sm text-white/50">
+            <BookOpen className="size-5 text-white/40" />
+            <span>Δεν υπάρχουν δημοσιευμένα βίντεο ακόμη.</span>
+          </div>
+        ) : null}
+
+        {items.length > 0 ? (
+          <div className="mt-14 space-y-16">
+            {COURSE_CATEGORIES.map((cat, catIndex) => {
+              const catItems = items.filter((item) => item.course.category === cat.key);
+              return (
+                <motion.section
+                  key={cat.key}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ duration: 0.5, delay: Math.min(catIndex * 0.05, 0.2) }}
+                >
+                  <div className="flex items-baseline gap-4 border-b border-white/10 pb-4">
+                    <h2 className="text-2xl font-bold uppercase tracking-tight text-white">
+                      {cat.label}
+                    </h2>
+                    <span className="text-xs uppercase tracking-[0.3em] text-white/40">
+                      {catItems.length} {catItems.length === 1 ? "video" : "videos"}
+                    </span>
+                  </div>
+
+                  {catItems.length === 0 ? (
+                    <p className="mt-6 text-sm text-white/40">
+                      Δεν υπάρχουν ακόμη βίντεο στην κατηγορία {cat.label}.
+                    </p>
+                  ) : (
+                    <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                      {catItems.map((item, index) => (
+                        <CourseCard key={item.course.id} item={item} index={index} />
+                      ))}
+                    </div>
+                  )}
+                </motion.section>
+              );
+            })}
+          </div>
+        ) : null}
+      </motion.div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/courses-LEqLhg7m.js ===
+import{t as e}from"./supabase-DXn9ZPwL.js";import{r as t}from"./roles-D-HGCJsI.js";import{r as n}from"./plans-BkcWWgXs.js";import{t as r}from"./db-DXn9ZPwL.js";async function i(t,n){let{data:r,error:i}=await e.functions.invoke(t,{body:n});if(i){let e=i.context;if(e&&typeof e.json==`function`)try{let t=await e.json();if(t?.error)throw Error(t.error)}catch(e){if(e instanceof Error&&e.message)throw e}throw Error(i.message||`Το αίτημα απέτυχε.`)}if(r&&typeof r==`object`&&`error`in r&&r.error)throw Error(String(r.error));if(!r)throw Error(`Άδεια απάντηση από τον server.`);return r}function a(e){return{id:e.id,courseId:e.course_id,lessonId:e.lesson_id,kind:e.kind,objectKey:e.b2_object_key,originalFilename:e.original_filename,mimeType:e.mime_type,sizeBytes:e.file_size_bytes,status:e.upload_status,updatedAt:e.updated_at}}function o(e,t,n,r){return new Promise((i,a)=>{let o=new XMLHttpRequest;o.open(`PUT`,e,!0),o.setRequestHeader(`Content-Type`,n),o.upload.onprogress=e=>{e.lengthComputable&&r(e.loaded)},o.onload=()=>{if(o.status>=200&&o.status<300){i({etag:o.getResponseHeader(`ETag`)});return}a(Error(`Το upload απέτυχε (HTTP ${o.status}).`))},o.onerror=()=>a(Error(`Το upload απέτυχε λόγω δικτύου.`)),o.onabort=()=>a(Error(`Το upload ακυρώθηκε.`)),o.send(t)})}async function s(e,t=3){let n;for(let r=0;r<t;r+=1)try{return await e()}catch(e){n=e,r<t-1&&await new Promise(e=>setTimeout(e,500*2**r))}throw n instanceof Error?n:Error(`Το upload απέτυχε.`)}async function c(e,t){let n=await i(`course-file-init-upload`,{courseId:e.courseId,lessonId:e.lessonId??null,kind:e.kind,filename:e.file.name,mimeType:e.file.type,fileSize:e.file.size});try{if(n.mode===`single`){await s(()=>o(n.uploadUrl,e.file,e.file.type,n=>t?.(Math.min(.99,n/Math.max(1,e.file.size)))));let r=await i(`course-file-complete-upload`,{fileId:n.fileId});return t?.(1),a(r.file)}let r=e.file.size,c=n.partSize,l=[],u=0;for(let i=0;i<n.partUrls.length;i+=1){let a=i*c,d=Math.min(a+c,r),f=e.file.slice(a,d),p=i+1,m=u,{etag:h}=await s(()=>o(n.partUrls[i],f,e.file.type,e=>{t?.(Math.min(.99,(m+e)/Math.max(1,r)))}));if(!h)throw Error(`Το B2 δεν επέστρεψε ETag για το part — έλεγξε τις CORS ρυθμίσεις του bucket (Access-Control-Expose-Headers: ETag).`);l.push({partNumber:p,etag:h}),u=d}let d=await i(`course-file-complete-upload`,{fileId:n.fileId,parts:l});return t?.(1),a(d.file)}catch(e){throw await i(`course-file-abort-upload`,{fileId:n.fileId}).catch(e=>console.error(`Αποτυχία καθαρισμού μετά από failed upload:`,e)),e}}async function l(e){await i(`course-file-delete`,e)}async function u(e){return(await i(`course-file-url`,e)).url}var d=[{key:`graduation`,label:`Graduation`},{key:`layers`,label:`Layers`},{key:`fade`,label:`Fade`},{key:`creative`,label:`Creative`}],f={low:1,mid:2,high:3,limited:4};function p(e){if(!e)return 0;let t=e.trim().toLowerCase();return t in f?f[t]:0}function m(e,t){return p(e)>=p(t)}var h=`course-videos`,g=[`video/mp4`,`video/quicktime`,`video/webm`],_=53687091200,v=3600,y=14400;function b(e){return e.startsWith(`courses/`)}var x=`id, title, slug, summary, outcome, audience, level, status, required_plan, estimated_hours, cover_url, sort_order, step_count, created_by, published_at, created_at, updated_at, category, video_path, video_duration_seconds, video_storage_provider, video_status, video_size_bytes, video_mime_type, video_original_filename, video_uploaded_at`;async function S(){let{data:e,error:t}=await r.auth.getUser();return t?null:e.user?.id??null}function C(){return typeof crypto<`u`&&typeof crypto.randomUUID==`function`?crypto.randomUUID():`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`}function w(e){let t={α:`a`,ά:`a`,β:`v`,γ:`g`,δ:`d`,ε:`e`,έ:`e`,ζ:`z`,η:`i`,ή:`i`,θ:`th`,ι:`i`,ί:`i`,ϊ:`i`,ΐ:`i`,κ:`k`,λ:`l`,μ:`m`,ν:`n`,ξ:`x`,ο:`o`,ό:`o`,π:`p`,ρ:`r`,σ:`s`,ς:`s`,τ:`t`,υ:`y`,ύ:`y`,ϋ:`y`,ΰ:`y`,φ:`f`,χ:`ch`,ψ:`ps`,ω:`o`,ώ:`o`};return e.toLowerCase().split(``).map(e=>t[e]??e).join(``).normalize(`NFD`).replace(/[\u0300-\u036f]/g,``).replace(/[^a-z0-9]+/g,`-`).replace(/^-+|-+$/g,``).slice(0,60)||`course-${C().slice(0,8)}`}async function T(e,t){let n=e;for(let i=0;i<20;i+=1){let a=r.from(`courses`).select(`id`).eq(`slug`,n).limit(1);t&&(a=a.neq(`id`,t));let{data:o,error:s}=await a;if(s)throw s;if(!o||o.length===0)return n;n=`${e}-${i+2}`}return`${e}-${C().slice(0,6)}`}function E(e){let t=e;return{...t,required_plan:n(t.required_plan)?t.required_plan:`low`,step_count:t.step_count??0,sort_order:t.sort_order??0}}async function D(){let e=await S(),i=r.from(`courses`).select(x).eq(`status`,`published`).order(`sort_order`,{ascending:!0}).order(`created_at`,{ascending:!0});if(!e){let{data:e,error:t}=await i;if(t)throw t;return{items:(e??[]).map(e=>({course:E(e),progress:null,locked:!0})),planId:null,planRank:0,isContent:!1,signedIn:!1}}let[a,o,s,c]=await Promise.all([i,r.from(`course_progress`).select(`*`).eq(`user_id`,e),r.from(`profiles`).select(`role`).eq(`id`,e).maybeSingle(),r.from(`subscriptions`).select(`plan_id, status, created_at`).eq(`user_id`,e).in(`status`,[`active`,`trialing`]).order(`created_at`,{ascending:!1}).limit(1).maybeSingle()]);if(a.error)throw a.error;if(o.error)throw o.error;let l=s.data?.role??null,u=t(l),d=c.data?.plan_id,f=n(d)?d:null,p=new Map;for(let e of o.data??[])p.set(e.course_id,e);return{items:(a.data??[]).map(e=>{let t=E(e);return{course:t,progress:p.get(t.id)??null,locked:!u&&!m(f,t.required_plan)}}),planId:f,planRank:f?+!!m(f,f):0,isContent:u,signedIn:!0}}async function O(e){let i=await S(),{data:a,error:o}=await r.from(`courses`).select(x).eq(`slug`,e).maybeSingle();if(o)throw o;if(!a)throw Error(`Το video δεν βρέθηκε.`);let s=E(a);if(!i)return{course:s,locked:!0,isContent:!1};let[c,l]=await Promise.all([r.from(`profiles`).select(`role`).eq(`id`,i).maybeSingle(),r.from(`subscriptions`).select(`plan_id, status, created_at`).eq(`user_id`,i).in(`status`,[`active`,`trialing`]).order(`created_at`,{ascending:!1}).limit(1).maybeSingle()]),u=t(c.data?.role??null),d=l.data?.plan_id,f=n(d)?d:null;return{course:s,locked:!u&&!m(f,s.required_plan),isContent:u}}async function k(e,t){if(b(e))return u({objectKey:e,courseId:t});let{data:n,error:i}=await r.storage.from(h).createSignedUrl(e,y);if(i)throw i;if(!n?.signedUrl)throw Error(`Δεν δημιουργήθηκε σύνδεσμος βίντεο.`);return n.signedUrl}async function A(){let e=await S();if(!e)return[];let{data:t,error:n}=await r.from(`course_progress`).select(`completed_at, replays, course:courses(id, title, slug, level, required_plan, step_count)`).eq(`user_id`,e).not(`completed_at`,`is`,null).order(`completed_at`,{ascending:!1});if(n)throw n;return(t??[]).filter(e=>e.course!==null).map(e=>({course:e.course,completedAt:e.completed_at,replays:e.replays??0}))}async function j(){let{data:e,error:t}=await r.from(`courses`).select(x).order(`sort_order`,{ascending:!0}).order(`updated_at`,{ascending:!1});if(t)throw t;return(e??[]).map(E)}async function M(e){let{data:t,error:n}=await r.from(`courses`).select(x).eq(`id`,e).maybeSingle();if(n)throw n;if(!t)throw Error(`Το video δεν βρέθηκε.`);return{course:E(t)}}async function N(e){let t=await S();if(!t)throw Error(`Δεν υπάρχει συνδεδεμένος χρήστης.`);let n=await T(w(e.title)),{data:i,error:a}=await r.from(`courses`).insert({title:e.title.trim(),slug:n,summary:e.summary.trim()||null,category:e.category,level:e.level,required_plan:e.requiredPlan,status:e.status,sort_order:0,created_by:t,published_at:e.status===`published`?new Date().toISOString():null}).select(x).single();if(a)throw a;return E(i)}async function P(e,t,n,i){let a=w(t.title),o=a===n?n:await T(a,e),s=t.status===`published`&&i!==`published`,c={title:t.title.trim(),slug:o,summary:t.summary.trim()||null,category:t.category,level:t.level,required_plan:t.requiredPlan,status:t.status};s&&(c.published_at=new Date().toISOString());let{data:l,error:u}=await r.from(`courses`).update(c).eq(`id`,e).select(x).single();if(u)throw u;return E(l)}async function F(e,t){let{data:n,error:i}=await r.from(`courses`).update({video_path:t.path,video_duration_seconds:t.durationSeconds,video_storage_provider:t.storageProvider,video_status:`ready`,video_size_bytes:t.sizeBytes,video_mime_type:t.mimeType,video_original_filename:t.originalFilename,video_uploaded_at:t.uploadedAt}).eq(`id`,e).select(x).single();if(i)throw i;return E(n)}async function I(e){let{data:t,error:n}=await r.from(`courses`).update({video_path:null,video_duration_seconds:null,video_storage_provider:null,video_status:null,video_size_bytes:null,video_mime_type:null,video_original_filename:null,video_uploaded_at:null}).eq(`id`,e).select(x).single();if(n)throw n;return E(t)}async function L(e){let{data:t,error:n}=await r.from(`course_steps`).select(`video_path`).eq(`course_id`,e);if(n)throw n;let i=(t??[]).map(e=>e.video_path).filter(e=>!!e),a=i.filter(e=>!b(e)),o=i.filter(b);if(a.length>0){let{error:e}=await r.storage.from(h).remove(a);e&&console.error(`Αποτυχία διαγραφής βίντεο:`,e.message)}for(let t of o)try{await l({objectKey:t,courseId:e})}catch(e){console.error(`Αποτυχία διαγραφής βίντεο (B2):`,e)}let{error:s}=await r.from(`courses`).delete().eq(`id`,e);if(s)throw s}function R(e){return new Promise(t=>{if(typeof document>`u`){t(null);return}let n=URL.createObjectURL(e),r=document.createElement(`video`),i=()=>URL.revokeObjectURL(n);r.preload=`metadata`,r.onloadedmetadata=()=>{let e=Number.isFinite(r.duration)?Math.round(r.duration):null;i(),t(e)},r.onerror=()=>{i(),t(null)},r.src=n})}async function z(e,t,n,r){if(!g.includes(t.type))throw Error(`Δεκτά μόνο αρχεία mp4, mov ή webm.`);if(t.size>53687091200)throw Error(`Το βίντεο ξεπερνά το όριο των ${Math.round(_/1073741824)}GB.`);let i=await R(t);if(i!==null&&i>3600)throw Error(`Το βίντεο διαρκεί ${Math.round(i/60)} λεπτά — το όριο είναι ${v/60} λεπτά.`);let a=await c({courseId:e,lessonId:r??null,kind:`video`,file:t},n);return{path:a.objectKey,durationSeconds:i,storageProvider:`backblaze_b2`,sizeBytes:a.sizeBytes,mimeType:a.mimeType,originalFilename:a.originalFilename,uploadedAt:a.updatedAt}}async function B(e,t){if(b(e)){await l({objectKey:e,courseId:t});return}let{error:n}=await r.storage.from(h).remove([e]);if(n)throw n}export{z as _,N as a,O as c,k as d,j as f,P as g,F as h,I as i,D as l,B as m,_ as n,L as o,R as p,v as r,M as s,g as t,A as u,d as v};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/review.index-CnqGNNPJ.mjs ===
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { Tt as ChevronRight, c as User, w as ShieldAlert, y as Sparkles, yt as Clock } from "../_libs/lucide-react.mjs";
+import { D as isStaffRole, S as getReviewQueue, y as getMyProfile } from "./queries-DCA4yifx.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { i as LockedState, n as ErrorState, r as LoadingSkeleton, t as EmptyState } from "./States-CTtcXN7r.mjs";
+import { r as useReducedMotion } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/review.index-CnqGNNPJ.js
+var import_jsx_runtime = require_jsx_runtime();
+var EASE = [
+	.22,
+	1,
+	.36,
+	1
+];
+var CHROME_TEXT = "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+var FRAME_BORDER = "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))";
+function Frame({ children, className = "", inner = "p-6" }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: `relative rounded-3xl p-px ${className}`,
+		style: {
+			background: FRAME_BORDER,
+			boxShadow: "0 0 60px rgba(0,0,0,0.9)"
+		},
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: `relative overflow-hidden rounded-[23px] bg-[#0a0a0b] ${inner}`,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute inset-x-0 top-0 h-24",
+				style: { background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "relative",
+				children
+			})]
+		})
+	});
+}
+function ReviewQueue() {
+	const reduce = useReducedMotion();
+	const profile = useAsync(getMyProfile, []);
+	const staff = profile.data ? isStaffRole(profile.data.role) : false;
+	const queue = useAsync(async () => staff ? getReviewQueue() : [], [staff]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "relative mx-auto min-h-screen max-w-5xl overflow-hidden px-4 py-16 text-white sm:px-6",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(800px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full",
+				style: { background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" },
+				animate: reduce ? void 0 : { opacity: [
+					.4,
+					1,
+					.4
+				] },
+				transition: {
+					duration: 8,
+					repeat: Infinity,
+					ease: "easeInOut"
+				}
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.header, {
+				initial: {
+					opacity: 0,
+					y: 20
+				},
+				animate: {
+					opacity: 1,
+					y: 0
+				},
+				transition: {
+					duration: .8,
+					ease: EASE
+				},
+				className: "relative mb-12 flex flex-col justify-between gap-5 border-b border-white/10 pb-8 sm:flex-row sm:items-end",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.05] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.3em] text-white/80",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { className: "size-3.5" }), "Educator Hub"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+					className: "text-4xl font-extrabold tracking-tight sm:text-6xl",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
+						initial: { backgroundPosition: "0% 50%" },
+						animate: reduce ? void 0 : { backgroundPosition: "100% 50%" },
+						transition: {
+							duration: 4,
+							repeat: Infinity,
+							repeatType: "reverse",
+							ease: "easeInOut"
+						},
+						style: {
+							backgroundImage: CHROME_TEXT,
+							backgroundSize: "300% auto",
+							WebkitBackgroundClip: "text",
+							backgroundClip: "text",
+							WebkitTextFillColor: "transparent"
+						},
+						className: "inline-block drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]",
+						children: "Review Queue"
+					})
+				})] }), queue.data && queue.data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-3 self-start rounded-full border border-white/20 bg-white/[0.04] px-4 py-2 text-xs text-white/60 backdrop-blur-md sm:self-auto",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "relative flex size-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "absolute inline-flex size-full animate-ping rounded-full bg-white opacity-70" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "relative inline-flex size-2 rounded-full bg-white" })]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+						className: "font-bold text-white",
+						children: queue.data.length
+					}), " εκκρεμείς αξιολογήσεις"] })]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative",
+				children: [
+					profile.loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 3 }),
+					profile.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: profile.error }),
+					profile.data && !staff && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Frame, {
+						inner: "p-8 text-center",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-white/20 bg-white/[0.05] text-white",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldAlert, { className: "size-6" })
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockedState, { reason: "Μόνο εκπαιδευτές έχουν πρόσβαση στην ουρά αξιολόγησης." })]
+					}),
+					staff && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+						queue.loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 4 }),
+						queue.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: queue.error }),
+						queue.data && queue.data.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Frame, {
+							inner: "p-12 text-center",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyState, {
+								title: "Καμία εκκρεμής υποβολή",
+								hint: "Όταν ένας student υποβάλει εργασία, θα εμφανιστεί εδώ."
+							})
+						}),
+						queue.data && queue.data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+							className: "space-y-4",
+							children: queue.data.map((row, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.li, {
+								initial: {
+									opacity: 0,
+									y: 20
+								},
+								animate: {
+									opacity: 1,
+									y: 0
+								},
+								transition: {
+									duration: .65,
+									ease: EASE,
+									delay: .15 + i * .07
+								},
+								whileHover: { y: -3 },
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+									to: "/review/$submissionId",
+									params: { submissionId: row.id },
+									className: "group block rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Frame, {
+										inner: "p-5 sm:p-6",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											"aria-hidden": true,
+											className: "pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent transition-transform duration-[1200ms] ease-out group-hover:translate-x-[320%]"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "relative flex flex-col justify-between gap-4 sm:flex-row sm:items-center",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												className: "flex min-w-0 items-start gap-4",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+													className: "flex size-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/[0.05] text-white transition-all duration-300 group-hover:scale-105 group-hover:border-white/60 group-hover:shadow-[0_0_26px_rgba(255,255,255,0.35)]",
+													children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Clock, { className: "size-5" })
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+													className: "min-w-0",
+													children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+														className: "truncate text-base font-bold text-white",
+														children: row.assignment?.title ?? "—"
+													}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+														className: "mt-1 flex items-center gap-2 truncate text-xs text-white/50",
+														children: [
+															/* @__PURE__ */ (0, import_jsx_runtime.jsx)(User, { className: "size-3.5 text-white/40" }),
+															/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+																className: "text-white/70",
+																children: row.student?.full_name ?? "Άγνωστος μαθητής"
+															}),
+															/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "·" }),
+															/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { children: ["attempt ", row.attempt] })
+														]
+													})]
+												})]
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												className: "flex shrink-0 items-center gap-4 self-end sm:self-center",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+													className: "rounded-full border border-white/25 bg-white/[0.06] px-3.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/80",
+													children: row.status
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+													className: "flex size-9 items-center justify-center rounded-full text-neutral-950 transition-transform duration-300 group-hover:translate-x-1 group-hover:shadow-[0_0_22px_rgba(255,255,255,0.6)]",
+													style: { backgroundImage: "linear-gradient(180deg,#ffffff,#b4b4bc 50%,#f4f4f6)" },
+													children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { className: "size-4" })
+												})]
+											})]
+										})]
+									})
+								})
+							}, row.id))
+						})
+					] })
+				]
+			})
+		]
+	});
+}
+//#endregion
+export { ReviewQueue as component };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/Footer.tsx ===
+import { Link } from "@tanstack/react-router";
+import { ArrowUp, ArrowUpRight, Instagram, Lock } from "lucide-react";
+
+/* ---------- Payment methods supported through Stripe ----------
+   Logos are inline SVGs drawn for a dark background (no white tiles).
+   To use the official brand files, drop them in /public/payments/ and set `src`
+   on the entry: it overrides the inline SVG. */
+
+type Method = { name: string; src?: string; logo: React.ReactNode };
+
+const svgProps = {
+  viewBox: "0 0 96 40",
+  className: "h-9 w-auto sm:h-11",
+  role: "img" as const,
+};
+
+const FONT = "Arial, Helvetica, sans-serif";
+
+const METHODS: Method[] = [
+  {
+    name: "Visa",
+    logo: (
+      <svg {...svgProps} aria-label="Visa">
+        <text x="48" y="27" textAnchor="middle" fontFamily={FONT} fontWeight={900} fontStyle="italic" fontSize="28" letterSpacing="-1" fill="#FFFFFF">
+          VISA
+        </text>
+        <path d="M22 34 Q48 30 74 34" stroke="#F7B600" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    name: "Mastercard",
+    logo: (
+      <svg {...svgProps} aria-label="Mastercard">
+        <circle cx="36" cy="20" r="16" fill="#EB001B" />
+        <circle cx="60" cy="20" r="16" fill="#F79E1B" />
+        <path d="M48 9.42A16 16 0 0 1 48 30.58A16 16 0 0 1 48 9.42Z" fill="#FF5F00" />
+      </svg>
+    ),
+  },
+  {
+    name: "American Express",
+    logo: (
+      <svg {...svgProps} aria-label="American Express">
+        <rect x="6" y="6" width="84" height="28" rx="4" fill="#2E77BC" />
+        <text x="48" y="26" textAnchor="middle" fontFamily={FONT} fontWeight={800} fontSize="18" letterSpacing="1" fill="#FFFFFF">
+          AMEX
+        </text>
+      </svg>
+    ),
+  },
+  {
+    name: "Apple Pay",
+    logo: (
+      <svg {...svgProps} aria-label="Apple Pay">
+        <g transform="translate(12 8)">
+          <path
+            fill="#FFFFFF"
+            d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+            transform="scale(0.9) translate(0 -1)"
+          />
+        </g>
+        <text x="40" y="28" fontFamily={FONT} fontWeight={600} fontSize="22" fill="#FFFFFF">
+          Pay
+        </text>
+      </svg>
+    ),
+  },
+  {
+    name: "Google Pay",
+    logo: (
+      <svg {...svgProps} aria-label="Google Pay">
+        <text x="48" y="26" textAnchor="middle" fontFamily={FONT} fontWeight={600} fontSize="18">
+          <tspan fill="#4285F4">G</tspan>
+          <tspan fill="#EA4335">o</tspan>
+          <tspan fill="#FBBC05">o</tspan>
+          <tspan fill="#4285F4">g</tspan>
+          <tspan fill="#34A853">l</tspan>
+          <tspan fill="#EA4335">e</tspan>
+          <tspan fill="#E8EAED"> Pay</tspan>
+        </text>
+      </svg>
+    ),
+  },
+  {
+    name: "PayPal",
+    logo: (
+      <svg {...svgProps} aria-label="PayPal">
+        <text x="48" y="27" textAnchor="middle" fontFamily={FONT} fontWeight={800} fontStyle="italic" fontSize="24">
+          <tspan fill="#5B9DFF">Pay</tspan>
+          <tspan fill="#00B5F0">Pal</tspan>
+        </text>
+      </svg>
+    ),
+  },
+  {
+    name: "Klarna",
+    logo: (
+      <svg {...svgProps} aria-label="Klarna">
+        <rect x="4" y="6" width="88" height="28" rx="14" fill="#FFB3C7" />
+        <text x="48" y="26.5" textAnchor="middle" fontFamily={FONT} fontWeight={800} fontSize="18" fill="#0A0B09">
+          Klarna.
+        </text>
+      </svg>
+    ),
+  },
+  {
+    name: "Link",
+    logo: (
+      <svg {...svgProps} aria-label="Link by Stripe">
+        <rect x="14" y="6" width="68" height="28" rx="8" fill="#00D66F" />
+        <text x="48" y="27" textAnchor="middle" fontFamily={FONT} fontWeight={800} fontSize="20" fill="#011E0F">
+          link
+        </text>
+      </svg>
+    ),
+  },
+];
+
+const LINKS = {
+  Explore: [
+    { to: "/method", label: "Method" },
+    { to: "/pricing", label: "Pricing" },
+    { to: "/about", label: "About" },
+  ],
+  Support: [
+    { to: "/contact", label: "Contact" },
+    { to: "/terms", label: "Terms" },
+  ],
+} as const;
+
+const linkCls =
+  "inline-flex items-center gap-1 text-sm text-aura-text-secondary transition-all duration-300 hover:text-aura-white hover:[text-shadow:0_0_18px_rgba(220,226,235,0.55)] focus-visible:outline-none focus-visible:text-aura-white";
+
+export default function Footer() {
+  return (
+    <footer className="relative w-full overflow-hidden bg-aura-bg2 px-6 pb-10 pt-24">
+      {/* Top glowing chrome edge */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-0 h-40 w-[70%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(210,218,230,0.22),transparent_70%)] blur-2xl"
+      />
+      {/* Ambient corner glows */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 -left-32 h-96 w-96 rounded-full bg-[radial-gradient(circle,rgba(190,198,212,0.10),transparent_65%)] blur-3xl"
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-[radial-gradient(circle,rgba(190,198,212,0.08),transparent_65%)] blur-3xl"
+      />
+      {/* Giant watermark wordmark */}
+      <div
+        aria-hidden="true"
+        className="chrome-text font-aura pointer-events-none absolute inset-x-0 bottom-0 select-none text-center text-[22vw] font-extrabold uppercase leading-none tracking-[0.2em] opacity-[0.04] md:text-[16vw]"
+      >
+        ΛURΛ
+      </div>
+
+      <div className="relative mx-auto max-w-6xl">
+        {/* Main grid */}
+        <div className="grid gap-14 md:grid-cols-[1.4fr_1fr_1fr_auto] md:gap-12">
+          {/* Brand */}
+          <div className="flex flex-col items-center text-center md:items-start md:text-left">
+            <span className="chrome-text font-aura text-2xl font-extrabold uppercase tracking-[0.45em] drop-shadow-[0_0_22px_rgba(220,226,235,0.35)]">
+              Λ U R Λ
+            </span>
+            <p className="font-aura mt-5 max-w-xs text-sm leading-relaxed text-aura-text-secondary">
+              The operating system for the modern barber. Learn. Practice. Prove.
+            </p>
+
+            <Link
+              to="/pricing"
+              className="font-aura group relative mt-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-5 py-2.5 text-sm font-semibold text-aura-white transition-all duration-300 hover:border-white/40 hover:bg-white/[0.07] hover:shadow-[0_0_28px_rgba(220,226,235,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            >
+              Start learning
+              <ArrowUpRight className="size-4 transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          {/* Link columns */}
+          {Object.entries(LINKS).map(([title, items]) => (
+            <nav
+              key={title}
+              aria-label={title}
+              className="font-aura flex flex-col items-center gap-4 md:items-start"
+            >
+              <h3 className="chrome-text text-sm font-bold tracking-[0.2em]">{title}</h3>
+              <ul className="flex flex-col items-center gap-3 md:items-start">
+                {items.map((item) => (
+                  <li key={item.to}>
+                    <Link to={item.to} className={linkCls}>
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
+
+          {/* Social */}
+          <div className="font-aura flex flex-col items-center gap-4 md:items-start">
+            <h3 className="chrome-text text-sm font-bold tracking-[0.2em]">Follow</h3>
+            <a
+              href="https://www.instagram.com/aura_.method/?__pwa=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="group flex size-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-aura-text-secondary transition-all duration-300 hover:border-white/40 hover:text-aura-white hover:shadow-[0_0_26px_rgba(220,226,235,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            >
+              <Instagram className="size-5 transition-transform duration-300 group-hover:scale-110" />
+            </a>
+          </div>
+        </div>
+
+        {/* Payments */}
+        <div className="mt-24 flex flex-col items-center text-center">
+          <div className="font-aura flex items-center gap-2.5 text-sm text-aura-text-secondary">
+            <Lock className="size-4 text-aura-white/80" />
+            <span>Secure checkout, powered by</span>
+            <span className="chrome-text text-lg font-extrabold tracking-tight drop-shadow-[0_0_14px_rgba(220,226,235,0.4)]">
+              viva.com
+            </span>
+          </div>
+
+          <ul className="mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-8 sm:gap-x-14">
+            {METHODS.map((m) => (
+              <li
+                key={m.name}
+                title={m.name}
+                className="flex items-center drop-shadow-[0_0_12px_rgba(255,255,255,0.07)] transition-all duration-300 hover:-translate-y-1 hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.45)]"
+              >
+                {m.src ? (
+                  <img src={m.src} alt={m.name} className="h-9 w-auto sm:h-11" loading="lazy" />
+                ) : (
+                  m.logo
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <p className="font-aura mt-8 text-xs text-aura-text-muted">
+            Available payment methods vary by country and device.
+          </p>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="chrome-line mt-14 h-px w-full" />
+        <div className="font-aura mt-8 flex flex-col items-center justify-between gap-5 text-xs text-aura-text-muted md:flex-row">
+          <p>© {new Date().getFullYear()} ΛURΛ. HAIR METHOD.</p>
+
+          <button
+            type="button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            aria-label="Back to top"
+            className="group flex size-9 items-center justify-center rounded-full border border-white/10 text-aura-text-secondary transition-all duration-300 hover:border-white/40 hover:text-aura-white hover:shadow-[0_0_22px_rgba(220,226,235,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          >
+            <ArrowUp className="size-4 transition-transform duration-300 group-hover:-translate-y-0.5" />
+          </button>
+        </div>
+      </div>
+    </footer>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/SkillTreeGraph.tsx ===
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import type { SkillCategory, SkillState, SkillWithState } from "@/lib/database.types";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const CATEGORY_ORDER: SkillCategory[] = [
+  "foundation",
+  "technical",
+  "analysis",
+  "design",
+  "business",
+  "educator",
+];
+
+const CATEGORY_LABEL: Record<SkillCategory, string> = {
+  foundation: "Foundation",
+  technical: "Technical",
+  analysis: "Analysis",
+  design: "Design",
+  business: "Business",
+  educator: "Educator",
+};
+
+const STATE_LABEL: Record<SkillState, string> = {
+  mastered: "Mastered",
+  verified: "Verified",
+  practicing: "Practicing",
+  learning: "Learning",
+  locked: "Locked",
+};
+
+/* Compact layout. One SVG scales to any screen, so mobile and desktop show
+   exactly the same graph. Rows hold at most MAX_COLS skills so text stays
+   readable on a phone. */
+const MAX_COLS = 4;
+const COL_W = 118;
+const PAD_X = 56;
+const PAD_TOP = 14;
+const PAD_BOTTOM = 14;
+const LABEL_BAND = 34; // category title above its first row
+const ROW_H = 96;
+const NODE_Y = 28; // node centre below the row top
+const R = 20;
+const MIN_WIDTH = 340;
+
+interface LaidOutNode {
+  skill: SkillWithState;
+  state: SkillState;
+  x: number;
+  y: number;
+}
+
+const isAchieved = (s: SkillState) => s === "verified" || s === "mastered";
+
+function layout(skills: SkillWithState[]) {
+  const byCategory = new Map<SkillCategory, SkillWithState[]>();
+  for (const s of skills) {
+    const list = byCategory.get(s.category) ?? [];
+    list.push(s);
+    byCategory.set(s.category, list);
+  }
+  for (const list of byCategory.values()) list.sort((a, b) => a.sort_order - b.sort_order);
+
+  const cats = CATEGORY_ORDER.filter((c) => (byCategory.get(c) ?? []).length > 0);
+  const maxCols = Math.min(MAX_COLS, Math.max(1, ...cats.map((c) => byCategory.get(c)!.length)));
+  const width = Math.max(MIN_WIDTH, PAD_X * 2 + (maxCols - 1) * COL_W);
+
+  const nodes: LaidOutNode[] = [];
+  const byId = new Map<string, LaidOutNode>();
+  const titles: { cat: SkillCategory; y: number }[] = [];
+
+  let cursor = PAD_TOP;
+  for (const cat of cats) {
+    titles.push({ cat, y: cursor });
+    cursor += LABEL_BAND;
+    const list = byCategory.get(cat)!;
+    for (let start = 0; start < list.length; start += MAX_COLS) {
+      const chunk = list.slice(start, start + MAX_COLS);
+      const startX = width / 2 - ((chunk.length - 1) * COL_W) / 2;
+      chunk.forEach((skill, i) => {
+        const node: LaidOutNode = {
+          skill,
+          state: skill.userSkill?.state ?? "locked",
+          x: startX + i * COL_W,
+          y: cursor + NODE_Y,
+        };
+        nodes.push(node);
+        byId.set(skill.id, node);
+      });
+      cursor += ROW_H;
+    }
+    cursor += 6;
+  }
+  const height = cursor + PAD_BOTTOM;
+
+  const edges: [LaidOutNode, LaidOutNode][] = [];
+  for (const node of nodes) {
+    for (const prereqId of node.skill.prerequisites ?? []) {
+      const from = byId.get(prereqId);
+      if (from) edges.push([from, node]);
+    }
+  }
+  return { nodes, edges, titles, width, height };
+}
+
+function wrap(name: string, max = 13): string[] {
+  const words = name.split(/\s+/);
+  let lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    if (cur && (cur + " " + w).length > max) {
+      lines.push(cur);
+      cur = w;
+    } else cur = cur ? cur + " " + w : w;
+  }
+  if (cur) lines.push(cur);
+  if (lines.length > 2) {
+    const rest = lines.slice(1).join(" ");
+    lines = [lines[0]!, rest.length > max ? rest.slice(0, max - 1) + "…" : rest];
+  }
+  return lines;
+}
+
+function starPoints(cx: number, cy: number, outer: number, inner: number) {
+  const pts: string[] = [];
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (-90 + i * 36) * (Math.PI / 180);
+    pts.push(`${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`);
+  }
+  return pts.join(" ");
+}
+
+function edgePath(a: LaidOutNode, b: LaidOutNode) {
+  if (Math.abs(a.y - b.y) < 1) return `M${a.x} ${a.y} L${b.x} ${b.y}`;
+  const my = (a.y + b.y) / 2;
+  return `M${a.x} ${a.y} C${a.x} ${my}, ${b.x} ${my}, ${b.x} ${b.y}`;
+}
+
+export default function SkillTreeGraph({ skills }: { skills: SkillWithState[] }) {
+  const reduce = useReducedMotion();
+  const { nodes, edges, titles, width, height } = useMemo(() => layout(skills), [skills]);
+
+  const defaultId = useMemo(() => {
+    const pick =
+      nodes.find((n) => n.state === "practicing") ??
+      nodes.find((n) => n.state === "learning") ??
+      nodes.find((n) => n.state !== "locked") ??
+      nodes[0];
+    return pick?.skill.id ?? null;
+  }, [nodes]);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  if (skills.length === 0 || nodes.length === 0) return null;
+
+  const sel = nodes.find((n) => n.skill.id === (selectedId ?? defaultId)) ?? nodes[0]!;
+  const prereqNames = (sel.skill.prerequisites ?? [])
+    .map((id) => skills.find((s) => s.id === id)?.name)
+    .filter(Boolean) as string[];
+
+  return (
+    <section className="relative mx-auto w-full max-w-md">
+      <div className="relative w-full overflow-hidden rounded-xl">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+            maskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
+            WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
+          }}
+        />
+
+        <svg viewBox={`0 0 ${width} ${height}`} className="relative block h-auto w-full select-none" role="group" aria-label="Skill progression tree">
+          <defs>
+            <linearGradient id="stg-edge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2={width} y2={height}>
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+              <stop offset="50%" stopColor="#9aa0a8" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
+            </linearGradient>
+            <linearGradient id="stg-rule" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
+            <radialGradient id="stg-chrome" cx="35%" cy="30%" r="80%">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="45%" stopColor="#c9ced4" />
+              <stop offset="100%" stopColor="#6c7279" />
+            </radialGradient>
+            <radialGradient id="stg-dark" cx="35%" cy="30%" r="90%">
+              <stop offset="0%" stopColor="#2a2d31" />
+              <stop offset="100%" stopColor="#0c0d0e" />
+            </radialGradient>
+            <filter id="stg-glow" x="-100%" y="-100%" width="300%" height="300%">
+              <feGaussianBlur stdDeviation="3" result="b" />
+              <feMerge>
+                <feMergeNode in="b" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+
+          {/* category titles */}
+          {titles.map(({ cat, y }) => (
+            <g key={cat}>
+              <text x={16} y={y + 14} className="font-aura" fill="rgba(255,255,255,0.65)" fontSize="11" fontWeight="600" letterSpacing="2.5">
+                {CATEGORY_LABEL[cat].toUpperCase()}
+              </text>
+              <line x1={16} y1={y + 22} x2={width - 16} y2={y + 22} stroke="url(#stg-rule)" strokeWidth="1" />
+            </g>
+          ))}
+
+          {/* edges */}
+          {edges.map(([from, to], i) => {
+            const lit = isAchieved(from.state) && to.state !== "locked";
+            const soft = !lit && from.state !== "locked" && to.state !== "locked";
+            const d = edgePath(from, to);
+            return (
+              <g key={`${from.skill.id}-${to.skill.id}`}>
+                <motion.path
+                  d={d}
+                  fill="none"
+                  stroke={lit ? "url(#stg-edge)" : soft ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)"}
+                  strokeWidth={lit ? 2 : 1.3}
+                  strokeLinecap="round"
+                  strokeDasharray={!lit && !soft ? "2 6" : undefined}
+                  filter={lit ? "url(#stg-glow)" : undefined}
+                  initial={{ pathLength: 0, opacity: 0 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 1, ease: "easeInOut", delay: 0.1 + i * 0.04 }}
+                />
+                {lit && !reduce && (
+                  <motion.path
+                    d={d}
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray="5 40"
+                    animate={{ strokeDashoffset: [0, -45] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                    style={{ filter: "drop-shadow(0 0 4px #fff)" }}
+                  />
+                )}
+              </g>
+            );
+          })}
+
+          {/* nodes (plain fade-in on mount, always visible) */}
+          {nodes.map((n, i) => {
+            const isSel = n.skill.id === sel.skill.id;
+            const lines = wrap(n.skill.name);
+            const achieved = isAchieved(n.state);
+            const locked = n.state === "locked";
+            return (
+              <motion.g
+                key={n.skill.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`${n.skill.name}, ${STATE_LABEL[n.state]}`}
+                aria-pressed={isSel}
+                onClick={() => setSelectedId(n.skill.id)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setSelectedId(n.skill.id)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, ease: EASE, delay: 0.25 + i * 0.05 }}
+                style={{ cursor: "pointer", outline: "none" }}
+              >
+                {/* larger tap target */}
+                <circle cx={n.x} cy={n.y} r={R + 14} fill="rgba(0,0,0,0.001)" />
+
+                {isSel && <circle cx={n.x} cy={n.y} r={R + 10} fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1" strokeDasharray="2 5" />}
+
+                {n.state === "mastered" && (
+                  <circle cx={n.x} cy={n.y} r={R + 5} fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" style={{ filter: "drop-shadow(0 0 6px #fff)" }} />
+                )}
+
+                {(achieved || n.state === "practicing") && !reduce && (
+                  <motion.circle
+                    cx={n.x} cy={n.y} r={R} fill="none" stroke="#ffffff" strokeWidth="1.3"
+                    style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                    animate={{ scale: [1, 1.8], opacity: [achieved ? 0.4 : 0.7, 0] }}
+                    transition={{ duration: achieved ? 3.2 : 2, repeat: Infinity, ease: "easeOut", delay: (i % 5) * 0.35 }}
+                  />
+                )}
+
+                {(n.state === "practicing" || n.state === "learning") && !reduce && (
+                  <motion.circle
+                    cx={n.x} cy={n.y} r={R + 5} fill="none"
+                    stroke={n.state === "practicing" ? "#d4d8dd" : "rgba(212,216,221,0.65)"}
+                    strokeWidth="1.6" strokeLinecap="round"
+                    strokeDasharray={n.state === "practicing" ? "26 98" : "2.5 8.5"}
+                    style={{ transformBox: "fill-box", transformOrigin: "center", filter: "drop-shadow(0 0 3px rgba(255,255,255,0.8))" }}
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: n.state === "practicing" ? 3.2 : 12, repeat: Infinity, ease: "linear" }}
+                  />
+                )}
+
+                <circle
+                  cx={n.x} cy={n.y} r={R}
+                  fill={achieved ? "url(#stg-chrome)" : "url(#stg-dark)"}
+                  stroke={achieved ? "#ffffff" : locked ? "rgba(255,255,255,0.16)" : "#BFC0C2"}
+                  strokeWidth="1.6"
+                  style={achieved ? { filter: "drop-shadow(0 0 10px rgba(255,255,255,0.65))" } : undefined}
+                />
+
+                {n.state === "verified" && (
+                  <path d={`M${n.x - 6.5} ${n.y} L${n.x - 1.5} ${n.y + 5} L${n.x + 7} ${n.y - 5.5}`} fill="none" stroke="#0a0a0a" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+                {n.state === "mastered" && <polygon points={starPoints(n.x, n.y + 1, 10, 4)} fill="#0a0a0a" />}
+                {n.state === "practicing" && (
+                  <g stroke="#d4d8dd" strokeWidth="1.7" strokeLinecap="round" fill="none">
+                    <circle cx={n.x} cy={n.y} r="7.5" />
+                    <path d={`M${n.x} ${n.y - 4} V${n.y} L${n.x + 3} ${n.y + 2.5}`} />
+                  </g>
+                )}
+                {n.state === "learning" && (
+                  <path d={`M${n.x} ${n.y - 7.5} L${n.x + 6} ${n.y} L${n.x} ${n.y + 7.5} L${n.x - 6} ${n.y} Z`} fill="none" stroke="#d4d8dd" strokeWidth="1.7" strokeLinejoin="round" />
+                )}
+                {locked && (
+                  <g stroke="rgba(255,255,255,0.38)" strokeWidth="1.7" fill="none" strokeLinecap="round">
+                    <rect x={n.x - 6} y={n.y - 2} width="12" height="8.5" rx="1.8" />
+                    <path d={`M${n.x - 3.5} ${n.y - 2} V${n.y - 5} a3.5 3.5 0 0 1 7 0 V${n.y - 2}`} />
+                  </g>
+                )}
+
+                <text
+                  x={n.x} y={n.y + R + 15} textAnchor="middle" className="font-aura"
+                  fill={locked ? "#6F6F6F" : isSel ? "#ffffff" : "#E4E4E4"}
+                  fontSize="12" fontWeight={isSel ? 700 : 500}
+                  style={isSel ? { filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))" } : undefined}
+                >
+                  {lines.map((l, li) => (
+                    <tspan key={li} x={n.x} dy={li === 0 ? 0 : 14}>
+                      {l}
+                    </tspan>
+                  ))}
+                </text>
+              </motion.g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* detail bar */}
+      <div className="mt-3 flex min-h-[64px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={sel.skill.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="flex w-full min-w-0 items-center justify-between gap-3"
+          >
+            <div className="min-w-0">
+              <h4 className="font-aura truncate text-sm font-bold text-white">{sel.skill.name}</h4>
+              {sel.skill.definition && (
+                <p className="font-aura mt-0.5 line-clamp-2 text-xs leading-relaxed text-white/55">{sel.skill.definition}</p>
+              )}
+              {sel.state === "locked" && prereqNames.length > 0 && (
+                <p className="font-aura mt-0.5 text-[11px] text-white/40">Χρειάζεται πρώτα: {prereqNames.join(", ")}</p>
+              )}
+            </div>
+            <span
+              className="font-aura shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+              style={{
+                borderColor: sel.state === "locked" ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.6)",
+                color: sel.state === "mastered" ? "#0a0a0a" : sel.state === "locked" ? "rgba(255,255,255,0.4)" : "#fff",
+                background: sel.state === "mastered" ? "#fff" : "transparent",
+                boxShadow: sel.state === "locked" ? "none" : "0 0 14px rgba(255,255,255,0.25)",
+              }}
+            >
+              {STATE_LABEL[sel.state]}
+            </span>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* legend */}
+      <div className="font-aura mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-white/55">
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full" style={{ background: "radial-gradient(circle at 35% 30%, #fff, #8a9098)", boxShadow: "0 0 6px rgba(255,255,255,0.7)" }} />
+          Verified / Mastered
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full border border-[#d4d8dd] bg-[#161718]" />
+          Practicing
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full border border-dashed border-[#d4d8dd]/70 bg-[#161718]" />
+          Learning
+        </span>
+        <span className="flex items-center gap-1.5">
+          <i className="inline-block size-2.5 rounded-full border border-white/15 bg-[#0a0a0a]" />
+          Locked
+        </span>
+      </div>
+    </section>
+  );
+}
+=== END FILE ===
+

@@ -1,0 +1,1626 @@
+=== FILE: .output/public/assets/elite-BuLnQzEn.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/EliteCommunity-eTSjqE7i.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/createLucideIcon-Dz5w4CtK.js","assets/chevron-left-eEe2n3pc.js","assets/chevron-right-LS5pF-bM.js","assets/circle-alert-Bs1x-kqg.js","assets/copy-CMIpwlCB.js","assets/crown-QxIH2HsF.js","assets/file-text-DWpyfNHk.js","assets/gem-CdTGHu1B.js","assets/graduation-cap-KbC_XaK8.js","assets/loader-circle-DdNdnF6-.js","assets/trash-2-DU4LXWLE.js","assets/plus-qBfxbRGB.js","assets/send-ClGHcKrI.js","assets/user-BFT04SdI.js","assets/users-mt-IxESh.js","assets/x-DCxPHqh1.js","assets/db-DXn9ZPwL.js","assets/client-CKVMbL1z.js"])))=>i.map(i=>d[i]);
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./check-l8y3aT-v.js";import{t as a}from"./crown-QxIH2HsF.js";import{t as o}from"./gem-CdTGHu1B.js";import{t as s}from"./loader-circle-DdNdnF6-.js";import{t as c}from"./lock-DHD2dW60.js";import{t as l}from"./preload-helper-Czpn1I53.js";import{n as u}from"./plans-BkcWWgXs.js";import{t as d}from"./db-DXn9ZPwL.js";var f=e(n()),p=t(),m=`/pricing`,h=`/login`,g=`/academy`;function _({signedOut:e=!1}){let t=u(`high`),n=t?.features.slice(1,5)??[];return(0,p.jsxs)(`div`,{className:`el-root`,children:[(0,p.jsx)(`style`,{children:v}),(0,p.jsxs)(`div`,{className:`el-card`,children:[(0,p.jsx)(`span`,{className:`el-crown`,children:(0,p.jsx)(a,{className:`size-8`,"aria-hidden":!0})}),(0,p.jsxs)(`p`,{className:`el-eyebrow`,children:[(0,p.jsx)(o,{className:`size-3.5`,"aria-hidden":!0}),` ELITE EXCLUSIVE`]}),(0,p.jsx)(`h1`,{className:`el-title`,children:e?`SIGN IN TO JOIN`:`UPGRADE TO ELITE TO JOIN`}),(0,p.jsx)(`span`,{className:`el-rule`,"aria-hidden":!0}),(0,p.jsxs)(`p`,{className:`el-text`,children:[`This private community is reserved for AURA Elite members.`,e?` Sign in with your Elite account to enter.`:` Upgrade your plan to unlock the group.`]}),t&&!e&&(0,p.jsxs)(`div`,{className:`el-plan`,children:[(0,p.jsxs)(`div`,{className:`el-plan-head`,children:[(0,p.jsx)(`span`,{className:`el-plan-name`,children:t.name}),(0,p.jsxs)(`span`,{className:`el-plan-price`,children:[t.priceLabel,(0,p.jsx)(`small`,{children:` / month`})]})]}),(0,p.jsx)(`ul`,{className:`el-perks`,children:n.map(e=>(0,p.jsxs)(`li`,{children:[(0,p.jsx)(i,{className:`size-4 shrink-0`,"aria-hidden":!0}),(0,p.jsx)(`span`,{children:e})]},e))})]}),(0,p.jsxs)(r,{to:e?h:m,className:`el-cta`,children:[(0,p.jsx)(c,{className:`size-4`,"aria-hidden":!0}),e?`Sign in`:`Upgrade to Elite`]}),(0,p.jsx)(r,{to:g,className:`el-back`,children:`Back to Academy`})]})]})}var v=`
+.el-root{
+  position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:24px; overflow-y:auto;
+  color:#f3f4f6;
+  background:
+    radial-gradient(110% 70% at 50% -10%,rgba(255,255,255,.08),transparent 60%),
+    linear-gradient(180deg,#0b0b0b,#050505);
+}
+.el-card{
+  width:min(100%,460px); margin:auto; padding:40px 28px 32px; text-align:center; border-radius:1.6rem;
+  display:flex; flex-direction:column; align-items:center;
+  border:1px solid transparent;
+  background:linear-gradient(180deg,rgba(18,18,19,.94),rgba(7,7,8,.96)) padding-box,
+             linear-gradient(145deg,rgba(255,255,255,.6),rgba(255,255,255,.06) 35%,rgba(232,236,242,.4) 70%,rgba(255,255,255,.1)) border-box;
+  box-shadow:0 30px 70px -30px #000, 0 0 70px -34px rgba(232,236,242,.5);
+  animation: el-in .5s cubic-bezier(.22,1,.36,1);
+}
+@keyframes el-in{ from{opacity:0; transform:translateY(16px) scale(.98)} to{opacity:1; transform:none} }
+
+.el-crown{
+  display:grid; place-items:center; width:72px; height:72px; border-radius:9999px; color:#eef1f5; margin-bottom:18px;
+  border:1px solid rgba(232,236,242,.45);
+  background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.25),rgba(255,255,255,.03) 70%);
+  box-shadow:0 0 36px -6px rgba(232,236,242,.6), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.el-eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.35em; color:rgba(255,255,255,.55); }
+.el-title{
+  margin-top:14px; font-family:"Cormorant Garamond",Georgia,serif; font-size:clamp(1.6rem,6vw,2.1rem);
+  line-height:1.15; letter-spacing:.08em; font-weight:500;
+  background:linear-gradient(115deg,#8b93a1 0%,#fff 28%,#aeb4bf 48%,#fff 62%,#8b93a1 82%,#f1f5f9 100%);
+  background-size:260% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation: el-shimmer 8s linear infinite;
+}
+@keyframes el-shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.el-rule{ width:60%; height:1px; margin:18px 0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent); }
+.el-text{ font-size:14px; line-height:1.6; color:rgba(255,255,255,.55); max-width:330px; }
+
+.el-plan{
+  width:100%; margin-top:22px; padding:16px 16px 12px; text-align:left; border-radius:1.1rem;
+  border:1px solid rgba(232,236,242,.22);
+  background:radial-gradient(90% 100% at 50% 0%,rgba(232,236,242,.1),transparent 70%),rgba(255,255,255,.02);
+}
+.el-plan-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.el-plan-name{ font-size:12px; font-weight:600; letter-spacing:.25em; color:#e8ecf2; }
+.el-plan-price{ font-family:"Cormorant Garamond",Georgia,serif; font-size:1.5rem; color:#fff; }
+.el-plan-price small{ font-family:inherit; font-size:11px; letter-spacing:.1em; color:rgba(255,255,255,.45); }
+.el-perks{ display:flex; flex-direction:column; gap:9px; }
+.el-perks li{ display:flex; align-items:flex-start; gap:10px; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.65); }
+.el-perks svg{ margin-top:2px; color:#e8ecf2; }
+
+.el-cta{
+  margin-top:26px; display:inline-flex; align-items:center; gap:10px; padding:.95rem 2rem; border-radius:9999px;
+  font-size:13px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:#101012;
+  background:radial-gradient(circle at 32% 22%,#fff 0%,#e0e4ea 22%,#98a0ab 60%,#5a606a 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.95) inset, 0 -6px 12px rgba(0,0,0,.3) inset, 0 12px 22px rgba(0,0,0,.7), 0 0 30px -6px rgba(232,236,242,.6);
+  transition:transform .15s, filter .2s;
+}
+.el-cta:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+.el-cta:active{ transform:translateY(2px) scale(.97); }
+.el-back{ margin-top:16px; font-size:12px; letter-spacing:.15em; color:rgba(255,255,255,.4); transition:color .2s; }
+.el-back:hover{ color:#fff; }
+.el-cta:focus-visible,.el-back:focus-visible{ outline:2px solid rgba(232,236,242,.8); outline-offset:3px; }
+
+@media (prefers-reduced-motion: reduce){
+  .el-card,.el-title{ animation:none !important; }
+}
+`,y=(0,f.lazy)(()=>l(()=>import(`./EliteCommunity-eTSjqE7i.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21]))),b=d;function x(){let[e,t]=(0,f.useState)({status:`loading`});return(0,f.useEffect)(()=>{let e=!1,n=async()=>{let{data:n}=await b.auth.getSession(),r=n.session?.user;if(e)return;if(!r){t({status:`signed-out`});return}let{data:i,error:a}=await b.rpc(`is_elite_member`);if(e)return;if(a||i!==!0){t({status:`locked`});return}let o=r.user_metadata??{};t({status:`elite`,id:r.id,name:o.full_name||o.name||r.email?.split(`@`)[0]||`Member`})};n();let{data:r}=b.auth.onAuthStateChange(e=>{(e===`SIGNED_IN`||e===`SIGNED_OUT`||e===`USER_UPDATED`)&&n()});return()=>{e=!0,r.subscription.unsubscribe()}},[]),e.status===`loading`?(0,p.jsx)(`div`,{className:`fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60`,children:(0,p.jsx)(s,{className:`size-6 animate-spin`,"aria-label":`Loading`})}):e.status===`signed-out`?(0,p.jsx)(_,{signedOut:!0}):e.status===`locked`?(0,p.jsx)(_,{}):(0,p.jsx)(f.Suspense,{fallback:(0,p.jsx)(`div`,{className:`fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60`,children:(0,p.jsx)(s,{className:`size-6 animate-spin`,"aria-label":`Loading`})}),children:(0,p.jsx)(y,{meId:e.id,meName:e.name},e.id)})}export{x as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/elite-BPoBsS7l.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { t as db } from "./db-BETNILr1.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { Ot as Check, Y as Lock, Z as LoaderCircle, ct as Gem, gt as Crown } from "../_libs/lucide-react.mjs";
+import { n as getPlan } from "./plans-sHsWJraA.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/elite-BPoBsS7l.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var UPGRADE_PATH = "/pricing";
+var LOGIN_PATH = "/login";
+var BACK_PATH = "/academy";
+function EliteLocked({ signedOut = false }) {
+	const elite = getPlan("high");
+	const perks = elite?.features.slice(1, 5) ?? [];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "el-root",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: css }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "el-card",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "el-crown",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Crown, {
+						className: "size-8",
+						"aria-hidden": true
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "el-eyebrow",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Gem, {
+						className: "size-3.5",
+						"aria-hidden": true
+					}), " ELITE EXCLUSIVE"]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+					className: "el-title",
+					children: signedOut ? "SIGN IN TO JOIN" : "UPGRADE TO ELITE TO JOIN"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "el-rule",
+					"aria-hidden": true
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "el-text",
+					children: ["This private community is reserved for AURA Elite members.", signedOut ? " Sign in with your Elite account to enter." : " Upgrade your plan to unlock the group."]
+				}),
+				elite && !signedOut && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "el-plan",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "el-plan-head",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "el-plan-name",
+							children: elite.name
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "el-plan-price",
+							children: [elite.priceLabel, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("small", { children: " / month" })]
+						})]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "el-perks",
+						children: perks.map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, {
+							className: "size-4 shrink-0",
+							"aria-hidden": true
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: f })] }, f))
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+					to: signedOut ? LOGIN_PATH : UPGRADE_PATH,
+					className: "el-cta",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, {
+						className: "size-4",
+						"aria-hidden": true
+					}), signedOut ? "Sign in" : "Upgrade to Elite"]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: BACK_PATH,
+					className: "el-back",
+					children: "Back to Academy"
+				})
+			]
+		})]
+	});
+}
+var css = `
+.el-root{
+  position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:24px; overflow-y:auto;
+  color:#f3f4f6;
+  background:
+    radial-gradient(110% 70% at 50% -10%,rgba(255,255,255,.08),transparent 60%),
+    linear-gradient(180deg,#0b0b0b,#050505);
+}
+.el-card{
+  width:min(100%,460px); margin:auto; padding:40px 28px 32px; text-align:center; border-radius:1.6rem;
+  display:flex; flex-direction:column; align-items:center;
+  border:1px solid transparent;
+  background:linear-gradient(180deg,rgba(18,18,19,.94),rgba(7,7,8,.96)) padding-box,
+             linear-gradient(145deg,rgba(255,255,255,.6),rgba(255,255,255,.06) 35%,rgba(232,236,242,.4) 70%,rgba(255,255,255,.1)) border-box;
+  box-shadow:0 30px 70px -30px #000, 0 0 70px -34px rgba(232,236,242,.5);
+  animation: el-in .5s cubic-bezier(.22,1,.36,1);
+}
+@keyframes el-in{ from{opacity:0; transform:translateY(16px) scale(.98)} to{opacity:1; transform:none} }
+
+.el-crown{
+  display:grid; place-items:center; width:72px; height:72px; border-radius:9999px; color:#eef1f5; margin-bottom:18px;
+  border:1px solid rgba(232,236,242,.45);
+  background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.25),rgba(255,255,255,.03) 70%);
+  box-shadow:0 0 36px -6px rgba(232,236,242,.6), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.el-eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.35em; color:rgba(255,255,255,.55); }
+.el-title{
+  margin-top:14px; font-family:"Cormorant Garamond",Georgia,serif; font-size:clamp(1.6rem,6vw,2.1rem);
+  line-height:1.15; letter-spacing:.08em; font-weight:500;
+  background:linear-gradient(115deg,#8b93a1 0%,#fff 28%,#aeb4bf 48%,#fff 62%,#8b93a1 82%,#f1f5f9 100%);
+  background-size:260% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation: el-shimmer 8s linear infinite;
+}
+@keyframes el-shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.el-rule{ width:60%; height:1px; margin:18px 0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent); }
+.el-text{ font-size:14px; line-height:1.6; color:rgba(255,255,255,.55); max-width:330px; }
+
+.el-plan{
+  width:100%; margin-top:22px; padding:16px 16px 12px; text-align:left; border-radius:1.1rem;
+  border:1px solid rgba(232,236,242,.22);
+  background:radial-gradient(90% 100% at 50% 0%,rgba(232,236,242,.1),transparent 70%),rgba(255,255,255,.02);
+}
+.el-plan-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.el-plan-name{ font-size:12px; font-weight:600; letter-spacing:.25em; color:#e8ecf2; }
+.el-plan-price{ font-family:"Cormorant Garamond",Georgia,serif; font-size:1.5rem; color:#fff; }
+.el-plan-price small{ font-family:inherit; font-size:11px; letter-spacing:.1em; color:rgba(255,255,255,.45); }
+.el-perks{ display:flex; flex-direction:column; gap:9px; }
+.el-perks li{ display:flex; align-items:flex-start; gap:10px; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.65); }
+.el-perks svg{ margin-top:2px; color:#e8ecf2; }
+
+.el-cta{
+  margin-top:26px; display:inline-flex; align-items:center; gap:10px; padding:.95rem 2rem; border-radius:9999px;
+  font-size:13px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:#101012;
+  background:radial-gradient(circle at 32% 22%,#fff 0%,#e0e4ea 22%,#98a0ab 60%,#5a606a 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.95) inset, 0 -6px 12px rgba(0,0,0,.3) inset, 0 12px 22px rgba(0,0,0,.7), 0 0 30px -6px rgba(232,236,242,.6);
+  transition:transform .15s, filter .2s;
+}
+.el-cta:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+.el-cta:active{ transform:translateY(2px) scale(.97); }
+.el-back{ margin-top:16px; font-size:12px; letter-spacing:.15em; color:rgba(255,255,255,.4); transition:color .2s; }
+.el-back:hover{ color:#fff; }
+.el-cta:focus-visible,.el-back:focus-visible{ outline:2px solid rgba(232,236,242,.8); outline-offset:3px; }
+
+@media (prefers-reduced-motion: reduce){
+  .el-card,.el-title{ animation:none !important; }
+}
+`;
+var EliteCommunity = (0, import_react.lazy)(() => import("./EliteCommunity-B2fe86f_.mjs"));
+var sb = db;
+function CommunityPage() {
+	const [gate, setGate] = (0, import_react.useState)({ status: "loading" });
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		const check = async () => {
+			const { data } = await sb.auth.getSession();
+			const user = data.session?.user;
+			if (cancelled) return;
+			if (!user) {
+				setGate({ status: "signed-out" });
+				return;
+			}
+			const { data: isElite, error } = await sb.rpc("is_elite_member");
+			if (cancelled) return;
+			if (error || isElite !== true) {
+				setGate({ status: "locked" });
+				return;
+			}
+			const meta = user.user_metadata ?? {};
+			setGate({
+				status: "elite",
+				id: user.id,
+				name: meta.full_name || meta.name || user.email?.split("@")[0] || "Member"
+			});
+		};
+		check();
+		const { data: sub } = sb.auth.onAuthStateChange((event) => {
+			if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") check();
+		});
+		return () => {
+			cancelled = true;
+			sub.subscription.unsubscribe();
+		};
+	}, []);
+	if (gate.status === "loading") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, {
+			className: "size-6 animate-spin",
+			"aria-label": "Loading"
+		})
+	});
+	if (gate.status === "signed-out") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EliteLocked, { signedOut: true });
+	if (gate.status === "locked") return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EliteLocked, {});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_react.Suspense, {
+		fallback: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, {
+				className: "size-6 animate-spin",
+				"aria-label": "Loading"
+			})
+		}),
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EliteCommunity, {
+			meId: gate.id,
+			meName: gate.name
+		}, gate.id)
+	});
+}
+//#endregion
+export { CommunityPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/messages-DLflnrJ_.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { H as Mic, N as Phone, P as PhoneOff, U as MicOff, a as Video, o as VideoOff } from "../_libs/lucide-react.mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/messages-DLflnrJ_.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+async function getCallLogs(conversationId) {
+	const { data, error } = await supabase.from("call_logs").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(100);
+	if (error) return [];
+	return data ?? [];
+}
+function formatDuration(totalSeconds) {
+	const s = Math.max(0, Math.floor(totalSeconds));
+	const h = Math.floor(s / 3600);
+	const m = Math.floor(s % 3600 / 60);
+	const sec = s % 60;
+	const mm = String(m).padStart(h > 0 ? 2 : 1, "0");
+	const ss = String(sec).padStart(2, "0");
+	return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+/** The line shown inside the chat for a call. */
+function describeCall(log, myId) {
+	const kind = log.kind === "video" ? "Βιντεοκλήση" : "Ηχητική κλήση";
+	const iCalled = log.caller_id === myId;
+	if (log.answered_at) {
+		if (!log.ended_at) return {
+			label: `${kind} σε εξέλιξη`,
+			missed: false
+		};
+		return {
+			label: `${kind} · ${formatDuration((new Date(log.ended_at).getTime() - new Date(log.answered_at).getTime()) / 1e3)}`,
+			missed: false
+		};
+	}
+	if (log.status === "declined") return {
+		label: iCalled ? "Η κλήση απορρίφθηκε" : "Απέρριψες την κλήση",
+		missed: false
+	};
+	if (log.status === "ringing" && Date.now() - new Date(log.created_at).getTime() < 6e4) return {
+		label: `${kind}…`,
+		missed: false
+	};
+	return {
+		label: iCalled ? "Δεν απάντησε" : "Αναπάντητη κλήση",
+		missed: !iCalled
+	};
+}
+var Ctx = (0, import_react.createContext)({
+	busy: false,
+	startCall: async () => {}
+});
+var useCall = () => (0, import_react.useContext)(Ctx);
+var RING_TIMEOUT_MS = 45e3;
+var FALLBACK_ICE = [{ urls: "stun:stun.l.google.com:19302" }];
+function makeId() {
+	if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+	const b = /* @__PURE__ */ new Uint8Array(16);
+	crypto.getRandomValues(b);
+	b[6] = b[6] & 15 | 64;
+	b[8] = b[8] & 63 | 128;
+	const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+	return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+async function getIceServers() {
+	try {
+		const { data, error } = await supabase.functions.invoke("get-ice-servers");
+		if (!error && data?.iceServers) return data.iceServers;
+	} catch {}
+	return FALLBACK_ICE;
+}
+function subscribe(ch, timeoutMs = 8e3) {
+	return new Promise((resolve, reject) => {
+		const t = setTimeout(() => reject(/* @__PURE__ */ new Error("subscribe timeout")), timeoutMs);
+		ch.subscribe((status) => {
+			if (status === "SUBSCRIBED") {
+				clearTimeout(t);
+				resolve();
+			}
+			if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+				clearTimeout(t);
+				reject(new Error(status));
+			}
+		});
+	});
+}
+/** Tries a private channel first, then falls back to a public one. */
+async function openChannel(name, setup) {
+	let lastErr;
+	for (const priv of [true, false]) {
+		const ch = supabase.channel(name, { config: { private: priv } });
+		setup(ch);
+		try {
+			await subscribe(ch);
+			return ch;
+		} catch (e) {
+			lastErr = e;
+			supabase.removeChannel(ch);
+		}
+	}
+	throw lastErr;
+}
+function CallProvider({ children }) {
+	const { profile } = useAuth();
+	const myId = profile?.id;
+	const [call, setCall] = (0, import_react.useState)(null);
+	const [phase, setPhase] = (0, import_react.useState)("idle");
+	const [muted, setMuted] = (0, import_react.useState)(false);
+	const [camOff, setCamOff] = (0, import_react.useState)(false);
+	const [localStream, setLocalStream] = (0, import_react.useState)(null);
+	const [remoteStream, setRemoteStream] = (0, import_react.useState)(null);
+	const [seconds, setSeconds] = (0, import_react.useState)(0);
+	const [notice, setNotice] = (0, import_react.useState)(null);
+	const callRef = (0, import_react.useRef)(null);
+	const phaseRef = (0, import_react.useRef)("idle");
+	const pcRef = (0, import_react.useRef)(null);
+	const roomRef = (0, import_react.useRef)(null);
+	const localRef = (0, import_react.useRef)(null);
+	const pendingIce = (0, import_react.useRef)([]);
+	const ringTimer = (0, import_react.useRef)(null);
+	const noticeTimer = (0, import_react.useRef)(null);
+	const readyTimer = (0, import_react.useRef)(null);
+	const connTimer = (0, import_react.useRef)(null);
+	const offeringRef = (0, import_react.useRef)(false);
+	const localVideoRef = (0, import_react.useRef)(null);
+	const remoteVideoRef = (0, import_react.useRef)(null);
+	const setPhaseBoth = (p) => {
+		phaseRef.current = p;
+		setPhase(p);
+	};
+	const showNotice = (0, import_react.useCallback)((msg) => {
+		setNotice(msg);
+		if (noticeTimer.current) clearTimeout(noticeTimer.current);
+		noticeTimer.current = setTimeout(() => setNotice(null), 6e3);
+	}, []);
+	const cleanup = (0, import_react.useCallback)(() => {
+		if (ringTimer.current) clearTimeout(ringTimer.current);
+		ringTimer.current = null;
+		if (readyTimer.current) clearInterval(readyTimer.current);
+		readyTimer.current = null;
+		if (connTimer.current) clearTimeout(connTimer.current);
+		connTimer.current = null;
+		offeringRef.current = false;
+		localRef.current?.getTracks().forEach((t) => t.stop());
+		localRef.current = null;
+		pcRef.current?.close();
+		pcRef.current = null;
+		if (roomRef.current) supabase.removeChannel(roomRef.current);
+		roomRef.current = null;
+		pendingIce.current = [];
+		callRef.current = null;
+		setCall(null);
+		setLocalStream(null);
+		setRemoteStream(null);
+		setMuted(false);
+		setCamOff(false);
+		setSeconds(0);
+		setPhaseBoth("idle");
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
+	}, [localStream, phase]);
+	(0, import_react.useEffect)(() => {
+		if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+	}, [remoteStream, phase]);
+	(0, import_react.useEffect)(() => {
+		if (phase !== "connected") return;
+		const t = setInterval(() => setSeconds((s) => s + 1), 1e3);
+		return () => clearInterval(t);
+	}, [phase]);
+	const ringing = !!call && phase === "ringing";
+	const incomingDir = call?.direction === "in";
+	(0, import_react.useEffect)(() => {
+		if (!ringing) return;
+		let ctx = null;
+		try {
+			ctx = new (window.AudioContext || window.webkitAudioContext)();
+		} catch {
+			return;
+		}
+		const beep = () => {
+			if (!ctx) return;
+			try {
+				const o = ctx.createOscillator();
+				const g = ctx.createGain();
+				o.frequency.value = incomingDir ? 880 : 440;
+				g.gain.value = .05;
+				o.connect(g);
+				g.connect(ctx.destination);
+				o.start();
+				o.stop(ctx.currentTime + .4);
+			} catch {}
+		};
+		beep();
+		const t = setInterval(() => {
+			beep();
+			if (incomingDir && navigator.vibrate) navigator.vibrate([
+				300,
+				150,
+				300
+			]);
+		}, 1500);
+		return () => {
+			clearInterval(t);
+			ctx?.close().catch(() => {});
+		};
+	}, [ringing, incomingDir]);
+	const endCall = (0, import_react.useCallback)(async (finalStatus = "ended") => {
+		const info = callRef.current;
+		if (!info) return;
+		const status = phaseRef.current === "connected" || phaseRef.current === "connecting" ? "ended" : info.direction === "out" ? finalStatus === "missed" ? "missed" : "cancelled" : "ended";
+		await supabase.from("call_logs").update({
+			status,
+			ended_at: (/* @__PURE__ */ new Date()).toISOString()
+		}).eq("id", info.id).is("ended_at", null);
+		roomRef.current?.send({
+			type: "broadcast",
+			event: "hangup",
+			payload: {}
+		});
+		setTimeout(cleanup, 80);
+	}, [cleanup]);
+	const joinRoom = (0, import_react.useCallback)(async (info, isCaller) => {
+		const stream = await navigator.mediaDevices.getUserMedia({
+			audio: true,
+			video: info.kind === "video" ? { facingMode: "user" } : false
+		});
+		localRef.current = stream;
+		setLocalStream(stream);
+		const pc = new RTCPeerConnection({ iceServers: await getIceServers() });
+		pcRef.current = pc;
+		stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+		const remote = new MediaStream();
+		pc.ontrack = (e) => {
+			e.streams[0]?.getTracks().forEach((t) => {
+				if (!remote.getTracks().includes(t)) remote.addTrack(t);
+			});
+			setRemoteStream(new MediaStream(remote.getTracks()));
+		};
+		const markConnected = () => {
+			if (connTimer.current) clearTimeout(connTimer.current);
+			connTimer.current = null;
+			setPhaseBoth("connected");
+		};
+		const startConnTimer = () => {
+			if (connTimer.current) return;
+			connTimer.current = setTimeout(() => {
+				if (phaseRef.current !== "connected") {
+					showNotice("Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.");
+					endCall("ended");
+				}
+			}, 25e3);
+		};
+		pc.oniceconnectionstatechange = () => {
+			console.log("[call] ice:", pc.iceConnectionState);
+			if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") markConnected();
+		};
+		pc.onconnectionstatechange = () => {
+			console.log("[call] pc:", pc.connectionState);
+			if (pc.connectionState === "connected") markConnected();
+			if (pc.connectionState === "failed") {
+				showNotice("Η σύνδεση απέτυχε.");
+				endCall("ended");
+			}
+		};
+		const send = (event, payload = {}) => roomRef.current?.send({
+			type: "broadcast",
+			event,
+			payload
+		});
+		pc.onicecandidate = (e) => {
+			if (e.candidate) send("ice", { c: e.candidate.toJSON() });
+		};
+		const flushIce = async () => {
+			for (const c of pendingIce.current) await pc.addIceCandidate(c).catch(() => {});
+			pendingIce.current = [];
+		};
+		roomRef.current = await openChannel(`call:${info.id}`, (room) => {
+			room.on("broadcast", { event: "ready" }, async () => {
+				if (!isCaller) return;
+				console.log("[call] got ready");
+				if (ringTimer.current) clearTimeout(ringTimer.current);
+				ringTimer.current = null;
+				if (phaseRef.current === "ringing") setPhaseBoth("connecting");
+				startConnTimer();
+				if (pc.remoteDescription) return;
+				if (pc.localDescription) {
+					send("offer", { sdp: pc.localDescription });
+					return;
+				}
+				if (offeringRef.current) return;
+				offeringRef.current = true;
+				const offer = await pc.createOffer();
+				await pc.setLocalDescription(offer);
+				send("offer", { sdp: offer });
+			}).on("broadcast", { event: "offer" }, async ({ payload }) => {
+				if (pc.remoteDescription) return;
+				console.log("[call] got offer");
+				if (readyTimer.current) clearInterval(readyTimer.current);
+				readyTimer.current = null;
+				await pc.setRemoteDescription(payload.sdp);
+				await flushIce();
+				const answer = await pc.createAnswer();
+				await pc.setLocalDescription(answer);
+				send("answer", { sdp: answer });
+			}).on("broadcast", { event: "answer" }, async ({ payload }) => {
+				if (pc.remoteDescription) return;
+				console.log("[call] got answer");
+				await pc.setRemoteDescription(payload.sdp);
+				await flushIce();
+			}).on("broadcast", { event: "ice" }, async ({ payload }) => {
+				if (pc.remoteDescription) await pc.addIceCandidate(payload.c).catch(() => {});
+				else pendingIce.current.push(payload.c);
+			}).on("broadcast", { event: "hangup" }, () => cleanup()).on("broadcast", { event: "decline" }, () => cleanup());
+		});
+		return send;
+	}, [
+		cleanup,
+		endCall,
+		showNotice
+	]);
+	const mediaErrorText = (e) => {
+		const name = e?.name;
+		if (name === "NotAllowedError") return "Επίτρεψε μικρόφωνο/κάμερα στον browser.";
+		if (name === "NotFoundError") return "Δεν βρέθηκε μικρόφωνο/κάμερα.";
+		if (!window.isSecureContext) return "Οι κλήσεις θέλουν HTTPS.";
+		return "Η κλήση απέτυχε. Δοκίμασε ξανά.";
+	};
+	const startCall = (0, import_react.useCallback)(async (peer, conversationId, kind) => {
+		if (!profile || callRef.current) return;
+		const id = makeId();
+		const info = {
+			id,
+			conversationId,
+			kind,
+			peer,
+			direction: "out"
+		};
+		callRef.current = info;
+		setCall(info);
+		setPhaseBoth("ringing");
+		try {
+			const { error } = await supabase.from("call_logs").insert({
+				id,
+				conversation_id: conversationId,
+				caller_id: profile.id,
+				callee_id: peer.id,
+				kind
+			});
+			if (error) throw error;
+			await joinRoom(info, true);
+			ringTimer.current = setTimeout(() => {
+				if (phaseRef.current === "ringing") endCall("missed");
+			}, RING_TIMEOUT_MS);
+		} catch (e) {
+			console.error("startCall failed", e);
+			showNotice(mediaErrorText(e));
+			await supabase.from("call_logs").update({
+				status: "cancelled",
+				ended_at: (/* @__PURE__ */ new Date()).toISOString()
+			}).eq("id", id);
+			cleanup();
+		}
+	}, [
+		profile,
+		joinRoom,
+		endCall,
+		cleanup,
+		showNotice
+	]);
+	(0, import_react.useEffect)(() => {
+		if (!myId) return;
+		const showIncoming = async (row) => {
+			if (callRef.current) return;
+			if (row.status !== "ringing" || row.ended_at) return;
+			if (Date.now() - new Date(row.created_at).getTime() > 6e4) return;
+			let name = "Χρήστης";
+			let avatar = null;
+			try {
+				const { data } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", row.caller_id).maybeSingle();
+				if (data) {
+					name = data.full_name ?? name;
+					avatar = data.avatar_url ?? null;
+				}
+			} catch {}
+			if (callRef.current) return;
+			const info = {
+				id: row.id,
+				conversationId: row.conversation_id,
+				kind: row.kind,
+				peer: {
+					id: row.caller_id,
+					name,
+					avatar
+				},
+				direction: "in"
+			};
+			callRef.current = info;
+			setCall(info);
+			setPhaseBoth("ringing");
+			if (navigator.vibrate) navigator.vibrate([
+				300,
+				150,
+				300
+			]);
+		};
+		const ch = supabase.channel(`incoming-calls:${myId}`).on("postgres_changes", {
+			event: "INSERT",
+			schema: "public",
+			table: "call_logs",
+			filter: `callee_id=eq.${myId}`
+		}, (payload) => void showIncoming(payload.new)).subscribe();
+		(async () => {
+			const since = (/* @__PURE__ */ new Date(Date.now() - 45e3)).toISOString();
+			const { data } = await supabase.from("call_logs").select("*").eq("callee_id", myId).eq("status", "ringing").is("ended_at", null).gte("created_at", since).order("created_at", { ascending: false }).limit(1);
+			if (data?.[0]) showIncoming(data[0]);
+		})();
+		return () => {
+			supabase.removeChannel(ch);
+		};
+	}, [myId]);
+	const callId = call?.id;
+	(0, import_react.useEffect)(() => {
+		if (!callId) return;
+		const ch = supabase.channel(`call-status:${callId}`).on("postgres_changes", {
+			event: "UPDATE",
+			schema: "public",
+			table: "call_logs",
+			filter: `id=eq.${callId}`
+		}, (payload) => {
+			if (payload.new.ended_at && callRef.current?.id === callId) cleanup();
+		}).subscribe();
+		return () => {
+			supabase.removeChannel(ch);
+		};
+	}, [callId, cleanup]);
+	const accept = async () => {
+		const info = callRef.current;
+		if (!info) return;
+		setPhaseBoth("connecting");
+		try {
+			const send = await joinRoom(info, false);
+			await supabase.from("call_logs").update({
+				status: "answered",
+				answered_at: (/* @__PURE__ */ new Date()).toISOString()
+			}).eq("id", info.id);
+			let tries = 0;
+			const sendReady = () => {
+				console.log("[call] send ready");
+				send("ready");
+			};
+			sendReady();
+			readyTimer.current = setInterval(() => {
+				if (pcRef.current?.remoteDescription || ++tries > 25) {
+					if (readyTimer.current) clearInterval(readyTimer.current);
+					readyTimer.current = null;
+					return;
+				}
+				sendReady();
+			}, 1e3);
+			connTimer.current = setTimeout(() => {
+				if (phaseRef.current !== "connected") {
+					showNotice("Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.");
+					endCall("ended");
+				}
+			}, 25e3);
+		} catch (e) {
+			console.error("accept failed", e);
+			showNotice(mediaErrorText(e));
+			await endCall("ended");
+		}
+	};
+	const decline = async () => {
+		const info = callRef.current;
+		if (!info) return;
+		await supabase.from("call_logs").update({
+			status: "declined",
+			ended_at: (/* @__PURE__ */ new Date()).toISOString()
+		}).eq("id", info.id);
+		cleanup();
+	};
+	const toggleMute = () => {
+		const next = !muted;
+		localRef.current?.getAudioTracks().forEach((t) => t.enabled = !next);
+		setMuted(next);
+	};
+	const toggleCam = () => {
+		const next = !camOff;
+		localRef.current?.getVideoTracks().forEach((t) => t.enabled = !next);
+		setCamOff(next);
+	};
+	const value = (0, import_react.useMemo)(() => ({
+		busy: !!call,
+		startCall
+	}), [call, startCall]);
+	const incomingRinging = call?.direction === "in" && phase === "ringing";
+	const isVideo = call?.kind === "video";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Ctx.Provider, {
+		value,
+		children: [
+			children,
+			notice && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "fixed left-1/2 top-4 z-[120] -translate-x-1/2 rounded-full bg-red-500/90 px-4 py-2 text-sm text-white shadow-lg",
+				children: notice
+			}),
+			call && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "fixed inset-0 z-[100] flex flex-col bg-[#070707] text-white",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+						ref: remoteVideoRef,
+						autoPlay: true,
+						playsInline: true,
+						className: `absolute inset-0 h-full w-full object-cover ${isVideo && phase === "connected" ? "" : "invisible"}`
+					}),
+					(!isVideo || phase !== "connected") && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-6",
+						children: [
+							call.peer.avatar ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: call.peer.avatar,
+								alt: "",
+								className: "h-28 w-28 rounded-full object-cover ring-1 ring-white/20"
+							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "flex h-28 w-28 items-center justify-center rounded-full bg-white/10 text-3xl font-semibold",
+								children: call.peer.name.charAt(0).toUpperCase()
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-xl font-medium",
+								children: call.peer.name
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-sm text-white/50",
+								children: phase === "connected" ? formatDuration(seconds) : phase === "connecting" ? "Σύνδεση…" : incomingRinging ? isVideo ? "Εισερχόμενη βιντεοκλήση" : "Εισερχόμενη κλήση" : "Καλεί…"
+							})
+						]
+					}),
+					isVideo && phase === "connected" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "absolute left-0 right-0 top-6 z-10 text-center text-sm text-white/80 [text-shadow:0_1px_4px_rgba(0,0,0,.6)]",
+						children: [
+							call.peer.name,
+							" · ",
+							formatDuration(seconds)
+						]
+					}),
+					isVideo && localStream && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+						ref: localVideoRef,
+						autoPlay: true,
+						playsInline: true,
+						muted: true,
+						className: "absolute right-4 top-4 z-20 h-36 w-24 -scale-x-100 rounded-xl bg-black object-cover ring-1 ring-white/20"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "relative z-10 flex items-center justify-center gap-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6",
+						children: incomingRinging ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: decline,
+							"aria-label": "Απόρριψη",
+							className: "flex h-16 w-16 items-center justify-center rounded-full bg-red-500",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PhoneOff, { size: 26 })
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: accept,
+							"aria-label": "Απάντηση",
+							className: "flex h-16 w-16 items-center justify-center rounded-full bg-green-500",
+							children: isVideo ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Video, { size: 26 }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Phone, { size: 26 })
+						})] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								onClick: toggleMute,
+								"aria-label": "Σίγαση",
+								className: `flex h-14 w-14 items-center justify-center rounded-full ${muted ? "bg-white text-black" : "bg-white/15"}`,
+								children: muted ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MicOff, { size: 22 }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Mic, { size: 22 })
+							}),
+							isVideo && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								onClick: toggleCam,
+								"aria-label": "Κάμερα",
+								className: `flex h-14 w-14 items-center justify-center rounded-full ${camOff ? "bg-white text-black" : "bg-white/15"}`,
+								children: camOff ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VideoOff, { size: 22 }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Video, { size: 22 })
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								onClick: () => endCall("ended"),
+								"aria-label": "Τερματισμός",
+								className: "flex h-16 w-16 items-center justify-center rounded-full bg-red-500",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(PhoneOff, { size: 26 })
+							})
+						] })
+					})
+				]
+			})
+		]
+	});
+}
+var $$splitComponentImporter = () => import("./messages-CL4iEbbx.mjs");
+var Route = createFileRoute("/messages")({
+	component: lazyRouteComponent($$splitComponentImporter, "component"),
+	validateSearch: (search) => ({ with: typeof search.with === "string" ? search.with : void 0 })
+});
+//#endregion
+export { useCall as a, getCallLogs as i, Route as n, describeCall as r, CallProvider as t };
+
+=== END FILE ===
+
+=== FILE: README.md ===
+# Aura Lumina
+
+# AURA BRAND VISUAL IDENTITY — CRITICAL
+
+The uploaded AURA logo is the definitive source of truth for the visual identity.
+
+DO NOT introduce unrelated accent colors.
+
+The entire website and application must derive its visual language from the logo:
+
+BLACK + CHROME + SILVER + WHITE.
+
+The logo has a futuristic luxury-metal aesthetic:
+
+- deep black background
+
+- polished chrome
+
+- metallic silver
+
+- bright white highlights
+
+- dark gunmetal shadows
+
+- reflective surfaces
+
+- high contrast
+
+- sophisticated monochrome palette
+
+The website must feel like the digital extension of this exact logo.
+
+==================================================
+
+COLOR SYSTEM
+
+==================================================
+
+PRIMARY BACKGROUND
+
+#050505
+
+Near-black / obsidian.
+
+SECONDARY BACKGROUND
+
+#0A0A0A
+
+SURFACE
+
+#111111
+
+ELEVATED SURFACE
+
+#171717
+
+DARK GUNMETAL
+
+#222222
+
+BORDER
+
+rgba(255,255,255,0.10)
+
+SUBTLE BORDER
+
+rgba(255,255,255,0.06)
+
+PRIMARY TEXT
+
+#F5F5F5
+
+SECONDARY TEXT
+
+#A8A8A8
+
+MUTED TEXT
+
+#6F6F6F
+
+CHROME LIGHT
+
+#F2F2F2
+
+CHROME MID
+
+#BFC0C2
+
+CHROME DARK
+
+#6E7073
+
+WHITE HIGHLIGHT
+
+#FFFFFF
+
+There should be NO green, purple, orange, red, blue or gold as a brand accent.
+
+The interface should be essentially monochromatic.
+
+==================================================
+
+CHROME / METALLIC DESIGN LANGUAGE
+
+==================================================
+
+The most distinctive visual element of AURA should be its metallic chrome language.
+
+Use metallic gradients carefully on:
+
+- logo treatments
+
+- major headings
+
+- selected icons
+
+- premium CTA buttons
+
+- progress indicators
+
+- verified skill states
+
+- certification visuals
+
+- decorative lines
+
+- selected UI highlights
+
+Chrome should NOT be used everywhere.
+
+It should feel rare and premium.
+
+Create subtle metallic gradients using grayscale tones:
+
+bright silver → white → mid silver → gunmetal → dark silver
+
+Avoid fake-looking rainbow metallic gradients.
+
+The effect should resemble polished brushed chrome.
+
+==================================================
+
+TYPOGRAPHY
+
+==================================================
+
+Use a premium modern grotesk for UI:
+
+Geist
+
+Inter
+
+Satoshi
+
+or Manrope
+
+For major editorial headlines, consider a sophisticated high-contrast serif or elegant display font only where appropriate.
+
+The combination should feel like:
+
+LUXURY FASHION
+
++
+
+FUTURISTIC TECHNOLOGY
+
++
+
+PRECISION CRAFT
+
+Large headlines should be extremely confident.
+
+Examples:
+
+AURA
+
+THE OPERATING SYSTEM
+
+FOR THE MODERN BARBER.
+
+LEARN.
+
+PRACTICE.
+
+PROVE.
+
+MASTER THE CRAFT.
+
+Do not make the typography playful or overly rounded.
+
+==================================================
+
+BACKGROUND
+
+==================================================
+
+The website background should be predominantly black.
+
+However, avoid making it look flat.
+
+Use extremely subtle layers:
+
+- black-to-charcoal gradients
+
+- radial light
+
+- soft silver atmospheric glow
+
+- subtle film grain
+
+- very subtle noise
+
+- blurred chrome reflections
+
+- soft light falloff
+
+These effects should be almost invisible until the user notices them.
+
+The visual philosophy is:
+
+BLACK SPACE + LIGHT + CHROME.
+
+==================================================
+
+HERO VISUAL
+
+==================================================
+
+The homepage hero should be cinematic.
+
+Use the AURA logo prominently but elegantly.
+
+Do NOT simply place the logo as a static image.
+
+Create a premium entrance animation:
+
+1. Black screen.
+
+2. Very subtle ambient light appears.
+
+3. Chrome reflections slowly move across the screen.
+
+4. The AURA emblem emerges from darkness.
+
+5. Metallic highlights travel across the emblem.
+
+6. The AURA wordmark fades/reveals underneath.
+
+7. The headline appears with a subtle stagger.
+
+8. CTA buttons appear last.
+
+The animation should be slow, elegant and cinematic.
+
+Think:
+
+LUXURY AUTOMOTIVE COMMERCIAL
+
++
+
+HIGH-END WATCH BRAND
+
++
+
+FUTURISTIC TECHNOLOGY
+
+Not a gaming website.
+
+==================================================
+
+CHROME LIGHTING
+
+==================================================
+
+Use dynamic lighting effects around selected chrome elements.
+
+For example:
+
+A thin silver line can have a moving highlight passing across it.
+
+Buttons can have a subtle reflective sweep on hover.
+
+The logo can have a slow metallic light sweep.
+
+Cards can reveal a soft radial spotlight when hovered.
+
+Keep these effects extremely subtle.
+
+==================================================
+
+HOVER SYSTEM
+
+==================================================
+
+Every important interactive element should have a sophisticated hover state.
+
+BUTTONS:
+
+Default:
+
+dark surface + thin silver border.
+
+Hover:
+
+slightly brighter chrome border,
+
+subtle silver glow,
+
+1-2px upward movement,
+
+soft reflective highlight.
+
+ACTIVE:
+
+bright silver accent line.
+
+CARDS:
+
+Default:
+
+dark black surface.
+
+Hover:
+
+translateY(-4px),
+
+slightly brighter border,
+
+subtle radial chrome illumination,
+
+image scale 1.02-1.04.
+
+Do NOT use colorful hover effects.
+
+==================================================
+
+PARALLAX
+
+==================================================
+
+Use elegant parallax throughout the marketing website.
+
+Hero:
+
+- logo moves at one speed
+
+- typography moves at another
+
+- background atmosphere moves slower
+
+- cinematic image has depth
+
+Method section:
+
+Each step can exist on a different visual depth layer.
+
+Case studies:
+
+Images move subtly against the surrounding frame.
+
+Large typography can move slightly during scroll.
+
+Use Framer Motion and transform-based animations.
+
+Keep motion smooth and premium.
+
+Respect prefers-reduced-motion.
+
+==================================================
+
+SIGNATURE AURA EFFECT
+
+==================================================
+
+Create a subtle visual effect that becomes recognizable as the AURA brand.
+
+Think of a very soft:
+
+CHROME LIGHT FIELD
+
+A small area of the interface can respond to cursor movement with a subtle grayscale radial glow.
+
+Example:
+
+As the cursor moves over a card:
+
+a soft circular silver/white light follows the pointer.
+
+It should be barely visible.
+
+This should NOT look like a gaming RGB effect.
+
+It should feel like reflected light on polished metal.
+
+==================================================
+
+LOGO USAGE
+
+==================================================
+
+The uploaded logo is the primary brand asset.
+
+Use the exact logo without redesigning it.
+
+Do not distort it.
+
+Do not recolor it into green, gold, blue or purple.
+
+Keep the chrome/silver appearance.
+
+Use it:
+
+- navbar
+
+- hero
+
+- login
+
+- loading screen
+
+- authentication
+
+- certification
+
+- footer
+
+- favicon where appropriate
+
+The logo should be especially prominent during the initial website loading experience.
+
+==================================================
+
+LOADING EXPERIENCE
+
+==================================================
+
+Create an exceptionally beautiful AURA loading sequence.
+
+Black background.
+
+Centered chrome AURA emblem.
+
+The emblem begins almost invisible.
+
+A subtle light passes over the chrome surface.
+
+The emblem gradually becomes visible.
+
+A thin silver circular line can slowly draw around it.
+
+Then:
+
+AURA
+
+appears below.
+
+After the loading sequence:
+
+the logo subtly scales down and transitions into the navbar.
+
+The transition into the homepage should feel seamless.
+
+Avoid generic spinners.
+
+==================================================
+
+NAVIGATION
+
+==================================================
+
+Navbar:
+
+black / transparent.
+
+Initially overlay the hero.
+
+On scroll:
+
+background becomes slightly darker,
+
+subtle blur,
+
+thin silver border.
+
+Logo on the left.
+
+Navigation centered/right.
+
+CTA:
+
+START LEARNING
+
+CTA should use black + silver/chrome only.
+
+==================================================
+
+CTA DESIGN
+
+==================================================
+
+Primary CTA:
+
+dark black background
+
+chrome/silver border
+
+white text
+
+On hover:
+
+subtle metallic highlight sweeps across the button.
+
+Secondary CTA:
+
+transparent
+
+white/silver text
+
+minimal border.
+
+Avoid bright filled colors.
+
+==================================================
+
+PROGRESS UI
+
+==================================================
+
+Progress should use grayscale/chrome.
+
+Example:
+
+0%:
+
+dark gunmetal
+
+50%:
+
+silver
+
+100%:
+
+bright chrome/white
+
+Verified:
+
+silver-white glow.
+
+Do not use green for successful/verified states.
+
+Instead use a refined silver/chrome success state.
+
+Errors and warnings can still use conventional semantic colors when necessary, but brand UI must remain monochromatic.
+
+==================================================
+
+SKILL TREE
+
+==================================================
+
+The Skill Tree should be one of the visual signatures of the application.
+
+Black background.
+
+Thin metallic silver connections.
+
+Nodes use dark gunmetal surfaces.
+
+Active nodes:
+
+silver border.
+
+Verified nodes:
+
+bright chrome ring + subtle glow.
+
+Locked nodes:
+
+dark gray.
+
+When a skill becomes verified:
+
+animate the connection line,
+
+then illuminate the node,
+
+then reveal the VERIFIED state.
+
+Make it feel like a sophisticated professional competency map.
+
+NOT like a video game skill tree.
+
+==================================================
+
+CERTIFICATION
+
+==================================================
+
+Certification should feel extremely prestigious.
+
+Use:
+
+black
+
+chrome
+
+silver
+
+white
+
+Create a certificate interface inspired by:
+
+luxury credentials
+
+premium watch certificates
+
+automotive certification
+
+high-end fashion houses
+
+Use subtle metallic borders and embossed-style effects.
+
+A certificate verification ID should look highly official.
+
+==================================================
+
+IMAGERY
+
+==================================================
+
+Photography should match the brand:
+
+high contrast
+
+dramatic shadows
+
+black backgrounds
+
+directional lighting
+
+close-up details
+
+hair texture
+
+hands
+
+tools
+
+precision
+
+craftsmanship
+
+Avoid generic smiling classroom stock photography.
+
+Avoid colorful barber-shop imagery.
+
+Use cinematic monochrome or desaturated imagery whenever possible.
+
+If color photography is used, keep it dark and restrained.
+
+==================================================
+
+OVERALL EXPERIENCE
+
+==================================================
+
+The final website must feel like:
+
+A LUXURY BARBER ACADEMY
+
++
+
+A FUTURISTIC PROFESSIONAL PLATFORM
+
++
+
+A PREMIUM TECHNOLOGY PRODUCT.
+
+It should NOT feel like:
+
+a traditional barber school,
+
+a generic LMS,
+
+a generic SaaS dashboard,
+
+or a template website.
+
+The AURA identity should be immediately recognizable from:
+
+BLACK
+
+CHROME
+
+SILVER
+
+WHITE
+
+LIGHT
+
+DEPTH
+
+PRECISION
+
+MOTION
+
+The strongest visual rule:
+
+WHEN IN DOUBT, REMOVE ELEMENTS.
+
+AURA should feel expensive because it is restrained.
+
+Minimalism is more important than decoration.
+
+This project was built with [Lovable](https://lovable.dev).
+
+## Build with Lovable
+
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/5150717a-5e25-4e4d-80e5-cb3fa4c562f6).
+
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+
+## Development
+
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
+```
+
+=== END FILE ===
+

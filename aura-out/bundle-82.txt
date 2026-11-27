@@ -1,0 +1,1636 @@
+=== FILE: src/components/ui/calendar.tsx ===
+"use client";
+
+import * as React from "react";
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
+
+import { cn } from "@/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
+
+function Calendar({
+  className,
+  classNames,
+  showOutsideDays = true,
+  captionLayout = "label",
+  buttonVariant = "ghost",
+  formatters,
+  components,
+  ...props
+}: React.ComponentProps<typeof DayPicker> & {
+  buttonVariant?: React.ComponentProps<typeof Button>["variant"];
+}) {
+  const defaultClassNames = getDefaultClassNames();
+
+  return (
+    <DayPicker
+      showOutsideDays={showOutsideDays}
+      className={cn(
+        "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
+        String.raw`rtl:**:[.rdp-button\_next>svg]:rotate-180`,
+        String.raw`rtl:**:[.rdp-button\_previous>svg]:rotate-180`,
+        className,
+      )}
+      captionLayout={captionLayout}
+      formatters={{
+        formatMonthDropdown: (date) => date.toLocaleString("default", { month: "short" }),
+        ...formatters,
+      }}
+      classNames={{
+        root: cn("w-fit", defaultClassNames.root),
+        months: cn("relative flex flex-col gap-4 md:flex-row", defaultClassNames.months),
+        month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
+        nav: cn(
+          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          defaultClassNames.nav,
+        ),
+        button_previous: cn(
+          buttonVariants({ variant: buttonVariant }),
+          "h-(--cell-size) w-(--cell-size) select-none p-0 aria-disabled:opacity-50",
+          defaultClassNames.button_previous,
+        ),
+        button_next: cn(
+          buttonVariants({ variant: buttonVariant }),
+          "h-(--cell-size) w-(--cell-size) select-none p-0 aria-disabled:opacity-50",
+          defaultClassNames.button_next,
+        ),
+        month_caption: cn(
+          "flex h-(--cell-size) w-full items-center justify-center px-(--cell-size)",
+          defaultClassNames.month_caption,
+        ),
+        dropdowns: cn(
+          "flex h-(--cell-size) w-full items-center justify-center gap-1.5 text-sm font-medium",
+          defaultClassNames.dropdowns,
+        ),
+        dropdown_root: cn(
+          "has-focus:border-ring border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] relative rounded-md border",
+          defaultClassNames.dropdown_root,
+        ),
+        dropdown: cn("bg-popover absolute inset-0 opacity-0", defaultClassNames.dropdown),
+        caption_label: cn(
+          "select-none font-medium",
+          captionLayout === "label"
+            ? "text-sm"
+            : "[&>svg]:text-muted-foreground flex h-8 items-center gap-1 rounded-md pl-2 pr-1 text-sm [&>svg]:size-3.5",
+          defaultClassNames.caption_label,
+        ),
+        table: "w-full border-collapse",
+        weekdays: cn("flex", defaultClassNames.weekdays),
+        weekday: cn(
+          "text-muted-foreground flex-1 select-none rounded-md text-[0.8rem] font-normal",
+          defaultClassNames.weekday,
+        ),
+        week: cn("mt-2 flex w-full", defaultClassNames.week),
+        week_number_header: cn("w-(--cell-size) select-none", defaultClassNames.week_number_header),
+        week_number: cn(
+          "text-muted-foreground select-none text-[0.8rem]",
+          defaultClassNames.week_number,
+        ),
+        day: cn(
+          "group/day relative aspect-square h-full w-full select-none p-0 text-center [&:first-child[data-selected=true]_button]:rounded-l-md [&:last-child[data-selected=true]_button]:rounded-r-md",
+          defaultClassNames.day,
+        ),
+        range_start: cn("bg-accent rounded-l-md", defaultClassNames.range_start),
+        range_middle: cn("rounded-none", defaultClassNames.range_middle),
+        range_end: cn("bg-accent rounded-r-md", defaultClassNames.range_end),
+        today: cn(
+          "bg-accent text-accent-foreground rounded-md data-[selected=true]:rounded-none",
+          defaultClassNames.today,
+        ),
+        outside: cn(
+          "text-muted-foreground aria-selected:text-muted-foreground",
+          defaultClassNames.outside,
+        ),
+        disabled: cn("text-muted-foreground opacity-50", defaultClassNames.disabled),
+        hidden: cn("invisible", defaultClassNames.hidden),
+        ...classNames,
+      }}
+      components={{
+        Root: ({ className, rootRef, ...props }) => {
+          return <div data-slot="calendar" ref={rootRef} className={cn(className)} {...props} />;
+        },
+        Chevron: ({ className, orientation, ...props }) => {
+          if (orientation === "left") {
+            return <ChevronLeftIcon className={cn("size-4", className)} {...props} />;
+          }
+
+          if (orientation === "right") {
+            return <ChevronRightIcon className={cn("size-4", className)} {...props} />;
+          }
+
+          return <ChevronDownIcon className={cn("size-4", className)} {...props} />;
+        },
+        DayButton: CalendarDayButton,
+        WeekNumber: ({ children, ...props }) => {
+          return (
+            <td {...props}>
+              <div className="flex size-(--cell-size) items-center justify-center text-center">
+                {children}
+              </div>
+            </td>
+          );
+        },
+        ...components,
+      }}
+      {...props}
+    />
+  );
+}
+
+function CalendarDayButton({
+  className,
+  day,
+  modifiers,
+  ...props
+}: React.ComponentProps<typeof DayButton>) {
+  const defaultClassNames = getDefaultClassNames();
+
+  const ref = React.useRef<HTMLButtonElement>(null);
+  React.useEffect(() => {
+    if (modifiers["focused"]) ref.current?.focus();
+  }, [modifiers]);
+
+  return (
+    <Button
+      ref={ref}
+      variant="ghost"
+      size="icon"
+      data-day={day.date.toLocaleDateString()}
+      data-selected-single={
+        modifiers["selected"] &&
+        !modifiers["range_start"] &&
+        !modifiers["range_end"] &&
+        !modifiers["range_middle"]
+      }
+      data-range-start={modifiers["range_start"]}
+      data-range-end={modifiers["range_end"]}
+      data-range-middle={modifiers["range_middle"]}
+      className={cn(
+        "data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground data-[range-middle=true]:bg-accent data-[range-middle=true]:text-accent-foreground data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground group-data-[focused=true]/day:border-ring group-data-[focused=true]/day:ring-ring/50 flex aspect-square h-auto w-full min-w-(--cell-size) flex-col gap-1 font-normal leading-none data-[range-end=true]:rounded-md data-[range-middle=true]:rounded-none data-[range-start=true]:rounded-md group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 group-data-[focused=true]/day:ring-[3px] [&>span]:text-xs [&>span]:opacity-70",
+        defaultClassNames.day,
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export { Calendar, CalendarDayButton };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/scroll-area.tsx ===
+import * as React from "react";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
+
+import { cn } from "@/lib/utils";
+
+const ScrollArea = React.forwardRef<
+  React.ElementRef<typeof ScrollAreaPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
+  <ScrollAreaPrimitive.Root
+    ref={ref}
+    className={cn("relative overflow-hidden", className)}
+    {...props}
+  >
+    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">
+      {children}
+    </ScrollAreaPrimitive.Viewport>
+    <ScrollBar />
+    <ScrollAreaPrimitive.Corner />
+  </ScrollAreaPrimitive.Root>
+));
+ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName;
+
+const ScrollBar = React.forwardRef<
+  React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
+>(({ className, orientation = "vertical", ...props }, ref) => (
+  <ScrollAreaPrimitive.ScrollAreaScrollbar
+    ref={ref}
+    orientation={orientation}
+    className={cn(
+      "flex touch-none select-none transition-colors",
+      orientation === "vertical" && "h-full w-2.5 border-l border-l-transparent p-[1px]",
+      orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent p-[1px]",
+      className,
+    )}
+    {...props}
+  >
+    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+  </ScrollAreaPrimitive.ScrollAreaScrollbar>
+));
+ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
+
+export { ScrollArea, ScrollBar };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/table.tsx ===
+import * as React from "react";
+
+import { cn } from "@/lib/utils";
+
+const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
+  ({ className, ...props }, ref) => (
+    <div className="relative w-full overflow-auto">
+      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
+    </div>
+  ),
+);
+Table.displayName = "Table";
+
+const TableHeader = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+));
+TableHeader.displayName = "TableHeader";
+
+const TableBody = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tbody ref={ref} className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+));
+TableBody.displayName = "TableBody";
+
+const TableFooter = React.forwardRef<
+  HTMLTableSectionElement,
+  React.HTMLAttributes<HTMLTableSectionElement>
+>(({ className, ...props }, ref) => (
+  <tfoot
+    ref={ref}
+    className={cn("border-t bg-muted/50 font-medium [&>tr]:last:border-b-0", className)}
+    {...props}
+  />
+));
+TableFooter.displayName = "TableFooter";
+
+const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTMLTableRowElement>>(
+  ({ className, ...props }, ref) => (
+    <tr
+      ref={ref}
+      className={cn(
+        "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+TableRow.displayName = "TableRow";
+
+const TableHead = React.forwardRef<
+  HTMLTableCellElement,
+  React.ThHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <th
+    ref={ref}
+    className={cn(
+      "h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      className,
+    )}
+    {...props}
+  />
+));
+TableHead.displayName = "TableHead";
+
+const TableCell = React.forwardRef<
+  HTMLTableCellElement,
+  React.TdHTMLAttributes<HTMLTableCellElement>
+>(({ className, ...props }, ref) => (
+  <td
+    ref={ref}
+    className={cn(
+      "p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+      className,
+    )}
+    {...props}
+  />
+));
+TableCell.displayName = "TableCell";
+
+const TableCaption = React.forwardRef<
+  HTMLTableCaptionElement,
+  React.HTMLAttributes<HTMLTableCaptionElement>
+>(({ className, ...props }, ref) => (
+  <caption ref={ref} className={cn("mt-4 text-sm text-muted-foreground", className)} {...props} />
+));
+TableCaption.displayName = "TableCaption";
+
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };
+
+=== END FILE ===
+
+=== FILE: src/lib/changePlan.ts ===
+// src/lib/changePlan.ts
+import { supabase } from "@/lib/supabase";
+import type { PlanId } from "@/lib/plans";
+
+export const PLAN_RANK: Record<PlanId, number> = { low: 1, mid: 2, high: 3 };
+
+/**
+ * What a pricing card should show for the signed-in user:
+ *  - none:    no active subscription -> normal "subscribe" button
+ *  - current: this is the user's plan  -> "Έχεις πρόσβαση"
+ *  - upgrade: a higher plan            -> "Αναβάθμιση"
+ *  - lower:   a plan below the user's  -> already included, no button
+ */
+export type PlanCardState = "none" | "current" | "upgrade" | "lower";
+
+export function getPlanCardState(
+  currentPlanId: PlanId | null | undefined,
+  cardPlanId: PlanId,
+): PlanCardState {
+  if (!currentPlanId) return "none";
+  if (cardPlanId === currentPlanId) return "current";
+  return PLAN_RANK[cardPlanId] > PLAN_RANK[currentPlanId] ? "upgrade" : "lower";
+}
+
+export interface CardInfo {
+  brand: string;
+  last4: string;
+}
+
+export interface UpgradePreview {
+  currentPlanId: PlanId;
+  targetPlanId: PlanId;
+  currentPlanName: string;
+  targetPlanName: string;
+  currency: string;
+  /** What the customer pays per month right now. */
+  currentAmountCents: number;
+  /** Full monthly price of the new plan (charged from the next renewal on). */
+  newAmountCents: number;
+  /** Length of the current billing period in days (e.g. 31). */
+  periodDays: number;
+  /** Days left in the current billing period (a started day counts). */
+  remainingDays: number;
+  /** Deducted for unused days of the old plan (0 unless the server enables it). */
+  creditCents: number;
+  /** What is charged today: new price x remainingDays / periodDays. */
+  dueTodayCents: number;
+  /** ISO date of the next renewal. It does NOT change when upgrading. */
+  renewalDate: string;
+  /** The saved card that will be charged, if Stripe could tell us. */
+  card: CardInfo | null;
+}
+
+export interface UpgradeResult {
+  ok: true;
+  planId: PlanId;
+  chargedCents: number | null;
+  nextRenewal: string | null;
+  card: CardInfo | null;
+  invoiceUrl: string | null;
+  invoiceNumber: string | null;
+}
+
+async function callChangePlan<T>(body: { planId: PlanId; preview?: boolean }): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T & { error?: string }>("change-plan", {
+    body,
+  });
+
+  if (error) {
+    // FunctionsHttpError keeps the original Response in `context`.
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) throw new Error(payload.error);
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message) throw parseErr;
+      }
+    }
+    throw new Error(error.message || "Η αναβάθμιση δεν μπόρεσε να ολοκληρωθεί.");
+  }
+
+  const payload = data as (T & { error?: string }) | null;
+  if (!payload) throw new Error("Κενή απάντηση από τον server.");
+  if (payload.error) throw new Error(payload.error);
+  return payload;
+}
+
+/** Numbers only, nothing is charged or changed. */
+export function previewUpgrade(planId: PlanId): Promise<UpgradePreview> {
+  return callChangePlan<UpgradePreview>({ planId, preview: true });
+}
+
+/** Charges the difference and switches the plan. */
+export function upgradePlan(planId: PlanId): Promise<UpgradeResult> {
+  return callChangePlan<UpgradeResult>({ planId });
+}
+=== END FILE ===
+
+=== FILE: src/lib/jobs.ts ===
+// src/lib/jobs.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+
+// job_listings is not in the generated types, so use an untyped client.
+export const sb = db as unknown as SupabaseClient;
+
+export const LOGO_BUCKET = "job-logos";
+export const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+export const LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+export const LEVELS = ["Junior", "Mid", "Senior"] as const;
+export const EMPLOYMENT_TYPES = ["Full-time", "Part-time", "Seasonal"] as const;
+
+export interface JobListing {
+  id: string;
+  shop_name: string;
+  title: string;
+  address: string;
+  city: string;
+  salary: string;
+  experience: string | null;
+  level: string | null;
+  employment_type: string | null;
+  phone: string | null;
+  email: string;
+  website: string | null;
+  instagram: string | null;
+  maps_url: string | null;
+  description: string;
+  logo_path: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export function uid(): string {
+  const c: Crypto | undefined = typeof crypto !== "undefined" ? crypto : undefined;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function errText(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "message" in e && typeof (e as { message: unknown }).message === "string") {
+    return (e as { message: string }).message;
+  }
+  return fallback;
+}
+
+export function logoUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  const { data } = sb.storage.from(LOGO_BUCKET).getPublicUrl(path);
+  return data?.publicUrl ?? null;
+}
+
+/** Only allow real web links (blocks javascript: and friends). */
+export function safeUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.trim();
+  if (!v) return null;
+  const withProto = /^https?:\/\//i.test(v) ? v : `https://${v}`;
+  try {
+    const u = new URL(withProto);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function instagramUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const v = raw.trim();
+  if (!v) return null;
+  if (/^https?:\/\//i.test(v)) return safeUrl(v);
+  const handle = v.replace(/^@/, "").replace(/[^a-zA-Z0-9._]/g, "");
+  return handle ? `https://instagram.com/${handle}` : null;
+}
+
+export function mapsLink(job: Pick<JobListing, "maps_url" | "address" | "city">): string {
+  return (
+    safeUrl(job.maps_url) ??
+    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${job.address}, ${job.city}`)}`
+  );
+}
+
+export function isNew(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() < 7 * 24 * 60 * 60 * 1000;
+}
+
+export function telHref(phone: string): string {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+/** Opens the student's mail app with a ready-to-send application to the barbershop. */
+export function applyMailto(job: JobListing, applicant: { name: string; email: string }): string {
+  const subject = `Αίτηση για τη θέση ${job.title} – ${applicant.name}`;
+  const body = [
+    "Καλησπέρα σας,",
+    "",
+    `Ονομάζομαι ${applicant.name} και ενδιαφέρομαι για τη θέση «${job.title}» στο ${job.shop_name} (${job.city}), την οποία είδα μέσω του AURA Academy.`,
+    "",
+    "Θα χαρώ να σας γνωρίσω και να σας στείλω βιογραφικό / portfolio με δουλειές μου.",
+    "",
+    "Στοιχεία επικοινωνίας:",
+    `Ονοματεπώνυμο: ${applicant.name}`,
+    `Email: ${applicant.email}`,
+    "",
+    "Ευχαριστώ πολύ,",
+    applicant.name,
+  ].join("\n");
+  return `mailto:${job.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+=== END FILE ===
+
+=== FILE: src/lib/usePlans.ts ===
+// src/lib/usePlans.ts
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+import {
+  formatEuro,
+  getLivePlans,
+  isPlanId,
+  setLivePlans,
+  subscribePlans,
+  type AuraPlan,
+} from "@/lib/plans";
+
+// `plans` is not in the generated types, so use an untyped client.
+const sb = db as unknown as SupabaseClient;
+
+interface PlanRowDb {
+  id: string;
+  name: string;
+  slogan: string | null;
+  tagline: string | null;
+  badge: string | null;
+  price_cents: number;
+  currency: string | null;
+  features: unknown;
+  highlight: boolean;
+  sort_order: number;
+}
+
+export function rowToPlan(row: PlanRowDb): AuraPlan | null {
+  if (!isPlanId(row.id)) return null;
+  const features = Array.isArray(row.features)
+    ? row.features.filter((f): f is string => typeof f === "string" && f.trim().length > 0)
+    : [];
+  return {
+    id: row.id,
+    name: row.name,
+    slogan: row.slogan ?? "",
+    tagline: row.tagline ?? "",
+    badge: row.badge?.trim() ? row.badge : undefined,
+    priceLabel: formatEuro(row.price_cents),
+    amountCents: row.price_cents,
+    currency: "eur",
+    interval: "month",
+    features,
+    highlight: row.highlight,
+  };
+}
+
+let loaded = false;
+let inflight: Promise<void> | null = null;
+
+async function fetchPlans(): Promise<void> {
+  const { data, error } = await sb
+    .from("plans")
+    .select("id, name, slogan, tagline, badge, price_cents, currency, features, highlight, sort_order")
+    .eq("active", true)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  const plans = ((data ?? []) as PlanRowDb[])
+    .map(rowToPlan)
+    .filter((p): p is AuraPlan => p !== null);
+
+  // An empty table must never leave the site without plans: keep the defaults.
+  if (plans.length > 0) setLivePlans(plans);
+}
+
+/** Call after an admin saves, so public pages re-fetch the new prices. */
+export function invalidatePlans(): void {
+  loaded = false;
+  inflight = null;
+  setLivePlans(null);
+}
+
+/**
+ * The plans to show. Defaults first, replaced by the admin-edited ones as soon
+ * as the database answers. `loading` is true until the first answer, so pricing
+ * and checkout can avoid flashing a stale price.
+ */
+export function usePlans(): {
+  plans: AuraPlan[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+} {
+  const plans = useSyncExternalStore(subscribePlans, getLivePlans, getLivePlans);
+  const [loading, setLoading] = useState(!loaded);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      inflight = inflight ?? fetchPlans();
+      await inflight;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load plans.");
+    } finally {
+      inflight = null;
+      loaded = true;
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) void refresh();
+  }, [refresh]);
+
+  return { plans, loading, error, refresh };
+}
+=== END FILE ===
+
+=== FILE: src/lib/usePresence.ts ===
+// src/lib/usePresence.ts
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import type { Profile } from "@/lib/database.types";
+
+export interface PresenceUser {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: string;
+}
+
+const CHANNEL_NAME = "academy-online-users";
+
+/**
+ * Δείχνει ποιοι είναι online ΤΩΡΑ, μέσω Supabase Realtime Presence.
+ * Δεν γράφει τίποτα στη βάση — μηδενικό storage cost, καθαρίζεται
+ * αυτόματα μόλις κάποιος κλείσει το tab / αποσυνδεθεί.
+ */
+export function useOnlinePresence(
+  me: Pick<Profile, "id" | "full_name" | "avatar_url" | "role"> | null,
+): PresenceUser[] {
+  const [users, setUsers] = useState<PresenceUser[]>([]);
+
+  useEffect(() => {
+    if (!me) {
+      setUsers([]);
+      return;
+    }
+
+    const channel = supabase.channel(CHANNEL_NAME, {
+      config: { presence: { key: me.id } },
+    });
+
+    channel.on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState<PresenceUser>();
+      const flat = Object.values(state)
+        .map((presences) => presences[0])
+        .filter(Boolean) as unknown as PresenceUser[];
+      setUsers(flat);
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await channel.track({
+          id: me.id,
+          full_name: me.full_name,
+          avatar_url: me.avatar_url,
+          role: me.role,
+        });
+      }
+    });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id, me?.full_name, me?.avatar_url, me?.role]);
+
+  return users;
+}
+=== END FILE ===
+
+=== FILE: src/routes/verify.$id.tsx ===
+// src/routes/verify.$id.tsx
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import AuraMark from "@/components/aura/AuraMark";
+import ChromeButton from "@/components/aura/ChromeButton";
+import ChromeCursor from "@/components/aura/ChromeCursor";
+import { db, type VerifiedCertificate } from "@/lib/db";
+
+export const Route = createFileRoute("/verify/$id")({
+  component: VerifyPage,
+});
+
+// A well-formed AURA id looks like AURA-XXXX-XXXX-XXXX.
+const ID_PATTERN = /^AURA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
+type Status = "loading" | "valid" | "invalid";
+
+function VerifyPage() {
+  const { id } = Route.useParams();
+  const [status, setStatus] = useState<Status>("loading");
+  const [cert, setCert] = useState<VerifiedCertificate | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function run() {
+      if (!ID_PATTERN.test(id)) {
+        if (active) setStatus("invalid");
+        return;
+      }
+
+      const { data, error } = await db.rpc("verify_certificate", {
+        cert_id: id,
+      });
+
+      if (!active) return;
+
+      const row = Array.isArray(data)
+        ? (data[0] as VerifiedCertificate | undefined)
+        : undefined;
+
+      if (error || !row) {
+        setStatus("invalid");
+      } else {
+        setCert(row);
+        setStatus("valid");
+      }
+    }
+
+    setStatus("loading");
+    run();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const issued =
+    cert?.issued_at &&
+    new Date(cert.issued_at).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-6 text-aura-text">
+      <div className="aura-grain" aria-hidden />
+      <ChromeCursor />
+      <div className="hero-atmosphere absolute inset-0" aria-hidden />
+
+      <motion.div
+        initial={{ opacity: 0, y: 24, filter: "blur(6px)" }}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+        className="chrome-field relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-aura-elevated to-aura-surface p-10 text-center shadow-[0_0_70px_-34px_rgba(255,255,255,0.35)]"
+      >
+        <div className="chrome-line absolute left-8 right-8 top-0 h-px" />
+
+        <div className="flex justify-center">
+          <AuraMark />
+        </div>
+        <span className="chrome-text font-aura mt-6 inline-block text-xs font-semibold uppercase tracking-[0.5em]">
+          Aura Certification
+        </span>
+
+        {status === "loading" && (
+          <p className="font-aura mt-8 text-sm text-aura-text-secondary">
+            Verifying credential…
+          </p>
+        )}
+
+        {status === "valid" && cert && (
+          <>
+            <div className="mt-8 flex flex-col items-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/40 shadow-[0_0_24px_-4px_rgba(255,255,255,0.5)]">
+                <span className="chrome-text font-aura text-2xl font-bold">✓</span>
+              </div>
+              <h1 className="chrome-text font-aura mt-6 text-3xl font-bold tracking-tight">
+                Verified Credential
+              </h1>
+              <p className="font-aura mt-3 max-w-sm text-sm text-aura-text-secondary">
+                This certificate is authentic and issued by AURA
+                {cert.holder_name ? ` to ${cert.holder_name}` : ""}.
+              </p>
+            </div>
+
+            <h2 className="font-aura mt-8 text-xl font-bold text-aura-text">
+              {cert.title}
+            </h2>
+
+            <div className="certificate-strip mt-8 justify-center">
+              <div className="text-left">
+                <p className="font-aura text-[0.6rem] uppercase tracking-[0.24em] text-aura-text-muted">
+                  Verification ID
+                </p>
+                <p className="font-aura mt-1 font-mono text-sm text-aura-text">
+                  {cert.certificate_id}
+                </p>
+              </div>
+              {issued && (
+                <div className="text-left">
+                  <p className="font-aura text-[0.6rem] uppercase tracking-[0.24em] text-aura-text-muted">
+                    Issued
+                  </p>
+                  <p className="font-aura mt-1 text-sm text-aura-text">{issued}</p>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {status === "invalid" && (
+          <>
+            <h1 className="font-aura mt-8 text-3xl font-bold tracking-tight text-aura-text">
+              Credential not recognized
+            </h1>
+            <p className="font-aura mt-3 text-sm text-aura-text-secondary">
+              The ID <span className="font-mono text-aura-text">{id}</span> is
+              not a valid AURA verification code.
+            </p>
+          </>
+        )}
+
+        <div className="mt-10">
+          <Link to="/">
+            <ChromeButton variant="secondary">Back to AURA</ChromeButton>
+          </Link>
+        </div>
+
+        <div className="chrome-line absolute bottom-0 left-8 right-8 h-px" />
+      </motion.div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/CourseStepPlayer.tsx ===
+// src/components/aura/CourseStepPlayer.tsx
+import { useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import type { CourseStep } from "@/lib/courses.types";
+
+interface CourseStepPlayerProps {
+  step: CourseStep;
+  index: number;
+  total: number;
+  videoUrl: string | null;
+  videoError: string | null;
+  /** Το βήμα έχει ήδη ολοκληρωθεί σε προηγούμενη προβολή. */
+  alreadyCompleted: boolean;
+  onWatched: () => void;
+}
+
+export default function CourseStepPlayer({
+  step,
+  index,
+  total,
+  videoUrl,
+  videoError,
+  alreadyCompleted,
+  onWatched,
+}: CourseStepPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const notifiedRef = useRef(false);
+  const [watchedPct, setWatchedPct] = useState(0);
+
+  // Νέο βήμα → μηδενίζουμε το gate.
+  useEffect(() => {
+    notifiedRef.current = false;
+    setWatchedPct(0);
+    const el = videoRef.current;
+    if (el) {
+      el.pause();
+      el.currentTime = 0;
+    }
+  }, [step.id]);
+
+  // Βήμα χωρίς βίντεο ή ήδη ολοκληρωμένο: ξεκλειδώνει αμέσως.
+  useEffect(() => {
+    if (notifiedRef.current) return;
+    if (!step.video_path || alreadyCompleted) {
+      notifiedRef.current = true;
+      onWatched();
+    }
+  }, [step.id, step.video_path, alreadyCompleted, onWatched]);
+
+  const notifyOnce = () => {
+    if (notifiedRef.current) return;
+    notifiedRef.current = true;
+    onWatched();
+  };
+
+  return (
+    <motion.section
+      key={step.id}
+      initial={{ opacity: 0, y: 28 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -28 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+      className="space-y-8"
+      aria-label={`Βήμα ${index + 1} από ${total}`}
+    >
+      <header className="space-y-3">
+        <p className="text-[10px] uppercase tracking-[0.5em] text-neutral-500">
+          ΒΗΜΑ {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}
+        </p>
+        <h2 className="text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">
+          {step.title || `Βήμα ${index + 1}`}
+        </h2>
+      </header>
+
+      {step.video_path ? (
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_0_60px_-20px_rgba(255,255,255,0.25)]">
+          {videoError ? (
+            <div className="flex aspect-video w-full items-center justify-center px-6 text-center text-sm text-red-400">
+              {videoError}
+            </div>
+          ) : videoUrl ? (
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              controls
+              playsInline
+              preload="metadata"
+              controlsList="nodownload"
+              onContextMenu={(event) => event.preventDefault()}
+              onEnded={notifyOnce}
+              onTimeUpdate={(event) => {
+                const el = event.currentTarget;
+                if (!Number.isFinite(el.duration) || el.duration <= 0) return;
+                const pct = (el.currentTime / el.duration) * 100;
+                setWatchedPct(pct);
+                // Μερικά mp4 δεν πυροδοτούν 'ended' μετά από seek.
+                if (pct >= 95) notifyOnce();
+              }}
+              className="aspect-video w-full bg-black"
+            />
+          ) : (
+            <div className="flex aspect-video w-full items-center justify-center text-xs uppercase tracking-[0.4em] text-neutral-500">
+              ΦΟΡΤΩΣΗ ΒΙΝΤΕΟ…
+            </div>
+          )}
+        </div>
+      ) : null}
+
+      {step.description ? (
+        <div className="space-y-4 border-l border-white/10 pl-5">
+          {step.description
+            .split(/\n{2,}/)
+            .map((paragraph) => paragraph.trim())
+            .filter(Boolean)
+            .map((paragraph, i) => (
+              <p
+                key={`${step.id}-p-${i}`}
+                className="whitespace-pre-line text-sm leading-relaxed text-neutral-300 sm:text-base"
+              >
+                {paragraph}
+              </p>
+            ))}
+        </div>
+      ) : null}
+
+      {step.video_path && !alreadyCompleted ? (
+        <p className="text-[11px] uppercase tracking-[0.3em] text-neutral-600">
+          {watchedPct >= 95
+            ? "ΤΟ ΒΙΝΤΕΟ ΟΛΟΚΛΗΡΩΘΗΚΕ"
+            : `ΠΑΡΑΚΟΛΟΥΘΗΣΗ ${Math.floor(watchedPct)}% — ΤΕΛΕΙΩΣΕ ΤΟ ΒΙΝΤΕΟ ΓΙΑ ΤΟ ΕΠΟΜΕΝΟ ΒΗΜΑ`}
+        </p>
+      ) : null}
+    </motion.section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/MethodSteps.tsx ===
+import { useState } from "react";
+
+interface Step {
+  index: string;
+  title: string;
+  subtitle: string;
+  body: string;
+  image: string;
+}
+
+const STEPS: Step[] = [
+  {
+    index: "01",
+    title: "OBSERVE",
+    subtitle: "Παρατήρησε πριν αγγίξεις",
+    body: "Κάθε κεφάλι είναι διαφορετικό. Πριν πιάσεις ψαλίδι, μαθαίνεις να διαβάζεις σχήμα κρανίου, γραμμή μαλλιών, πυκνότητα, κατεύθυνση φυσικής πτώσης και αναλογίες προσώπου. Η παρατήρηση είναι δεξιότητα, όχι ταλέντο.",
+    image: "/images/method/observe.jpg",
+  },
+  {
+    index: "02",
+    title: "ANALYZE",
+    subtitle: "Κατάλαβε το γιατί",
+    body: "Μετατρέπεις αυτό που βλέπεις σε δεδομένα: τι δουλεύει, τι δημιουργεί πρόβλημα, τι περιορίζει το αποτέλεσμα. Εδώ σταματάει η αντιγραφή και ξεκινάει η κρίση.",
+    image: "/images/method/analyze.jpg",
+  },
+  {
+    index: "03",
+    title: "DESIGN",
+    subtitle: "Σχεδίασε το αποτέλεσμα",
+    body: "Πριν το πρώτο πέρασμα, υπάρχει πλάνο: γραμμές, βάρη, μεταβάσεις, τελικό σχήμα. Ένα κούρεμα σχεδιάζεται στο μυαλό και μετά εκτελείται στα χέρια.",
+    image: "/images/method/design.jpg",
+  },
+  {
+    index: "04",
+    title: "EXECUTE",
+    subtitle: "Εκτέλεσε με ακρίβεια",
+    body: "Τεχνική, σειρά κινήσεων, έλεγχος πίεσης, σωστό εργαλείο στη σωστή στιγμή. Η εκτέλεση κρίνεται στη συνέπεια, όχι στην ταχύτητα.",
+    image: "/images/method/execute.jpg",
+  },
+  {
+    index: "05",
+    title: "EVALUATE",
+    subtitle: "Αξιολόγησε με στοιχεία",
+    body: "Ανεβάζεις before / process / after, εξηγείς τι επέλεξες και γιατί, και παίρνεις δομημένο feedback από AURA educator πάνω σε συγκεκριμένο rubric. Αποδείξεις, όχι εντυπώσεις.",
+    image: "/images/method/evaluate.jpg",
+  },
+  {
+    index: "06",
+    title: "EVOLVE",
+    subtitle: "Εξελίξου μετρήσιμα",
+    body: "Κάθε verified skill ξεκλειδώνει το επόμενο βήμα. Το επίπεδό σου δεν προχωράει επειδή πλήρωσες, αλλά επειδή αποδείχθηκε.",
+    image: "/images/method/evolve.jpg",
+  },
+];
+
+function StepMedia({ step }: { step: Step }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A]">
+      {failed ? (
+        <div
+          aria-hidden
+          className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.10),transparent_60%)]"
+        >
+          <span className="text-5xl font-semibold tracking-[0.3em] text-white/10">
+            {step.index}
+          </span>
+        </div>
+      ) : (
+        <img
+          src={step.image}
+          alt={`AURA Method — ${step.title}`}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="h-full w-full object-cover grayscale transition-all duration-700 hover:scale-[1.03] hover:grayscale-0"
+        />
+      )}
+    </div>
+  );
+}
+
+export default function MethodSteps() {
+  return (
+    <ol className="space-y-20">
+      {STEPS.map((step, i) => (
+        <li
+          key={step.title}
+          className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14"
+        >
+          <div className={i % 2 === 1 ? "lg:order-2" : undefined}>
+            <StepMedia step={step} />
+          </div>
+          <div className={i % 2 === 1 ? "lg:order-1" : undefined}>
+            <span className="text-xs uppercase tracking-[0.4em] text-neutral-600">
+              STEP {step.index}
+            </span>
+            <h3 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100 sm:text-4xl">
+              {step.title}
+            </h3>
+            <p className="mt-2 text-sm uppercase tracking-[0.2em] text-neutral-500">
+              {step.subtitle}
+            </p>
+            <p className="mt-5 max-w-prose text-base leading-relaxed text-neutral-400">
+              {step.body}
+            </p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/portfolio/PortfolioBoardPage.tsx ===
+// src/components/aura/portfolio/PortfolioBoardPage.tsx
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { Gem, Heart, Images, MapPin, Search, Sparkles } from "lucide-react";
+import { fetchBoard, imageUrl, useIsElite, useMyPortfolio, type BoardEntry } from "@/lib/portfolio";
+import { useAuthUser } from "@/lib/useAuthUser";
+import { pfCss } from "./pfStyles";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+function Avatar({ entry, size }: { entry: BoardEntry; size: number }) {
+  return (
+    <span className="pf-ring" style={{ width: size, height: size }}>
+      <span className="pf-ring-inner">
+        {entry.avatar_url ? (
+          <img src={entry.avatar_url} alt="" referrerPolicy="no-referrer" />
+        ) : (
+          <span style={{ fontSize: size * 0.4 }}>{entry.display_name.slice(0, 1).toUpperCase()}</span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+function BoardCard({ entry, index }: { entry: BoardEntry; index: number }) {
+  function onMove(e: MouseEvent<HTMLAnchorElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-40px" }}
+      transition={{ duration: 0.6, delay: Math.min(index % 6, 5) * 0.07, ease: EASE }}
+    >
+      <Link to="/portfolios/$slug" params={{ slug: entry.slug }} className="pf-bcard" onMouseMove={onMove}>
+        <div className="pf-bcard-in">
+          <div className="pf-bcard-cover">
+            {entry.cover_path ? (
+              <img src={imageUrl(entry.cover_path)} alt="" loading="lazy" />
+            ) : (
+              <div className="grid h-full w-full place-items-center text-white/25">
+                <Images className="size-10" />
+              </div>
+            )}
+          </div>
+          <span className="pf-bcard-sheen" />
+
+          <div className="relative z-[1] -mt-10 px-5 pb-5">
+            <Avatar entry={entry} size={64} />
+            <div className="mt-3 flex items-center gap-2">
+              <h3 className="truncate text-lg font-semibold tracking-tight text-white">{entry.display_name}</h3>
+              <Gem className="size-3.5 shrink-0 text-white/70" aria-label="Elite" />
+            </div>
+            {entry.username && <p className="truncate text-xs text-white/40">@{entry.username}</p>}
+            {entry.headline && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/60">{entry.headline}</p>}
+
+            <div className="mt-4 flex items-center gap-4 text-xs text-white/50">
+              <span className="inline-flex items-center gap-1.5">
+                <Images className="size-3.5" /> {entry.posts_count}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Heart className="size-3.5" /> {entry.likes_count}
+              </span>
+              {entry.city && (
+                <span className="ml-auto inline-flex min-w-0 items-center gap-1.5">
+                  <MapPin className="size-3.5 shrink-0" />
+                  <span className="truncate">{entry.city}</span>
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <div className="pf-panel overflow-hidden">
+      <div className="pf-skel aspect-[16/10] w-full" />
+      <div className="space-y-3 p-5">
+        <div className="pf-skel h-4 w-2/3 rounded" />
+        <div className="pf-skel h-3 w-1/3 rounded" />
+        <div className="pf-skel h-3 w-full rounded" />
+      </div>
+    </div>
+  );
+}
+
+export default function PortfolioBoardPage() {
+  const { user } = useAuthUser();
+  const { isElite } = useIsElite(user?.id);
+  const { portfolio } = useMyPortfolio(user?.id);
+
+  const [entries, setEntries] = useState<BoardEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetchBoard()
+      .then((d) => active && setEntries(d))
+      .catch((e) => active && setError(e instanceof Error ? e.message : "Κάτι πήγε στραβά."));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    if (!entries) return null;
+    const s = q.trim().toLowerCase();
+    if (!s) return entries;
+    return entries.filter((e) =>
+      [e.display_name, e.username ?? "", e.city, e.headline].some((v) => v.toLowerCase().includes(s)),
+    );
+  }, [entries, q]);
+
+  return (
+    <main className="pf-root relative min-h-screen overflow-hidden bg-[#050506] px-4 pb-28 pt-28 text-white sm:px-6">
+      <style>{pfCss}</style>
+
+      {/* backdrop */}
+      <div className="pf-grid-bg absolute inset-x-0 top-0 h-[620px]" />
+      <div className="pf-orb -left-24 top-24 h-80 w-80" />
+      <div className="pf-orb -right-16 top-64 h-96 w-96" />
+
+      <div className="relative mx-auto max-w-6xl">
+        <motion.header
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: EASE }}
+          className="text-center"
+        >
+          <span className="pf-kicker">Aura Elite</span>
+          <h1 className="pf-title mt-4 text-4xl font-bold tracking-tight sm:text-6xl">Portfolios</h1>
+          <p className="mx-auto mt-5 max-w-xl text-sm leading-relaxed text-white/55 sm:text-base">
+            Οι δουλειές των μελών AURA ELITE. Εμπνεύσου, ανακάλυψε στυλ και στήριξε με ένα like.
+          </p>
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            {user && isElite && !portfolio && (
+              <Link to="/portfolios/create" className="pf-btn pf-btn-solid px-6 py-3 tracking-[0.16em]">
+                <Sparkles className="size-4" /> ΔΗΜΙΟΥΡΓΗΣΕ ΤΟ PORTFOLIO ΣΟΥ
+              </Link>
+            )}
+            {user && isElite && portfolio && (
+              <Link to="/portfolios/$slug" params={{ slug: portfolio.slug }} className="pf-btn pf-btn-solid px-6 py-3 tracking-[0.16em]">
+                ΤΟ PORTFOLIO ΜΟΥ
+              </Link>
+            )}
+            {!isElite && (
+              <Link to="/pricing" className="pf-btn px-6 py-3 tracking-[0.16em]">
+                <Gem className="size-4" /> ΓΙΝΕ ELITE
+              </Link>
+            )}
+          </div>
+        </motion.header>
+
+        {/* search */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
+          className="relative mx-auto mt-12 max-w-md"
+        >
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-white/40" />
+          <input
+            className="pf-input"
+            style={{ paddingLeft: "2.6rem" }}
+            placeholder="Αναζήτηση ονόματος ή πόλης…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Αναζήτηση portfolio"
+          />
+        </motion.div>
+
+        {/* grid */}
+        <div className="mt-12">
+          {error ? (
+            <p className="pf-toast mx-auto max-w-md" role="alert">
+              {error}
+            </p>
+          ) : !filtered ? (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="pf-panel mx-auto max-w-md p-10 text-center">
+              <Images className="mx-auto size-9 text-white/40" />
+              <p className="mt-4 text-sm text-white/60">
+                {entries && entries.length === 0 ? "Δεν υπάρχουν ακόμα portfolios. Γίνε ο πρώτος!" : "Δεν βρέθηκε κανένα αποτέλεσμα."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((e, i) => (
+                <BoardCard key={e.slug} entry={e} index={i} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/UserProfileModal.tsx ===
+// src/components/aura/UserProfileModal.tsx
+import { useEffect, useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  Instagram,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import {
+  getOrCreateDirectConversation,
+  getProfileById,
+} from "@/lib/messagingQueries";
+import { isAdminRole } from "@/lib/roles";
+import type { Profile } from "@/lib/database.types";
+
+export default function UserProfileModal({
+  userId,
+  onClose,
+}: {
+  userId: string;
+  onClose: () => void;
+}) {
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    getProfileById(userId)
+      .then((p) => {
+        if (!cancelled) setProfile(p);
+      })
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  async function handleMessage() {
+    setSending(true);
+    setError(null);
+    try {
+      const conversationId = await getOrCreateDirectConversation(userId);
+      onClose();
+      navigate({ to: "/messages", search: { with: conversationId } });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.97 }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-[#111] to-[#070707] shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+        >
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 z-10 rounded-full bg-black/50 p-1.5 text-white/70 transition hover:bg-white hover:text-black"
+          >
+            <X size={15} />
+          </button>
+
+          {loading && (
+            <div className="flex h-64 items-center justify-center">
+              <Loader2 className="animate-spin text-white/50" />
+            </div>
+          )}
+
+          {error && !loading && !profile && (
+            <p className="p-6 text-sm text-rose-400">{error}</p>
+          )}
+
+          {profile && !loading && (
+            <div>
+              <div className="h-20 bg-gradient-to-r from-white/10 via-white/5 to-transparent" />
+              <div className="-mt-10 px-6 pb-6">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt=""
+                    className="h-20 w-20 rounded-full object-cover ring-4 ring-[#0a0a0a]"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-xl font-semibold text-white/80 ring-4 ring-[#0a0a0a]">
+                    {profile.full_name?.[0]?.toUpperCase() ?? "?"}
+                  </div>
+                )}
+
+                <div className="mt-3 flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-white">
+                    {profile.full_name ?? "Χρήστης"}
+                  </h2>
+                  {isAdminRole(profile.role) && (
+                    <ShieldCheck size={16} className="text-white/70" />
+                  )}
+                </div>
+
+                {profile.headline && (
+                  <p className="mt-0.5 text-sm text-white/50">
+                    {profile.headline}
+                  </p>
+                )}
+
+                <div className="mt-3 flex flex-wrap gap-3 text-xs text-white/40">
+                  {profile.city && (
+                    <span className="flex items-center gap-1">
+                      <MapPin size={12} /> {profile.city}
+                    </span>
+                  )}
+                  {profile.instagram && (
+                    <span className="flex items-center gap-1">
+                      <Instagram size={12} /> {profile.instagram}
+                    </span>
+                  )}
+                </div>
+
+                {profile.bio && (
+                  <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-white/70">
+                    {profile.bio}
+                  </p>
+                )}
+
+                {error && (
+                  <p className="mt-3 text-xs text-rose-400">{error}</p>
+                )}
+
+                <button
+                  onClick={handleMessage}
+                  disabled={sending}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-black transition hover:bg-white/90 disabled:opacity-50"
+                >
+                  {sending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <MessageCircle size={14} />
+                  )}
+                  Στείλε μήνυμα
+                </button>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/ui/badge.tsx ===
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const badgeVariants = cva(
+  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        default: "border-transparent bg-primary text-primary-foreground shadow hover:bg-primary/80",
+        secondary:
+          "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        destructive:
+          "border-transparent bg-destructive text-destructive-foreground shadow hover:bg-destructive/80",
+        outline: "text-foreground",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  },
+);
+
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
+
+function Badge({ className, variant, ...props }: BadgeProps) {
+  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+}
+
+export { Badge, badgeVariants };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/input-otp.tsx ===
+import * as React from "react";
+import { OTPInput, OTPInputContext } from "input-otp";
+import { Minus } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const InputOTP = React.forwardRef<
+  React.ElementRef<typeof OTPInput>,
+  React.ComponentPropsWithoutRef<typeof OTPInput>
+>(({ className, containerClassName, ...props }, ref) => (
+  <OTPInput
+    ref={ref}
+    containerClassName={cn(
+      "flex items-center gap-2 has-[:disabled]:opacity-50",
+      containerClassName,
+    )}
+    className={cn("disabled:cursor-not-allowed", className)}
+    {...props}
+  />
+));
+InputOTP.displayName = "InputOTP";
+
+const InputOTPGroup = React.forwardRef<
+  React.ElementRef<"div">,
+  React.ComponentPropsWithoutRef<"div">
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("flex items-center", className)} {...props} />
+));
+InputOTPGroup.displayName = "InputOTPGroup";
+
+const InputOTPSlot = React.forwardRef<
+  React.ElementRef<"div">,
+  React.ComponentPropsWithoutRef<"div"> & { index: number }
+>(({ index, className, ...props }, ref) => {
+  const inputOTPContext = React.useContext(OTPInputContext);
+  const { char, hasFakeCaret, isActive } = inputOTPContext.slots[index] ?? {
+    char: null,
+    hasFakeCaret: false,
+    isActive: false,
+  };
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "relative flex h-9 w-9 items-center justify-center border-y border-r border-input text-sm shadow-sm transition-all first:rounded-l-md first:border-l last:rounded-r-md",
+        isActive && "z-10 ring-1 ring-ring",
+        className,
+      )}
+      {...props}
+    >
+      {char}
+      {hasFakeCaret && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
+        </div>
+      )}
+    </div>
+  );
+});
+InputOTPSlot.displayName = "InputOTPSlot";
+
+const InputOTPSeparator = React.forwardRef<
+  React.ElementRef<"div">,
+  React.ComponentPropsWithoutRef<"div">
+>(({ ...props }, ref) => (
+  <div ref={ref} role="separator" {...props}>
+    <Minus />
+  </div>
+));
+InputOTPSeparator.displayName = "InputOTPSeparator";
+
+export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator };
+
+=== END FILE ===
+

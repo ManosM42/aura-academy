@@ -1,0 +1,1139 @@
+=== FILE: .output/server/_ssr/routes-CJBZmASg.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { $ as Layers, E as Scissors, G as MessageCircle, M as Play, Mt as BookOpen, O as Ruler, at as Hand, c as User, dt as Eye, gt as Crown, nt as Images, s as Users, vt as Compass, zt as ArrowRight } from "../_libs/lucide-react.mjs";
+import { t as Footer } from "./Footer-CDaciXSR.mjs";
+import { n as developer_default, r as founder_default, t as cofounder_default } from "./developer-BEywxc1M.mjs";
+import { a as useTransform, c as useScroll, i as useSpring, l as motion, o as useMotionTemplate, r as useReducedMotion, s as useMotionValue, u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion$1 } from "../_libs/motion.mjs";
+import { r as ChromeCTALink } from "./chrome-CqNlZkJS.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { t as book_default } from "./book-B5U9vdLJ.mjs";
+import { t as ChromeCursor } from "./ChromeCursor-BJgZMGhf.mjs";
+import { t as GALLERY } from "./gallery-B93qOO1b.mjs";
+import { t as aura_default } from "./aura-BExz5ChF.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/routes-CJBZmASg.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function Hero() {
+	const navigate = useNavigate();
+	const ref = (0, import_react.useRef)(null);
+	const reduced = useReducedMotion();
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start start", "end start"]
+	});
+	const emblemY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 140]);
+	const headlineY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 60]);
+	const atmoY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 40]);
+	const fade = useTransform(scrollYProgress, [0, .7], [1, 0]);
+	const container = {
+		hidden: {},
+		show: { transition: {
+			staggerChildren: .15,
+			delayChildren: .1
+		} }
+	};
+	const item = {
+		hidden: {
+			opacity: 0,
+			y: 20
+		},
+		show: {
+			opacity: 1,
+			y: 0,
+			transition: {
+				duration: .9,
+				ease: [
+					.22,
+					1,
+					.36,
+					1
+				]
+			}
+		}
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		id: "top",
+		ref,
+		className: "relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-black px-6",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+				"aria-hidden": true,
+				style: { y: atmoY },
+				className: "aura-radial absolute inset-0 z-0 pointer-events-none"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "absolute inset-0 flex items-center justify-center pointer-events-none z-0 overflow-hidden px-4",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.img, {
+					src: aura_default,
+					alt: "",
+					"aria-hidden": "true",
+					draggable: false,
+					style: {
+						y: emblemY,
+						opacity: fade,
+						WebkitMaskImage: "radial-gradient(ellipse 61% 61% at 50% 50%, black 35.5%, transparent 100%)",
+						maskImage: "radial-gradient(ellipse 61% 61% at 50% 50%, black 35.5%, transparent 100%)"
+					},
+					className: "select-none w-[650px] sm:w-[920px] md:w-[1250px] max-h-[96vh] max-w-none object-contain opacity-25"
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+				style: { y: headlineY },
+				variants: container,
+				initial: "hidden",
+				animate: "show",
+				className: "relative z-10 flex flex-col items-center justify-center text-center w-full max-w-4xl mx-auto -mt-14 sm:-mt-20",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.p, {
+					variants: item,
+					className: "font-aura mt-5 sm:mt-6 text-sm sm:text-base md:text-lg font-extralight tracking-[0.4em] pl-[0.4em] uppercase text-neutral-200 drop-shadow-[0_2px_10px_rgba(255,255,255,0.15)]"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+					variants: item,
+					className: "mt-6 sm:mt-8 flex flex-col items-center justify-center gap-2.5 w-full max-w-[220px] sm:max-w-[240px] mx-auto",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.button, {
+						whileHover: { scale: 1.03 },
+						whileTap: { scale: .97 },
+						onClick: () => navigate({ to: "/pricing" }),
+						className: "group relative w-full overflow-hidden rounded-full py-2.5 px-4 backdrop-blur-md bg-white/10 hover:bg-white/20 text-white font-aura text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] border border-white/40 hover:border-white/70 shadow-[0_4px_16px_rgba(0,0,0,0.3)] hover:shadow-[0_0_20px_rgba(255,255,255,0.3)] transition-all duration-300 cursor-pointer",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.span, {
+							className: "absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-25deg] pointer-events-none",
+							animate: { x: ["-150%", "300%"] },
+							transition: {
+								duration: 2.8,
+								repeat: Infinity,
+								repeatDelay: 1.5,
+								ease: "easeInOut"
+							}
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "relative z-10 flex items-center justify-center gap-2",
+							children: "START LEARNING"
+						})]
+					})
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "chrome-line absolute bottom-0 left-1/2 h-px w-[70%] max-w-3xl -translate-x-1/2 z-20" })
+		]
+	});
+}
+var CX = 320;
+var CY = 280;
+var R = 185;
+var STEPS = [
+	{
+		n: "01",
+		label: "Observe",
+		desc: "I gather visual and technical information."
+	},
+	{
+		n: "02",
+		label: "Analyze",
+		desc: "I understand the face, head, hair and goal."
+	},
+	{
+		n: "03",
+		label: "Design",
+		desc: "I choose shapes, lengths and transitions."
+	},
+	{
+		n: "04",
+		label: "Execute",
+		desc: "I apply the technique with control."
+	},
+	{
+		n: "05",
+		label: "Evaluate",
+		desc: "I compare the result with the goal."
+	},
+	{
+		n: "06",
+		label: "Evolve",
+		desc: "I spot mistakes and refine the process."
+	}
+].map((s, i) => {
+	const a = (-90 + i * 60) * Math.PI / 180;
+	return {
+		...s,
+		x: CX + R * Math.cos(a),
+		y: CY + R * Math.sin(a)
+	};
+});
+var EASE = [
+	.22,
+	1,
+	.36,
+	1
+];
+var CHROME_TEXT = "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+/** where the label sits relative to each node (hexagon: top, right x2, bottom, left x2) */
+function labelProps(i, s) {
+	if (i === 0) return {
+		x: s.x,
+		y: s.y - 40,
+		anchor: "middle"
+	};
+	if (i === 3) return {
+		x: s.x,
+		y: s.y + 54,
+		anchor: "middle"
+	};
+	if (i === 1 || i === 2) return {
+		x: s.x + 40,
+		y: s.y + 7,
+		anchor: "start"
+	};
+	return {
+		x: s.x - 40,
+		y: s.y + 7,
+		anchor: "end"
+	};
+}
+function SkillTree() {
+	const reduce = useReducedMotion();
+	const [active, setActive] = (0, import_react.useState)(0);
+	const [paused, setPaused] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		if (paused || reduce) return;
+		const t = setInterval(() => setActive((a) => (a + 1) % STEPS.length), 3200);
+		return () => clearInterval(t);
+	}, [paused, reduce]);
+	const sel = STEPS[active];
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		id: "skilltree",
+		className: "relative mx-auto max-w-5xl overflow-hidden px-4 py-20 sm:px-6 sm:py-32",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[min(760px,100%)] -translate-x-1/2 -translate-y-1/2 rounded-full",
+				style: { background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" },
+				animate: reduce ? void 0 : { opacity: [
+					.4,
+					1,
+					.4
+				] },
+				transition: {
+					duration: 8,
+					repeat: Infinity,
+					ease: "easeInOut"
+				}
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+				initial: {
+					opacity: 0,
+					y: 24
+				},
+				whileInView: {
+					opacity: 1,
+					y: 0
+				},
+				viewport: {
+					once: true,
+					margin: "-100px"
+				},
+				transition: {
+					duration: .9,
+					ease: EASE
+				},
+				className: "relative mb-10 text-center sm:mb-14",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "font-aura text-xs uppercase tracking-[0.4em] text-white/50 sm:tracking-[0.5em]",
+						children: "Aura Cycle"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "font-aura mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-6xl",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.span, {
+							initial: { backgroundPosition: "0% 50%" },
+							animate: { backgroundPosition: "100% 50%" },
+							transition: {
+								duration: 4,
+								repeat: Infinity,
+								repeatType: "reverse",
+								ease: "easeInOut"
+							},
+							style: {
+								backgroundImage: CHROME_TEXT,
+								backgroundSize: "300% auto",
+								WebkitBackgroundClip: "text",
+								WebkitTextFillColor: "transparent"
+							},
+							className: "inline-block drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_60px_rgba(255,255,255,0.7)]",
+							children: "THE AURA METHOD"
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "font-aura mx-auto mt-5 max-w-xs text-sm leading-relaxed text-white/55 sm:max-w-md",
+						children: "The core thinking cycle of the professional."
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+				initial: {
+					opacity: 0,
+					y: 30
+				},
+				whileInView: {
+					opacity: 1,
+					y: 0
+				},
+				viewport: {
+					once: true,
+					margin: "-80px"
+				},
+				transition: {
+					duration: 1,
+					ease: EASE
+				},
+				onPointerEnter: () => setPaused(true),
+				onPointerLeave: () => setPaused(false),
+				className: "relative mx-auto w-full max-w-3xl rounded-3xl p-px",
+				style: {
+					background: "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.05) 35%, rgba(255,255,255,0.05) 65%, rgba(255,255,255,0.4))",
+					boxShadow: "0 0 80px rgba(0,0,0,0.9), 0 0 60px rgba(255,255,255,0.05)"
+				},
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "relative overflow-hidden rounded-[23px] bg-[#070707] p-2 sm:p-4",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							"aria-hidden": true,
+							className: "pointer-events-none absolute inset-x-0 top-0 h-32",
+							style: { background: "linear-gradient(180deg, rgba(255,255,255,0.06), transparent)" }
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							"aria-hidden": true,
+							className: "pointer-events-none absolute inset-0 opacity-[0.35]",
+							style: {
+								backgroundImage: "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)",
+								backgroundSize: "28px 28px",
+								maskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+								WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)"
+							}
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "relative w-full",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+								viewBox: "0 0 640 560",
+								className: "block h-auto w-full select-none",
+								role: "group",
+								"aria-label": "AURA Cycle",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("defs", { children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("linearGradient", {
+											id: "edgeChrome",
+											gradientUnits: "userSpaceOnUse",
+											x1: "0",
+											y1: "0",
+											x2: "640",
+											y2: "560",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+													offset: "0%",
+													stopColor: "#ffffff",
+													stopOpacity: "0.9"
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+													offset: "50%",
+													stopColor: "#9aa0a8",
+													stopOpacity: "0.55"
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+													offset: "100%",
+													stopColor: "#ffffff",
+													stopOpacity: "0.9"
+												})
+											]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("radialGradient", {
+											id: "discChrome",
+											cx: "35%",
+											cy: "30%",
+											r: "80%",
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+													offset: "0%",
+													stopColor: "#ffffff"
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+													offset: "45%",
+													stopColor: "#c9ced4"
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+													offset: "100%",
+													stopColor: "#6c7279"
+												})
+											]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("radialGradient", {
+											id: "discDark",
+											cx: "35%",
+											cy: "30%",
+											r: "90%",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+												offset: "0%",
+												stopColor: "#2a2d31"
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+												offset: "100%",
+												stopColor: "#0c0d0e"
+											})]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("filter", {
+											id: "softGlow",
+											x: "-100%",
+											y: "-100%",
+											width: "300%",
+											height: "300%",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("feGaussianBlur", {
+												stdDeviation: "5",
+												result: "b"
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("feMerge", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("feMergeNode", { in: "b" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feMergeNode", { in: "SourceGraphic" })] })]
+										})
+									] }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										cx: CX,
+										cy: CY,
+										r: 237,
+										fill: "none",
+										stroke: "rgba(255,255,255,0.05)",
+										strokeWidth: "1",
+										strokeDasharray: "2 8"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										cx: CX,
+										cy: CY,
+										r: 133,
+										fill: "none",
+										stroke: "rgba(255,255,255,0.06)",
+										strokeWidth: "1"
+									}),
+									STEPS.map((from, i) => {
+										const to = STEPS[(i + 1) % STEPS.length];
+										return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.line, {
+											x1: from.x,
+											y1: from.y,
+											x2: to.x,
+											y2: to.y,
+											stroke: "url(#edgeChrome)",
+											strokeWidth: "2.5",
+											strokeLinecap: "round",
+											filter: "url(#softGlow)",
+											initial: {
+												pathLength: 0,
+												opacity: 0
+											},
+											animate: {
+												pathLength: 1,
+												opacity: 1
+											},
+											transition: {
+												duration: 1.2,
+												ease: "easeInOut",
+												delay: i * .12
+											}
+										}), !reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.line, {
+											x1: from.x,
+											y1: from.y,
+											x2: to.x,
+											y2: to.y,
+											stroke: "#ffffff",
+											strokeWidth: "2.5",
+											strokeLinecap: "round",
+											strokeDasharray: "6 44",
+											animate: { strokeDashoffset: [0, -50] },
+											transition: {
+												duration: 1.8,
+												repeat: Infinity,
+												ease: "linear"
+											},
+											style: { filter: "drop-shadow(0 0 6px #fff)" }
+										})] }, `edge-${i}`);
+									}),
+									STEPS.map((s, i) => {
+										const on = i === active;
+										const lp = labelProps(i, s);
+										return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.g, {
+											role: "button",
+											tabIndex: 0,
+											"aria-label": `${s.n} ${s.label}`,
+											"aria-current": on,
+											onClick: () => setActive(i),
+											onFocus: () => setActive(i),
+											onKeyDown: (e) => (e.key === "Enter" || e.key === " ") && setActive(i),
+											initial: { opacity: 0 },
+											animate: { opacity: 1 },
+											transition: {
+												duration: .7,
+												ease: EASE,
+												delay: .3 + i * .09
+											},
+											style: {
+												cursor: "pointer",
+												outline: "none"
+											},
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+													cx: s.x,
+													cy: s.y,
+													r: "44",
+													fill: "rgba(0,0,0,0.001)"
+												}),
+												on && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+													cx: s.x,
+													cy: s.y,
+													r: "40",
+													fill: "none",
+													stroke: "rgba(255,255,255,0.55)",
+													strokeWidth: "1.2",
+													strokeDasharray: "2 6"
+												}),
+												on && !reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.circle, {
+													cx: s.x,
+													cy: s.y,
+													r: "28",
+													fill: "none",
+													stroke: "#ffffff",
+													strokeWidth: "1.8",
+													style: {
+														transformBox: "fill-box",
+														transformOrigin: "center"
+													},
+													animate: {
+														scale: [1, 1.9],
+														opacity: [.7, 0]
+													},
+													transition: {
+														duration: 2,
+														repeat: Infinity,
+														ease: "easeOut"
+													}
+												}),
+												on && !reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.circle, {
+													cx: s.x,
+													cy: s.y,
+													r: "35",
+													fill: "none",
+													stroke: "#d4d8dd",
+													strokeWidth: "2",
+													strokeLinecap: "round",
+													strokeDasharray: "36 184",
+													style: {
+														transformBox: "fill-box",
+														transformOrigin: "center",
+														filter: "drop-shadow(0 0 5px #fff)"
+													},
+													animate: { rotate: 360 },
+													transition: {
+														duration: 3.5,
+														repeat: Infinity,
+														ease: "linear"
+													}
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+													cx: s.x,
+													cy: s.y,
+													r: "28",
+													fill: "url(#discDark)",
+													stroke: "rgba(255,255,255,0.35)",
+													strokeWidth: "2"
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.circle, {
+													cx: s.x,
+													cy: s.y,
+													r: "28",
+													fill: "url(#discChrome)",
+													stroke: "#ffffff",
+													strokeWidth: "2",
+													animate: { opacity: on ? 1 : 0 },
+													transition: {
+														duration: .5,
+														ease: EASE
+													},
+													style: { filter: "drop-shadow(0 0 14px rgba(255,255,255,0.65))" }
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+													x: s.x,
+													y: s.y + 6,
+													textAnchor: "middle",
+													className: "font-aura",
+													fontSize: "17",
+													fontWeight: "800",
+													fill: on ? "#0a0a0a" : "#d9dce0",
+													children: s.n
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+													x: lp.x,
+													y: lp.y,
+													textAnchor: lp.anchor,
+													className: "font-aura",
+													fontSize: "21",
+													fontWeight: on ? 700 : 500,
+													fill: on ? "#ffffff" : "#B8BBBF",
+													style: on ? { filter: "drop-shadow(0 0 8px rgba(255,255,255,0.6))" } : void 0,
+													children: s.label
+												})
+											]
+										}, s.n);
+									})
+								]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "pointer-events-none absolute left-1/2 top-1/2 flex w-[34%] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-center",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+									mode: "wait",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+										initial: {
+											opacity: 0,
+											y: 8,
+											filter: "blur(6px)"
+										},
+										animate: {
+											opacity: 1,
+											y: 0,
+											filter: "blur(0px)"
+										},
+										exit: {
+											opacity: 0,
+											y: -8,
+											filter: "blur(6px)"
+										},
+										transition: {
+											duration: .45,
+											ease: EASE
+										},
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "font-aura block text-5xl font-extrabold leading-none sm:text-7xl",
+											style: {
+												backgroundImage: CHROME_TEXT,
+												backgroundSize: "200% auto",
+												WebkitBackgroundClip: "text",
+												WebkitTextFillColor: "transparent",
+												filter: "drop-shadow(0 0 20px rgba(255,255,255,0.45))"
+											},
+											children: sel.n
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "font-aura mt-2 block text-[10px] tracking-[0.3em] text-white/50 sm:text-xs",
+											children: "AURA CYCLE"
+										})]
+									}, sel.n)
+								})
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "relative mt-2 flex min-h-[72px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-4 sm:px-6",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+								mode: "wait",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+									initial: {
+										opacity: 0,
+										y: 8
+									},
+									animate: {
+										opacity: 1,
+										y: 0
+									},
+									exit: {
+										opacity: 0,
+										y: -8
+									},
+									transition: {
+										duration: .35,
+										ease: EASE
+									},
+									className: "min-w-0",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h4", {
+										className: "font-aura text-base font-bold text-white",
+										children: [
+											sel.n,
+											" ",
+											sel.label
+										]
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "font-aura mt-1 text-sm leading-relaxed text-white/60",
+										children: sel.desc
+									})]
+								}, sel.n)
+							})
+						})
+					]
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+				initial: {
+					opacity: 0,
+					y: 24
+				},
+				whileInView: {
+					opacity: 1,
+					y: 0
+				},
+				viewport: {
+					once: true,
+					margin: "-60px"
+				},
+				transition: {
+					duration: .9,
+					ease: EASE
+				},
+				className: "relative mt-14 text-center sm:mt-20",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						"aria-hidden": true,
+						className: "mx-auto mb-8 h-px w-full max-w-xs sm:max-w-md",
+						style: {
+							background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)",
+							boxShadow: "0 0 20px rgba(255,255,255,0.5)"
+						}
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "font-aura text-xl font-extrabold tracking-[0.18em] sm:text-3xl sm:tracking-[0.25em]",
+						style: {
+							backgroundImage: CHROME_TEXT,
+							backgroundSize: "300% auto",
+							WebkitBackgroundClip: "text",
+							WebkitTextFillColor: "transparent",
+							filter: "drop-shadow(0 0 18px rgba(255,255,255,0.35))"
+						},
+						children: "REPEAT → IMPROVE"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "font-aura mx-auto mt-4 max-w-xs text-sm leading-relaxed text-white/55 sm:max-w-lg",
+						children: "Evaluation returns to observation, and the cycle continues."
+					})
+				]
+			})
+		]
+	});
+}
+var CHAPTERS = [
+	"Foundations of the craft",
+	"Cutting geometry and shapes",
+	"Scissors, razor and clippers",
+	"Fades and blending",
+	"Face shapes and consultation",
+	"Styling and finishing",
+	"Clients, image and mindset"
+];
+var ROMAN = [
+	"I",
+	"II",
+	"III",
+	"IV",
+	"V",
+	"VI",
+	"VII"
+];
+var TOPICS$1 = [
+	{
+		icon: Ruler,
+		title: "Cutting geometry",
+		text: "The angles, sections and shapes behind every clean haircut."
+	},
+	{
+		icon: Scissors,
+		title: "Every tool, mastered",
+		text: "Scissors, razor and clipper technique, explained step by step."
+	},
+	{
+		icon: Layers,
+		title: "Fades and blending",
+		text: "From fast fades to photo-ready transitions."
+	},
+	{
+		icon: Compass,
+		title: "Face shapes",
+		text: "Read the client and choose the cut that suits them."
+	},
+	{
+		icon: MessageCircle,
+		title: "Client experience",
+		text: "Consultation and service that turn visitors into regulars."
+	},
+	{
+		icon: Crown,
+		title: "Professional mindset",
+		text: "The standards, image and confidence behind the chair."
+	}
+];
+var W = 260;
+var H = 360;
+var T = 52;
+var B = 3;
+var PAGE_INSET_Y = 5;
+var PAGE_DEPTH = 46;
+var PAGE_W = 254;
+var PAGE_H = 350;
+var face = {
+	position: "absolute",
+	top: 0,
+	left: 0,
+	backfaceVisibility: "hidden",
+	WebkitBackfaceVisibility: "hidden"
+};
+var pagesV = "repeating-linear-gradient(90deg, #0a0a0b 0px, #0a0a0b 1px, #2b2b2f 1px, #1c1c1f 2px, #0a0a0b 3px)";
+var pagesH = "repeating-linear-gradient(0deg, #0a0a0b 0px, #0a0a0b 1px, #2b2b2f 1px, #1c1c1f 2px, #0a0a0b 3px)";
+var boardEdgeTop = "linear-gradient(180deg, #34343a 0%, #16161a 45%, #050506 100%)";
+var boardEdgeSide = "linear-gradient(90deg, #34343a 0%, #16161a 45%, #050506 100%)";
+var chromeText$2 = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+function SpotlightCard({ children }) {
+	const x = useMotionValue(-300);
+	const y = useMotionValue(-300);
+	const spot = useMotionTemplate`radial-gradient(240px circle at ${x}px ${y}px, rgba(255,255,255,0.13), transparent 70%)`;
+	function onMove(e) {
+		const r = e.currentTarget.getBoundingClientRect();
+		x.set(e.clientX - r.left);
+		y.set(e.clientY - r.top);
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+		onPointerMove: onMove,
+		whileHover: { y: -4 },
+		transition: {
+			type: "spring",
+			stiffness: 300,
+			damping: 22
+		},
+		className: "group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-5 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/30",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+			"aria-hidden": true,
+			style: { background: spot },
+			className: "pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "relative",
+			children
+		})]
+	});
+}
+function PhysicalBook() {
+	const sectionRef = (0, import_react.useRef)(null);
+	const reduce = useReducedMotion();
+	const [hovered, setHovered] = (0, import_react.useState)(false);
+	const [pinned, setPinned] = (0, import_react.useState)(false);
+	const open = hovered || pinned;
+	const { scrollYProgress } = useScroll({
+		target: sectionRef,
+		offset: ["start end", "end start"]
+	});
+	const watermarkY = useTransform(scrollYProgress, [0, 1], [140, -140]);
+	const glowY = useTransform(scrollYProgress, [0, 1], [-70, 70]);
+	const mx = useMotionValue(0);
+	const my = useMotionValue(0);
+	const sx = useSpring(mx, {
+		stiffness: 90,
+		damping: 16
+	});
+	const sy = useSpring(my, {
+		stiffness: 90,
+		damping: 16
+	});
+	const rotY = useTransform([sx, scrollYProgress], (latest) => {
+		if (reduce) return 0;
+		const [x, s] = latest;
+		return x * 26 + (.5 - s) * 30;
+	});
+	const rotX = useTransform(sy, (y) => reduce ? 0 : -y * 18);
+	const gx = useTransform(sx, (v) => 50 + v * 90);
+	const gy = useTransform(sy, (v) => 50 + v * 90);
+	const glare = useMotionTemplate`radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,0.22), rgba(255,255,255,0.04) 35%, transparent 62%)`;
+	function handleMove(e) {
+		const r = e.currentTarget.getBoundingClientRect();
+		mx.set((e.clientX - r.left) / r.width - .5);
+		my.set((e.clientY - r.top) / r.height - .5);
+	}
+	function handleLeave(e) {
+		mx.set(0);
+		my.set(0);
+		if (e.pointerType === "mouse") setHovered(false);
+	}
+	function handleKey(e) {
+		if (e.key === "Enter" || e.key === " ") {
+			e.preventDefault();
+			setPinned((p) => !p);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		ref: sectionRef,
+		id: "book",
+		className: "relative isolate overflow-hidden py-24 sm:py-32",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+				"aria-hidden": true,
+				style: { y: watermarkY },
+				className: "pointer-events-none absolute inset-x-0 top-8 -z-10 select-none text-center font-serif text-[24vw] font-bold leading-none tracking-[0.12em] text-white/[0.025]",
+				children: "ΛURΛ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+				"aria-hidden": true,
+				style: { y: glowY },
+				className: "pointer-events-none absolute right-[-10%] top-1/3 -z-10 h-[520px] w-[520px] rounded-full bg-white/[0.05] blur-[130px]"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 md:px-10 lg:grid-cols-[1.05fr_1fr]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+						initial: {
+							opacity: 0,
+							y: 24
+						},
+						whileInView: {
+							opacity: 1,
+							y: 0
+						},
+						viewport: {
+							once: true,
+							margin: "-80px"
+						},
+						transition: {
+							duration: .7,
+							ease: [
+								.16,
+								1,
+								.3,
+								1
+							]
+						},
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-px w-10 bg-gradient-to-r from-white/60 to-transparent" }), "The ΛURΛ book"]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+								className: `text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText$2}`,
+								children: "Years of chair time, bound in one book."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-6 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg",
+								children: "The AURA physical book is a barbering reference built to live at your station. Clear technique breakdowns, cutting geometry, fades from clean to photo-ready, and the client skills that keep your chair full."
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-8",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeCTALink, {
+							to: "/book",
+							children: "Order the book"
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-10 grid gap-4 sm:grid-cols-2",
+						children: TOPICS$1.map((t) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SpotlightCard, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex items-start gap-4",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(t.icon, { className: "size-5" })
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+								className: "text-sm font-semibold text-white",
+								children: t.title
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-1 text-sm leading-relaxed text-zinc-400",
+								children: t.text
+							})] })]
+						}) }, t.title))
+					})
+				] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					role: "button",
+					tabIndex: 0,
+					"aria-pressed": open,
+					"aria-label": "Open or close the AURA book",
+					onPointerEnter: (e) => {
+						if (e.pointerType === "mouse") setHovered(true);
+					},
+					onPointerLeave: handleLeave,
+					onPointerMove: handleMove,
+					onClick: () => setPinned((p) => !p),
+					onKeyDown: handleKey,
+					className: "relative flex h-[390px] cursor-pointer items-center justify-center rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:h-[580px]",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							"aria-hidden": true,
+							className: "absolute h-[420px] w-[420px] rounded-full bg-white/[0.08] blur-[90px]"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+							"aria-hidden": true,
+							animate: reduce ? void 0 : { rotate: 360 },
+							transition: {
+								duration: 90,
+								repeat: Infinity,
+								ease: "linear"
+							},
+							className: "absolute h-[440px] w-[440px] rounded-full border border-dashed border-white/15"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+							"aria-hidden": true,
+							animate: reduce ? void 0 : { rotate: -360 },
+							transition: {
+								duration: 140,
+								repeat: Infinity,
+								ease: "linear"
+							},
+							className: "absolute h-[540px] w-[540px] rounded-full border border-white/[0.07]"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+							"aria-hidden": true,
+							animate: reduce ? void 0 : {
+								scaleX: [
+									1,
+									.86,
+									1
+								],
+								opacity: [
+									.55,
+									.32,
+									.55
+								]
+							},
+							transition: {
+								duration: 6,
+								repeat: Infinity,
+								ease: "easeInOut"
+							},
+							className: "absolute bottom-[70px] h-8 w-[240px] rounded-[100%] bg-white/25 blur-2xl sm:bottom-[92px]"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "origin-center scale-[0.58] min-[420px]:scale-[0.72] sm:scale-100",
+							style: { perspective: 1800 },
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion$1.div, {
+								style: {
+									transformStyle: "preserve-3d",
+									width: W,
+									height: H
+								},
+								animate: {
+									rotateY: open ? -8 : -28,
+									x: open ? 112 : 0,
+									y: reduce ? 0 : [
+										0,
+										-14,
+										0
+									]
+								},
+								transition: {
+									default: {
+										type: "spring",
+										stiffness: 55,
+										damping: 16
+									},
+									y: reduce ? { duration: 0 } : {
+										duration: 6,
+										repeat: Infinity,
+										ease: "easeInOut"
+									}
+								},
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion$1.div, {
+									style: {
+										transformStyle: "preserve-3d",
+										position: "relative",
+										width: "100%",
+										height: "100%",
+										rotateX: rotX,
+										rotateY: rotY
+									},
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "overflow-hidden rounded-sm bg-[linear-gradient(215deg,#1d1d21,#070708_55%,#0d0d0f)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]",
+											style: {
+												...face,
+												width: W,
+												height: H,
+												transform: `translateZ(${-52 / 2}px) rotateY(180deg)`
+											},
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-5 rounded-sm border border-zinc-500/25" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-[26px] rounded-sm border border-zinc-600/15" })]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: {
+											...face,
+											width: W,
+											height: B,
+											top: -3 / 2,
+											background: boardEdgeTop,
+											transform: `translateZ(-24.5px) rotateX(90deg)`
+										} }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: {
+											...face,
+											width: W,
+											height: B,
+											top: H - B / 2,
+											background: boardEdgeTop,
+											transform: `translateZ(-24.5px) rotateX(-90deg)`
+										} }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: {
+											...face,
+											width: B,
+											height: H,
+											left: W - B / 2,
+											background: boardEdgeSide,
+											transform: `translateZ(-24.5px) rotateY(90deg)`
+										} }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "flex items-center justify-center overflow-hidden border-y border-white/10 bg-gradient-to-r from-[#1b1b1f] via-[#0e0e10] to-[#050506]",
+											style: {
+												...face,
+												width: T,
+												height: H,
+												left: -52 / 2,
+												transform: "rotateY(-90deg)"
+											},
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+													"aria-hidden": true,
+													className: "absolute inset-0",
+													style: { background: "linear-gradient(90deg, rgba(255,255,255,0.10), transparent 30%, transparent 70%, rgba(255,255,255,0.05))" }
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-0 top-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-0 top-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+													className: "bg-gradient-to-b from-zinc-100 to-zinc-500 bg-clip-text font-serif text-sm font-semibold tracking-[0.5em] text-transparent",
+													style: {
+														writingMode: "vertical-rl",
+														transform: "rotate(180deg)"
+													},
+													children: "ΛURΛ THE BARBERING BOOK"
+												}),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" }),
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" })
+											]
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: {
+											...face,
+											width: PAGE_DEPTH,
+											height: PAGE_H,
+											top: PAGE_INSET_Y,
+											left: PAGE_W - PAGE_DEPTH / 2,
+											transform: "rotateY(90deg)",
+											backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.55), transparent 16%, transparent 84%, rgba(0,0,0,.65)), ${pagesV}`
+										} }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: {
+											...face,
+											width: PAGE_W,
+											height: PAGE_DEPTH,
+											top: PAGE_INSET_Y - PAGE_DEPTH / 2,
+											transform: "rotateX(90deg)",
+											backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%), ${pagesH}`
+										} }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: {
+											...face,
+											width: PAGE_W,
+											height: PAGE_DEPTH,
+											top: 355 - PAGE_DEPTH / 2,
+											transform: "rotateX(-90deg)",
+											backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%), ${pagesH}`
+										} }),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "overflow-hidden rounded-r-sm bg-[linear-gradient(90deg,#0c0c0e,#1a1a1d_10%,#111113)] p-7 pl-9",
+											style: {
+												...face,
+												top: PAGE_INSET_Y,
+												width: PAGE_W,
+												height: PAGE_H,
+												transform: `translateZ(${T / 2 - B - .5}px)`
+											},
+											children: [
+												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+													className: "font-serif text-lg text-zinc-100",
+													children: "Inside"
+												}),
+												/* @__PURE__ */ (0
+[TRUNCATED: file is 93002 bytes, first 40960 included]
+=== END FILE ===
+

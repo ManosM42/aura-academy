@@ -1,0 +1,1213 @@
+=== FILE: src/routes/academy.index.tsx ===
+// src/routes/academy/index.tsx
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  Ban,
+  ChevronDown,
+  ImagePlus,
+  Loader2,
+  Lock,
+  Send,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  X,
+} from "lucide-react";
+import { createAcademyPost, getAcademyFeed, getMyProfile } from "@/lib/queries";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton, EmptyState } from "@/components/aura/States";
+import PostCardPro from "@/components/aura/PostCardPro";
+import OnlineUsersPanel from "@/components/aura/OnlineUsersPanel";
+import StoriesBar from "@/components/aura/StoriesBar";
+import { CHROME_FILL, ChromeText, EASE, FRAME_BORDER } from "@/components/aura/chrome";
+import {
+  deletePostAsModerator,
+  friendlyError,
+  getBannedUsers,
+  getMyPostingStatus,
+  getPostAuthorId,
+  isModeratorRole,
+  setPostingBan,
+  type BannedUser,
+  type PostingStatus,
+} from "@/lib/academy-moderation";
+
+export const Route = createFileRoute("/academy/")({ component: AcademyPage });
+
+const PAGE_SIZE = 6;
+const MAX_CHARS = 2000;
+const MAX_IMAGE_MB = 10;
+
+/* ------------------------------------------------------------------------ */
+/*  Online users: docked on desktop, swipe-out drawer on mobile              */
+/* ------------------------------------------------------------------------ */
+
+function DraggableOnlineUsersPanel() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth < 1024 : false,
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  return (
+    <motion.div
+      drag={isMobile ? "x" : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.2}
+      onDragEnd={(_, { offset, velocity }) => {
+        if (!isMobile) return;
+        if (offset.x < -40 || velocity.x < -400) setIsOpen(true);
+        else if (offset.x > 40 || velocity.x > 400) setIsOpen(false);
+      }}
+      animate={isMobile ? { x: isOpen ? 0 : "calc(100% - 36px)" } : { x: 0 }}
+      transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
+      style={isMobile ? { willChange: "transform" } : undefined}
+      className={
+        isMobile
+          ? "fixed bottom-0 right-0 top-28 z-50 flex w-[85vw] max-w-sm flex-row"
+          : "sticky top-36 hidden w-80 shrink-0 lg:flex"
+      }
+    >
+      {isMobile && (
+        <button
+          type="button"
+          aria-label={isOpen ? "Close online users" : "Open online users"}
+          onClick={() => setIsOpen((o) => !o)}
+          className="flex w-9 shrink-0 cursor-grab items-center justify-center rounded-l-2xl border-y border-l border-white/20 bg-[#0a0a0b] shadow-[-8px_0_20px_rgba(0,0,0,0.6)] outline-none active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-white/60"
+        >
+          <span className="flex flex-col gap-1.5">
+            <span className="h-6 w-1 rounded-full" style={{ backgroundImage: CHROME_FILL }} />
+            <span className="h-6 w-1 rounded-full" style={{ backgroundImage: CHROME_FILL }} />
+          </span>
+        </button>
+      )}
+      <div
+        className={
+          isMobile
+            ? "flex-1 overflow-y-auto border-y border-white/10 bg-[#070707] shadow-2xl"
+            : "w-full"
+        }
+      >
+        <OnlineUsersPanel />
+      </div>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Page                                                                    */
+/* ------------------------------------------------------------------------ */
+
+function AcademyPage() {
+  const reduce = useReducedMotion();
+  const profile = useAsync(getMyProfile, []);
+  const feed = useAsync(getAcademyFeed, []);
+
+  const me = profile.data;
+  const isMod = isModeratorRole(me?.role);
+
+  const [status, setStatus] = useState<PostingStatus>({ banned: false, reason: null });
+  const [banned, setBanned] = useState<BannedUser[]>([]);
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // my own ban status
+  useEffect(() => {
+    if (!me?.id) return;
+    let alive = true;
+    getMyPostingStatus(me.id).then((s) => alive && setStatus(s));
+    return () => {
+      alive = false;
+    };
+  }, [me?.id]);
+
+  // moderators: the list of banned people
+  const loadBanned = useCallback(async () => {
+    try {
+      setBanned(await getBannedUsers());
+    } catch {
+      /* column missing until the SQL is applied */
+    }
+  }, []);
+  useEffect(() => {
+    if (isMod) void loadBanned();
+  }, [isMod, loadBanned]);
+
+  const bannedIds = useMemo(() => new Set(banned.map((b) => b.id)), [banned]);
+
+  // reveal the feed in small batches: fast first paint, no lag on phones
+  const total = feed.data?.length ?? 0;
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || visible >= total) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) setVisible((v) => v + PAGE_SIZE);
+      },
+      { rootMargin: "600px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [visible, total]);
+
+  const reloadFeed = useCallback(() => feed.reload?.(), [feed]);
+
+  return (
+    <main className="relative min-h-screen w-full overflow-x-hidden bg-[#070707] px-4 py-28 text-white selection:bg-white selection:text-black sm:px-6 sm:py-36 md:px-10">
+      {/* ambient glow (desktop only: keeps phones smooth) */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(1000px,130%)] -translate-x-1/2 -translate-y-1/3 rounded-full md:block"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(170,180,190,0.035) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.45, 1, 0.45] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <div className="relative mx-auto flex max-w-6xl items-start lg:gap-8">
+        <div className="mx-auto w-full min-w-0 max-w-2xl flex-1 space-y-8">
+          {/* header */}
+          <motion.header
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE }}
+          >
+            <div className="mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50">
+              <span className="h-px w-10 bg-gradient-to-r from-white/70 to-transparent" />
+              AURA Academy
+            </div>
+            <h1 className="text-3xl font-extrabold uppercase tracking-tight sm:text-5xl">
+              <ChromeText>Community Feed</ChromeText>
+            </h1>
+          </motion.header>
+
+          {me && (
+            <StoriesBar
+              currentUserId={me.id}
+              currentUserAvatar={me.avatar_url}
+              currentUserName={me.full_name}
+            />
+          )}
+
+          {profile.error && <ErrorState message={profile.error} />}
+
+          {/* composer: everyone, unless banned */}
+          {me && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: EASE, delay: 0.08 }}
+            >
+              {status.banned ? (
+                <BannedNotice reason={status.reason} />
+              ) : (
+                <Composer
+                  authorAvatar={me.avatar_url}
+                  authorName={me.full_name}
+                  onPosted={reloadFeed}
+                  onBanned={() => setStatus({ banned: true, reason: null })}
+                />
+              )}
+            </motion.div>
+          )}
+
+          {isMod && (
+            <BannedPanel
+              users={banned}
+              onUnbanned={(id) => setBanned((list) => list.filter((u) => u.id !== id))}
+            />
+          )}
+
+          {feed.loading && <LoadingSkeleton rows={4} />}
+          {feed.error && <ErrorState message={feed.error} />}
+
+          {feed.data && feed.data.length === 0 && (
+            <Surface>
+              <div className="p-8 text-center">
+                <EmptyState
+                  title="Δεν υπάρχουν αναρτήσεις ακόμη"
+                  hint="Γίνε ο πρώτος που θα μοιραστεί κάτι με την κοινότητα."
+                />
+              </div>
+            </Surface>
+          )}
+
+          {feed.data && feed.data.length > 0 && me && (
+            <div className="space-y-6">
+              {feed.data.slice(0, visible).map((post, i) => {
+                const authorId = getPostAuthorId(post);
+                const showBar = isMod && !!authorId && authorId !== me.id;
+                return (
+                  <motion.div
+                    key={post.id}
+                    // only the first few animate: the rest render instantly
+                    initial={i < 4 && !reduce ? { opacity: 0, y: 18 } : false}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.55, ease: EASE, delay: i < 4 ? 0.12 + i * 0.07 : 0 }}
+                    style={{ contentVisibility: "auto", containIntrinsicSize: "auto 420px" }}
+                  >
+                    <PostCardPro
+                      post={post}
+                      currentUserId={me.id}
+                      currentUserRole={me.role}
+                      onChanged={reloadFeed}
+                    />
+                    {showBar && (
+                      <ModBar
+                        postId={post.id}
+                        authorId={authorId!}
+                        authorBanned={bannedIds.has(authorId!)}
+                        onDeleted={reloadFeed}
+                        onBanChanged={loadBanned}
+                      />
+                    )}
+                  </motion.div>
+                );
+              })}
+
+              {visible < total && (
+                <div ref={sentinelRef} className="flex justify-center py-6" aria-hidden>
+                  <Loader2 className="size-5 animate-spin text-white/40" />
+                </div>
+              )}
+              {visible >= total && total > PAGE_SIZE && (
+                <p className="py-6 text-center text-xs uppercase tracking-[0.3em] text-white/25">
+                  Τέλος του feed
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <DraggableOnlineUsersPanel />
+      </div>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------------ */
+/*  Building blocks                                                         */
+/* ------------------------------------------------------------------------ */
+
+/** Light chrome-bordered surface (no heavy blur / shadow: smooth on phones). */
+function Surface({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`relative rounded-2xl p-px ${className}`} style={{ background: FRAME_BORDER }}>
+      <div className="relative overflow-hidden rounded-[15px] bg-[#0b0b0c]">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-16"
+          style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }}
+        />
+        <div className="relative">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Avatar({ src, name }: { src: string | null; name: string | null }) {
+  return src ? (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="size-11 shrink-0 rounded-full object-cover ring-2 ring-white/30"
+    />
+  ) : (
+    <span
+      className="flex size-11 shrink-0 items-center justify-center rounded-full text-sm font-bold text-neutral-950"
+      style={{ backgroundImage: CHROME_FILL, boxShadow: "0 0 18px rgba(255,255,255,0.3)" }}
+    >
+      {name?.[0]?.toUpperCase() ?? "A"}
+    </span>
+  );
+}
+
+function BannedNotice({ reason }: { reason: string | null }) {
+  return (
+    <Surface>
+      <div className="flex items-start gap-4 p-5">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/[0.05] text-white/80">
+          <Lock className="size-5" />
+        </span>
+        <div>
+          <p className="text-sm font-semibold text-white">Η δημοσίευση είναι απενεργοποιημένη</p>
+          <p className="mt-1 text-sm leading-relaxed text-white/55">
+            Οι διαχειριστές έχουν περιορίσει τη δυνατότητά σου να γράφεις στο feed. Μπορείς να συνεχίσεις να διαβάζεις
+            την Academy κανονικά.
+            {reason && <span className="mt-1 block text-white/40">Λόγος: {reason}</span>}
+          </p>
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+/* ------------------------------ composer ------------------------------ */
+
+function Composer({
+  authorAvatar,
+  authorName,
+  onPosted,
+  onBanned,
+}: {
+  authorAvatar: string | null;
+  authorName: string | null;
+  onPosted: () => void;
+  onBanned: () => void;
+}) {
+  const [content, setContent] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => () => {
+    if (preview) URL.revokeObjectURL(preview);
+  }, [preview]);
+
+  function pick(file: File | null) {
+    setErr(null);
+    if (file && file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      setErr(`Η εικόνα πρέπει να είναι έως ${MAX_IMAGE_MB}MB.`);
+      return;
+    }
+    setImage(file);
+    setPreview(file ? URL.createObjectURL(file) : null);
+  }
+
+  async function submit() {
+    const text = content.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await createAcademyPost(text, image ?? undefined);
+      setContent("");
+      pick(null);
+      onPosted();
+    } catch (e) {
+      const msg = (e as Error).message ?? "";
+      if (msg.includes("POSTING_BANNED")) onBanned();
+      setErr(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const left = MAX_CHARS - content.length;
+
+  return (
+    <Surface>
+      <div
+        className="p-4 sm:p-5"
+        style={focused ? { boxShadow: "inset 0 0 40px rgba(255,255,255,0.04)" } : undefined}
+      >
+        <div className="flex items-start gap-3 sm:gap-4">
+          <Avatar src={authorAvatar} name={authorName} />
+          <div className="min-w-0 flex-1">
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value.slice(0, MAX_CHARS))}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") void submit();
+              }}
+              placeholder="Μοιράσου κάτι με την κοινότητα…"
+              rows={focused || content ? 4 : 2}
+              aria-label="Νέα ανάρτηση"
+              className="w-full resize-none rounded-xl border border-white/10 bg-black/50 p-3.5 text-sm text-white outline-none transition-all duration-300 placeholder:text-white/30 focus:border-white/45 focus:bg-black/70 focus:shadow-[0_0_24px_rgba(255,255,255,0.08)]"
+            />
+
+            <AnimatePresence initial={false}>
+              {preview && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                  className="overflow-hidden"
+                >
+                  <div className="relative mt-3 inline-block">
+                    <img src={preview} alt="" className="max-h-56 max-w-full rounded-xl object-cover ring-1 ring-white/20" />
+                    <button
+                      type="button"
+                      onClick={() => pick(null)}
+                      aria-label="Αφαίρεση εικόνας"
+                      className="absolute -right-2 -top-2 rounded-full bg-black p-1.5 text-white ring-1 ring-white/30 outline-none transition-all hover:bg-white hover:text-black focus-visible:ring-2 focus-visible:ring-white"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {err && (
+              <p role="alert" className="mt-3 rounded-lg border border-white/20 bg-white/[0.05] px-3 py-2 text-xs text-white/85">
+                {err}
+              </p>
+            )}
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <label className="flex cursor-pointer items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-white/80 transition-all hover:border-white/50 hover:bg-white/[0.09] hover:text-white hover:shadow-[0_0_18px_rgba(255,255,255,0.12)] focus-within:ring-2 focus-within:ring-white/60">
+                  <ImagePlus size={14} />
+                  <span>Εικόνα</span>
+                  <input type="file" accept="image/*" className="sr-only" onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+                </label>
+                {content.length > MAX_CHARS * 0.8 && (
+                  <span className={`text-xs ${left < 100 ? "text-white" : "text-white/40"}`}>{left}</span>
+                )}
+              </div>
+
+              <motion.button
+                type="button"
+                whileHover={busy || !content.trim() ? undefined : { scale: 1.04, y: -1 }}
+                whileTap={busy || !content.trim() ? undefined : { scale: 0.96 }}
+                onClick={() => void submit()}
+                disabled={busy || !content.trim()}
+                className="group relative flex items-center gap-2 overflow-hidden rounded-full px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-neutral-950 outline-none transition-shadow duration-300 hover:shadow-[0_0_34px_rgba(255,255,255,0.4)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:opacity-40"
+                style={{ backgroundImage: CHROME_FILL, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.95), 0 0 22px rgba(255,255,255,0.15)" }}
+              >
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                <span>Δημοσίευση</span>
+              </motion.button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+/* ----------------------------- moderation ----------------------------- */
+
+function ModBar({
+  postId,
+  authorId,
+  authorBanned,
+  onDeleted,
+  onBanChanged,
+}: {
+  postId: string;
+  authorId: string;
+  authorBanned: boolean;
+  onDeleted: () => void;
+  onBanChanged: () => void;
+}) {
+  const [mode, setMode] = useState<null | "delete" | "ban">(null);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function run(fn: () => Promise<void>, after: () => void) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await fn();
+      setMode(null);
+      setReason("");
+      after();
+    } catch (e) {
+      setErr(friendlyError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const btn =
+    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold outline-none transition-all focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-40";
+  const ghost = `${btn} border-white/20 bg-white/[0.04] text-white/75 hover:border-white/60 hover:bg-white/[0.1] hover:text-white hover:shadow-[0_0_18px_rgba(255,255,255,0.15)]`;
+  const solid = `${btn} border-white bg-white text-neutral-950 hover:shadow-[0_0_24px_rgba(255,255,255,0.5)]`;
+
+  return (
+    <div className="mt-2 rounded-xl border border-white/10 bg-white/[0.025] px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-white/35">
+          <ShieldCheck className="size-3.5" /> Moderation
+        </span>
+
+        {mode !== "delete" && (
+          <button type="button" className={ghost} onClick={() => { setMode("delete"); setErr(null); }} disabled={busy}>
+            <Trash2 className="size-3.5" /> Διαγραφή
+          </button>
+        )}
+
+        {authorBanned ? (
+          <button
+            type="button"
+            className={ghost}
+            disabled={busy}
+            onClick={() => void run(() => setPostingBan(authorId, false), onBanChanged)}
+          >
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldOff className="size-3.5" />} Unban
+          </button>
+        ) : (
+          mode !== "ban" && (
+            <button type="button" className={ghost} onClick={() => { setMode("ban"); setErr(null); }} disabled={busy}>
+              <Ban className="size-3.5" /> Ban συγγραφέα
+            </button>
+          )
+        )}
+
+        {authorBanned && <span className="text-[11px] text-white/45">Ο συγγραφέας είναι αποκλεισμένος</span>}
+      </div>
+
+      <AnimatePresence initial={false}>
+        {mode && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: EASE }}
+            className="overflow-hidden"
+          >
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+              {mode === "ban" && (
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Λόγος (προαιρετικό)"
+                  maxLength={200}
+                  autoFocus
+                  className="min-w-0 flex-1 rounded-lg border border-white/15 bg-black/50 px-3 py-2 text-xs text-white outline-none placeholder:text-white/30 focus:border-white/50"
+                />
+              )}
+              {mode === "delete" && <span className="text-xs text-white/70">Να διαγραφεί οριστικά αυτή η ανάρτηση;</span>}
+              <button
+                type="button"
+                className={solid}
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    mode === "delete" ? () => deletePostAsModerator(postId) : () => setPostingBan(authorId, true, reason),
+                    mode === "delete" ? onDeleted : onBanChanged,
+                  )
+                }
+              >
+                {busy && <Loader2 className="size-3.5 animate-spin" />}
+                {mode === "delete" ? "Ναι, διαγραφή" : "Επιβεβαίωση ban"}
+              </button>
+              <button type="button" className={ghost} onClick={() => setMode(null)} disabled={busy}>
+                Άκυρο
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {err && (
+        <p role="alert" className="mt-2 text-xs text-white/80">
+          {err}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function BannedPanel({ users, onUnbanned }: { users: BannedUser[]; onUnbanned: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function unban(id: string) {
+    setBusyId(id);
+    setErr(null);
+    try {
+      await setPostingBan(id, false);
+      onUnbanned(id);
+    } catch (e) {
+      setErr(friendlyError(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <Surface>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left outline-none transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.05]"
+      >
+        <span className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
+          <ShieldCheck className="size-4 text-white" />
+          Αποκλεισμένοι χρήστες
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-bold text-neutral-950"
+            style={{ backgroundImage: CHROME_FILL }}
+          >
+            {users.length}
+          </span>
+        </span>
+        <ChevronDown className={`size-4 text-white/50 transition-transform duration-300 ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-white/10 px-5 py-3">
+              {users.length === 0 && <p className="py-3 text-sm text-white/45">Κανένας χρήστης δεν είναι αποκλεισμένος.</p>}
+              <ul className="divide-y divide-white/[0.06]">
+                {users.map((u) => (
+                  <li key={u.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar src={u.avatar_url} name={u.full_name} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{u.full_name ?? "Χωρίς όνομα"}</p>
+                        {u.reason && <p className="truncate text-xs text-white/45">{u.reason}</p>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void unban(u.id)}
+                      disabled={busyId === u.id}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/25 bg-white/[0.05] px-3.5 py-1.5 text-xs font-semibold text-white outline-none transition-all hover:border-white/60 hover:bg-white/[0.12] hover:shadow-[0_0_18px_rgba(255,255,255,0.18)] focus-visible:ring-2 focus-visible:ring-white/60 disabled:opacity-40"
+                    >
+                      {busyId === u.id ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldOff className="size-3.5" />}
+                      Unban
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {err && <p role="alert" className="pb-2 text-xs text-white/80">{err}</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Surface>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/useSubscription.ts ===
+// src/lib/useSubscription.ts
+import { useCallback, useEffect, useState } from "react";
+import { db } from "@/lib/db";
+import { isPlanId, type PlanId } from "@/lib/plans";
+
+export interface SubscriptionRow {
+  id: string;
+  user_id: string;
+  plan_id: PlanId;
+  status: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  created_at: string;
+}
+
+const ACTIVE_STATUSES = ["active", "trialing"] as const;
+const NON_CANCELLABLE_STATUSES = ["canceled", "incomplete_expired"] as const;
+const COLUMNS =
+  "id, user_id, plan_id, status, current_period_end, cancel_at_period_end, created_at";
+
+export function isActiveStatus(status: string): boolean {
+  return (ACTIVE_STATUSES as readonly string[]).includes(status);
+}
+
+export function isCancellableStatus(status: string): boolean {
+  return !(NON_CANCELLABLE_STATUSES as readonly string[]).includes(status);
+}
+
+export interface UseSubscriptionOptions {
+  includeInactive?: boolean;
+}
+
+export interface SubscriptionState {
+  subscription: SubscriptionRow | null;
+  hasAccess: boolean;
+  loading: boolean;
+  error: string | null;
+  refresh: () => void;
+}
+
+export function useSubscription(
+  userId: string | undefined,
+  options: UseSubscriptionOptions = {},
+): SubscriptionState {
+  const includeInactive = options.includeInactive ?? false;
+
+  const [subscription, setSubscription] = useState<SubscriptionRow | null>(null);
+  const [loading, setLoading] = useState<boolean>(Boolean(userId));
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  const refresh = useCallback(() => setTick((n) => n + 1), []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!userId) {
+      setSubscription(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    let query = db.from("subscriptions").select(COLUMNS).eq("user_id", userId);
+
+    if (!includeInactive) {
+      query = query.in("status", ACTIVE_STATUSES as unknown as string[]);
+    }
+
+    void query
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data, error: queryError }) => {
+        if (!active) return;
+
+        if (queryError) {
+          setError(queryError.message);
+          setSubscription(null);
+        } else if (data && isPlanId((data as SubscriptionRow).plan_id)) {
+          setSubscription(data as SubscriptionRow);
+        } else {
+          if (data) {
+            console.error("subscriptions row with unknown plan_id", data);
+            setError("Άγνωστο πακέτο στη συνδρομή.");
+          }
+          setSubscription(null);
+        }
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [userId, includeInactive, tick]);
+
+  return {
+    subscription,
+    hasAccess: subscription !== null && isActiveStatus(subscription.status),
+    loading,
+    error,
+    refresh,
+  };
+}
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/contact-CjLk65qT.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { t as db } from "./db-BETNILr1.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as Footer } from "./Footer-CDaciXSR.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/contact-CjLk65qT.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+var inputClass = "w-full rounded-lg border border-white/10 bg-[#111111] px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 transition-colors focus:border-white/35 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40";
+var labelClass = "mb-2 block text-[11px] uppercase tracking-[0.25em] text-neutral-500";
+function ContactForm() {
+	const { session } = useAuth();
+	const [kind, setKind] = (0, import_react.useState)("message");
+	const [fullName, setFullName] = (0, import_react.useState)("");
+	const [email, setEmail] = (0, import_react.useState)(session?.user?.email ?? "");
+	const [phone, setPhone] = (0, import_react.useState)("");
+	const [message, setMessage] = (0, import_react.useState)("");
+	const [preferredAt, setPreferredAt] = (0, import_react.useState)("");
+	const [consent, setConsent] = (0, import_react.useState)(false);
+	const [honeypot, setHoneypot] = (0, import_react.useState)("");
+	const [errors, setErrors] = (0, import_react.useState)({});
+	const [status, setStatus] = (0, import_react.useState)("idle");
+	const [serverError, setServerError] = (0, import_react.useState)(null);
+	function validate() {
+		const next = {};
+		if (fullName.trim().length < 2) next.full_name = "Συμπλήρωσε το ονοματεπώνυμό σου.";
+		if (!EMAIL_RE.test(email.trim())) next.email = "Δώσε ένα έγκυρο email.";
+		if (kind === "appointment") {
+			if (phone.trim().length < 8) next.phone = "Για ραντεβού χρειαζόμαστε τηλέφωνο.";
+			if (!preferredAt) next.preferred_at = "Διάλεξε ημερομηνία και ώρα.";
+			else if (new Date(preferredAt).getTime() < Date.now()) next.preferred_at = "Η ημερομηνία πρέπει να είναι στο μέλλον.";
+		}
+		if (message.trim().length < 10) next.message = "Γράψε τουλάχιστον 10 χαρακτήρες.";
+		if (!consent) next.consent = "Χρειαζόμαστε τη συγκατάθεσή σου για να σου απαντήσουμε.";
+		return next;
+	}
+	async function handleSubmit(event) {
+		event.preventDefault();
+		setServerError(null);
+		if (honeypot.trim() !== "") {
+			setStatus("sent");
+			return;
+		}
+		const nextErrors = validate();
+		setErrors(nextErrors);
+		if (Object.keys(nextErrors).length > 0) return;
+		setStatus("sending");
+		const { error } = await db.from("contact_messages").insert({
+			kind,
+			full_name: fullName.trim(),
+			email: email.trim().toLowerCase(),
+			phone: phone.trim() || null,
+			message: message.trim(),
+			preferred_at: kind === "appointment" ? new Date(preferredAt).toISOString() : null,
+			user_id: session?.user?.id ?? null
+		});
+		if (error) {
+			setStatus("error");
+			setServerError(error.message);
+			return;
+		}
+		setStatus("sent");
+		setFullName("");
+		setPhone("");
+		setMessage("");
+		setPreferredAt("");
+		setConsent(false);
+	}
+	if (status === "sent") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "rounded-2xl border border-white/15 bg-[#0A0A0A] p-8 text-center",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-xs uppercase tracking-[0.4em] text-neutral-500",
+				children: "ΕΛΗΦΘΗ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+				className: "mt-4 text-2xl font-semibold tracking-tight text-neutral-100",
+				children: kind === "appointment" ? "Το αίτημα ραντεβού στάλθηκε." : "Το μήνυμά σου στάλθηκε."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400",
+				children: "Η ομάδα της AURA απαντά συνήθως μέσα σε 1–2 εργάσιμες ημέρες στο email που έδωσες."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				type: "button",
+				onClick: () => setStatus("idle"),
+				className: "mt-6 rounded-full border border-white/20 px-6 py-2.5 text-xs uppercase tracking-[0.2em] text-neutral-200 transition-colors hover:border-white/50 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+				children: "Νέο μήνυμα"
+			})
+		]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("form", {
+		onSubmit: handleSubmit,
+		noValidate: true,
+		className: "rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("fieldset", {
+				className: "mb-7",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("legend", {
+					className: labelClass,
+					children: "Τι θέλεις να κάνεις"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "inline-flex rounded-full border border-white/10 p-1",
+					children: [{
+						value: "message",
+						label: "ΜΗΝΥΜΑ"
+					}, {
+						value: "appointment",
+						label: "ΡΑΝΤΕΒΟΥ"
+					}].map((option) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						"aria-pressed": kind === option.value,
+						onClick: () => setKind(option.value),
+						className: ["rounded-full px-5 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50", kind === option.value ? "bg-white/10 text-white" : "text-neutral-500 hover:text-neutral-200"].join(" "),
+						children: option.label
+					}, option.value))
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "grid gap-5 sm:grid-cols-2",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+							className: labelClass,
+							htmlFor: "contact-name",
+							children: "Ονοματεπώνυμο"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							id: "contact-name",
+							name: "full_name",
+							autoComplete: "name",
+							className: inputClass,
+							value: fullName,
+							onChange: (e) => setFullName(e.target.value),
+							"aria-invalid": Boolean(errors.full_name),
+							"aria-describedby": errors.full_name ? "err-name" : void 0,
+							placeholder: "Γιάννης Παπαδόπουλος"
+						}),
+						errors.full_name && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							id: "err-name",
+							className: "mt-2 text-xs text-neutral-400",
+							children: errors.full_name
+						})
+					] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+							className: labelClass,
+							htmlFor: "contact-email",
+							children: "Email"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							id: "contact-email",
+							name: "email",
+							type: "email",
+							autoComplete: "email",
+							className: inputClass,
+							value: email,
+							onChange: (e) => setEmail(e.target.value),
+							"aria-invalid": Boolean(errors.email),
+							"aria-describedby": errors.email ? "err-email" : void 0,
+							placeholder: "you@example.com"
+						}),
+						errors.email && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							id: "err-email",
+							className: "mt-2 text-xs text-neutral-400",
+							children: errors.email
+						})
+					] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+							className: labelClass,
+							htmlFor: "contact-phone",
+							children: ["Τηλέφωνο ", kind === "message" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-neutral-700",
+								children: "(προαιρετικό)"
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							id: "contact-phone",
+							name: "phone",
+							type: "tel",
+							autoComplete: "tel",
+							className: inputClass,
+							value: phone,
+							onChange: (e) => setPhone(e.target.value),
+							"aria-invalid": Boolean(errors.phone),
+							"aria-describedby": errors.phone ? "err-phone" : void 0,
+							placeholder: "+30 69XXXXXXXX"
+						}),
+						errors.phone && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							id: "err-phone",
+							className: "mt-2 text-xs text-neutral-400",
+							children: errors.phone
+						})
+					] }),
+					kind === "appointment" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+							className: labelClass,
+							htmlFor: "contact-when",
+							children: "Προτιμώμενη ημερομηνία & ώρα"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							id: "contact-when",
+							name: "preferred_at",
+							type: "datetime-local",
+							className: inputClass,
+							value: preferredAt,
+							onChange: (e) => setPreferredAt(e.target.value),
+							"aria-invalid": Boolean(errors.preferred_at),
+							"aria-describedby": errors.preferred_at ? "err-when" : void 0
+						}),
+						errors.preferred_at && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							id: "err-when",
+							className: "mt-2 text-xs text-neutral-400",
+							children: errors.preferred_at
+						})
+					] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "sm:col-span-2",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+								className: labelClass,
+								htmlFor: "contact-message",
+								children: kind === "appointment" ? "Τι θέλεις να δουλέψουμε" : "Μήνυμα"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+								id: "contact-message",
+								name: "message",
+								rows: 5,
+								className: `${inputClass} resize-y`,
+								value: message,
+								onChange: (e) => setMessage(e.target.value),
+								"aria-invalid": Boolean(errors.message),
+								"aria-describedby": errors.message ? "err-message" : void 0,
+								placeholder: "Πες μας λίγα λόγια για το επίπεδό σου και τον στόχο σου."
+							}),
+							errors.message && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								id: "err-message",
+								className: "mt-2 text-xs text-neutral-400",
+								children: errors.message
+							})
+						]
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "hidden",
+				"aria-hidden": "true",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+					htmlFor: "contact-company",
+					children: "Company"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					id: "contact-company",
+					name: "company",
+					tabIndex: -1,
+					autoComplete: "off",
+					value: honeypot,
+					onChange: (e) => setHoneypot(e.target.value)
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-6 flex items-start gap-3",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					id: "contact-consent",
+					type: "checkbox",
+					checked: consent,
+					onChange: (e) => setConsent(e.target.checked),
+					"aria-invalid": Boolean(errors.consent),
+					className: "mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-[#111111] accent-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+					htmlFor: "contact-consent",
+					className: "text-xs leading-relaxed text-neutral-400",
+					children: "Συμφωνώ να αποθηκεύσει η AURA τα στοιχεία μου για να απαντήσει στο αίτημά μου."
+				})]
+			}),
+			errors.consent && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-2 text-xs text-neutral-400",
+				children: errors.consent
+			}),
+			status === "error" && serverError && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				role: "alert",
+				className: "mt-5 rounded-lg border border-white/15 bg-[#111111] px-4 py-3 text-xs text-neutral-300",
+				children: ["Κάτι πήγε λάθος: ", serverError]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-8",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+					type: "submit",
+					disabled: status === "sending",
+					className: "w-full sm:w-auto",
+					children: status === "sending" ? "ΑΠΟΣΤΟΛΗ…" : kind === "appointment" ? "ΚΛΕΙΣΕ ΡΑΝΤΕΒΟΥ" : "ΣΤΕΙΛΕ ΜΗΝΥΜΑ"
+				})
+			})
+		]
+	});
+}
+function ContactPage() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-40",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "grid gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-16",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+					children: "CONTACT"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+					className: "mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-neutral-100 sm:text-5xl",
+					children: "ΜΙΛΑ ΜΑΣ."
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "mt-6 text-base leading-relaxed text-neutral-400",
+					children: "Ρώτα για τη μέθοδο, τα πακέτα ή την πιστοποίηση — ή κλείσε ραντεβού για να συζητήσουμε το επίπεδό σου και τους στόχους σου."
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dl", {
+					className: "mt-10 space-y-6 border-t border-white/10 pt-8",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", {
+							className: "text-[11px] uppercase tracking-[0.25em] text-neutral-600",
+							children: "Χρόνος απάντησης"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", {
+							className: "mt-2 text-sm text-neutral-300",
+							children: "1–2 εργάσιμες ημέρες"
+						})] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", {
+							className: "text-[11px] uppercase tracking-[0.25em] text-neutral-600",
+							children: "Ραντεβού"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", {
+							className: "mt-2 text-sm text-neutral-300",
+							children: "Δήλωσε προτιμώμενη ώρα και επιβεβαιώνουμε με email."
+						})] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", {
+							className: "text-[11px] uppercase tracking-[0.25em] text-neutral-600",
+							children: "Υπάρχοντες μαθητές"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", {
+							className: "mt-2 text-sm text-neutral-300",
+							children: "Για θέματα λογαριασμού ή χρέωσης, ανάφερέ το στο μήνυμά σου."
+						})] })
+					]
+				})
+			] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ContactForm, {})]
+		})
+	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Footer, {})] });
+}
+//#endregion
+export { ContactPage as component };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/avatar.tsx ===
+"use client";
+
+import * as React from "react";
+import * as AvatarPrimitive from "@radix-ui/react-avatar";
+
+import { cn } from "@/lib/utils";
+
+const Avatar = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Root
+    ref={ref}
+    className={cn("relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full", className)}
+    {...props}
+  />
+));
+Avatar.displayName = AvatarPrimitive.Root.displayName;
+
+const AvatarImage = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Image>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Image>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Image
+    ref={ref}
+    className={cn("aspect-square h-full w-full", className)}
+    {...props}
+  />
+));
+AvatarImage.displayName = AvatarPrimitive.Image.displayName;
+
+const AvatarFallback = React.forwardRef<
+  React.ElementRef<typeof AvatarPrimitive.Fallback>,
+  React.ComponentPropsWithoutRef<typeof AvatarPrimitive.Fallback>
+>(({ className, ...props }, ref) => (
+  <AvatarPrimitive.Fallback
+    ref={ref}
+    className={cn(
+      "flex h-full w-full items-center justify-center rounded-full bg-muted",
+      className,
+    )}
+    {...props}
+  />
+));
+AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName;
+
+export { Avatar, AvatarImage, AvatarFallback };
+
+=== END FILE ===
+

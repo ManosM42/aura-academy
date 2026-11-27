@@ -1,0 +1,648 @@
+=== FILE: src/routes/dashboard.tsx ===
+import { useMemo } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "motion/react";
+import {
+  getDashboard,
+  getMySkills,
+  getSkillAssignments,
+  isStaffRole,
+} from "@/lib/queries";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import SkillTreeGraph from "@/components/aura/SkillTreeGraph";
+import type { SkillCategory, SkillState, SkillWithState } from "@/lib/database.types";
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle,
+  Crown,
+  Gem,
+  Lock,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  UserCheck,
+} from "lucide-react";
+
+export const Route = createFileRoute("/dashboard")({
+  component: DashboardPage,
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Shared chrome helpers                                                     */
+/* -------------------------------------------------------------------------- */
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+const CHROME_TEXT =
+  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+const CHROME_FILL =
+  "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)";
+const FRAME_BORDER =
+  "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))";
+
+function ChromeText({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      initial={{ backgroundPosition: "0% 50%" }}
+      animate={reduce ? undefined : { backgroundPosition: "100% 50%" }}
+      transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+      style={{
+        backgroundImage: CHROME_TEXT,
+        backgroundSize: "300% auto",
+        WebkitBackgroundClip: "text",
+        backgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+      }}
+      className={`inline-block drop-shadow-[0_0_28px_rgba(255,255,255,0.45)] ${className}`}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+/** 1px chrome gradient border around a dark surface. */
+function Frame({ children, className = "", inner = "p-5 sm:p-6" }: { children: React.ReactNode; className?: string; inner?: string }) {
+  return (
+    <div
+      className={`relative rounded-2xl p-px ${className}`}
+      style={{ background: FRAME_BORDER, boxShadow: "0 0 50px rgba(0,0,0,0.85)" }}
+    >
+      <div className={`relative h-full overflow-hidden rounded-[15px] bg-[#0a0a0b] ${inner}`}>
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-20" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }} />
+        <div className="relative">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function Sheen() {
+  const reduce = useReducedMotion();
+  if (reduce) return null;
+  return (
+    <motion.span
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent"
+      animate={{ x: ["-160%", "420%"] }}
+      transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 3.2, ease: "easeInOut" }}
+      style={{ skewX: -18 }}
+    />
+  );
+}
+
+/** Animated chrome link-button. `solid` = filled chrome, otherwise glass outline. */
+function ChromeLink({
+  to,
+  params,
+  label,
+  icon,
+  solid = false,
+}: {
+  to: string;
+  params?: Record<string, string>;
+  label: string;
+  icon?: React.ReactNode;
+  solid?: boolean;
+}) {
+  return (
+    <motion.div whileHover={{ y: -2, scale: 1.03 }} whileTap={{ scale: 0.97 }} className="inline-block">
+      <Link
+        to={to as never}
+        params={params as never}
+        className={`group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold outline-none transition-shadow duration-300 focus-visible:ring-2 focus-visible:ring-white/70 ${
+          solid
+            ? "text-neutral-950 shadow-[0_0_30px_rgba(255,255,255,0.18)] hover:shadow-[0_0_46px_rgba(255,255,255,0.4)]"
+            : "border border-white/25 bg-white/[0.04] text-white hover:border-white/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.14)]"
+        }`}
+        style={solid ? { backgroundImage: CHROME_FILL, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4)" } : undefined}
+      >
+        {solid && <Sheen />}
+        {icon}
+        <span className="relative">{label}</span>
+        <ArrowRight className="relative size-4 transition-transform duration-300 group-hover:translate-x-1" />
+      </Link>
+    </motion.div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Rank + skill helpers                                                      */
+/* -------------------------------------------------------------------------- */
+
+const RANKS = [
+  { key: "initiate", label: "Initiate", min: 0, Icon: Shield },
+  { key: "apprentice", label: "Apprentice", min: 100, Icon: Star },
+  { key: "artisan", label: "Artisan", min: 300, Icon: Gem },
+  { key: "master", label: "Master", min: 700, Icon: Crown },
+  { key: "legend", label: "Legend", min: 1500, Icon: Sparkles },
+] as const;
+
+function getRankForPoints(points: number) {
+  let rank: (typeof RANKS)[number] = RANKS[0];
+  for (const r of RANKS) if (points >= r.min) rank = r;
+  return rank;
+}
+
+const CATEGORY_LABEL: Record<SkillCategory, string> = {
+  foundation: "Foundation",
+  technical: "Technical",
+  analysis: "Analysis",
+  design: "Design",
+  business: "Business",
+  educator: "Educator",
+};
+
+const STATE_CLASS: Record<SkillState, string> = {
+  locked: "border-white/10 bg-white/[0.03] text-white/35",
+  learning: "border-white/20 bg-white/[0.07] text-white/65",
+  practicing: "border-white/35 bg-white/[0.12] text-white/85",
+  verified: "border-white/70 bg-white/[0.18] text-white shadow-[0_0_16px_rgba(255,255,255,0.35)]",
+  mastered: "border-white bg-white text-neutral-950 shadow-[0_0_22px_rgba(255,255,255,0.6)]",
+};
+
+const ACHIEVED_STATES: SkillState[] = ["verified", "mastered"];
+
+function isAchieved(skill: SkillWithState): boolean {
+  return ACHIEVED_STATES.includes(skill.userSkill?.state ?? "locked");
+}
+
+function isUnlocked(skill: SkillWithState, all: SkillWithState[]): boolean {
+  if (!skill.prerequisites || skill.prerequisites.length === 0) return true;
+  return skill.prerequisites.every((prereqId) => {
+    const prereq = all.find((s) => s.id === prereqId);
+    return prereq ? isAchieved(prereq) : false;
+  });
+}
+
+/** Maps a review decision to the label students see (no numeric scores). */
+function decisionLabel(decision: string | null | undefined): { text: string; ok: boolean } | null {
+  if (!decision) return null;
+  if (decision === "passed") return { text: "Verified", ok: true };
+  if (decision === "needs_revision") return { text: "Needs revision", ok: false };
+  return { text: "Not passed", ok: false };
+}
+
+function DecisionBadge({ decision }: { decision: string | null | undefined }) {
+  const d = decisionLabel(decision);
+  if (!d) return <span className="text-white/40">—</span>;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${
+        d.ok
+          ? "border-white bg-white text-neutral-950 shadow-[0_0_24px_rgba(255,255,255,0.55)]"
+          : "border-white/25 bg-white/[0.06] text-white/75"
+      }`}
+    >
+      {d.ok && <ShieldCheck className="size-3.5" />}
+      {d.text}
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Page                                                                      */
+/* -------------------------------------------------------------------------- */
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.09 } } };
+const item = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } },
+};
+
+function DashboardPage() {
+  const reduce = useReducedMotion();
+  const { data, error, loading } = useAsync(getDashboard, []);
+  const staff = data ? isStaffRole(data.profile.role) : false;
+
+  const skills = useAsync(getMySkills, []);
+  const assignments = useAsync(getSkillAssignments, []);
+
+  const rank = useMemo(() => getRankForPoints(data?.profile?.points ?? 0), [data?.profile]);
+
+  const nextSkill = useMemo(() => {
+    if (!skills.data) return null;
+    return skills.data.find((s) => !isAchieved(s) && isUnlocked(s, skills.data!)) ?? null;
+  }, [skills.data]);
+
+  const nextAssignmentId = nextSkill ? assignments.data?.[nextSkill.id] : null;
+
+  const groupedSkills = useMemo(() => {
+    if (!skills.data) return {};
+    return skills.data.reduce<Record<string, SkillWithState[]>>((acc, s) => {
+      (acc[s.category] ??= []).push(s);
+      return acc;
+    }, {});
+  }, [skills.data]);
+
+  return (
+    <main className="relative min-h-screen w-full overflow-x-hidden bg-[#070707] px-4 py-12 text-white selection:bg-white selection:text-black sm:px-6 md:px-10">
+      {/* ambient chrome glow */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {loading && (
+        <div className="relative mx-auto max-w-5xl">
+          <LoadingSkeleton rows={3} />
+        </div>
+      )}
+      {error && (
+        <div className="relative mx-auto max-w-5xl">
+          <ErrorState message={error} />
+        </div>
+      )}
+
+      {data && (
+        <motion.div variants={container} initial="hidden" animate="show" className="relative mx-auto max-w-6xl space-y-10">
+          {/* header */}
+          <motion.header variants={item} className="flex flex-col gap-5 border-b border-white/10 pb-8 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50">
+                <span className="h-px w-10 bg-gradient-to-r from-white/70 to-transparent" />
+                AURA Command Center
+              </div>
+              <h1 className="text-3xl font-extrabold uppercase tracking-tight sm:text-5xl">
+                <ChromeText>
+                  Καλωσήρθες{data.profile.full_name ? `, ${data.profile.full_name}` : ""}.
+                </ChromeText>
+              </h1>
+            </div>
+
+           
+          </motion.header>
+
+          {/* stats */}
+          <motion.div variants={item} className="grid gap-5 sm:grid-cols-3">
+            <StatCard
+              label="Verified skills"
+              icon={<ShieldCheck className="size-5" />}
+              value={
+                <span className="text-4xl font-extrabold tracking-tight text-white">
+                  {data.verifiedSkills}
+                  <span className="text-white/35"> / {data.totalSkills}</span>
+                </span>
+              }
+            />
+            <StatCard
+              label="Ανοιχτές υποβολές"
+              icon={<CheckCircle className="size-5" />}
+              value={<span className="text-4xl font-extrabold tracking-tight text-white">{data.openSubmissions}</span>}
+            />
+            <StatCard
+              label="Τελευταίο αποτέλεσμα"
+              icon={<Sparkles className="size-5" />}
+              value={
+                data.latestReview ? (
+                  <DecisionBadge decision={data.latestReview.decision} />
+                ) : (
+                  <span className="text-4xl font-extrabold text-white/40">—</span>
+                )
+              }
+            />
+          </motion.div>
+
+          {/* skill tree */}
+          {skills.data && skills.data.length > 0 && (
+            <motion.div variants={item} className="space-y-4">
+              <SectionTitle>Skill Progression Tree</SectionTitle>
+              <p className="-mt-2 px-1 text-xs leading-relaxed text-white/50">
+                Locked → Learning → Practicing → Verified → Mastered. Για να ξεκλειδώσεις ένα skill πρέπει πρώτα να έχεις verified όλα τα προαπαιτούμενά του.
+              </p>
+              <Frame className="w-full" inner="p-4 sm:p-6">
+                <SkillTreeGraph skills={skills.data} />
+              </Frame>
+            </motion.div>
+          )}
+
+          {/* categorized skills */}
+          {skills.data && skills.data.length > 0 && (
+            <motion.div variants={item} className="space-y-6">
+              <SectionTitle>Αναλυτική Λίστα Skills</SectionTitle>
+              <div className="space-y-9">
+                {(Object.keys(groupedSkills) as SkillCategory[]).map((cat) => (
+                  <section key={cat} className="space-y-3">
+                    <h3 className="flex items-center gap-3 px-1 text-xs font-medium uppercase tracking-[0.3em] text-white/45">
+                      {CATEGORY_LABEL[cat] ?? cat}
+                      <span className="h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" />
+                    </h3>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {groupedSkills[cat]!.map((s, i) => {
+                        const state = s.userSkill?.state ?? "locked";
+                        const achieved = isAchieved(s);
+                        const unlocked = isUnlocked(s, skills.data!);
+                        const assignmentId = assignments.data?.[s.id];
+                        const missingPrereqs = (s.prerequisites ?? [])
+                          .map((id) => skills.data!.find((sk) => sk.id === id))
+                          .filter((sk) => sk && !isAchieved(sk));
+
+                        return (
+                          <motion.div
+                            key={s.id}
+                            initial={{ opacity: 0, y: 16 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-40px" }}
+                            transition={{ duration: 0.6, ease: EASE, delay: (i % 4) * 0.06 }}
+                            whileHover={{ y: -4 }}
+                            className="group relative"
+                          >
+                            <Frame inner="p-5">
+                              <div className="flex items-start justify-between gap-3">
+                                <h4 className="text-sm font-semibold text-white">{s.name}</h4>
+                                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${STATE_CLASS[state]}`}>
+                                  {state}
+                                </span>
+                              </div>
+                              {s.definition && (
+                                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-white/50">{s.definition}</p>
+                              )}
+                              {s.userSkill?.verified_at && (
+                                <p className="mt-3 text-xs text-white/40">
+                                  Verified {new Date(s.userSkill.verified_at).toLocaleDateString("el-GR")}
+                                </p>
+                              )}
+
+                              <div className="mt-4 border-t border-white/[0.07] pt-4">
+                                {achieved ? (
+                                  <span className="flex items-center gap-2 text-xs font-semibold text-white">
+                                    <ShieldCheck className="size-4" /> Ολοκληρώθηκε
+                                  </span>
+                                ) : unlocked ? (
+                                  assignmentId ? (
+                                    <ChromeLink
+                                      to="/practice/$assignmentId"
+                                      params={{ assignmentId }}
+                                      label="Ανέβασε φωτογραφία κουρέματος"
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-white/35">Δεν έχει οριστεί assignment ακόμη.</span>
+                                  )
+                                ) : (
+                                  <span className="flex items-center gap-2 text-xs text-white/40">
+                                    <Lock className="size-3.5 shrink-0" />
+                                    Χρειάζεται πρώτα: {missingPrereqs.map((p) => p!.name).join(", ")}
+                                  </span>
+                                )}
+                              </div>
+                            </Frame>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* continue + feedback */}
+          <motion.div variants={item} className="grid gap-8 md:grid-cols-2">
+            <Panel title="Continue learning">
+              {data.continueLesson ? (
+                <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.99 }}>
+                  <Link to="/lesson/$lessonId" params={{ lessonId: data.continueLesson.id }} className="group block outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-2xl">
+                    <Frame inner="p-5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-4">
+                          <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/[0.06] text-white transition-shadow duration-300 group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+                            <BookOpen className="size-5" />
+                          </span>
+                          <span className="truncate text-sm font-semibold text-white">{data.continueLesson.title}</span>
+                        </div>
+                        <span
+                          className="flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-950 transition-transform duration-300 group-hover:translate-x-1"
+                          style={{ backgroundImage: CHROME_FILL }}
+                        >
+                          <ArrowRight className="size-4" />
+                        </span>
+                      </div>
+                    </Frame>
+                  </Link>
+                </motion.div>
+              ) : (
+                <Frame inner="p-5">
+                  <p className="text-sm text-white/60">
+                    Δεν υπάρχει μάθημα σε εξέλιξη.{" "}
+                    <Link to="/academy" className="text-white underline underline-offset-4 hover:text-white/80">
+                      Πήγαινε στην Academy
+                    </Link>
+                    .
+                  </p>
+                </Frame>
+              )}
+            </Panel>
+
+            <Panel title="Recent feedback">
+              <Frame inner="p-5">
+                {data.latestReview ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs uppercase tracking-[0.25em] text-white/45">Evaluation</span>
+                      <DecisionBadge decision={data.latestReview.decision} />
+                    </div>
+                    {data.latestReview.next_actions && (
+                      <p className="border-t border-white/10 pt-3 text-sm leading-relaxed text-white/75">
+                        {data.latestReview.next_actions}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/45">Δεν υπάρχει feedback ακόμη.</p>
+                )}
+              </Frame>
+            </Panel>
+          </motion.div>
+
+          {/* next submission */}
+          <motion.div variants={item}>
+            <Panel title="Επόμενη υποβολή">
+              {nextSkill ? (
+                nextAssignmentId ? (
+                  <Frame inner="p-5 sm:p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="text-sm text-white/85">
+                        Ανέβασε φωτογραφία για:{" "}
+                        <span className="font-semibold text-white underline decoration-white/40 underline-offset-4">{nextSkill.name}</span>
+                      </span>
+                      <ChromeLink to="/practice/$assignmentId" params={{ assignmentId: nextAssignmentId }} label="Υποβολή" solid />
+                    </div>
+                  </Frame>
+                ) : (
+                  <Frame inner="p-5">
+                    <p className="text-sm text-white/60">
+                      Το επόμενο skill (<span className="font-medium text-white">{nextSkill.name}</span>) δεν έχει ακόμη assignment.
+                    </p>
+                  </Frame>
+                )
+              ) : skills.data ? (
+                <Frame inner="p-5">
+                  <p className="flex items-center gap-3 text-sm text-white/85">
+                    <ShieldCheck className="size-5 text-white" />
+                    Έχεις ολοκληρώσει όλα τα διαθέσιμα skills προς το παρόν.
+                  </p>
+                </Frame>
+              ) : (
+                <Frame inner="p-5">
+                  <p className="text-sm text-white/40">Φόρτωση…</p>
+                </Frame>
+              )}
+            </Panel>
+          </motion.div>
+
+          {/* nav */}
+          <motion.nav variants={item} className="flex flex-wrap gap-4 border-t border-white/10 pt-8">
+            <ChromeLink to="/academy" label="Academy" />
+            {staff && <ChromeLink to="/review" label="Review Queue" icon={<UserCheck className="size-4" />} solid />}
+          </motion.nav>
+        </motion.div>
+      )}
+    </main>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Small components                                                          */
+/* -------------------------------------------------------------------------- */
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="flex items-center gap-3 px-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/65">
+      <span className="size-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+      {children}
+    </h2>
+  );
+}
+
+function Panel({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4">
+      <SectionTitle>{title}</SectionTitle>
+      {children}
+    </section>
+  );
+}
+
+function StatCard({ label, value, icon }: { label: string; value: React.ReactNode; icon: React.ReactNode }) {
+  return (
+    <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.25 }} className="group relative">
+      <Frame inner="p-6">
+        <div className="absolute right-0 top-0 text-white/35 transition-all duration-300 group-hover:text-white group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+          {icon}
+        </div>
+        <p className="text-xs uppercase tracking-[0.25em] text-white/50">{label}</p>
+        <div className="mt-4 flex min-h-[2.5rem] items-center">{value}</div>
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      </Frame>
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: supabase/migrations/20260830123128_25d91fd7-e547-417a-ba99-382438670e3c.sql ===
+CREATE TABLE public.profiles (
+  id uuid PRIMARY KEY,
+  display_name text NOT NULL DEFAULT '' CHECK (char_length(display_name) <= 80),
+  avatar_url text CHECK (avatar_url IS NULL OR char_length(avatar_url) <= 2048),
+  barber_level text NOT NULL DEFAULT 'foundation' CHECK (barber_level IN ('foundation', 'developing', 'advanced', 'master')),
+  bio text NOT NULL DEFAULT '' CHECK (char_length(bio) <= 500),
+  location text NOT NULL DEFAULT '' CHECK (char_length(location) <= 120),
+  preferences jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(preferences) = 'object'),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles TO authenticated;
+GRANT ALL ON public.profiles TO service_role;
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Members can view their own profile"
+ON public.profiles FOR SELECT TO authenticated
+USING (auth.uid() = id);
+
+CREATE POLICY "Members can create their own profile"
+ON public.profiles FOR INSERT TO authenticated
+WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Members can update their own profile"
+ON public.profiles FOR UPDATE TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Members can delete their own profile"
+ON public.profiles FOR DELETE TO authenticated
+USING (auth.uid() = id);
+
+CREATE OR REPLACE FUNCTION public.update_profile_timestamp()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER profiles_updated_at
+BEFORE UPDATE ON public.profiles
+FOR EACH ROW EXECUTE FUNCTION public.update_profile_timestamp();
+
+CREATE OR REPLACE FUNCTION public.handle_new_user_profile()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public.profiles (id, display_name, avatar_url)
+  VALUES (
+    NEW.id,
+    LEFT(COALESCE(NEW.raw_user_meta_data ->> 'display_name', NEW.raw_user_meta_data ->> 'full_name', ''), 80),
+    NULLIF(LEFT(COALESCE(NEW.raw_user_meta_data ->> 'avatar_url', ''), 2048), '')
+  );
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER on_auth_user_created_profile
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_profile();
+=== END FILE ===
+
+=== FILE: .output/public/assets/queries-B7Arqryn.js ===
+import{t as e}from"./supabase-DXn9ZPwL.js";async function t(){let{data:t,error:n}=await e.auth.getUser();if(n||!t.user)throw Error(`Δεν υπάρχει ενεργή συνεδρία.`);return t.user.id}async function n(){let n=await t(),{data:r,error:i}=await e.from(`profiles`).select(`*`).eq(`id`,n).single();if(i)throw i;return r}var r=[`educator`,`senior_educator`,`content_manager`,`operations`,`admin`,`super_admin`],i=e=>r.includes(e);async function a(t){let{data:n,error:r}=await e.from(`courses`).select(`*, modules(*, lessons(*))`).eq(`slug`,t).single();if(r)throw r;let i=n;i.modules=(i.modules??[]).sort((e,t)=>e.sort_order-t.sort_order);for(let e of i.modules)e.lessons=(e.lessons??[]).sort((e,t)=>e.sort_order-t.sort_order);return i}async function o(t){let{data:n,error:r}=await e.from(`lessons`).select(`*`).eq(`id`,t).single();if(r)throw r;return n}async function s(n){let r=await t(),{data:i,error:a}=await e.from(`lesson_progress`).select(`*`).eq(`user_id`,r).eq(`lesson_id`,n).maybeSingle();if(a)throw a;return i??null}async function c(n,r){let i=await t(),{error:a}=await e.from(`lesson_progress`).upsert({user_id:i,lesson_id:n,...r,completed_at:r.completed?new Date().toISOString():null},{onConflict:`user_id,lesson_id`});if(a)throw a}async function l(t){let{data:n,error:r}=await e.from(`assignments`).select(`*`).eq(`id`,t).single();if(r)throw r;return n}async function u(n){let r=await t(),{data:i,error:a}=await e.from(`submissions`).select(`*`).eq(`assignment_id`,n).eq(`user_id`,r).order(`created_at`,{ascending:!1}).limit(1).maybeSingle();if(a)throw a;if(i)return i;let{data:o,error:s}=await e.from(`submissions`).insert({assignment_id:n,user_id:r,status:`draft`}).select(`*`).single();if(s)throw s;return o}async function d(n,r,i){let a=await t(),o=i.name.replace(/[^\w.\-]/g,`_`),s=`${a}/${n}/${r}-${Date.now()}-${o}`,{error:c}=await e.storage.from(`submissions`).upload(s,i,{upsert:!1});if(c)throw c;return s}async function f(t){let{data:n,error:r}=await e.storage.from(`submissions`).createSignedUrl(t,3600);if(r)throw r;return n.signedUrl}async function p(t,n){let{error:r}=await e.from(`submissions`).update(n).eq(`id`,t);if(r)throw r}async function m(t){let{error:n}=await e.from(`submissions`).update({status:`submitted`,submitted_at:new Date().toISOString()}).eq(`id`,t);if(n)throw n}async function h(t){let{data:n,error:r}=await e.from(`reviews`).select(`*`).eq(`submission_id`,t).order(`created_at`,{ascending:!1}).limit(1).maybeSingle();if(r)throw r;return n??null}async function g(){let n=await t(),[{data:r,error:i},{data:a,error:o}]=await Promise.all([e.from(`skills`).select(`*`).order(`sort_order`),e.from(`user_skills`).select(`*`).eq(`user_id`,n)]);if(i)throw i;if(o)throw o;let s=new Map;return(a??[]).forEach(e=>s.set(e.skill_id,e)),(r??[]).map(e=>({...e,userSkill:s.get(e.id)??null}))}async function _(){let{data:t,error:n}=await e.from(`assignments`).select(`id, skill_id`).not(`skill_id`,`is`,null);if(n)throw n;let r={};for(let e of t??[])r[e.skill_id]=e.id;return r}async function v(){let{data:t,error:n}=await e.from(`submissions`).select(`*, assignment:assignments(id,title), student:profiles!submissions_user_id_fkey(id,full_name)`).in(`status`,[`submitted`,`in_review`,`needs_revision`]).order(`submitted_at`,{ascending:!0});if(n)throw n;return t??[]}async function y(t){let{data:n,error:r}=await e.from(`submissions`).select(`*, assignment:assignments(*, skill:skills(id,name)), student:profiles!submissions_user_id_fkey(id,full_name,level)`).eq(`id`,t).single();if(r)throw r;let{data:i,error:a}=await e.from(`reviews`).select(`*`).eq(`submission_id`,t).order(`created_at`,{ascending:!1});if(a)throw a;return{submission:n,history:i??[]}}async function b(t){let{data:n,error:r}=await e.rpc(`submit_review`,{p_submission_id:t.submissionId,p_score:t.score,p_rubric_scores:t.rubricScores,p_strengths:t.strengths,p_technical_gaps:t.technicalGaps,p_method_gaps:t.methodGaps,p_next_actions:t.nextActions,p_decision:t.decision});if(r)throw r;return n}async function x(){let r=await t(),i=await n(),[a,o,s,c,l]=await Promise.all([e.from(`skills`).select(`id`,{count:`exact`,head:!0}),e.from(`user_skills`).select(`skill_id`,{count:`exact`,head:!0}).eq(`user_id`,r).in(`state`,[`verified`,`mastered`]),e.from(`lesson_progress`).select(`lesson_id, lessons(id,title)`).eq(`user_id`,r).eq(`completed`,!1).order(`updated_at`,{ascending:!1}).limit(1).maybeSingle(),e.from(`reviews`).select(`*, submissions!inner(user_id)`).eq(`submissions.user_id`,r).order(`created_at`,{ascending:!1}).limit(1).maybeSingle(),e.from(`submissions`).select(`id`,{count:`exact`,head:!0}).eq(`user_id`,r).in(`status`,[`submitted`,`in_review`,`needs_revision`])]),u=s.data;return{profile:i,verifiedSkills:o.count??0,totalSkills:a.count??0,continueLesson:u?.lessons??null,latestReview:c.data??null,openSubmissions:l.count??0}}async function S(){let[t,n,r,i]=await Promise.all([e.from(`profiles`).select(`id`,{count:`exact`,head:!0}),e.from(`profiles`).select(`id`,{count:`exact`,head:!0}).eq(`role`,`student`),e.from(`submissions`).select(`id`,{count:`exact`,head:!0}).in(`status`,[`submitted`,`in_review`,`needs_revision`]),e.from(`courses`).select(`id`,{count:`exact`,head:!0}).eq(`status`,`published`)]);if(t.error)throw t.error;if(n.error)throw n.error;if(r.error)throw r.error;if(i.error)throw i.error;let a=t.count??0,o=n.count??0;return{totalUsers:a,students:o,staff:Math.max(a-o,0),pendingReviews:r.count??0,publishedCourses:i.count??0}}async function C(){let{data:t,error:n}=await e.from(`profiles`).select(`*`).order(`updated_at`,{ascending:!1});if(n)throw n;return t??[]}async function w(t,n){let{error:r}=await e.from(`profiles`).update({role:n}).eq(`id`,t);if(r)throw r}async function T(t,n){let{error:r}=await e.from(`profiles`).update({status:n}).eq(`id`,t);if(r)throw r}async function E(t=50){let{data:n,error:r}=await e.from(`audit_log`).select(`*`).order(`created_at`,{ascending:!1}).limit(t);if(r)throw r;return n??[]}async function D(n){let r=await t(),{data:i,error:a}=await e.from(`profiles`).update(n).eq(`id`,r).select(`*`).single();if(a)throw a;return i}async function O(n){let r=await t();if(!n.type.startsWith(`image/`))throw Error(`Επίτρεψε μόνο εικόνες για το avatar.`);if(n.size>5242880)throw Error(`Η εικόνα ξεπερνά τα 5MB.`);let i=n.name.split(`.`).pop()?.toLowerCase()||`jpg`,a=`${r}/avatar-${Date.now()}.${i}`,{error:o}=await e.storage.from(`avatars`).upload(a,n,{upsert:!0,contentType:n.type});if(o)throw o;let{data:s}=e.storage.from(`avatars`).getPublicUrl(a);return s.publicUrl}async function k(){let{data:t,error:n}=await e.from(`academy_posts`).select(`id, content, image_url, created_at,
+       author:profiles!academy_posts_author_id_fkey(id,full_name,avatar_url,role),
+       likes:academy_post_likes(user_id),
+       comments:academy_post_comments(
+         id, content, created_at,
+         author:profiles!academy_post_comments_author_id_fkey(id,full_name,avatar_url,role)
+       )`).order(`created_at`,{ascending:!1});if(n)throw n;return t??[]}async function A(n,r){let i=await t(),a=null;if(r){let t=r.name.split(`.`).pop()?.toLowerCase()||`jpg`,n=`${i}/${Date.now()}.${t}`,{error:o}=await e.storage.from(`academy-posts`).upload(n,r,{upsert:!1,contentType:r.type});if(o)throw o;let{data:s}=e.storage.from(`academy-posts`).getPublicUrl(n);a=s.publicUrl}let{error:o}=await e.from(`academy_posts`).insert({author_id:i,content:n,image_url:a});if(o)throw o}async function j(n,r){let i=await t();if(r){let{error:t}=await e.from(`academy_post_likes`).delete().eq(`post_id`,n).eq(`user_id`,i);if(t)throw t}else{let{error:t}=await e.from(`academy_post_likes`).insert({post_id:n,user_id:i});if(t)throw t}}async function M(n,r){let i=await t(),{error:a}=await e.from(`academy_post_comments`).insert({post_id:n,author_id:i,content:r});if(a)throw a}async function N(t){let{error:n}=await e.from(`academy_posts`).delete().eq(`id`,t);if(n)throw n}async function P(){let n=await t(),r=new Date().toISOString(),[{data:i,error:a},{data:o,error:s}]=await Promise.all([e.from(`stories`).select(`id, author_id, media_url, media_type, audio_url, audio_title, created_at, expires_at,
+           author:profiles!stories_author_id_fkey(id, full_name, avatar_url)`).gt(`expires_at`,r).order(`created_at`,{ascending:!0}),e.from(`story_views`).select(`story_id`).eq(`viewer_id`,n)]);if(a)throw a;if(s)throw s;let c=new Set((o??[]).map(e=>e.story_id)),l=new Map;for(let e of i??[])e.author&&(l.has(e.author.id)||l.set(e.author.id,{author:e.author,stories:[],allViewed:!0}),l.get(e.author.id).stories.push({id:e.id,author_id:e.author_id,media_url:e.media_url,media_type:e.media_type,audio_url:e.audio_url,audio_title:e.audio_title,created_at:e.created_at,expires_at:e.expires_at}));for(let e of l.values())e.allViewed=e.stories.every(e=>c.has(e.id));let u=Array.from(l.values());return u.sort((e,t)=>{if(e.author.id===n)return-1;if(t.author.id===n)return 1;if(e.allViewed!==t.allViewed)return e.allViewed?1:-1;let r=e.stories.at(-1)?.created_at??``;return(t.stories.at(-1)?.created_at??``).localeCompare(r)}),u}async function F(n,r){let i=await t(),a=n.type.startsWith(`image/`),o=n.type.startsWith(`video/`);if(!a&&!o)throw Error(`Επίτρεψε μόνο εικόνες ή βίντεο για το story.`);let s=o?52428800:10485760;if(n.size>s)throw Error(o?`Το βίντεο ξεπερνά τα 50MB.`:`Η εικόνα ξεπερνά τα 10MB.`);let c=n.name.split(`.`).pop()?.toLowerCase()||(o?`mp4`:`jpg`),l=`${i}/${Date.now()}.${c}`,{error:u}=await e.storage.from(`stories`).upload(l,n,{upsert:!1,contentType:n.type});if(u)throw u;let{data:d}=e.storage.from(`stories`).getPublicUrl(l),f=null;if(r){if(r.file.size>10485760)throw Error(`Το αρχείο ήχου ξεπερνά τα 10MB.`);let t=r.file.name.split(`.`).pop()?.toLowerCase()||`mp3`,n=`${i}/audio-${Date.now()}.${t}`,{error:a}=await e.storage.from(`stories`).upload(n,r.file,{upsert:!1,contentType:r.file.type});if(a)throw a;let{data:o}=e.storage.from(`stories`).getPublicUrl(n);f=o.publicUrl}let{error:p}=await e.from(`stories`).insert({author_id:i,media_url:d.publicUrl,media_type:o?`video`:`image`,audio_url:f,audio_title:r?.title??null});if(p)throw p}async function I(n){let r=await t(),{error:i}=await e.from(`story_views`).upsert({story_id:n,viewer_id:r},{onConflict:`story_id,viewer_id`});if(i)throw i}async function L(t){let{error:n}=await e.from(`stories`).delete().eq(`id`,t);if(n)throw n}async function R(n,r,i){let a=await t(),o=i.name.replace(/[^\w.\-]/g,`_`),s=`${a}/${n}/${r}-${Date.now()}-${o}`,{error:c}=await e.storage.from(`haircut-media`).upload(s,i,{upsert:!1});if(c)throw c;return s}async function z(t){let{data:n,error:r}=await e.storage.from(`haircut-media`).createSignedUrl(t,3600);if(r)throw r;return n.signedUrl}async function B(n){let r=await t(),{data:i,error:a}=await e.from(`haircut_reviews`).insert({user_id:r,method_description:n.methodDescription,technique:n.technique||null,tools:n.tools||null,notes:n.notes||null}).select(`id`).single();if(a)throw a;let o=i.id,[s,c,l]=await Promise.all([Promise.all(n.before.map(e=>R(o,`before`,e))),Promise.all(n.process.map(e=>R(o,`process`,e))),Promise.all(n.after.map(e=>R(o,`after`,e)))]),{error:u}=await e.from(`haircut_reviews`).update({before_media:s,process_media:c,after_media:l}).eq(`id`,o);if(u)throw u;return o}async function V(){let{data:t,error:n}=await e.from(`haircut_reviews`).select(`*, student:profiles!haircut_reviews_user_id_fkey(id,full_name)`).eq(`status`,`pending`).order(`created_at`,{ascending:!0});if(n)throw n;return t??[]}async function H(t){let{data:n,error:r}=await e.from(`haircut_reviews`).select(`*, student:profiles!haircut_reviews_user_id_fkey(id,full_name,level)`).eq(`id`,t).single();if(r)throw r;return n}async function U(t){let{error:n}=await e.rpc(`submit_haircut_review`,{p_haircut_review_id:t.haircutReviewId,p_score:t.score,p_feedback:t.feedback});if(n)throw n}export{p as A,O as B,_ as C,i as D,U as E,m as F,j as I,D as L,f as M,B as N,I as O,b as P,w as R,v as S,h as T,d as V,o as _,L as a,g as b,S as c,E as d,a as f,V as g,H as h,N as i,z as j,c as k,C as l,x as m,A as n,k as o,t as p,F as r,P as s,M as t,l as u,s as v,y as w,u as x,n as y,T as z};
+=== END FILE ===
+
+=== FILE: .output/public/assets/useSubscription-CI-f8eKe.js ===
+import{r as e}from"./jsx-runtime-BkSabwWG.js";import{r as t}from"./useRouter-C8taXhX3.js";import{r as n}from"./plans-BkcWWgXs.js";import{t as r}from"./db-DXn9ZPwL.js";var i=e(t(),1),a=[`active`,`trialing`],o=[`canceled`,`incomplete_expired`],s=`id, user_id, plan_id, status, current_period_end, cancel_at_period_end, created_at`;function c(e){return a.includes(e)}function l(e){return!o.includes(e)}function u(e,t={}){let o=t.includeInactive??!1,[l,u]=(0,i.useState)(null),[d,f]=(0,i.useState)(!!e),[p,m]=(0,i.useState)(null),[h,g]=(0,i.useState)(0),_=(0,i.useCallback)(()=>g(e=>e+1),[]);return(0,i.useEffect)(()=>{let t=!0;if(!e){u(null),f(!1),m(null);return}f(!0),m(null);let i=r.from(`subscriptions`).select(s).eq(`user_id`,e);return o||(i=i.in(`status`,a)),i.order(`created_at`,{ascending:!1}).limit(1).maybeSingle().then(({data:e,error:r})=>{t&&(r?(m(r.message),u(null)):e&&n(e.plan_id)?u(e):(e&&(console.error(`subscriptions row with unknown plan_id`,e),m(`Άγνωστο πακέτο στη συνδρομή.`)),u(null)),f(!1))}),()=>{t=!1}},[e,o,h]),{subscription:l,hasAccess:l!==null&&c(l.status),loading:d,error:p,refresh:_}}export{l as n,u as r,c as t};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/checkout.index-C-YhEBgD.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+import { r as isPlanId } from "./plans-sHsWJraA.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/checkout.index-C-YhEBgD.js
+var $$splitComponentImporter = () => import("./checkout.index-Bq5_y1Lf.mjs");
+var Route = createFileRoute("/checkout/")({
+	validateSearch: (search) => ({ plan: isPlanId(search["plan"]) ? search["plan"] : void 0 }),
+	head: () => ({ meta: [{ title: "AURA — Checkout" }] }),
+	component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+

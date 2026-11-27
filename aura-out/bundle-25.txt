@@ -1,0 +1,1191 @@
+=== FILE: .output/server/_ssr/EliteCommunity-B2fe86f_.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { t as db } from "./db-BETNILr1.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { Et as ChevronLeft, I as Pencil, L as Paperclip, Q as Library, T as Send, Tt as ChevronRight, Vt as ArrowDown, Z as LoaderCircle, _t as Copy, b as Smile, c as User, ct as Gem, g as Trash2, gt as Crown, ht as Ellipsis, j as Plus, k as Reply, lt as FileText, n as X, ot as GraduationCap, s as Users, wt as CircleAlert } from "../_libs/lucide-react.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/EliteCommunity-B2fe86f_.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var sb = db;
+var BUCKET = "elite-chat";
+var SELECT = "*, reactions:elite_reactions(user_id, emoji)";
+var TYPING_TTL_MS = 4e3;
+function displayName(m) {
+	return m?.full_name?.trim() || m?.username || "Member";
+}
+function sortMessages(list) {
+	return [...list].sort((a, b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0);
+}
+function errMessage(e, fallback) {
+	if (e && typeof e === "object" && "message" in e && typeof e.message === "string") return e.message;
+	return fallback;
+}
+function safeFileName(name) {
+	return name.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
+}
+function useEliteChat(meId) {
+	const [messages, setMessages] = (0, import_react.useState)([]);
+	const [members, setMembers] = (0, import_react.useState)({});
+	const [memberIds, setMemberIds] = (0, import_react.useState)([]);
+	const [reads, setReads] = (0, import_react.useState)({});
+	const [initialRead, setInitialRead] = (0, import_react.useState)(null);
+	const [online, setOnline] = (0, import_react.useState)([]);
+	const [typing, setTyping] = (0, import_react.useState)({});
+	const [urls, setUrls] = (0, import_react.useState)({});
+	const [loading, setLoading] = (0, import_react.useState)(true);
+	const [loadingMore, setLoadingMore] = (0, import_react.useState)(false);
+	const [hasMore, setHasMore] = (0, import_react.useState)(true);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [actionError, setActionError] = (0, import_react.useState)(null);
+	const [sending, setSending] = (0, import_react.useState)(false);
+	const messagesRef = (0, import_react.useRef)([]);
+	const membersRef = (0, import_react.useRef)({});
+	const urlsRef = (0, import_react.useRef)({});
+	const requestedRef = (0, import_react.useRef)(/* @__PURE__ */ new Set());
+	const channelRef = (0, import_react.useRef)(null);
+	(0, import_react.useEffect)(() => {
+		messagesRef.current = messages;
+	}, [messages]);
+	(0, import_react.useEffect)(() => {
+		membersRef.current = members;
+	}, [members]);
+	(0, import_react.useEffect)(() => {
+		urlsRef.current = urls;
+	}, [urls]);
+	const ensureProfiles = (0, import_react.useCallback)(async (ids) => {
+		const missing = Array.from(new Set(ids)).filter((id) => !membersRef.current[id] && !requestedRef.current.has(id));
+		if (missing.length === 0) return;
+		missing.forEach((id) => requestedRef.current.add(id));
+		const { data } = await sb.rpc("elite_profiles", { p_ids: missing });
+		if (!data) return;
+		setMembers((prev) => {
+			const next = { ...prev };
+			for (const row of data) next[row.id] = row;
+			return next;
+		});
+	}, []);
+	const ensureUrls = (0, import_react.useCallback)(async (list) => {
+		const paths = Array.from(new Set(list.map((m) => m.attachment_path).filter((p) => Boolean(p) && !urlsRef.current[p])));
+		if (paths.length === 0) return;
+		const { data } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+		if (!data) return;
+		setUrls((prev) => {
+			const next = { ...prev };
+			for (const row of data) if (row.path && row.signedUrl) next[row.path] = row.signedUrl;
+			return next;
+		});
+	}, []);
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		(async () => {
+			setLoading(true);
+			setError(null);
+			const [msgRes, memRes, readRes] = await Promise.all([
+				sb.from("elite_messages").select(SELECT).order("created_at", { ascending: false }).limit(40),
+				sb.rpc("elite_members"),
+				sb.from("elite_reads").select("user_id, last_read_at")
+			]);
+			if (cancelled) return;
+			if (msgRes.error) {
+				setError(msgRes.error.message);
+				setLoading(false);
+				return;
+			}
+			const rows = (msgRes.data ?? []).slice().reverse();
+			setMessages(rows);
+			setHasMore((msgRes.data ?? []).length === 40);
+			const memberRows = memRes.data ?? [];
+			const map = {};
+			for (const m of memberRows) map[m.id] = m;
+			memberRows.forEach((m) => requestedRef.current.add(m.id));
+			setMembers(map);
+			setMemberIds(memberRows.map((m) => m.id));
+			const readMap = {};
+			for (const r of readRes.data ?? []) readMap[r.user_id] = r.last_read_at;
+			setReads(readMap);
+			setInitialRead(readMap[meId] ?? null);
+			membersRef.current = map;
+			ensureProfiles(rows.map((m) => m.user_id));
+			ensureUrls(rows);
+			setLoading(false);
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		meId,
+		ensureProfiles,
+		ensureUrls
+	]);
+	(0, import_react.useEffect)(() => {
+		const channel = sb.channel(`elite-db-${meId}`).on("postgres_changes", {
+			event: "INSERT",
+			schema: "public",
+			table: "elite_messages"
+		}, (p) => {
+			const row = p.new;
+			setMessages((prev) => prev.some((m) => m.id === row.id) ? prev : sortMessages([...prev, {
+				...row,
+				reactions: [],
+				fresh: true
+			}]));
+			setTyping((t) => {
+				if (!t[row.user_id]) return t;
+				const next = { ...t };
+				delete next[row.user_id];
+				return next;
+			});
+			ensureProfiles([row.user_id]);
+			ensureUrls([row]);
+		}).on("postgres_changes", {
+			event: "UPDATE",
+			schema: "public",
+			table: "elite_messages"
+		}, (p) => {
+			const row = p.new;
+			setMessages((prev) => prev.map((m) => m.id === row.id ? {
+				...m,
+				body: row.body,
+				edited_at: row.edited_at,
+				deleted_at: row.deleted_at,
+				attachment_path: row.attachment_path,
+				attachment_name: row.attachment_name,
+				attachment_type: row.attachment_type,
+				attachment_size: row.attachment_size,
+				reactions: row.deleted_at ? [] : m.reactions,
+				fresh: false
+			} : m));
+		}).on("postgres_changes", {
+			event: "*",
+			schema: "public",
+			table: "elite_reactions"
+		}, (p) => {
+			if (p.eventType === "DELETE") {
+				const old = p.old;
+				if (!old.message_id || !old.user_id) return;
+				setMessages((prev) => prev.map((m) => m.id === old.message_id ? {
+					...m,
+					reactions: m.reactions.filter((r) => r.user_id !== old.user_id)
+				} : m));
+				return;
+			}
+			const r = p.new;
+			setMessages((prev) => prev.map((m) => m.id === r.message_id ? {
+				...m,
+				reactions: [...m.reactions.filter((x) => x.user_id !== r.user_id), {
+					user_id: r.user_id,
+					emoji: r.emoji
+				}]
+			} : m));
+		}).on("postgres_changes", {
+			event: "*",
+			schema: "public",
+			table: "elite_reads"
+		}, (p) => {
+			const r = p.new;
+			if (!r?.user_id || !r.last_read_at) return;
+			setReads((prev) => ({
+				...prev,
+				[r.user_id]: r.last_read_at
+			}));
+		}).subscribe();
+		return () => {
+			sb.removeChannel(channel);
+		};
+	}, [
+		meId,
+		ensureProfiles,
+		ensureUrls
+	]);
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		let channel = null;
+		(async () => {
+			try {
+				await sb.realtime.setAuth();
+			} catch {}
+			if (cancelled) return;
+			channel = sb.channel("elite-community", { config: {
+				private: true,
+				broadcast: { self: false },
+				presence: { key: meId }
+			} });
+			channel.on("presence", { event: "sync" }, () => {
+				setOnline(Object.keys(channel?.presenceState() ?? {}));
+			}).on("broadcast", { event: "typing" }, ({ payload }) => {
+				const id = payload?.user_id;
+				if (!id || id === meId) return;
+				setTyping((t) => ({
+					...t,
+					[id]: {
+						name: String(payload?.name || "Someone"),
+						at: Date.now()
+					}
+				}));
+			}).subscribe(async (status) => {
+				if (status === "SUBSCRIBED") await channel?.track({ at: Date.now() });
+			});
+			channelRef.current = channel;
+		})();
+		const sweep = window.setInterval(() => {
+			const now = Date.now();
+			setTyping((t) => {
+				const entries = Object.entries(t);
+				const alive = entries.filter(([, v]) => now - v.at < TYPING_TTL_MS);
+				return alive.length === entries.length ? t : Object.fromEntries(alive);
+			});
+		}, 1e3);
+		return () => {
+			cancelled = true;
+			window.clearInterval(sweep);
+			if (channel) sb.removeChannel(channel);
+			channelRef.current = null;
+		};
+	}, [meId]);
+	const lastMark = (0, import_react.useRef)(0);
+	const markTimer = (0, import_react.useRef)(void 0);
+	const markRead = (0, import_react.useCallback)(() => {
+		const run = async () => {
+			lastMark.current = Date.now();
+			const { error: e } = await sb.rpc("mark_elite_read");
+			if (!e) setReads((r) => ({
+				...r,
+				[meId]: (/* @__PURE__ */ new Date()).toISOString()
+			}));
+		};
+		const since = Date.now() - lastMark.current;
+		if (since >= 1500) run();
+		else if (markTimer.current === void 0) markTimer.current = window.setTimeout(() => {
+			markTimer.current = void 0;
+			run();
+		}, 1500 - since);
+	}, [meId]);
+	(0, import_react.useEffect)(() => () => {
+		if (markTimer.current !== void 0) window.clearTimeout(markTimer.current);
+	}, []);
+	const lastTyping = (0, import_react.useRef)(0);
+	const notifyTyping = (0, import_react.useCallback)((name) => {
+		const now = Date.now();
+		if (now - lastTyping.current < 2500) return;
+		lastTyping.current = now;
+		channelRef.current?.send({
+			type: "broadcast",
+			event: "typing",
+			payload: {
+				user_id: meId,
+				name
+			}
+		});
+	}, [meId]);
+	const send = (0, import_react.useCallback)(async (opts) => {
+		const body = opts.body.trim();
+		const file = opts.file ?? null;
+		if (!body && !file) return false;
+		if (file && file.size > 10485760) {
+			setActionError("Files can be up to 10 MB.");
+			return false;
+		}
+		setSending(true);
+		setActionError(null);
+		const tempId = `tmp-${crypto.randomUUID()}`;
+		const temp = {
+			id: tempId,
+			user_id: meId,
+			body,
+			reply_to: opts.replyTo ?? null,
+			attachment_path: null,
+			attachment_name: file?.name ?? null,
+			attachment_type: file?.type ?? null,
+			attachment_size: file?.size ?? null,
+			created_at: (/* @__PURE__ */ new Date()).toISOString(),
+			edited_at: null,
+			deleted_at: null,
+			reactions: [],
+			pending: true,
+			fresh: true
+		};
+		setMessages((prev) => [...prev, temp]);
+		let uploadedPath = null;
+		try {
+			if (file) {
+				uploadedPath = `${meId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}-${safeFileName(file.name)}`;
+				const up = await sb.storage.from(BUCKET).upload(uploadedPath, file, {
+					contentType: file.type || void 0,
+					upsert: false
+				});
+				if (up.error) throw up.error;
+			}
+			const { data, error: insertError } = await sb.from("elite_messages").insert({
+				user_id: meId,
+				body,
+				reply_to: opts.replyTo ?? null,
+				attachment_path: uploadedPath,
+				attachment_name: file?.name ?? null,
+				attachment_type: file?.type ?? null,
+				attachment_size: file?.size ?? null
+			}).select(SELECT).single();
+			if (insertError) throw insertError;
+			const real = {
+				...data,
+				fresh: true
+			};
+			setMessages((prev) => {
+				const without = prev.filter((m) => m.id !== tempId);
+				return without.some((m) => m.id === real.id) ? without : sortMessages([...without, real]);
+			});
+			ensureUrls([real]);
+			return true;
+		} catch (e) {
+			setMessages((prev) => prev.filter((m) => m.id !== tempId));
+			if (uploadedPath) sb.storage.from(BUCKET).remove([uploadedPath]);
+			setActionError(errMessage(e, "Your message could not be sent."));
+			return false;
+		} finally {
+			setSending(false);
+		}
+	}, [meId, ensureUrls]);
+	const edit = (0, import_react.useCallback)(async (id, body) => {
+		const text = body.trim();
+		const before = messagesRef.current.find((m) => m.id === id);
+		if (!before) return false;
+		if (!text && !before.attachment_path) return false;
+		if (text === before.body) return true;
+		setActionError(null);
+		setMessages((prev) => prev.map((m) => m.id === id ? {
+			...m,
+			body: text,
+			edited_at: (/* @__PURE__ */ new Date()).toISOString()
+		} : m));
+		const { error: e } = await sb.rpc("edit_elite_message", {
+			p_id: id,
+			p_body: text
+		});
+		if (e) {
+			setMessages((prev) => prev.map((m) => m.id === id ? before : m));
+			setActionError(errMessage(e, "Could not edit the message."));
+			return false;
+		}
+		return true;
+	}, []);
+	const remove = (0, import_react.useCallback)(async (id) => {
+		const before = messagesRef.current.find((m) => m.id === id);
+		if (!before) return false;
+		setActionError(null);
+		setMessages((prev) => prev.map((m) => m.id === id ? {
+			...m,
+			body: "",
+			deleted_at: (/* @__PURE__ */ new Date()).toISOString(),
+			attachment_path: null,
+			reactions: []
+		} : m));
+		const { data, error: e } = await sb.rpc("delete_elite_message", { p_id: id });
+		if (e) {
+			setMessages((prev) => prev.map((m) => m.id === id ? before : m));
+			setActionError(errMessage(e, "Could not delete the message."));
+			return false;
+		}
+		if (typeof data === "string" && data) sb.storage.from(BUCKET).remove([data]);
+		return true;
+	}, []);
+	const react = (0, import_react.useCallback)(async (id, emoji) => {
+		const before = messagesRef.current.find((m) => m.id === id);
+		if (!before || before.deleted_at || id.startsWith("tmp-")) return;
+		const removing = before.reactions.find((r) => r.user_id === meId)?.emoji === emoji;
+		setMessages((prev) => prev.map((m) => m.id === id ? {
+			...m,
+			reactions: removing ? m.reactions.filter((r) => r.user_id !== meId) : [...m.reactions.filter((r) => r.user_id !== meId), {
+				user_id: meId,
+				emoji
+			}]
+		} : m));
+		const res = removing ? await sb.from("elite_reactions").delete().eq("message_id", id).eq("user_id", meId) : await sb.from("elite_reactions").upsert({
+			message_id: id,
+			user_id: meId,
+			emoji
+		}, { onConflict: "message_id,user_id" });
+		if (res.error) {
+			setMessages((prev) => prev.map((m) => m.id === id ? before : m));
+			setActionError(errMessage(res.error, "Could not save your reaction."));
+		}
+	}, [meId]);
+	const loadOlder = (0, import_react.useCallback)(async () => {
+		if (loadingMore || !hasMore) return false;
+		const oldest = messagesRef.current.find((m) => !m.id.startsWith("tmp-"));
+		if (!oldest) return false;
+		setLoadingMore(true);
+		const { data, error: e } = await sb.from("elite_messages").select(SELECT).lt("created_at", oldest.created_at).order("created_at", { ascending: false }).limit(40);
+		if (e) {
+			setActionError(e.message);
+			setLoadingMore(false);
+			return false;
+		}
+		const rows = (data ?? []).slice().reverse();
+		setHasMore((data ?? []).length === 40);
+		setMessages((prev) => {
+			const known = new Set(prev.map((m) => m.id));
+			return [...rows.filter((r) => !known.has(r.id)), ...prev];
+		});
+		ensureProfiles(rows.map((m) => m.user_id));
+		ensureUrls(rows);
+		setLoadingMore(false);
+		return rows.length > 0;
+	}, [
+		loadingMore,
+		hasMore,
+		ensureProfiles,
+		ensureUrls
+	]);
+	const clearFresh = (0, import_react.useCallback)(() => {
+		setMessages((prev) => prev.some((m) => m.fresh) ? prev.map((m) => m.fresh ? {
+			...m,
+			fresh: false
+		} : m) : prev);
+	}, []);
+	return {
+		messages,
+		members,
+		memberIds,
+		reads,
+		initialRead,
+		online,
+		typingNames: (0, import_react.useMemo)(() => Object.values(typing).map((t) => t.name), [typing]),
+		urls,
+		loading,
+		loadingMore,
+		hasMore,
+		error,
+		actionError,
+		setActionError,
+		sending,
+		send,
+		edit,
+		remove,
+		react,
+		loadOlder,
+		markRead,
+		notifyTyping,
+		clearFresh
+	};
+}
+var QUICK = [
+	"❤️",
+	"😂",
+	"😮",
+	"😢",
+	"😡",
+	"👍"
+];
+var EMOJI_GRID = [
+	"😀",
+	"😁",
+	"😂",
+	"🤣",
+	"😊",
+	"😍",
+	"😘",
+	"😎",
+	"🤩",
+	"🥳",
+	"😏",
+	"🤔",
+	"😮",
+	"😢",
+	"😭",
+	"😡",
+	"🙏",
+	"👍",
+	"👎",
+	"👏",
+	"🙌",
+	"💪",
+	"🔥",
+	"💎",
+	"❤️",
+	"🖤",
+	"🤍",
+	"💯",
+	"✨",
+	"⭐",
+	"🚀",
+	"🎯",
+	"💈",
+	"✂️",
+	"👑",
+	"🏆"
+];
+var GROUP_GAP_MS = 3e5;
+function timeOf(iso) {
+	return new Date(iso).toLocaleTimeString([], {
+		hour: "numeric",
+		minute: "2-digit"
+	});
+}
+function dayLabel(iso) {
+	const d = new Date(iso);
+	const today = /* @__PURE__ */ new Date();
+	const y = /* @__PURE__ */ new Date();
+	y.setDate(today.getDate() - 1);
+	if (d.toDateString() === today.toDateString()) return "Today";
+	if (d.toDateString() === y.toDateString()) return "Yesterday";
+	return d.toLocaleDateString([], {
+		day: "numeric",
+		month: "long",
+		year: "numeric"
+	});
+}
+function fmtSize(bytes) {
+	if (!bytes) return "";
+	if (bytes < 1048576) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+	return `${(bytes / 1048576).toFixed(1)} MB`;
+}
+function initials(m) {
+	return displayName(m).slice(0, 1).toUpperCase();
+}
+function renderBody(text, usernames) {
+	return text.split(/(@[a-zA-Z0-9_]{3,20})/g).map((part, i) => part.startsWith("@") && usernames.has(part.slice(1).toLowerCase()) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: "ec-mention",
+		children: part
+	}, i) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: part }, i));
+}
+function Avatar({ member, size = 40, badge = false, online = false }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		className: "ec-avatar",
+		style: {
+			width: size,
+			height: size
+		},
+		children: [
+			member?.avatar_url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+				src: member.avatar_url,
+				alt: "",
+				loading: "lazy",
+				referrerPolicy: "no-referrer"
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				style: { fontSize: size * .4 },
+				children: initials(member)
+			}),
+			badge && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "ec-avatar-gem",
+				"aria-hidden": true,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Gem, { className: "size-2.5" })
+			}),
+			online && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "ec-online",
+				"aria-label": "Online"
+			})
+		]
+	});
+}
+function EliteBadge({ small = false }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		className: `ec-badge ${small ? "ec-badge-sm" : ""}`,
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Gem, {
+			className: "size-3",
+			"aria-hidden": true
+		}), "Elite"]
+	});
+}
+var Row = (0, import_react.memo)(function Row({ meId, msg, mine, showHead, author, members, reply, seers, url, usernames, onMenu, onReact, onSeen, onJump, onMedia }) {
+	const bubbleRef = (0, import_react.useRef)(null);
+	const pressTimer = (0, import_react.useRef)(void 0);
+	const cancelPress = () => {
+		if (pressTimer.current !== void 0) {
+			window.clearTimeout(pressTimer.current);
+			pressTimer.current = void 0;
+		}
+	};
+	const startPress = (e) => {
+		if (e.pointerType !== "touch" || msg.pending || msg.deleted_at) return;
+		const el = e.currentTarget;
+		cancelPress();
+		pressTimer.current = window.setTimeout(() => onMenu(msg.id, el, mine), 420);
+	};
+	(0, import_react.useEffect)(() => cancelPress, []);
+	const grouped = (0, import_react.useMemo)(() => {
+		const map = /* @__PURE__ */ new Map();
+		for (const r of msg.reactions) {
+			const list = map.get(r.emoji) ?? [];
+			list.push(r.user_id);
+			map.set(r.emoji, list);
+		}
+		return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+	}, [msg.reactions]);
+	const isImage = Boolean(msg.attachment_type?.startsWith("image/"));
+	const name = displayName(author);
+	if (msg.deleted_at) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		id: `msg-${msg.id}`,
+		className: `ec-row ${mine ? "ec-mine" : ""}`,
+		children: [!mine && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "ec-av-col" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "ec-col",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "ec-tomb",
+				children: mine ? "You deleted a message" : `${name} deleted a message`
+			})
+		})]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		id: `msg-${msg.id}`,
+		className: `ec-row ${mine ? "ec-mine" : ""} ${msg.fresh ? "ec-pop" : ""} ${showHead ? "ec-head" : ""}`,
+		children: [!mine && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "ec-av-col",
+			children: showHead ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
+				member: author,
+				size: 44,
+				badge: true
+			}) : null
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "ec-col",
+			children: [
+				!mine && showHead && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "ec-meta",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "ec-name",
+							children: name
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(EliteBadge, { small: true }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "ec-time",
+							children: timeOf(msg.created_at)
+						})
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "ec-bubble-wrap",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							ref: bubbleRef,
+							className: `ec-bubble ${mine ? "ec-bubble-mine" : ""} ${msg.pending ? "ec-pending" : ""}`,
+							title: new Date(msg.created_at).toLocaleString(),
+							onDoubleClick: () => !msg.pending && onReact(msg.id, "❤️"),
+							onContextMenu: (e) => {
+								e.preventDefault();
+								if (!msg.pending && bubbleRef.current) onMenu(msg.id, bubbleRef.current, mine);
+							},
+							onPointerDown: startPress,
+							onPointerUp: cancelPress,
+							onPointerLeave: cancelPress,
+							onPointerCancel: cancelPress,
+							onTouchMove: cancelPress,
+							children: [
+								reply && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									type: "button",
+									className: "ec-quote",
+									onClick: () => msg.reply_to && onJump(msg.reply_to),
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "ec-quote-name",
+										children: reply.name
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "ec-quote-text",
+										children: reply.text
+									})]
+								}),
+								msg.attachment_name && isImage && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+									href: url,
+									target: "_blank",
+									rel: "noreferrer",
+									className: "ec-img-link",
+									"aria-label": "Open image",
+									children: url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+										src: url,
+										alt: msg.attachment_name,
+										loading: "lazy",
+										onLoad: onMedia
+									}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "ec-img-skel" })
+								}),
+								msg.attachment_name && !isImage && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("a", {
+									href: url,
+									target: "_blank",
+									rel: "noreferrer",
+									className: "ec-file",
+									download: msg.attachment_name,
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FileText, {
+										className: "size-5 shrink-0",
+										"aria-hidden": true
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+										className: "min-w-0",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "block truncate",
+											children: msg.attachment_name
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "block text-[11px] opacity-60",
+											children: fmtSize(msg.attachment_size)
+										})]
+									})]
+								}),
+								msg.body && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "ec-text",
+									children: renderBody(msg.body, usernames)
+								}),
+								msg.edited_at && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "ec-edited",
+									children: "Edited"
+								})
+							]
+						}),
+						!msg.pending && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ec-more",
+							"aria-label": "Message options",
+							onClick: (e) => {
+								const el = bubbleRef.current ?? e.currentTarget;
+								onMenu(msg.id, el, mine);
+							},
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Smile, { className: "size-4" })
+						}),
+						grouped.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "ec-reacts",
+							children: grouped.map(([emoji, ids]) => {
+								const iReacted = ids.includes(meId);
+								return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									type: "button",
+									className: `ec-react ${iReacted ? "ec-react-on" : ""}`,
+									title: ids.map((id) => displayName(members[id])).join(", "),
+									onClick: () => onReact(msg.id, emoji),
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: emoji }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: ids.length })]
+								}, emoji);
+							})
+						})
+					]
+				}),
+				mine && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "ec-time-mine",
+					children: msg.pending ? "Sending…" : timeOf(msg.created_at)
+				}),
+				seers && seers.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: "ec-seen",
+					onClick: () => onSeen(msg.id),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "ec-seen-avs",
+							children: seers.slice(0, 3).map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
+								member: s,
+								size: 16
+							}, s.id))
+						}),
+						"Seen by ",
+						seers.length
+					]
+				})
+			]
+		})]
+	});
+});
+function MessageMenu({ state, msg, myReaction, onClose, onReact, onReply, onCopy, onEdit, onDelete }) {
+	const [more, setMore] = (0, import_react.useState)(false);
+	const [confirm, setConfirm] = (0, import_react.useState)(false);
+	const vw = typeof window === "undefined" ? 400 : window.innerWidth;
+	const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+	const width = Math.min(320, vw - 16);
+	const left = Math.max(8, Math.min(state.mine ? state.rect.right - width : state.rect.left, vw - width - 8));
+	const top = state.rect.top > 120 ? Math.max(8, state.rect.top - 64) : Math.min(vh - 260, state.rect.bottom + 8);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "ec-menu-layer",
+		onPointerDown: onClose,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "ec-menu",
+			style: {
+				left,
+				top,
+				width
+			},
+			onPointerDown: (e) => e.stopPropagation(),
+			role: "menu",
+			"aria-label": "Message actions",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "ec-emoji-bar",
+					children: [QUICK.map((e) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: `ec-emoji-btn ${myReaction === e ? "ec-emoji-on" : ""}`,
+						onClick: () => onReact(e),
+						"aria-label": `React ${e}`,
+						children: e
+					}, e)), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ec-emoji-btn",
+						onClick: () => setMore((m) => !m),
+						"aria-label": "More emojis",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, { className: "size-5" })
+					})]
+				}),
+				more && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "ec-emoji-grid ec-menu-grid",
+					children: EMOJI_GRID.map((e) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: () => onReact(e),
+						children: e
+					}, e))
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "ec-actions",
+					children: confirm ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "ec-confirm",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Delete this message for everyone?" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: () => setConfirm(false),
+							children: "Cancel"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							className: "ec-danger",
+							onClick: onDelete,
+							children: "Delete"
+						})] })]
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							role: "menuitem",
+							onClick: onReply,
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Reply, { className: "size-4" }), " Reply"]
+						}),
+						msg.body && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							role: "menuitem",
+							onClick: onCopy,
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Copy, { className: "size-4" }), " Copy"]
+						}),
+						state.mine && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							role: "menuitem",
+							onClick: onEdit,
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { className: "size-4" }), " Edit"]
+						}),
+						state.mine && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							role: "menuitem",
+							className: "ec-danger",
+							onClick: () => setConfirm(true),
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { className: "size-4" }), " Delete"]
+						})
+					] })
+				})
+			]
+		})
+	});
+}
+function Sheet({ title, onClose, children }) {
+	(0, import_react.useEffect)(() => {
+		const onKey = (e) => e.key === "Escape" && onClose();
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [onClose]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "ec-sheet-layer",
+		onPointerDown: onClose,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "ec-sheet",
+			role: "dialog",
+			"aria-modal": "true",
+			"aria-label": title,
+			onPointerDown: (e) => e.stopPropagation(),
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ec-sheet-head",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", { children: title }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ec-iconbtn ec-iconbtn-sm",
+					onClick: onClose,
+					"aria-label": "Close",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "ec-sheet-body",
+				children
+			})]
+		})
+	});
+}
+function MemberRow({ m, online, you }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+		className: "ec-member",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
+				member: m,
+				size: 38,
+				badge: true,
+				online
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "min-w-0 flex-1",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "truncate text-sm",
+					children: [displayName(m), you ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "ec-you",
+						children: " (you)"
+					}) : null]
+				}), m.username ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "truncate text-[11px] text-white/40",
+					children: ["@", m.username]
+				}) : null]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(EliteBadge, { small: true })
+		]
+	});
+}
+function Composer({ members, sending, replyTo, replyName, editing, onCancelReply, onCancelEdit, onSend, onEditSubmit, onTyping }) {
+	const [text, setText] = (0, import_react.useState)("");
+	const [file, setFile] = (0, import_react.useState)(null);
+	const [preview, setPreview] = (0, import_react.useState)(null);
+	const [emojiOpen, setEmojiOpen] = (0, import_react.useState)(false);
+	const [caret, setCaret] = (0, import_react.useState)(0);
+	const [fileError, setFileError] = (0, import_react.useState)(null);
+	const ref = (0, import_react.useRef)(null);
+	const fileRef = (0, import_react.useRef)(null);
+	(0, import_react.useEffect)(() => {
+		if (editing) {
+			setText(editing.body);
+			setFile(null);
+			requestAnimationFrame(() => ref.current?.focus());
+		}
+	}, [editing]);
+	(0, import_react.useEffect)(() => {
+		if (replyTo) requestAnimationFrame(() => ref.current?.focus());
+	}, [replyTo]);
+	(0, import_react.useEffect)(() => {
+		const el = ref.current;
+		if (!el) return;
+		el.style.height = "auto";
+		el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+	}, [text]);
+	(0, import_react.useEffect)(() => {
+		if (!file || !file.type.startsWith("image/")) {
+			setPreview(null);
+			return;
+		}
+		const u = URL.createObjectURL(file);
+		setPreview(u);
+		return () => URL.revokeObjectURL(u);
+	}, [file]);
+	const mention = (0, import_react.useMemo)(() => {
+		const m = /(?:^|\s)@([a-zA-Z0-9_]{0,20})$/.exec(text.slice(0, caret));
+		if (!m) return null;
+		const q = (m[1] ?? "").toLowerCase();
+		const list = members.filter((x) => x.username && x.username.toLowerCase().startsWith(q)).slice(0, 5);
+		return list.length ? {
+			q,
+			list
+		} : null;
+	}, [
+		text,
+		caret,
+		members
+	]);
+	const insertMention = (username) => {
+		const before = text.slice(0, caret).replace(/@[a-zA-Z0-9_]{0,20}$/, `@${username} `);
+		const next = before + text.slice(caret);
+		setText(next);
+		requestAnimationFrame(() => {
+			ref.current?.focus();
+			ref.current?.setSelectionRange(before.length, before.length);
+			setCaret(before.length);
+		});
+	};
+	const canSend = (text.trim().length > 0 || Boolean(file)) && !sending;
+	const submit = async () => {
+		if (!canSend) return;
+		if (editing) {
+			if (await onEditSubmit(editing.id, text)) {
+				setText("");
+				onCancelEdit();
+			}
+			return;
+		}
+		if (await onSend(text, file)) {
+			setText("");
+			setFile(null);
+			setEmojiOpen(false);
+		}
+	};
+	const onKeyDown = (e) => {
+		if (e.key === "Escape") {
+			if (editing) {
+				setText("");
+				onCancelEdit();
+			} else if (replyTo) onCancelReply();
+			setEmojiOpen(false);
+			return;
+		}
+		const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+		if (e.key === "Enter" && !e.shiftKey && !coarse && !e.nativeEvent.isComposing) {
+			e.preventDefault();
+			submit();
+		}
+	};
+	const pickFile = (f) => {
+		setFileError(null);
+		if (!f) return;
+		if (f.size > 10485760) {
+			setFileError("Files can be up to 10 MB.");
+			return;
+		}
+		setFile(f);
+	};
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "ec-composer-wrap",
+		children: [
+			(replyTo || editing) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ec-ctx",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "min-w-0",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "ec-ctx-title",
+						children: editing ? "Editing message" : `Replying to ${replyName}`
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "ec-ctx-text",
+						children: (editing ?? replyTo)?.body || "Attachment"
+					})]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					className: "ec-iconbtn ec-iconbtn-sm",
+					"aria-label": "Cancel",
+					onClick: () => {
+						if (editing) {
+							setText("");
+							onCancelEdit();
+						} else onCancelReply();
+					},
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
+				})]
+			}),
+			file && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ec-attach-preview",
+				children: [
+					preview ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+						src: preview,
+						alt: ""
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FileText, {
+						className: "size-5",
+						"aria-hidden": true
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "truncate",
+						children: file.name
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ec-iconbtn ec-iconbtn-sm",
+						onClick: () => setFile(null),
+						"aria-label": "Remove attachment",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
+					})
+				]
+			}),
+			fileError && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "ec-inline-error",
+				role: "alert",
+				children: fileError
+			}),
+			mention && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+				className: "ec-mentions",
+				role: "listbox",
+				"aria-label": "Mention a member",
+				children: mention.list.map((m) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					onClick: () => insertMention(m.username),
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar, {
+							member: m,
+							size: 26
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: displayName(m) }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "opacity-50",
+							children: ["@", m.username]
+						})
+					]
+				}) }, m.id))
+			}),
+			emojiOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "ec-emoji-grid ec-emoji-pop",
+				children: EMOJI_GRID.map((e) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: () => {
+						setText((t) => t + e);
+						ref.current?.focus();
+					},
+					children: e
+				}, e))
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "ec-composer",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						ref: fileRef,
+						type: "file",
+						hidden: true,
+						accept: "image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain,.doc,.docx",
+						onChange: (e) => {
+							pickFile(e.target.files?.[0]);
+							e.target.value = "";
+						}
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ec-compbtn",
+						"aria-label": "Attach a file",
+						onClick: () => fileRef.current?.click(),
+						disabled: Boolean(editing),
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Paperclip, { className: "size-5" })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+						ref,
+						value: text,
+						rows: 1,
+						placeholder: editing ? "Edit your message…" : "Type a message…",
+						"aria-label": "Message",
+						enterKeyHint: "send",
+						maxLength: 4e3,
+						onChange: (e) => {
+							setText(e.target.value);
+							setCaret(e.target.selectionStart ?? e.target.value.length);
+							if (!editing) onTyping();
+						},
+						onSelect: (e) => setCaret(e.currentTarget.selectionStart ?? 0),
+						onKeyDown,
+						onFocus: () => window.setTimeout(() => ref.current?.scrollIntoView({ block: "nearest" }), 250)
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ec-compbtn",
+						"aria-label": "Emoji",
+						"aria-expanded": emojiOpen,
+						onClick: () => setEmojiOpen((o) => !o),
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Smile, { className: "size-5" })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						className: "ec-send",
+						"aria-label": editing ? "Save edit" : "Send message",
+						disabled: !canSend,
+						onClick: () => void submit(),
+						children: sending ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "size-5 animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Send, {
+							className: "size-5",
+							style: { marginLeft: -2 }
+						})
+					})
+				]
+			})
+		]
+	});
+}
+function EliteCommunity({ meId, meName }) {
+	const chat = useEliteChat(meId);
+	const { messages, members, memberIds, reads, online, urls } = chat;
+	const [menu, setMenu] = (0, import_react.useState)(null);
+	const [replyToId, setReplyToId] = (0, import_react.useState)(null);
+	const [editingId, setEditingId] = (0, import_react.useState)(null);
+	const [membersOpen, setMembersOpen] = (0, import_react.useState)(false);
+	const [seenFor, setSeenFor] = (0, import_react.useState)(null);
+	const [newCount, setNewCount] = (0, import_react.useState)(0);
+	const [bustOk, setBustOk] = (0, import_react.useState)(true);
+	const [viewport, setViewport] = (0, import_react.useState)(null);
+	const scrollerRef = (0, import_react.useRef)(null);
+	const atBottomRef = (0, import_react.useRef)(true);
+	const initialisedRef = (0, import_react.useRef)(false);
+	const lastIdRef = (0, import_react.useRef)(void 0);
+	cons
+[TRUNCATED: file is 97564 bytes, first 40960 included]
+=== END FILE ===
+

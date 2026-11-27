@@ -1,0 +1,419 @@
+=== FILE: src/routes/admin.index.tsx ===
+import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import {
+  getAdminOverview,
+  getAllProfiles,
+  getAuditLog,
+  getMyProfile,
+  updateUserRole,
+  updateUserStatus,
+} from "@/lib/queries";
+import { hasAtLeastRole, isAdminRole } from "@/lib/roles";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton, LockedState } from "@/components/aura/States";
+import type { AccountStatus, Profile, UserRole } from "@/lib/database.types";
+import {
+  Users as UsersIcon,
+  Activity,
+  BookOpen,
+  Inbox,
+  CheckSquare,
+  GraduationCap,
+  RefreshCw,
+  AlertCircle,
+  Shield,
+  Scissors,
+  CalendarIcon,
+  Globe,
+} from "lucide-react";
+import { AdminSeminars } from "@/components/aura/AdminSeminars";
+import { AdminOnlineSeminars } from "@/components/aura/AdminOnlineSeminars";
+import { ChromeCTALink } from "@/components/aura/chrome";
+
+
+
+export const Route = createFileRoute("/admin/")({ component: AdminPage });
+
+const ROLES: UserRole[] = [
+  "student",
+  "educator",
+  "senior_educator",
+  "content_manager",
+  "operations",
+  "admin",
+  "super_admin",
+];
+
+const STATUSES: AccountStatus[] = ["active", "suspended", "deleted"];
+
+function AdminPage() {
+  const profile = useAsync(getMyProfile, []);
+  const role = profile.data?.role ?? null;
+
+  const admin = isAdminRole(role);
+  const superAdmin = hasAtLeastRole(role, "super_admin");
+
+  return (
+    <main className="mx-auto min-h-screen max-w-7xl px-4 sm:px-6 md:px-10 pb-20 pt-28 text-white relative selection:bg-white selection:text-black">
+      {/* Ambient background blur */}
+      <div className="absolute top-24 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-white/[0.03] blur-[140px] pointer-events-none rounded-full" />
+
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 space-y-12"
+      >
+        <header className="border-b border-white/10 pb-6">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-white/50 mb-2">
+            <span className="h-px w-8 bg-gradient-to-r from-white/60 to-transparent" />
+            Control Room
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold uppercase tracking-tight">Admin Panel</h1>
+          <p className="mt-2 text-sm text-white/50 max-w-2xl leading-relaxed">
+            Πρόσβαση μόνο για λογαριασμούς admin και πάνω. Οι αλλαγές ρόλων και status καταγράφονται
+            στο audit log.
+          </p>
+        </header>
+
+        {profile.loading && <LoadingSkeleton rows={3} />}
+        {profile.error && <ErrorState message={profile.error} />}
+
+        {profile.data && !admin && (
+          <LockedState reason="Αυτή η περιοχή είναι μόνο για admins της AURA." />
+        )}
+
+        {profile.data && admin && (
+  <div className="space-y-12">
+    <OverviewSection />
+    <AdminSeminars adminId={profile.data.id} />
+    <AdminOnlineSeminars />  
+    <UsersSection selfId={profile.data.id} canEditAdmins={superAdmin} />
+    <AuditSection />
+  </div>
+)}
+      </motion.div>
+    </main>
+  );
+}
+
+/* ---------------- Overview ---------------- */
+
+function OverviewSection() {
+  const { data, error, loading } = useAsync(getAdminOverview, []);
+
+  return (
+    <section className="space-y-6">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2 px-1">
+        <span className="size-1.5 rounded-full bg-white/60" />
+        Επισκόπηση
+      </h2>
+
+      {loading && <LoadingSkeleton rows={1} />}
+      {error && <ErrorState message={error} />}
+
+      {data && (
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+          <Stat label="Χρήστες" value={data.totalUsers} icon={<UsersIcon className="size-5 text-white/70" />} />
+          <Stat label="Students" value={data.students} icon={<GraduationCap className="size-5 text-white/70" />} />
+          <Stat label="Team" value={data.staff} icon={<Shield className="size-5 text-white/70" />} />
+          <Stat label="Εκκρεμείς reviews" value={data.pendingReviews} icon={<Activity className="size-5 text-white/70" />} />
+          <Stat label="Published courses" value={data.publishedCourses} icon={<BookOpen className="size-5 text-white/70" />} />
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3 pt-2">
+        <QuickLink to="/admin/courses" label="Course Management" icon={<BookOpen className="size-4" />} />
+        <QuickLink to="/admin/inbox" label="Inbox" icon={<Inbox className="size-4" />} />
+        <QuickLink to="/review" label="Review Queue" icon={<CheckSquare className="size-4" />} />
+        <QuickLink to="/academy" label="Academy" icon={<GraduationCap className="size-4" />} />
+        <QuickLink to="/review/haircuts" label="Haircut Review" icon={<Scissors className="size-4" />} />
+        <QuickLink to="/seminars" label="Booking Page" icon={<CalendarIcon className="size-4" />} />
+        <QuickLink to="/online-seminars" label="Online Seminars" icon={<Globe className="size-4" />} />
+        <ChromeCTALink to="/admin/book">Book &amp; Orders</ChromeCTALink>
+        <ChromeCTALink to="/admin/notifications">Notifications</ChromeCTALink>
+        <ChromeCTALink to="/admin/plans-and-users">Plans And Users</ChromeCTALink>
+        <ChromeCTALink to="/admin/jobs">Book &amp; Jobs</ChromeCTALink>
+      </div>
+    </section>
+  );
+}
+
+function Stat({ label, value, icon }: { label: string; value: number; icon: React.ReactNode }) {
+  return (
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.2 }}
+      className="group relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-white/[0.06] to-white/[0.01] p-6 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.5)] transition-all hover:border-white/40 hover:shadow-[0_0_25px_rgba(255,255,255,0.06)]"
+    >
+      <div className="absolute top-0 right-0 p-6 opacity-40 transition-opacity group-hover:opacity-80">
+        {icon}
+      </div>
+      <p className="text-xs uppercase tracking-[0.2em] text-white/50">{label}</p>
+      <p className="mt-3 text-3xl font-bold tracking-tight text-white">{value}</p>
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+    </motion.div>
+  );
+}
+
+function QuickLink({ to, label, icon }: { to: string; label: string; icon: React.ReactNode }) {
+  return (
+    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+      <Link
+        to={to}
+        className="group flex items-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-2.5 text-sm font-medium text-white/90 transition-all duration-300 hover:border-white/40 hover:bg-white hover:text-black hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+      >
+        {icon}
+        <span>{label}</span>
+      </Link>
+    </motion.div>
+  );
+}
+
+/* ---------------- Users ---------------- */
+
+function UsersSection({ selfId, canEditAdmins }: { selfId: string; canEditAdmins: boolean }) {
+  const [reload, setReload] = useState(0);
+  const { data, error, loading } = useAsync(getAllProfiles, [reload]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  function isLocked(user: Profile): boolean {
+    if (canEditAdmins) return false;
+    return isAdminRole(user.role) && user.id !== selfId;
+  }
+
+  async function changeRole(user: Profile, role: UserRole) {
+    if (role === user.role) return;
+    if (user.id === selfId && !window.confirm("Αλλάζεις τον ΔΙΚΟ σου ρόλο. Σίγουρα;")) return;
+    if (!canEditAdmins && isAdminRole(role)) {
+      setMsg("Μόνο super_admin μπορεί να δώσει admin-tier ρόλο.");
+      return;
+    }
+
+    setBusyId(user.id);
+    setMsg(null);
+    try {
+      await updateUserRole(user.id, role);
+      setMsg(`Ο ρόλος του ${user.full_name ?? "χρήστη"} έγινε ${role}.`);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function changeStatus(user: Profile, status: AccountStatus) {
+    if (status === user.status) return;
+    if (
+      user.id === selfId &&
+      status !== "active" &&
+      !window.confirm("Απενεργοποιείς τον ΔΙΚΟ σου λογαριασμό. Σίγουρα;")
+    ) {
+      return;
+    }
+
+    setBusyId(user.id);
+    setMsg(null);
+    try {
+      await updateUserStatus(user.id, status);
+      setMsg(`Το status του ${user.full_name ?? "χρήστη"} έγινε ${status}.`);
+      setReload((n) => n + 1);
+    } catch (e) {
+      setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center justify-between gap-4 px-1">
+        <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2">
+          <span className="size-1.5 rounded-full bg-white/60" />
+          Χρήστες
+        </h2>
+        <button
+          type="button"
+          onClick={() => setReload((n) => n + 1)}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/15 hover:border-white/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-50 cursor-pointer shadow-inner"
+        >
+          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+          <span>Ανανέωση</span>
+        </button>
+      </div>
+
+      {msg && (
+        <div className="p-4 rounded-2xl bg-zinc-950/80 border border-white/10 text-zinc-300 text-sm flex items-center gap-3 backdrop-blur-xl shadow-lg" role="status">
+          <AlertCircle className="w-5 h-5 text-white/70 shrink-0" />
+          <span>{msg}</span>
+        </div>
+      )}
+
+      {loading && <LoadingSkeleton rows={4} />}
+      {error && <ErrorState message={error} />}
+
+      {data && (
+        <div className="overflow-x-auto rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+          <table className="w-full min-w-[720px] text-left text-sm">
+            <thead className="bg-white/[0.03] text-xs uppercase tracking-wider text-white/50 border-b border-white/10">
+              <tr>
+                <th scope="col" className="p-4 font-semibold">
+                  Χρήστης
+                </th>
+                <th scope="col" className="p-4 font-semibold">
+                  Level
+                </th>
+                <th scope="col" className="p-4 font-semibold">
+                  Ρόλος
+                </th>
+                <th scope="col" className="p-4 font-semibold">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {data.map((u) => {
+                const locked = isLocked(u);
+                const busy = busyId === u.id;
+                return (
+                  <tr key={u.id} className="align-middle hover:bg-white/[0.02] transition-colors">
+                    <td className="p-4">
+                      <p className="font-medium text-white/90">
+                        {u.full_name ?? "—"}
+                        {u.id === selfId && (
+                          <span className="ml-2 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
+                            εσύ
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-white/40 mt-0.5 font-mono">{u.country ?? "—"}</p>
+                    </td>
+                    <td className="p-4 text-white/70 font-mono">{u.level}</td>
+                    <td className="p-4">
+                      {locked ? (
+                        <span className="text-white/70 font-mono text-xs">{u.role}</span>
+                      ) : (
+                        <>
+                          <label className="sr-only" htmlFor={`role-${u.id}`}>
+                            Ρόλος για {u.full_name ?? "χρήστη"}
+                          </label>
+                          <select
+                            id={`role-${u.id}`}
+                            value={u.role}
+                            disabled={busy}
+                            onChange={(e) => changeRole(u, e.target.value as UserRole)}
+                            className="rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white/90 outline-none focus:border-white/40 focus:ring-2 focus:ring-white/10 disabled:opacity-50 transition-all"
+                          >
+                            {ROLES.map((r) => (
+                              <option key={r} value={r} className="bg-zinc-900 text-white">
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      {locked ? (
+                        <StatusBadge status={u.status} />
+                      ) : (
+                        <>
+                          <label className="sr-only" htmlFor={`status-${u.id}`}>
+                            Status για {u.full_name ?? "χρήστη"}
+                          </label>
+                          <select
+                            id={`status-${u.id}`}
+                            value={u.status}
+                            disabled={busy}
+                            onChange={(e) => changeStatus(u, e.target.value as AccountStatus)}
+                            className="rounded-xl border border-white/15 bg-black/60 px-3 py-2 text-xs text-white/90 outline-none focus:border-white/40 focus:ring-2 focus:ring-white/10 disabled:opacity-50 transition-all"
+                          >
+                            {STATUSES.map((s) => (
+                              <option key={s} value={s} className="bg-zinc-900 text-white">
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {data.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-8 text-center text-white/40">
+                    Κανένας χρήστης.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StatusBadge({ status }: { status: AccountStatus }) {
+  const map: Record<AccountStatus, string> = {
+    active: "bg-emerald-500/15 border border-emerald-500/30 text-emerald-300",
+    suspended: "bg-amber-500/15 border border-amber-500/30 text-amber-300",
+    deleted: "bg-red-500/15 border border-red-500/30 text-red-300",
+  };
+  return <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-wider ${map[status]}`}>{status}</span>;
+}
+
+/* ---------------- Audit log ---------------- */
+
+function AuditSection() {
+  const { data, error, loading } = useAsync(() => getAuditLog(50), []);
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-white/60 flex items-center gap-2 px-1">
+        <span className="size-1.5 rounded-full bg-white/60" />
+        Audit Log
+      </h2>
+
+      {loading && <LoadingSkeleton rows={3} />}
+      {error && <ErrorState message={error} />}
+
+      {data && data.length === 0 && <p className="text-sm text-white/40 px-1">Καμία καταγραφή ακόμη.</p>}
+
+      {data && data.length > 0 && (
+        <ul className="divide-y divide-white/5 rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl overflow-hidden">
+          {data.map((entry) => (
+            <li key={entry.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 text-sm hover:bg-white/[0.02] transition-colors">
+              <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-mono font-medium text-white/80">
+                {entry.action}
+              </span>
+              <span className="text-white/60 font-medium">{entry.entity}</span>
+              <time
+                dateTime={entry.created_at}
+                className="ml-auto text-xs text-white/40 font-mono"
+              >
+                {new Date(entry.created_at).toLocaleString("el-GR")}
+              </time>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/contact-ae2V9TPP.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./useAuth-B1WX5JkE.js";import{t as i}from"./db-DXn9ZPwL.js";import{t as a}from"./Footer-Bkdzkq98.js";import{t as o}from"./ChromeButton-CdfVnEPs.js";var s=e(n(),1),c=t(),l=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,u=`w-full rounded-lg border border-white/10 bg-[#111111] px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 transition-colors focus:border-white/35 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40`,d=`mb-2 block text-[11px] uppercase tracking-[0.25em] text-neutral-500`;function f(){let{session:e}=r(),[t,n]=(0,s.useState)(`message`),[a,f]=(0,s.useState)(``),[p,m]=(0,s.useState)(e?.user?.email??``),[h,g]=(0,s.useState)(``),[_,v]=(0,s.useState)(``),[y,b]=(0,s.useState)(``),[x,S]=(0,s.useState)(!1),[C,w]=(0,s.useState)(``),[T,E]=(0,s.useState)({}),[D,O]=(0,s.useState)(`idle`),[k,A]=(0,s.useState)(null);function j(){let e={};return a.trim().length<2&&(e.full_name=`Συμπλήρωσε το ονοματεπώνυμό σου.`),l.test(p.trim())||(e.email=`Δώσε ένα έγκυρο email.`),t===`appointment`&&(h.trim().length<8&&(e.phone=`Για ραντεβού χρειαζόμαστε τηλέφωνο.`),y?new Date(y).getTime()<Date.now()&&(e.preferred_at=`Η ημερομηνία πρέπει να είναι στο μέλλον.`):e.preferred_at=`Διάλεξε ημερομηνία και ώρα.`),_.trim().length<10&&(e.message=`Γράψε τουλάχιστον 10 χαρακτήρες.`),x||(e.consent=`Χρειαζόμαστε τη συγκατάθεσή σου για να σου απαντήσουμε.`),e}async function M(n){if(n.preventDefault(),A(null),C.trim()!==``){O(`sent`);return}let r=j();if(E(r),Object.keys(r).length>0)return;O(`sending`);let{error:o}=await i.from(`contact_messages`).insert({kind:t,full_name:a.trim(),email:p.trim().toLowerCase(),phone:h.trim()||null,message:_.trim(),preferred_at:t===`appointment`?new Date(y).toISOString():null,user_id:e?.user?.id??null});if(o){O(`error`),A(o.message);return}O(`sent`),f(``),g(``),v(``),b(``),S(!1)}return D===`sent`?(0,c.jsxs)(`div`,{className:`rounded-2xl border border-white/15 bg-[#0A0A0A] p-8 text-center`,children:[(0,c.jsx)(`p`,{className:`text-xs uppercase tracking-[0.4em] text-neutral-500`,children:`ΕΛΗΦΘΗ`}),(0,c.jsx)(`h3`,{className:`mt-4 text-2xl font-semibold tracking-tight text-neutral-100`,children:t===`appointment`?`Το αίτημα ραντεβού στάλθηκε.`:`Το μήνυμά σου στάλθηκε.`}),(0,c.jsx)(`p`,{className:`mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400`,children:`Η ομάδα της AURA απαντά συνήθως μέσα σε 1–2 εργάσιμες ημέρες στο email που έδωσες.`}),(0,c.jsx)(`button`,{type:`button`,onClick:()=>O(`idle`),className:`mt-6 rounded-full border border-white/20 px-6 py-2.5 text-xs uppercase tracking-[0.2em] text-neutral-200 transition-colors hover:border-white/50 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50`,children:`Νέο μήνυμα`})]}):(0,c.jsxs)(`form`,{onSubmit:M,noValidate:!0,className:`rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8`,children:[(0,c.jsxs)(`fieldset`,{className:`mb-7`,children:[(0,c.jsx)(`legend`,{className:d,children:`Τι θέλεις να κάνεις`}),(0,c.jsx)(`div`,{className:`inline-flex rounded-full border border-white/10 p-1`,children:[{value:`message`,label:`ΜΗΝΥΜΑ`},{value:`appointment`,label:`ΡΑΝΤΕΒΟΥ`}].map(e=>(0,c.jsx)(`button`,{type:`button`,"aria-pressed":t===e.value,onClick:()=>n(e.value),className:[`rounded-full px-5 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50`,t===e.value?`bg-white/10 text-white`:`text-neutral-500 hover:text-neutral-200`].join(` `),children:e.label},e.value))})]}),(0,c.jsxs)(`div`,{className:`grid gap-5 sm:grid-cols-2`,children:[(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`label`,{className:d,htmlFor:`contact-name`,children:`Ονοματεπώνυμο`}),(0,c.jsx)(`input`,{id:`contact-name`,name:`full_name`,autoComplete:`name`,className:u,value:a,onChange:e=>f(e.target.value),"aria-invalid":!!T.full_name,"aria-describedby":T.full_name?`err-name`:void 0,placeholder:`Γιάννης Παπαδόπουλος`}),T.full_name&&(0,c.jsx)(`p`,{id:`err-name`,className:`mt-2 text-xs text-neutral-400`,children:T.full_name})]}),(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`label`,{className:d,htmlFor:`contact-email`,children:`Email`}),(0,c.jsx)(`input`,{id:`contact-email`,name:`email`,type:`email`,autoComplete:`email`,className:u,value:p,onChange:e=>m(e.target.value),"aria-invalid":!!T.email,"aria-describedby":T.email?`err-email`:void 0,placeholder:`you@example.com`}),T.email&&(0,c.jsx)(`p`,{id:`err-email`,className:`mt-2 text-xs text-neutral-400`,children:T.email})]}),(0,c.jsxs)(`div`,{children:[(0,c.jsxs)(`label`,{className:d,htmlFor:`contact-phone`,children:[`Τηλέφωνο `,t===`message`&&(0,c.jsx)(`span`,{className:`text-neutral-700`,children:`(προαιρετικό)`})]}),(0,c.jsx)(`input`,{id:`contact-phone`,name:`phone`,type:`tel`,autoComplete:`tel`,className:u,value:h,onChange:e=>g(e.target.value),"aria-invalid":!!T.phone,"aria-describedby":T.phone?`err-phone`:void 0,placeholder:`+30 69XXXXXXXX`}),T.phone&&(0,c.jsx)(`p`,{id:`err-phone`,className:`mt-2 text-xs text-neutral-400`,children:T.phone})]}),t===`appointment`&&(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`label`,{className:d,htmlFor:`contact-when`,children:`Προτιμώμενη ημερομηνία & ώρα`}),(0,c.jsx)(`input`,{id:`contact-when`,name:`preferred_at`,type:`datetime-local`,className:u,value:y,onChange:e=>b(e.target.value),"aria-invalid":!!T.preferred_at,"aria-describedby":T.preferred_at?`err-when`:void 0}),T.preferred_at&&(0,c.jsx)(`p`,{id:`err-when`,className:`mt-2 text-xs text-neutral-400`,children:T.preferred_at})]}),(0,c.jsxs)(`div`,{className:`sm:col-span-2`,children:[(0,c.jsx)(`label`,{className:d,htmlFor:`contact-message`,children:t===`appointment`?`Τι θέλεις να δουλέψουμε`:`Μήνυμα`}),(0,c.jsx)(`textarea`,{id:`contact-message`,name:`message`,rows:5,className:`${u} resize-y`,value:_,onChange:e=>v(e.target.value),"aria-invalid":!!T.message,"aria-describedby":T.message?`err-message`:void 0,placeholder:`Πες μας λίγα λόγια για το επίπεδό σου και τον στόχο σου.`}),T.message&&(0,c.jsx)(`p`,{id:`err-message`,className:`mt-2 text-xs text-neutral-400`,children:T.message})]})]}),(0,c.jsxs)(`div`,{className:`hidden`,"aria-hidden":`true`,children:[(0,c.jsx)(`label`,{htmlFor:`contact-company`,children:`Company`}),(0,c.jsx)(`input`,{id:`contact-company`,name:`company`,tabIndex:-1,autoComplete:`off`,value:C,onChange:e=>w(e.target.value)})]}),(0,c.jsxs)(`div`,{className:`mt-6 flex items-start gap-3`,children:[(0,c.jsx)(`input`,{id:`contact-consent`,type:`checkbox`,checked:x,onChange:e=>S(e.target.checked),"aria-invalid":!!T.consent,className:`mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-[#111111] accent-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50`}),(0,c.jsx)(`label`,{htmlFor:`contact-consent`,className:`text-xs leading-relaxed text-neutral-400`,children:`Συμφωνώ να αποθηκεύσει η AURA τα στοιχεία μου για να απαντήσει στο αίτημά μου.`})]}),T.consent&&(0,c.jsx)(`p`,{className:`mt-2 text-xs text-neutral-400`,children:T.consent}),D===`error`&&k&&(0,c.jsxs)(`p`,{role:`alert`,className:`mt-5 rounded-lg border border-white/15 bg-[#111111] px-4 py-3 text-xs text-neutral-300`,children:[`Κάτι πήγε λάθος: `,k]}),(0,c.jsx)(`div`,{className:`mt-8`,children:(0,c.jsx)(o,{type:`submit`,disabled:D===`sending`,className:`w-full sm:w-auto`,children:D===`sending`?`ΑΠΟΣΤΟΛΗ…`:t===`appointment`?`ΚΛΕΙΣΕ ΡΑΝΤΕΒΟΥ`:`ΣΤΕΙΛΕ ΜΗΝΥΜΑ`})})]})}function p(){return(0,c.jsxs)(c.Fragment,{children:[(0,c.jsx)(`main`,{className:`mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-40`,children:(0,c.jsxs)(`div`,{className:`grid gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-16`,children:[(0,c.jsxs)(`header`,{children:[(0,c.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:`CONTACT`}),(0,c.jsx)(`h1`,{className:`mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-neutral-100 sm:text-5xl`,children:`ΜΙΛΑ ΜΑΣ.`}),(0,c.jsx)(`p`,{className:`mt-6 text-base leading-relaxed text-neutral-400`,children:`Ρώτα για τη μέθοδο, τα πακέτα ή την πιστοποίηση — ή κλείσε ραντεβού για να συζητήσουμε το επίπεδό σου και τους στόχους σου.`}),(0,c.jsxs)(`dl`,{className:`mt-10 space-y-6 border-t border-white/10 pt-8`,children:[(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`dt`,{className:`text-[11px] uppercase tracking-[0.25em] text-neutral-600`,children:`Χρόνος απάντησης`}),(0,c.jsx)(`dd`,{className:`mt-2 text-sm text-neutral-300`,children:`1–2 εργάσιμες ημέρες`})]}),(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`dt`,{className:`text-[11px] uppercase tracking-[0.25em] text-neutral-600`,children:`Ραντεβού`}),(0,c.jsx)(`dd`,{className:`mt-2 text-sm text-neutral-300`,children:`Δήλωσε προτιμώμενη ώρα και επιβεβαιώνουμε με email.`})]}),(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`dt`,{className:`text-[11px] uppercase tracking-[0.25em] text-neutral-600`,children:`Υπάρχοντες μαθητές`}),(0,c.jsx)(`dd`,{className:`mt-2 text-sm text-neutral-300`,children:`Για θέματα λογαριασμού ή χρέωσης, ανάφερέ το στο μήνυμά σου.`})]})]})]}),(0,c.jsx)(f,{})]})}),(0,c.jsx)(a,{})]})}export{p as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/dashboard--lHvzaaV.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./AnimatePresence-ClHpx5iG.js";import{t as a}from"./use-reduced-motion-CNAPwhZE.js";import{t as o}from"./react-D9fOyxUn.js";import{C as s,D as c,b as l,m as u}from"./queries-B7Arqryn.js";import{t as d}from"./createLucideIcon-Dz5w4CtK.js";import{t as f}from"./arrow-right-D_t5sPRj.js";import{t as p}from"./book-open-l6w5YLVR.js";import{t as m}from"./crown-QxIH2HsF.js";import{t as h}from"./gem-CdTGHu1B.js";import{t as ee}from"./lock-DHD2dW60.js";import{t as g}from"./shield-check-Djau1VnD.js";import{t as _}from"./shield-DjyPlGo5.js";import{t as v}from"./sparkles-gf6_8K8H.js";import{t as y}from"./useAsync-CZJ1G06G.js";import{n as b,r as te}from"./States-BulpY35p.js";var ne=d(`circle-check-big`,[[`path`,{d:`M21.801 10A10 10 0 1 1 17 3.335`,key:`yps3ct`}],[`path`,{d:`m9 11 3 3L22 4`,key:`1pflzl`}]]),x=d(`star`,[[`path`,{d:`M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z`,key:`r04s7s`}]]),S=d(`user-check`,[[`path`,{d:`m16 11 2 2 4-4`,key:`9rsbq5`}],[`path`,{d:`M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2`,key:`1yyitq`}],[`circle`,{cx:`9`,cy:`7`,r:`4`,key:`nufk8`}]]),C=e(n(),1),w=t(),T=[.22,1,.36,1],re=[`foundation`,`technical`,`analysis`,`design`,`business`,`educator`],E={foundation:`Foundation`,technical:`Technical`,analysis:`Analysis`,design:`Design`,business:`Business`,educator:`Educator`},D={mastered:`Mastered`,verified:`Verified`,practicing:`Practicing`,learning:`Learning`,locked:`Locked`},O=4,k=118,A=14,ie=14,ae=34,oe=96,se=28,j=20,ce=340,M=e=>e===`verified`||e===`mastered`;function N(e){let t=new Map;for(let n of e){let e=t.get(n.category)??[];e.push(n),t.set(n.category,e)}for(let e of t.values())e.sort((e,t)=>e.sort_order-t.sort_order);let n=re.filter(e=>(t.get(e)??[]).length>0),r=Math.min(O,Math.max(1,...n.map(e=>t.get(e).length))),i=Math.max(ce,112+(r-1)*k),a=[],o=new Map,s=[],c=A;for(let e of n){s.push({cat:e,y:c}),c+=ae;let n=t.get(e);for(let e=0;e<n.length;e+=O){let t=n.slice(e,e+O),r=i/2-(t.length-1)*k/2;t.forEach((e,t)=>{let n={skill:e,state:e.userSkill?.state??`locked`,x:r+t*k,y:c+se};a.push(n),o.set(e.id,n)}),c+=oe}c+=6}let l=c+ie,u=[];for(let e of a)for(let t of e.skill.prerequisites??[]){let n=o.get(t);n&&u.push([n,e])}return{nodes:a,edges:u,titles:s,width:i,height:l}}function P(e,t=13){let n=e.split(/\s+/),r=[],i=``;for(let e of n)i&&(i+` `+e).length>t?(r.push(i),i=e):i=i?i+` `+e:e;if(i&&r.push(i),r.length>2){let e=r.slice(1).join(` `);r=[r[0],e.length>t?e.slice(0,t-1)+`…`:e]}return r}function F(e,t,n,r){let i=[];for(let a=0;a<10;a++){let o=a%2==0?n:r,s=(-90+a*36)*(Math.PI/180);i.push(`${(e+o*Math.cos(s)).toFixed(2)},${(t+o*Math.sin(s)).toFixed(2)}`)}return i.join(` `)}function I(e,t){if(Math.abs(e.y-t.y)<1)return`M${e.x} ${e.y} L${t.x} ${t.y}`;let n=(e.y+t.y)/2;return`M${e.x} ${e.y} C${e.x} ${n}, ${t.x} ${n}, ${t.x} ${t.y}`}function L({skills:e}){let t=a(),{nodes:n,edges:r,titles:s,width:c,height:l}=(0,C.useMemo)(()=>N(e),[e]),u=(0,C.useMemo)(()=>(n.find(e=>e.state===`practicing`)??n.find(e=>e.state===`learning`)??n.find(e=>e.state!==`locked`)??n[0])?.skill.id??null,[n]),[d,f]=(0,C.useState)(null);if(e.length===0||n.length===0)return null;let p=n.find(e=>e.skill.id===(d??u))??n[0],m=(p.skill.prerequisites??[]).map(t=>e.find(e=>e.id===t)?.name).filter(Boolean);return(0,w.jsxs)(`section`,{className:`relative mx-auto w-full max-w-md`,children:[(0,w.jsxs)(`div`,{className:`relative w-full overflow-hidden rounded-xl`,children:[(0,w.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-0 opacity-30`,style:{backgroundImage:`radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)`,backgroundSize:`22px 22px`,maskImage:`radial-gradient(ellipse at center, black 30%, transparent 80%)`,WebkitMaskImage:`radial-gradient(ellipse at center, black 30%, transparent 80%)`}}),(0,w.jsxs)(`svg`,{viewBox:`0 0 ${c} ${l}`,className:`relative block h-auto w-full select-none`,role:`group`,"aria-label":`Skill progression tree`,children:[(0,w.jsxs)(`defs`,{children:[(0,w.jsxs)(`linearGradient`,{id:`stg-edge`,gradientUnits:`userSpaceOnUse`,x1:`0`,y1:`0`,x2:c,y2:l,children:[(0,w.jsx)(`stop`,{offset:`0%`,stopColor:`#ffffff`,stopOpacity:`0.95`}),(0,w.jsx)(`stop`,{offset:`50%`,stopColor:`#9aa0a8`,stopOpacity:`0.6`}),(0,w.jsx)(`stop`,{offset:`100%`,stopColor:`#ffffff`,stopOpacity:`0.95`})]}),(0,w.jsxs)(`linearGradient`,{id:`stg-rule`,x1:`0`,y1:`0`,x2:`1`,y2:`0`,children:[(0,w.jsx)(`stop`,{offset:`0%`,stopColor:`#ffffff`,stopOpacity:`0.3`}),(0,w.jsx)(`stop`,{offset:`100%`,stopColor:`#ffffff`,stopOpacity:`0`})]}),(0,w.jsxs)(`radialGradient`,{id:`stg-chrome`,cx:`35%`,cy:`30%`,r:`80%`,children:[(0,w.jsx)(`stop`,{offset:`0%`,stopColor:`#ffffff`}),(0,w.jsx)(`stop`,{offset:`45%`,stopColor:`#c9ced4`}),(0,w.jsx)(`stop`,{offset:`100%`,stopColor:`#6c7279`})]}),(0,w.jsxs)(`radialGradient`,{id:`stg-dark`,cx:`35%`,cy:`30%`,r:`90%`,children:[(0,w.jsx)(`stop`,{offset:`0%`,stopColor:`#2a2d31`}),(0,w.jsx)(`stop`,{offset:`100%`,stopColor:`#0c0d0e`})]}),(0,w.jsxs)(`filter`,{id:`stg-glow`,x:`-100%`,y:`-100%`,width:`300%`,height:`300%`,children:[(0,w.jsx)(`feGaussianBlur`,{stdDeviation:`3`,result:`b`}),(0,w.jsxs)(`feMerge`,{children:[(0,w.jsx)(`feMergeNode`,{in:`b`}),(0,w.jsx)(`feMergeNode`,{in:`SourceGraphic`})]})]})]}),s.map(({cat:e,y:t})=>(0,w.jsxs)(`g`,{children:[(0,w.jsx)(`text`,{x:16,y:t+14,className:`font-aura`,fill:`rgba(255,255,255,0.65)`,fontSize:`11`,fontWeight:`600`,letterSpacing:`2.5`,children:E[e].toUpperCase()}),(0,w.jsx)(`line`,{x1:16,y1:t+22,x2:c-16,y2:t+22,stroke:`url(#stg-rule)`,strokeWidth:`1`})]},e)),r.map(([e,n],r)=>{let i=M(e.state)&&n.state!==`locked`,a=!i&&e.state!==`locked`&&n.state!==`locked`,s=I(e,n);return(0,w.jsxs)(`g`,{children:[(0,w.jsx)(o.path,{d:s,fill:`none`,stroke:i?`url(#stg-edge)`:a?`rgba(255,255,255,0.3)`:`rgba(255,255,255,0.12)`,strokeWidth:i?2:1.3,strokeLinecap:`round`,strokeDasharray:!i&&!a?`2 6`:void 0,filter:i?`url(#stg-glow)`:void 0,initial:{pathLength:0,opacity:0},animate:{pathLength:1,opacity:1},transition:{duration:1,ease:`easeInOut`,delay:.1+r*.04}}),i&&!t&&(0,w.jsx)(o.path,{d:s,fill:`none`,stroke:`#ffffff`,strokeWidth:`2`,strokeLinecap:`round`,strokeDasharray:`5 40`,animate:{strokeDashoffset:[0,-45]},transition:{duration:1.8,repeat:1/0,ease:`linear`},style:{filter:`drop-shadow(0 0 4px #fff)`}})]},`${e.skill.id}-${n.skill.id}`)}),n.map((e,n)=>{let r=e.skill.id===p.skill.id,i=P(e.skill.name),a=M(e.state),s=e.state===`locked`;return(0,w.jsxs)(o.g,{role:`button`,tabIndex:0,"aria-label":`${e.skill.name}, ${D[e.state]}`,"aria-pressed":r,onClick:()=>f(e.skill.id),onKeyDown:t=>(t.key===`Enter`||t.key===` `)&&f(e.skill.id),initial:{opacity:0},animate:{opacity:1},transition:{duration:.6,ease:T,delay:.25+n*.05},style:{cursor:`pointer`,outline:`none`},children:[(0,w.jsx)(`circle`,{cx:e.x,cy:e.y,r:34,fill:`rgba(0,0,0,0.001)`}),r&&(0,w.jsx)(`circle`,{cx:e.x,cy:e.y,r:30,fill:`none`,stroke:`rgba(255,255,255,0.6)`,strokeWidth:`1`,strokeDasharray:`2 5`}),e.state===`mastered`&&(0,w.jsx)(`circle`,{cx:e.x,cy:e.y,r:25,fill:`none`,stroke:`rgba(255,255,255,0.55)`,strokeWidth:`1.2`,style:{filter:`drop-shadow(0 0 6px #fff)`}}),(a||e.state===`practicing`)&&!t&&(0,w.jsx)(o.circle,{cx:e.x,cy:e.y,r:j,fill:`none`,stroke:`#ffffff`,strokeWidth:`1.3`,style:{transformBox:`fill-box`,transformOrigin:`center`},animate:{scale:[1,1.8],opacity:[a?.4:.7,0]},transition:{duration:a?3.2:2,repeat:1/0,ease:`easeOut`,delay:n%5*.35}}),(e.state===`practicing`||e.state===`learning`)&&!t&&(0,w.jsx)(o.circle,{cx:e.x,cy:e.y,r:25,fill:`none`,stroke:e.state===`practicing`?`#d4d8dd`:`rgba(212,216,221,0.65)`,strokeWidth:`1.6`,strokeLinecap:`round`,strokeDasharray:e.state===`practicing`?`26 98`:`2.5 8.5`,style:{transformBox:`fill-box`,transformOrigin:`center`,filter:`drop-shadow(0 0 3px rgba(255,255,255,0.8))`},animate:{rotate:360},transition:{duration:e.state===`practicing`?3.2:12,repeat:1/0,ease:`linear`}}),(0,w.jsx)(`circle`,{cx:e.x,cy:e.y,r:j,fill:a?`url(#stg-chrome)`:`url(#stg-dark)`,stroke:a?`#ffffff`:s?`rgba(255,255,255,0.16)`:`#BFC0C2`,strokeWidth:`1.6`,style:a?{filter:`drop-shadow(0 0 10px rgba(255,255,255,0.65))`}:void 0}),e.state===`verified`&&(0,w.jsx)(`path`,{d:`M${e.x-6.5} ${e.y} L${e.x-1.5} ${e.y+5} L${e.x+7} ${e.y-5.5}`,fill:`none`,stroke:`#0a0a0a`,strokeWidth:`2.6`,strokeLinecap:`round`,strokeLinejoin:`round`}),e.state===`mastered`&&(0,w.jsx)(`polygon`,{points:F(e.x,e.y+1,10,4),fill:`#0a0a0a`}),e.state===`practicing`&&(0,w.jsxs)(`g`,{stroke:`#d4d8dd`,strokeWidth:`1.7`,strokeLinecap:`round`,fill:`none`,children:[(0,w.jsx)(`circle`,{cx:e.x,cy:e.y,r:`7.5`}),(0,w.jsx)(`path`,{d:`M${e.x} ${e.y-4} V${e.y} L${e.x+3} ${e.y+2.5}`})]}),e.state===`learning`&&(0,w.jsx)(`path`,{d:`M${e.x} ${e.y-7.5} L${e.x+6} ${e.y} L${e.x} ${e.y+7.5} L${e.x-6} ${e.y} Z`,fill:`none`,stroke:`#d4d8dd`,strokeWidth:`1.7`,strokeLinejoin:`round`}),s&&(0,w.jsxs)(`g`,{stroke:`rgba(255,255,255,0.38)`,strokeWidth:`1.7`,fill:`none`,strokeLinecap:`round`,children:[(0,w.jsx)(`rect`,{x:e.x-6,y:e.y-2,width:`12`,height:`8.5`,rx:`1.8`}),(0,w.jsx)(`path`,{d:`M${e.x-3.5} ${e.y-2} V${e.y-5} a3.5 3.5 0 0 1 7 0 V${e.y-2}`})]}),(0,w.jsx)(`text`,{x:e.x,y:e.y+j+15,textAnchor:`middle`,className:`font-aura`,fill:s?`#6F6F6F`:r?`#ffffff`:`#E4E4E4`,fontSize:`12`,fontWeight:r?700:500,style:r?{filter:`drop-shadow(0 0 6px rgba(255,255,255,0.6))`}:void 0,children:i.map((t,n)=>(0,w.jsx)(`tspan`,{x:e.x,dy:n===0?0:14,children:t},n))})]},e.skill.id)})]})]}),(0,w.jsx)(`div`,{className:`mt-3 flex min-h-[64px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3`,children:(0,w.jsx)(i,{mode:`wait`,children:(0,w.jsxs)(o.div,{initial:{opacity:0,y:6},animate:{opacity:1,y:0},exit:{opacity:0,y:-6},transition:{duration:.3,ease:T},className:`flex w-full min-w-0 items-center justify-between gap-3`,children:[(0,w.jsxs)(`div`,{className:`min-w-0`,children:[(0,w.jsx)(`h4`,{className:`font-aura truncate text-sm font-bold text-white`,children:p.skill.name}),p.skill.definition&&(0,w.jsx)(`p`,{className:`font-aura mt-0.5 line-clamp-2 text-xs leading-relaxed text-white/55`,children:p.skill.definition}),p.state===`locked`&&m.length>0&&(0,w.jsxs)(`p`,{className:`font-aura mt-0.5 text-[11px] text-white/40`,children:[`Χρειάζεται πρώτα: `,m.join(`, `)]})]}),(0,w.jsx)(`span`,{className:`font-aura shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider`,style:{borderColor:p.state===`locked`?`rgba(255,255,255,0.15)`:`rgba(255,255,255,0.6)`,color:p.state===`mastered`?`#0a0a0a`:p.state===`locked`?`rgba(255,255,255,0.4)`:`#fff`,background:p.state===`mastered`?`#fff`:`transparent`,boxShadow:p.state===`locked`?`none`:`0 0 14px rgba(255,255,255,0.25)`},children:D[p.state]})]},p.skill.id)})}),(0,w.jsxs)(`div`,{className:`font-aura mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-white/55`,children:[(0,w.jsxs)(`span`,{className:`flex items-center gap-1.5`,children:[(0,w.jsx)(`i`,{className:`inline-block size-2.5 rounded-full`,style:{background:`radial-gradient(circle at 35% 30%, #fff, #8a9098)`,boxShadow:`0 0 6px rgba(255,255,255,0.7)`}}),`Verified / Mastered`]}),(0,w.jsxs)(`span`,{className:`flex items-center gap-1.5`,children:[(0,w.jsx)(`i`,{className:`inline-block size-2.5 rounded-full border border-[#d4d8dd] bg-[#161718]`}),`Practicing`]}),(0,w.jsxs)(`span`,{className:`flex items-center gap-1.5`,children:[(0,w.jsx)(`i`,{className:`inline-block size-2.5 rounded-full border border-dashed border-[#d4d8dd]/70 bg-[#161718]`}),`Learning`]}),(0,w.jsxs)(`span`,{className:`flex items-center gap-1.5`,children:[(0,w.jsx)(`i`,{className:`inline-block size-2.5 rounded-full border border-white/15 bg-[#0a0a0a]`}),`Locked`]})]})]})}var R=[.22,1,.36,1],z=`linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)`,B=`linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)`,V=`linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))`;function H({children:e,className:t=``}){let n=a();return(0,w.jsx)(o.span,{initial:{backgroundPosition:`0% 50%`},animate:n?void 0:{backgroundPosition:`100% 50%`},transition:{duration:4,repeat:1/0,repeatType:`reverse`,ease:`easeInOut`},style:{backgroundImage:z,backgroundSize:`300% auto`,WebkitBackgroundClip:`text`,backgroundClip:`text`,WebkitTextFillColor:`transparent`},className:`inline-block drop-shadow-[0_0_28px_rgba(255,255,255,0.45)] ${t}`,children:e})}function U({children:e,className:t=``,inner:n=`p-5 sm:p-6`}){return(0,w.jsx)(`div`,{className:`relative rounded-2xl p-px ${t}`,style:{background:V,boxShadow:`0 0 50px rgba(0,0,0,0.85)`},children:(0,w.jsxs)(`div`,{className:`relative h-full overflow-hidden rounded-[15px] bg-[#0a0a0b] ${n}`,children:[(0,w.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-x-0 top-0 h-20`,style:{background:`linear-gradient(180deg, rgba(255,255,255,0.05), transparent)`}}),(0,w.jsx)(`div`,{className:`relative`,children:e})]})})}function W(){return a()?null:(0,w.jsx)(o.span,{"aria-hidden":!0,className:`pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent`,animate:{x:[`-160%`,`420%`]},transition:{duration:1.8,repeat:1/0,repeatDelay:3.2,ease:`easeInOut`},style:{skewX:-18}})}function G({to:e,params:t,label:n,icon:i,solid:a=!1}){return(0,w.jsx)(o.div,{whileHover:{y:-2,scale:1.03},whileTap:{scale:.97},className:`inline-block`,children:(0,w.jsxs)(r,{to:e,params:t,className:`group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold outline-none transition-shadow duration-300 focus-visible:ring-2 focus-visible:ring-white/70 ${a?`text-neutral-950 shadow-[0_0_30px_rgba(255,255,255,0.18)] hover:shadow-[0_0_46px_rgba(255,255,255,0.4)]`:`border border-white/25 bg-white/[0.04] text-white hover:border-white/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.14)]`}`,style:a?{backgroundImage:B,boxShadow:`inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4)`}:void 0,children:[a&&(0,w.jsx)(W,{}),i,(0,w.jsx)(`span`,{className:`relative`,children:n}),(0,w.jsx)(f,{className:`relative size-4 transition-transform duration-300 group-hover:translate-x-1`})]})})}var K=[{key:`initiate`,label:`Initiate`,min:0,Icon:_},{key:`apprentice`,label:`Apprentice`,min:100,Icon:x},{key:`artisan`,label:`Artisan`,min:300,Icon:h},{key:`master`,label:`Master`,min:700,Icon:m},{key:`legend`,label:`Legend`,min:1500,Icon:v}];function le(e){let t=K[0];for(let n of K)e>=n.min&&(t=n);return t}var ue={foundation:`Foundation`,technical:`Technical`,analysis:`Analysis`,design:`Design`,business:`Business`,educator:`Educator`},de={locked:`border-white/10 bg-white/[0.03] text-white/35`,learning:`border-white/20 bg-white/[0.07] text-white/65`,practicing:`border-white/35 bg-white/[0.12] text-white/85`,verified:`border-white/70 bg-white/[0.18] text-white shadow-[0_0_16px_rgba(255,255,255,0.35)]`,mastered:`border-white bg-white text-neutral-950 shadow-[0_0_22px_rgba(255,255,255,0.6)]`},fe=[`verified`,`mastered`];function q(e){return fe.includes(e.userSkill?.state??`locked`)}function J(e,t){return!e.prerequisites||e.prerequisites.length===0||e.prerequisites.every(e=>{let n=t.find(t=>t.id===e);return n?q(n):!1})}function pe(e){return e?e===`passed`?{text:`Verified`,ok:!0}:e===`needs_revision`?{text:`Needs revision`,ok:!1}:{text:`Not passed`,ok:!1}:null}function Y({decision:e}){let t=pe(e);return t?(0,w.jsxs)(`span`,{className:`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${t.ok?`border-white bg-white text-neutral-950 shadow-[0_0_24px_rgba(255,255,255,0.55)]`:`border-white/25 bg-white/[0.06] text-white/75`}`,children:[t.ok&&(0,w.jsx)(g,{className:`size-3.5`}),t.text]}):(0,w.jsx)(`span`,{className:`text-white/40`,children:`—`})}var me={hidden:{},show:{transition:{staggerChildren:.09}}},X={hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:R}}};function he(){let e=a(),{data:t,error:n,loading:i}=y(u,[]),d=t?c(t.profile.role):!1,m=y(l,[]),h=y(s,[]);(0,C.useMemo)(()=>le(t?.profile?.points??0),[t?.profile]);let _=(0,C.useMemo)(()=>m.data?m.data.find(e=>!q(e)&&J(e,m.data))??null:null,[m.data]),x=_?h.data?.[_.id]:null,T=(0,C.useMemo)(()=>m.data?m.data.reduce((e,t)=>((e[t.category]??=[]).push(t),e),{}):{},[m.data]);return(0,w.jsxs)(`main`,{className:`relative min-h-screen w-full overflow-x-hidden bg-[#070707] px-4 py-12 text-white selection:bg-white selection:text-black sm:px-6 md:px-10`,children:[(0,w.jsx)(o.div,{"aria-hidden":!0,className:`pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full`,style:{background:`radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)`},animate:e?void 0:{opacity:[.4,1,.4]},transition:{duration:8,repeat:1/0,ease:`easeInOut`}}),i&&(0,w.jsx)(`div`,{className:`relative mx-auto max-w-5xl`,children:(0,w.jsx)(te,{rows:3})}),n&&(0,w.jsx)(`div`,{className:`relative mx-auto max-w-5xl`,children:(0,w.jsx)(b,{message:n})}),t&&(0,w.jsxs)(o.div,{variants:me,initial:`hidden`,animate:`show`,className:`relative mx-auto max-w-6xl space-y-10`,children:[(0,w.jsx)(o.header,{variants:X,className:`flex flex-col gap-5 border-b border-white/10 pb-8 md:flex-row md:items-center md:justify-between`,children:(0,w.jsxs)(`div`,{children:[(0,w.jsxs)(`div`,{className:`mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50`,children:[(0,w.jsx)(`span`,{className:`h-px w-10 bg-gradient-to-r from-white/70 to-transparent`}),`AURA Command Center`]}),(0,w.jsx)(`h1`,{className:`text-3xl font-extrabold uppercase tracking-tight sm:text-5xl`,children:(0,w.jsxs)(H,{children:[`Καλωσήρθες`,t.profile.full_name?`, ${t.profile.full_name}`:``,`.`]})})]})}),(0,w.jsxs)(o.div,{variants:X,className:`grid gap-5 sm:grid-cols-3`,children:[(0,w.jsx)($,{label:`Verified skills`,icon:(0,w.jsx)(g,{className:`size-5`}),value:(0,w.jsxs)(`span`,{className:`text-4xl font-extrabold tracking-tight text-white`,children:[t.verifiedSkills,(0,w.jsxs)(`span`,{className:`text-white/35`,children:[` / `,t.totalSkills]})]})}),(0,w.jsx)($,{label:`Ανοιχτές υποβολές`,icon:(0,w.jsx)(ne,{className:`size-5`}),value:(0,w.jsx)(`span`,{className:`text-4xl font-extrabold tracking-tight text-white`,children:t.openSubmissions})}),(0,w.jsx)($,{label:`Τελευταίο αποτέλεσμα`,icon:(0,w.jsx)(v,{className:`size-5`}),value:t.latestReview?(0,w.jsx)(Y,{decision:t.latestReview.decision}):(0,w.jsx)(`span`,{className:`text-4xl font-extrabold text-white/40`,children:`—`})})]}),m.data&&m.data.length>0&&(0,w.jsxs)(o.div,{variants:X,className:`space-y-4`,children:[(0,w.jsx)(Z,{children:`Skill Progression Tree`}),(0,w.jsx)(`p`,{className:`-mt-2 px-1 text-xs leading-relaxed text-white/50`,children:`Locked → Learning → Practicing → Verified → Mastered. Για να ξεκλειδώσεις ένα skill πρέπει πρώτα να έχεις verified όλα τα προαπαιτούμενά του.`}),(0,w.jsx)(U,{className:`w-full`,inner:`p-4 sm:p-6`,children:(0,w.jsx)(L,{skills:m.data})})]}),m.data&&m.data.length>0&&(0,w.jsxs)(o.div,{variants:X,className:`space-y-6`,children:[(0,w.jsx)(Z,{children:`Αναλυτική Λίστα Skills`}),(0,w.jsx)(`div`,{className:`space-y-9`,children:Object.keys(T).map(e=>(0,w.jsxs)(`section`,{className:`space-y-3`,children:[(0,w.jsxs)(`h3`,{className:`flex items-center gap-3 px-1 text-xs font-medium uppercase tracking-[0.3em] text-white/45`,children:[ue[e]??e,(0,w.jsx)(`span`,{className:`h-px flex-1 bg-gradient-to-r from-white/15 to-transparent`})]}),(0,w.jsx)(`div`,{className:`grid gap-4 sm:grid-cols-2`,children:T[e].map((e,t)=>{let n=e.userSkill?.state??`locked`,r=q(e),i=J(e,m.data),a=h.data?.[e.id],s=(e.prerequisites??[]).map(e=>m.data.find(t=>t.id===e)).filter(e=>e&&!q(e));return(0,w.jsx)(o.div,{initial:{opacity:0,y:16},whileInView:{opacity:1,y:0},viewport:{once:!0,margin:`-40px`},transition:{duration:.6,ease:R,delay:t%4*.06},whileHover:{y:-4},className:`group relative`,children:(0,w.jsxs)(U,{inner:`p-5`,children:[(0,w.jsxs)(`div`,{className:`flex items-start justify-between gap-3`,children:[(0,w.jsx)(`h4`,{className:`text-sm font-semibold text-white`,children:e.name}),(0,w.jsx)(`span`,{className:`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${de[n]}`,children:n})]}),e.definition&&(0,w.jsx)(`p`,{className:`mt-2 line-clamp-2 text-xs leading-relaxed text-white/50`,children:e.definition}),e.userSkill?.verified_at&&(0,w.jsxs)(`p`,{className:`mt-3 text-xs text-white/40`,children:[`Verified `,new Date(e.userSkill.verified_at).toLocaleDateString(`el-GR`)]}),(0,w.jsx)(`div`,{className:`mt-4 border-t border-white/[0.07] pt-4`,children:r?(0,w.jsxs)(`span`,{className:`flex items-center gap-2 text-xs font-semibold text-white`,children:[(0,w.jsx)(g,{className:`size-4`}),` Ολοκληρώθηκε`]}):i?a?(0,w.jsx)(G,{to:`/practice/$assignmentId`,params:{assignmentId:a},label:`Ανέβασε φωτογραφία κουρέματος`}):(0,w.jsx)(`span`,{className:`text-xs text-white/35`,children:`Δεν έχει οριστεί assignment ακόμη.`}):(0,w.jsxs)(`span`,{className:`flex items-center gap-2 text-xs text-white/40`,children:[(0,w.jsx)(ee,{className:`size-3.5 shrink-0`}),`Χρειάζεται πρώτα: `,s.map(e=>e.name).join(`, `)]})})]})},e.id)})})]},e))})]}),(0,w.jsxs)(o.div,{variants:X,className:`grid gap-8 md:grid-cols-2`,children:[(0,w.jsx)(Q,{title:`Continue learning`,children:t.continueLesson?(0,w.jsx)(o.div,{whileHover:{y:-3},whileTap:{scale:.99},children:(0,w.jsx)(r,{to:`/lesson/$lessonId`,params:{lessonId:t.continueLesson.id},className:`group block outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-2xl`,children:(0,w.jsx)(U,{inner:`p-5`,children:(0,w.jsxs)(`div`,{className:`flex items-center justify-between gap-3`,children:[(0,w.jsxs)(`div`,{className:`flex min-w-0 items-center gap-4`,children:[(0,w.jsx)(`span`,{className:`flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/[0.06] text-white transition-shadow duration-300 group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]`,children:(0,w.jsx)(p,{className:`size-5`})}),(0,w.jsx)(`span`,{className:`truncate text-sm font-semibold text-white`,children:t.continueLesson.title})]}),(0,w.jsx)(`span`,{className:`flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-950 transition-transform duration-300 group-hover:translate-x-1`,style:{backgroundImage:B},children:(0,w.jsx)(f,{className:`size-4`})})]})})})}):(0,w.jsx)(U,{inner:`p-5`,children:(0,w.jsxs)(`p`,{className:`text-sm text-white/60`,children:[`Δεν υπάρχει μάθημα σε εξέλιξη.`,` `,(0,w.jsx)(r,{to:`/academy`,className:`text-white underline underline-offset-4 hover:text-white/80`,children:`Πήγαινε στην Academy`}),`.`]})})}),(0,w.jsx)(Q,{title:`Recent feedback`,children:(0,w.jsx)(U,{inner:`p-5`,children:t.latestReview?(0,w.jsxs)(`div`,{className:`space-y-3`,children:[(0,w.jsxs)(`div`,{className:`flex items-center justify-between`,children:[(0,w.jsx)(`span`,{className:`text-xs uppercase tracking-[0.25em] text-white/45`,children:`Evaluation`}),(0,w.jsx)(Y,{decision:t.latestReview.decision})]}),t.latestReview.next_actions&&(0,w.jsx)(`p`,{className:`border-t border-white/10 pt-3 text-sm leading-relaxed text-white/75`,children:t.latestReview.next_actions})]}):(0,w.jsx)(`p`,{className:`text-sm text-white/45`,children:`Δεν υπάρχει feedback ακόμη.`})})})]}),(0,w.jsx)(o.div,{variants:X,children:(0,w.jsx)(Q,{title:`Επόμενη υποβολή`,children:_?x?(0,w.jsx)(U,{inner:`p-5 sm:p-6`,children:(0,w.jsxs)(`div`,{className:`flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between`,children:[(0,w.jsxs)(`span`,{className:`text-sm text-white/85`,children:[`Ανέβασε φωτογραφία για:`,` `,(0,w.jsx)(`span`,{className:`font-semibold text-white underline decoration-white/40 underline-offset-4`,children:_.name})]}),(0,w.jsx)(G,{to:`/practice/$assignmentId`,params:{assignmentId:x},label:`Υποβολή`,solid:!0})]})}):(0,w.jsx)(U,{inner:`p-5`,children:(0,w.jsxs)(`p`,{className:`text-sm text-white/60`,children:[`Το επόμενο skill (`,(0,w.jsx)(`span`,{className:`font-medium text-white`,children:_.name}),`) δεν έχει ακόμη assignment.`]})}):m.data?(0,w.jsx)(U,{inner:`p-5`,children:(0,w.jsxs)(`p`,{className:`flex items-center gap-3 text-sm text-white/85`,children:[(0,w.jsx)(g,{className:`size-5 text-white`}),`Έχεις ολοκληρώσει όλα τα διαθέσιμα skills προς το παρόν.`]})}):(0,w.jsx)(U,{inner:`p-5`,children:(0,w.jsx)(`p`,{className:`text-sm text-white/40`,children:`Φόρτωση…`})})})}),(0,w.jsxs)(o.nav,{variants:X,className:`flex flex-wrap gap-4 border-t border-white/10 pt-8`,children:[(0,w.jsx)(G,{to:`/academy`,label:`Academy`}),d&&(0,w.jsx)(G,{to:`/review`,label:`Review Queue`,icon:(0,w.jsx)(S,{className:`size-4`}),solid:!0})]})]})]})}function Z({children:e}){return(0,w.jsxs)(`h2`,{className:`flex items-center gap-3 px-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/65`,children:[(0,w.jsx)(`span`,{className:`size-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]`}),e]})}function Q({title:e,children:t}){return(0,w.jsxs)(`section`,{className:`space-y-4`,children:[(0,w.jsx)(Z,{children:e}),t]})}function $({label:e,value:t,icon:n}){return(0,w.jsx)(o.div,{whileHover:{y:-5},transition:{duration:.25},className:`group relative`,children:(0,w.jsxs)(U,{inner:`p-6`,children:[(0,w.jsx)(`div`,{className:`absolute right-0 top-0 text-white/35 transition-all duration-300 group-hover:text-white group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]`,children:n}),(0,w.jsx)(`p`,{className:`text-xs uppercase tracking-[0.25em] text-white/50`,children:e}),(0,w.jsx)(`div`,{className:`mt-4 flex min-h-[2.5rem] items-center`,children:t}),(0,w.jsx)(`div`,{className:`absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100`})]})})}export{he as component};
+=== END FILE ===
+

@@ -1,0 +1,1407 @@
+=== FILE: supabase/functions/viva-renew/index.ts ===
+// supabase/functions/viva-renew/index.ts
+//
+// STAGE 4: the renewal engine. Called on a schedule (pg_cron, hourly) with a
+// secret header. For every Viva subscription that is due it:
+//
+//   1. reserves the billing period in OUR database   (viva_begin_renewal)
+//   2. charges the saved payment method at Viva      (no customer interaction)
+//   3. asks Viva to CONFIRM the result before believing it
+//   4. applies it atomically                         (viva_apply_renewal)
+//
+// Safety rules:
+//  * At most ONE charge per member per billing period: the order row is the lock.
+//  * If we cannot tell whether a charge went through (network cut, timeout,
+//    Viva error), the order stays PENDING and is never retried automatically:
+//    the money may have moved. The webhook usually settles it; otherwise the
+//    admin is alerted.
+//  * A declined card starts the grace period (members keep access meanwhile);
+//    OUR errors (bad credentials...) are never held against the customer.
+//  * Prices come from public.plans at charge time (the admin panel decides).
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  chargeRecurring,
+  loadVivaConfig,
+  retrieveTransaction,
+  VivaConfigError,
+  type VivaConfig,
+} from "../_shared/viva.ts";
+
+const EUR_ISO_NUMERIC = "978";
+const DEFAULT_BATCH = 25;
+const STALE_FROM_MINUTES = 180; // alert once, in the hourly run that first sees an order this old
+const STALE_TO_MINUTES = 240;
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+type AdminClient = ReturnType<typeof createClient>;
+
+async function rpc<T = Record<string, unknown>>(admin: AdminClient, name: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await admin.rpc(name, args);
+  if (error) throw new Error(`${name} failed: ${error.message}`);
+  return data as T;
+}
+
+async function alertAdmins(admin: AdminClient, title: string, body: string, data: Record<string, unknown>) {
+  try {
+    await admin.rpc("notify_admins", { p_type: "billing_alert", p_title: title, p_body: body, p_url: "/admin", p_data: data });
+  } catch (err) {
+    console.error("alertAdmins failed:", err instanceof Error ? err.message : "unknown");
+  }
+}
+
+/** Constant-time string comparison (the cron secret). */
+function safeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const x = enc.encode(a);
+  const y = enc.encode(b);
+  let diff = x.length ^ y.length;
+  const len = Math.max(x.length, y.length);
+  for (let i = 0; i < len; i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}
+
+interface Summary {
+  due: number;
+  renewed: number;
+  declined: number;
+  rejected: number;
+  left_pending: number;
+  skipped: number;
+  anomalies: number;
+  ended: number;
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  // ---- Only our scheduler may call this. ----
+  const expected = Deno.env.get("CRON_SECRET");
+  if (!expected) {
+    console.error("CRON_SECRET is not set");
+    return json({ error: "misconfigured" }, 500);
+  }
+  if (!safeEqual(req.headers.get("x-cron-secret") ?? "", expected)) return json({ error: "unauthorized" }, 401);
+
+  let cfg: VivaConfig;
+  try {
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+    if (!cfg.merchantId || !cfg.apiKey) {
+      throw new VivaConfigError("Missing Viva secrets: MERCHANT_ID / API_KEY");
+    }
+  } catch (err) {
+    console.error("Viva configuration problem:", err instanceof VivaConfigError ? err.message : "unknown");
+    return json({ error: "misconfigured" }, 500);
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    console.error("Missing Supabase environment configuration");
+    return json({ error: "misconfigured" }, 500);
+  }
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  const batch = Math.min(Math.max(Number(Deno.env.get("VIVA_RENEW_BATCH")) || DEFAULT_BATCH, 1), 100);
+  const summary: Summary = { due: 0, renewed: 0, declined: 0, rejected: 0, left_pending: 0, skipped: 0, anomalies: 0, ended: 0 };
+
+  try {
+    // ---------------- 1. charge what is due ----------------
+    const due = await rpc<{ subscription_id: string }[]>(admin, "viva_due_renewals", {
+      p_environment: cfg.env,
+      p_limit: batch,
+    });
+    summary.due = Array.isArray(due) ? due.length : 0;
+
+    for (const row of Array.isArray(due) ? due : []) {
+      try {
+        await renewOne(admin, cfg, row.subscription_id, summary);
+      } catch (err) {
+        // One member's problem must never stop the others.
+        console.error("renewal failed unexpectedly:", err instanceof Error ? err.message : "unknown");
+        summary.anomalies += 1;
+      }
+    }
+
+    // ---------------- 2. end what is over ----------------
+    const lapsed = await rpc<{ ended: { user_id: string; reason: string }[] }>(admin, "viva_finish_lapsed", {
+      p_environment: cfg.env,
+    });
+    for (const e of lapsed.ended ?? []) {
+      summary.ended += 1;
+      const loud = e.reason === "overdue" || e.reason === "no_authorization";
+      await alertAdmins(
+        admin,
+        loud ? "Λήξη συνδρομής Viva (απαιτεί έλεγχο)" : "Λήξη συνδρομής Viva",
+        loud
+          ? `Η συνδρομή έληξε χωρίς ανανέωση (${e.reason}). Έλεγξε αν υπάρχει πρόβλημα στις χρεώσεις.`
+          : `Η συνδρομή έληξε (${e.reason}).`,
+        { user_id: e.user_id, kind: `lapsed_${e.reason}` },
+      );
+    }
+
+    // ---------------- 3. attempts whose outcome we never learned ----------------
+    const stale = await rpc<{ order_id: string; user_id: string; amount_cents: number }[]>(admin, "viva_stale_renewals", {
+      p_environment: cfg.env,
+      p_from_minutes: STALE_FROM_MINUTES,
+      p_to_minutes: STALE_TO_MINUTES,
+    });
+    for (const s of Array.isArray(stale) ? stale : []) {
+      await alertAdmins(
+        admin,
+        "Ανανέωση Viva χωρίς αποτέλεσμα",
+        "Μια χρέωση ανανέωσης δεν έχει επιβεβαιωθεί εδώ και ώρες. ΔΕΝ θα ξαναδοκιμαστεί αυτόματα (μπορεί να έχει χρεωθεί ο πελάτης). Έλεγξε τη συναλλαγή στη Viva.",
+        { order_id: s.order_id, user_id: s.user_id, amount_cents: s.amount_cents, kind: "renewal_unresolved" },
+      );
+    }
+
+    console.log("viva-renew run:", JSON.stringify(summary));
+    return json({ ok: true, ...summary });
+  } catch (err) {
+    console.error("viva-renew run failed:", err instanceof Error ? err.message : "unknown");
+    return json({ error: "run failed", ...summary }, 500);
+  }
+});
+
+async function renewOne(admin: AdminClient, cfg: VivaConfig, subscriptionId: string, summary: Summary): Promise<void> {
+  const begin = await rpc<{
+    result: string;
+    order_id?: string;
+    user_id?: string;
+    plan_id?: string;
+    amount_cents?: number;
+    initial_transaction_id?: string;
+  }>(admin, "viva_begin_renewal", { p_environment: cfg.env, p_subscription_id: subscriptionId });
+
+  if (begin.result === "plan_invalid") {
+    summary.anomalies += 1;
+    await alertAdmins(admin, "Πρόβλημα ανανέωσης Viva", "Το πλάνο του μέλους δεν έχει έγκυρη τιμή ή νόμισμα. Δεν έγινε χρέωση.", {
+      user_id: null, kind: "plan_invalid", subscription_id: subscriptionId,
+    });
+    return;
+  }
+  if (begin.result !== "ready" || !begin.order_id || !begin.initial_transaction_id || !begin.amount_cents) {
+    summary.skipped += 1; // not due any more / already in progress / no authorization
+    return;
+  }
+
+  const orderId = begin.order_id;
+  const amountCents = begin.amount_cents;
+
+  const charge = await chargeRecurring(cfg, begin.initial_transaction_id, {
+    amountCents,
+    customerTrns: `AURA ${begin.plan_id ?? ""} - μηνιαία συνδρομή`.trim(),
+    merchantTrns: orderId,
+  });
+
+  // ---- Outcome we cannot be sure about: do NOT retry, do NOT fail. ----
+  if (charge.kind === "unknown") {
+    summary.left_pending += 1;
+    console.error("renewal outcome unknown:", charge.reason);
+    await alertAdmins(admin, "Ανανέωση Viva χωρίς απάντηση", "Η χρέωση ανανέωσης δεν επιβεβαιώθηκε (πρόβλημα επικοινωνίας). ΔΕΝ θα ξαναδοκιμαστεί αυτόματα. Θα ενημερωθείς αν η Viva επιβεβαιώσει την πληρωμή.", {
+      order_id: orderId, kind: "renewal_unknown", reason: charge.reason,
+    });
+    return;
+  }
+
+  // ---- OUR side was refused (credentials / request): nothing moved, not the customer's fault. ----
+  if (charge.kind === "rejected") {
+    summary.rejected += 1;
+    await rpc(admin, "viva_fail_renewal", { p_environment: cfg.env, p_order_id: orderId, p_reason: `viva_rejected_${charge.status}`, p_counts: false });
+    await alertAdmins(admin, "Η Viva απέρριψε το αίτημα ανανέωσης", `Η Viva απάντησε ${charge.status}. Έλεγξε τα διαπιστευτήρια (Merchant ID / API key) και ότι είναι ενεργοποιημένες οι επαναλαμβανόμενες πληρωμές. Κανένας πελάτης δεν επηρεάστηκε.`, {
+      order_id: orderId, kind: "renewal_rejected", http_status: charge.status,
+    });
+    return;
+  }
+
+  // ---- The bank said no. ----
+  if (charge.kind === "declined") {
+    await failForCustomer(admin, cfg, orderId, `declined_${charge.errorCode ?? "unknown"}`, summary);
+    return;
+  }
+
+  // ---- Viva gave us a transaction id: remember it, then verify it. ----
+  await rpc(admin, "viva_note_renewal_transaction", { p_order_id: orderId, p_transaction_id: charge.transactionId });
+
+  let tx;
+  try {
+    tx = await retrieveTransaction(cfg, charge.transactionId);
+  } catch (err) {
+    summary.left_pending += 1;
+    console.error("could not verify the renewal with Viva:", err instanceof Error ? err.message : "unknown");
+    await alertAdmins(admin, "Ανανέωση Viva χωρίς επιβεβαίωση", "Η χρέωση έγινε αλλά δεν επιβεβαιώθηκε ακόμη από τη Viva. ΔΕΝ θα ξαναδοκιμαστεί αυτόματα.", {
+      order_id: orderId, kind: "renewal_unverified",
+    });
+    return;
+  }
+
+  if (tx.statusId === "F") {
+    if (tx.merchantTrns !== orderId || tx.amountCents !== amountCents || (tx.currencyCode !== null && tx.currencyCode !== EUR_ISO_NUMERIC)) {
+      // The money may have moved but it is not what we asked for. A human decides.
+      summary.anomalies += 1;
+      summary.left_pending += 1;
+      await alertAdmins(admin, "Ανανέωση Viva: ασυμφωνία στοιχείων", "Η Viva επιβεβαίωσε πληρωμή που δεν ταιριάζει με την παραγγελία μας. Δεν έγινε ενεργοποίηση.", {
+        order_id: orderId, transaction_id: charge.transactionId, kind: "renewal_mismatch",
+        expected_cents: amountCents, received_cents: tx.amountCents,
+      });
+      return;
+    }
+
+    const applied = await rpc<{ result: string }>(admin, "viva_apply_renewal", {
+      p_environment: cfg.env,
+      p_merchant_trns: orderId,
+      p_transaction_id: tx.transactionId,
+      p_amount_cents: tx.amountCents,
+      p_paid_at: tx.insDate,
+    });
+
+    if (applied.result === "renewed" || applied.result === "already_processed") {
+      summary.renewed += 1;
+      return;
+    }
+    summary.anomalies += 1;
+    await alertAdmins(admin, "Πρόβλημα ανανέωσης Viva", `Η πληρωμή επιβεβαιώθηκε αλλά δεν εφαρμόστηκε (${applied.result}). Έλεγξε τη συναλλαγή.`, {
+      order_id: orderId, transaction_id: charge.transactionId, kind: applied.result,
+    });
+    return;
+  }
+
+  if (tx.statusId === "E") {
+    await failForCustomer(admin, cfg, orderId, `viva_status_${tx.statusId}`, summary);
+    return;
+  }
+
+  // Any other status is not final: leave the order pending and let the webhook decide.
+  summary.left_pending += 1;
+  await alertAdmins(admin, "Ανανέωση Viva σε αναμονή", `Η συναλλαγή έχει κατάσταση ${tx.statusId} (όχι τελική). Αναμένεται ειδοποίηση από τη Viva.`, {
+    order_id: orderId, transaction_id: charge.transactionId, kind: "renewal_not_final",
+  });
+}
+
+async function failForCustomer(admin: AdminClient, cfg: VivaConfig, orderId: string, reason: string, summary: Summary) {
+  summary.declined += 1;
+  const r = await rpc<{ result: string; attempts?: number; user_id?: string; grace_until?: string; will_retry?: boolean }>(
+    admin,
+    "viva_fail_renewal",
+    { p_environment: cfg.env, p_order_id: orderId, p_reason: reason, p_counts: true },
+  );
+  // One alert per member for the first failure; the end of the grace period alerts again.
+  if (r.result === "failure_recorded" && (r.attempts ?? 1) <= 1) {
+    await alertAdmins(admin, "Αποτυχία ανανέωσης συνδρομής Viva", "Η κάρτα του μέλους απορρίφθηκε. Το μέλος κρατά πρόσβαση στην περίοδο χάριτος και θα γίνουν νέες προσπάθειες.", {
+      user_id: r.user_id ?? null, kind: "renewal_declined", grace_until: r.grace_until ?? null,
+    });
+  }
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/notify-admin-email/templates.ts ===
+// supabase/functions/notify-admin-email/templates.ts
+// Καθαρή λογική (χωρίς Deno APIs): ποια γεγονότα στέλνουν email και πώς χτίζεται το κάθε email.
+
+type Row = Record<string, unknown>;
+
+export type WebhookPayload = {
+  table: string;
+  type: string; // INSERT | UPDATE
+  record: Row;
+  old_record?: Row | null;
+};
+
+export type EventKind =
+  | "contact_message"
+  | "contact_appointment"
+  | "seminar_booking"
+  | "online_seminar_paid"
+  | "book_sold";
+
+/** Επιπλέον στοιχεία που φέρνει η function από τη βάση (π.χ. τίτλος online σεμιναρίου). */
+export type Extras = {
+  siteUrl?: string;
+  seminar?: { title?: string | null; starts_at?: string | null; duration_minutes?: number | null; capacity?: number | null } | null;
+  paidCount?: number | null;
+};
+
+export type Mail = { subject: string; html: string; text: string; replyTo?: string };
+
+/* ------------------------------------------------------------------ */
+/* Ποιο γεγονός είναι αυτό;                                             */
+/* ------------------------------------------------------------------ */
+
+export function classify(p: WebhookPayload, opts: { bookTable: string }): EventKind | null {
+  const rec = p.record ?? {};
+  const wasPaid = p.old_record?.status === "paid";
+  const nowPaid = rec.status === "paid";
+  const becamePaid = nowPaid && (p.type === "INSERT" || !wasPaid);
+
+  switch (p.table) {
+    case "contact_messages":
+      if (p.type !== "INSERT") return null;
+      return rec.kind === "appointment" ? "contact_appointment" : "contact_message";
+    case "seminar_bookings":
+      return p.type === "INSERT" ? "seminar_booking" : null; // κράτηση σεμιναρίου επί τόπου
+    case "online_seminar_bookings":
+      return becamePaid ? "online_seminar_paid" : null; // πληρωμένη κράτηση online σεμιναρίου
+    default:
+      if (p.table === opts.bookTable) return becamePaid ? "book_sold" : null; // πουλήθηκε βιβλίο
+      return null;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Βοηθητικά                                                            */
+/* ------------------------------------------------------------------ */
+
+export const esc = (v: unknown): string =>
+  String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
+const isEmail = (v: string) => /^[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+$/.test(v);
+
+function money(cents: unknown, currency: unknown = "eur"): string {
+  const n = Number(cents);
+  if (!Number.isFinite(n)) return "—";
+  try {
+    return new Intl.NumberFormat("el-GR", { style: "currency", currency: str(currency).toUpperCase() || "EUR" }).format(n / 100);
+  } catch {
+    return `${(n / 100).toFixed(2)} €`;
+  }
+}
+
+function dateTime(iso: unknown): string {
+  const s = str(iso);
+  if (!s) return "—";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString("el-GR", { timeZone: "Europe/Athens", dateStyle: "full", timeStyle: "short" });
+}
+
+function dateOnly(v: unknown): string {
+  const s = str(v);
+  if (!s) return "—";
+  const d = new Date(`${s}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString("el-GR", { timeZone: "Europe/Athens", weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
+const EXPERIENCE: Record<string, string> = {
+  beginner: "Αρχάριος",
+  intermediate: "Μέτριο επίπεδο",
+  professional: "Επαγγελματίας",
+};
+
+/* ------------------------------------------------------------------ */
+/* Δομή email: γραμμές + προαιρετικό μεγάλο κείμενο                     */
+/* ------------------------------------------------------------------ */
+
+type Line = { label: string; value: string; href?: string };
+type Spec = {
+  subject: string;
+  badge: string; // μικρή ετικέτα πάνω από τον τίτλο
+  title: string;
+  lead?: string;
+  lines: Line[];
+  blocks?: { label: string; text: string }[]; // μεγάλα κείμενα (μήνυμα, σημειώσεις)
+  link?: { label: string; path: string };
+  replyTo?: string;
+};
+
+const clean = (lines: (Line | null | false)[]): Line[] =>
+  lines.filter((l): l is Line => !!l && l.value !== "" && l.value !== "—");
+
+function render(spec: Spec, siteUrl?: string): Mail {
+  const base = str(siteUrl).replace(/\/+$/, "");
+  const url = spec.link && base ? `${base}${spec.link.path}` : "";
+
+  const rowsHtml = spec.lines
+    .map((l) => {
+      const val = l.href
+        ? `<a href="${esc(l.href)}" style="color:#111;text-decoration:underline">${esc(l.value)}</a>`
+        : esc(l.value).replace(/\n/g, "<br>");
+      return `<tr><td style="padding:9px 14px 9px 0;color:#6b7280;font-size:13px;vertical-align:top;white-space:nowrap">${esc(l.label)}</td><td style="padding:9px 0;color:#111;font-size:14px;font-weight:500;vertical-align:top">${val}</td></tr>`;
+    })
+    .join("");
+
+  const blocksHtml = (spec.blocks ?? [])
+    .map(
+      (b) =>
+        `<div style="margin-top:18px"><div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px">${esc(b.label)}</div><div style="background:#f4f4f5;border-radius:10px;padding:14px 16px;font-size:14px;line-height:1.6;color:#111;white-space:pre-wrap">${esc(b.text)}</div></div>`,
+    )
+    .join("");
+
+  const button = url
+    ? `<div style="margin-top:24px"><a href="${esc(url)}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-size:13px;font-weight:600;padding:11px 20px;border-radius:999px">${esc(spec.link!.label)}</a></div>`
+    : "";
+
+  const html = `<!doctype html><html lang="el"><body style="margin:0;padding:24px;background:#eef0f3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb">
+<div style="background:#0b0b0c;padding:18px 24px"><span style="color:#fff;font-size:15px;font-weight:700;letter-spacing:.32em">AURA</span><span style="color:#9ca3af;font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin-left:12px">${esc(spec.badge)}</span></div>
+<div style="padding:24px">
+<h1 style="margin:0;font-size:20px;line-height:1.3;color:#111">${esc(spec.title)}</h1>
+${spec.lead ? `<p style="margin:8px 0 0;font-size:14px;color:#4b5563">${esc(spec.lead)}</p>` : ""}
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:18px;width:100%;border-top:1px solid #eee">${rowsHtml}</table>
+${blocksHtml}${button}
+</div></div>
+<p style="max-width:560px;margin:14px auto 0;text-align:center;font-size:11px;color:#9ca3af">Αυτόματη ειδοποίηση από το AURA. Μπορείς να απαντήσεις απευθείας σε αυτό το email.</p>
+</body></html>`;
+
+  const text = [
+    spec.title,
+    spec.lead ?? "",
+    "",
+    ...spec.lines.map((l) => `${l.label}: ${l.value}`),
+    ...(spec.blocks ?? []).flatMap((b) => ["", `${b.label}:`, b.text]),
+    url ? `\n${spec.link!.label}: ${url}` : "",
+  ]
+    .filter((s, i, a) => !(s === "" && a[i - 1] === ""))
+    .join("\n")
+    .trim();
+
+  return { subject: spec.subject.replace(/[\r\n]+/g, " ").trim(), html, text, replyTo: spec.replyTo };
+}
+
+const mailto = (email: string) => (isEmail(email) ? `mailto:${email}` : undefined);
+const tel = (phone: string) => (phone ? `tel:${phone.replace(/[^\d+]/g, "")}` : undefined);
+const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+/* ------------------------------------------------------------------ */
+/* Τα 5 email                                                           */
+/* ------------------------------------------------------------------ */
+
+export function buildMail(kind: EventKind, p: WebhookPayload, extras: Extras = {}): Mail {
+  const r = p.record;
+  const name = str(r.full_name) || "Κάποιος";
+  const email = str(r.email);
+  const phone = str(r.phone);
+  const replyTo = isEmail(email) ? email : undefined;
+
+  switch (kind) {
+    case "contact_message":
+    case "contact_appointment": {
+      const appt = kind === "contact_appointment";
+      return render(
+        {
+          subject: `${appt ? "📅 Νέο ραντεβού" : "✉️ Νέο μήνυμα"} από ${short(name, 40)}`,
+          badge: appt ? "Ραντεβού" : "Inbox",
+          title: appt ? `Νέο αίτημα ραντεβού από ${name}` : `Νέο μήνυμα από ${name}`,
+          lines: clean([
+            { label: "Όνομα", value: name },
+            { label: "Email", value: email, href: mailto(email) },
+            { label: "Τηλέφωνο", value: phone, href: tel(phone) },
+            appt && { label: "Επιθυμητή ημερομηνία", value: dateTime(r.preferred_at) },
+            { label: "Ελήφθη", value: dateTime(r.created_at) },
+          ]),
+          blocks: [{ label: "Μήνυμα", text: str(r.message) || "(κενό)" }],
+          link: { label: "Άνοιγμα στο Inbox", path: "/admin/inbox" },
+          replyTo,
+        },
+        extras.siteUrl,
+      );
+    }
+
+    case "seminar_booking": {
+      const group = r.format === "group";
+      const people = Number(r.participants) || 1;
+      return render(
+        {
+          subject: `🎓 Νέα κράτηση σεμιναρίου (${group ? "Group" : "Private"}) · ${dateOnly(r.seminar_date)} · ${short(name, 30)}`,
+          badge: "Σεμινάριο επί τόπου",
+          title: `Νέα κράτηση σεμιναρίου από ${name}`,
+          lead: group ? `Group για ${people} άτομα.` : "Private εκπαίδευση 1-προς-1.",
+          lines: clean([
+            { label: "Κωδικός", value: str(r.reference) },
+            { label: "Format", value: group ? `Group · ${people} άτομα` : "Private" },
+            { label: "Ημερομηνία", value: dateOnly(r.seminar_date) },
+            { label: "Ώρα", value: str(r.slot) },
+            { label: "Όνομα", value: name },
+            { label: "Email", value: email, href: mailto(email) },
+            { label: "Τηλέφωνο", value: phone, href: tel(phone) },
+            { label: "Πόλη", value: str(r.city) },
+            { label: "Επίπεδο", value: EXPERIENCE[str(r.experience_level)] ?? str(r.experience_level) },
+            group && { label: "Ομάδα", value: str(r.group_name) },
+          ]),
+          blocks: [
+            group && str(r.participant_names) ? { label: "Συμμετέχοντες", text: str(r.participant_names) } : null,
+            str(r.goals) ? { label: "Στόχοι", text: str(r.goals) } : null,
+            str(r.notes) ? { label: "Σημειώσεις", text: str(r.notes) } : null,
+          ].filter((b): b is { label: string; text: string } => !!b),
+          link: { label: "Άνοιγμα στο Admin", path: "/admin" },
+          replyTo,
+        },
+        extras.siteUrl,
+      );
+    }
+
+    case "online_seminar_paid": {
+      const sem = extras.seminar;
+      const title = str(sem?.title) || "Online σεμινάριο";
+      const list = Number(r.list_price_cents);
+      const discount = Number(r.discount_percent) || 0;
+      const seats =
+        extras.paidCount != null
+          ? `${extras.paidCount}${sem?.capacity ? ` / ${sem.capacity}` : ""} πληρωμένες θέσεις`
+          : "";
+      return render(
+        {
+          subject: `💳 Πληρώθηκε online σεμινάριο: ${short(title, 40)} · ${short(name, 30)}`,
+          badge: "Online σεμινάριο",
+          title: `Νέα πληρωμένη κράτηση από ${name}`,
+          lead: title,
+          lines: clean([
+            { label: "Σεμινάριο", value: title },
+            sem?.starts_at ? { label: "Ημερομηνία & ώρα", value: dateTime(sem.starts_at) } : null,
+            sem?.duration_minutes ? { label: "Διάρκεια", value: `${sem.duration_minutes} λεπτά` } : null,
+            { label: "Όνομα", value: name },
+            { label: "Email", value: email, href: mailto(email) },
+            { label: "Τηλέφωνο", value: phone, href: tel(phone) },
+            { label: "Πληρώθηκε", value: money(r.amount_cents) },
+            discount > 0 && Number.isFinite(list) ? { label: "Έκπτωση μέλους", value: `${discount}% (τιμή καταλόγου ${money(list)})` } : null,
+            { label: "Ώρα πληρωμής", value: dateTime(r.paid_at) },
+            r.viva_order_code ? { label: "Viva order", value: str(r.viva_order_code) } : null,
+            seats ? { label: "Θέσεις", value: seats } : null,
+          ]),
+          link: { label: "Άνοιγμα στο Admin", path: "/admin" },
+          replyTo,
+        },
+        extras.siteUrl,
+      );
+    }
+
+    case "book_sold": {
+      const qty = Number(r.quantity) || 1;
+      const currency = r.currency;
+      const unit = Number(r.unit_price_cents);
+      const region = str(r.region);
+      const address = [
+        str(r.address_line1),
+        str(r.address_line2),
+        `${str(r.postal_code)} ${str(r.city)}${region ? `, ${region}` : ""}`.trim(),
+        str(r.country),
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return render(
+        {
+          subject: `📚 Πουλήθηκε βιβλίο ×${qty} · ${money(r.total_cents, currency)} · ${short(name, 30)}`,
+          badge: "Βιβλίο",
+          title: `Πουλήθηκε βιβλίο: ${name}`,
+          lead: "Η παραγγελία πληρώθηκε και είναι έτοιμη προς αποστολή.",
+          lines: clean([
+            { label: "Ποσότητα", value: `${qty} ${qty > 1 ? "αντίτυπα" : "αντίτυπο"}` },
+            Number.isFinite(unit) ? { label: "Τιμή τεμαχίου", value: money(unit, currency) } : null,
+            { label: "Μεταφορικά", value: money(r.shipping_cents, currency) },
+            { label: "Σύνολο", value: money(r.total_cents, currency) },
+            { label: "Πληρώθηκε", value: dateTime(r.paid_at) },
+            { label: "Αποστολή σε", value: name },
+            { label: "Διεύθυνση", value: address },
+            { label: "Τηλέφωνο", value: phone, href: tel(phone) },
+            { label: "Email", value: email, href: mailto(email) },
+            r.id ? { label: "Παραγγελία", value: str(r.id).slice(0, 8) } : null,
+          ]),
+          blocks: str(r.notes) ? [{ label: "Σημείωση πελάτη", text: str(r.notes) }] : [],
+          link: { label: "Άνοιγμα Book Manager", path: "/admin/book" },
+          replyTo,
+        },
+        extras.siteUrl,
+      );
+    }
+  }
+}
+
+/** Email δοκιμής: για να επιβεβαιώσεις ότι όλο το σύστημα δουλεύει. */
+export function buildTestMail(recipients: string[], siteUrl?: string): Mail {
+  return render(
+    {
+      subject: "✅ AURA: δοκιμαστική ειδοποίηση",
+      badge: "Δοκιμή",
+      title: "Οι ειδοποιήσεις email δουλεύουν",
+      lead: "Θα λαμβάνεις email για κάθε νέο μήνυμα/ραντεβού στο Inbox, κάθε κράτηση σεμιναρίου, κάθε πληρωμένο online σεμινάριο και κάθε βιβλίο που πουλιέται.",
+      lines: [{ label: "Παραλήπτες", value: recipients.join(", ") }],
+      link: { label: "Άνοιγμα Admin", path: "/admin" },
+    },
+    siteUrl,
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/create-viva-checkout.ts ===
+// src/lib/create-viva-checkout.ts
+import { supabase } from "@/lib/supabase";
+import type { PlanId } from "@/lib/plans";
+
+/** The only places a customer may be sent to pay (demo and live Smart Checkout). */
+const ALLOWED_CHECKOUT_PREFIXES = [
+  "https://demo.vivapayments.com/web/checkout?ref=",
+  "https://www.vivapayments.com/web/checkout?ref=",
+];
+
+export function isVivaCheckoutUrl(url: string): boolean {
+  return ALLOWED_CHECKOUT_PREFIXES.some((prefix) => url.startsWith(prefix));
+}
+
+/**
+ * Asks the create-viva-checkout Edge Function for a payment page and returns
+ * its URL. The browser sends ONLY the plan id: price, user and eligibility are
+ * all decided on the server. Throws an Error with a readable message.
+ */
+export async function createVivaCheckout(planId: PlanId): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<{
+    redirectUrl?: string;
+    error?: string;
+  }>("create-viva-checkout", { body: { planId } });
+
+  if (error) {
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) throw new Error(payload.error);
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message) throw parseErr;
+      }
+    }
+    throw new Error(error.message || "Η πληρωμή δεν μπόρεσε να ξεκινήσει.");
+  }
+
+  if (data?.error) throw new Error(data.error);
+  const url = data?.redirectUrl;
+  // Never follow an address we do not recognise.
+  if (!url || !isVivaCheckoutUrl(url)) throw new Error("Δεν δημιουργήθηκε σελίδα πληρωμής.");
+  return url;
+}
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/checkout.index-Bq5_y1Lf.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { n as EmbeddedCheckoutProvider, r as require_react, t as EmbeddedCheckout } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+import { n as getPlan } from "./plans-sHsWJraA.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { i as setCheckoutIntent, t as clearCheckoutIntent } from "./checkout-intent-Cw-r21JH.mjs";
+import { t as loadStripe } from "../_libs/stripe__stripe-js.mjs";
+import { t as Route } from "./checkout.index-C-YhEBgD.mjs";
+import { r as useSubscription } from "./useSubscription-CNKMk-yc.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/checkout.index-Bq5_y1Lf.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var stripePromise = null;
+function getStripe() {
+	if (!stripePromise) {
+		const key = {
+			"BASE_URL": "/",
+			"DEV": false,
+			"MODE": "production",
+			"PROD": true,
+			"SSR": true,
+			"TSS_DEV_SERVER": "false",
+			"TSS_DEV_SSR_STYLES_BASEPATH": "/",
+			"TSS_DEV_SSR_STYLES_ENABLED": "true",
+			"TSS_DISABLE_CSRF_MIDDLEWARE_WARNING": "false",
+			"TSS_INLINE_CSS_ENABLED": "false",
+			"TSS_ROUTER_BASEPATH": "",
+			"TSS_SERVER_FN_BASE": "/_serverFn/",
+			"VITE_SITE_URL": "https://theauramethod.site",
+			"VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd",
+			"VITE_SUPABASE_ANON_KEY": "[REDACTED_JWT]",
+			"VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_L9Swjao34Gznj1IT7lLPuA_cCWSetH5",
+			"VITE_SUPABASE_URL": "https://kvnpixezrebxuvgbznqr.supabase.co",
+			"VITE_TURNSTILE_SITE_KEY": "0x4AAAAAAFuQC8D2OUlnvZo3"
+		}["VITE_STRIPE_PUBLISHABLE_KEY"];
+		if (!key) return Promise.reject(/* @__PURE__ */ new Error("Λείπει το VITE_STRIPE_PUBLISHABLE_KEY από το περιβάλλον."));
+		stripePromise = loadStripe(key);
+	}
+	return stripePromise;
+}
+function CheckoutModal({ plan, open, onClose }) {
+	const [error, setError] = (0, import_react.useState)(null);
+	const closeRef = (0, import_react.useRef)(null);
+	(0, import_react.useEffect)(() => {
+		if (!open || typeof document === "undefined") return;
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		closeRef.current?.focus();
+		const onKey = (event) => {
+			if (event.key === "Escape") onClose();
+		};
+		window.addEventListener("keydown", onKey);
+		return () => {
+			document.body.style.overflow = previousOverflow;
+			window.removeEventListener("keydown", onKey);
+		};
+	}, [open, onClose]);
+	const fetchClientSecret = (0, import_react.useCallback)(async () => {
+		setError(null);
+		const { data, error: fnError } = await supabase.functions.invoke("create-checkout-session", { body: { planId: plan.id } });
+		if (fnError) {
+			const res = fnError.context;
+			if (res && typeof res.json === "function") try {
+				const payload = await res.json();
+				if (payload?.error) throw new Error(payload.error);
+			} catch (parseErr) {
+				if (parseErr instanceof Error && parseErr.message) throw parseErr;
+			}
+			throw new Error(fnError.message || "Η πληρωμή δεν μπόρεσε να ξεκινήσει.");
+		}
+		if (!data?.clientSecret) throw new Error(data?.error ?? "Δεν δημιουργήθηκε συνεδρία πληρωμής.");
+		return data.clientSecret;
+	}, [plan.id]);
+	if (!open) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm sm:items-center sm:p-6",
+		role: "dialog",
+		"aria-modal": "true",
+		"aria-labelledby": "aura-checkout-title",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			"aria-label": "Κλείσιμο πληρωμής",
+			onClick: onClose,
+			className: "absolute inset-0 h-full w-full cursor-default",
+			tabIndex: -1
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "relative z-10 my-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-white/15 bg-[#050505] shadow-[0_0_120px_-40px_rgba(255,255,255,0.4)]",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "flex items-center justify-between gap-4 border-b border-white/10 px-6 py-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "min-w-0",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-[10px] uppercase tracking-[0.4em] text-neutral-500",
+						children: "AURA CHECKOUT"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						id: "aura-checkout-title",
+						className: "truncate text-lg font-semibold tracking-wide text-neutral-100",
+						children: plan.name
+					})]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					ref: closeRef,
+					type: "button",
+					onClick: onClose,
+					"aria-label": "Κλείσιμο",
+					className: "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 text-neutral-300 transition-colors hover:border-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+					children: "✕"
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "grid gap-0 lg:grid-cols-[300px_1fr]",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+					className: "border-b border-white/10 bg-[#0A0A0A] px-6 py-6 lg:border-b-0 lg:border-r",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							className: "flex items-baseline gap-2",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-3xl font-semibold tracking-tight text-white",
+								children: plan.priceLabel
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-xs uppercase tracking-[0.2em] text-neutral-500",
+								children: "/ ΜΗΝΑ"
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-3 text-sm text-neutral-500",
+							children: plan.tagline
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+							className: "mt-6 space-y-2.5 border-t border-white/5 pt-5",
+							children: plan.features.map((feature) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+								className: "flex items-start gap-3 text-xs uppercase tracking-wide text-neutral-400",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									"aria-hidden": true,
+									className: "mt-1.5 h-px w-3 shrink-0 bg-white/40"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: feature })]
+							}, feature))
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-6 text-[11px] leading-relaxed text-neutral-600",
+							children: "Ασφαλής πληρωμή μέσω Stripe. Η AURA δεν αποθηκεύει στοιχεία κάρτας. Ακύρωση ανά πάσα στιγμή από το προφίλ σου."
+						})
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "min-h-[420px] px-4 py-5 sm:px-6",
+					children: error ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex h-full flex-col items-start justify-center gap-4",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-sm text-neutral-300",
+								children: "Η πληρωμή δεν μπόρεσε να ξεκινήσει."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-xs text-neutral-500",
+								children: error
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								onClick: () => window.location.reload(),
+								className: "rounded-full border border-white/20 px-5 py-2 text-xs uppercase tracking-[0.2em] text-neutral-200 transition-colors hover:border-white/50 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+								children: "Δοκίμασε ξανά"
+							})
+						]
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StripePane, {
+						fetchClientSecret,
+						onError: setError
+					})
+				})]
+			})]
+		})]
+	});
+}
+function StripePane({ fetchClientSecret, onError }) {
+	const [stripe, setStripe] = (0, import_react.useState)(null);
+	const [ready, setReady] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		let active = true;
+		getStripe().then((instance) => {
+			if (!active) return;
+			setStripe(instance);
+			setReady(true);
+		}).catch((err) => {
+			if (!active) return;
+			onError(err instanceof Error ? err.message : "Το Stripe δεν φορτώθηκε.");
+		});
+		return () => {
+			active = false;
+		};
+	}, [onError]);
+	if (!ready || !stripe) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "flex h-full min-h-[400px] animate-pulse flex-col gap-3 pt-4",
+		"aria-busy": "true",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-11 rounded-lg bg-white/5" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-11 rounded-lg bg-white/5" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-11 w-2/3 rounded-lg bg-white/5" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-4 h-12 rounded-full bg-white/10" })
+		]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmbeddedCheckoutProvider, {
+		stripe,
+		options: { fetchClientSecret },
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmbeddedCheckout, { className: "w-full" })
+	});
+}
+function CheckoutPage() {
+	const { plan: planId } = Route.useSearch();
+	const navigate = useNavigate();
+	const { session, loading: authLoading } = useAuth();
+	const userId = session?.user.id;
+	const { hasAccess, loading: subLoading } = useSubscription(userId);
+	const [modalOpen, setModalOpen] = (0, import_react.useState)(false);
+	const autoOpenedRef = (0, import_react.useRef)(false);
+	const plan = getPlan(planId);
+	const signedIn = Boolean(session);
+	const waiting = authLoading || signedIn && subLoading;
+	(0, import_react.useEffect)(() => {
+		if (!plan) navigate({
+			to: "/pricing",
+			replace: true
+		});
+	}, [plan, navigate]);
+	(0, import_react.useEffect)(() => {
+		if (waiting || !signedIn) return;
+		if (hasAccess) {
+			clearCheckoutIntent();
+			navigate({
+				to: "/academy",
+				replace: true
+			});
+		}
+	}, [
+		waiting,
+		signedIn,
+		hasAccess,
+		navigate
+	]);
+	(0, import_react.useEffect)(() => {
+		if (!plan || authLoading || signedIn) return;
+		setCheckoutIntent(plan.id);
+	}, [
+		plan,
+		authLoading,
+		signedIn
+	]);
+	(0, import_react.useEffect)(() => {
+		if (waiting || !signedIn || hasAccess) return;
+		clearCheckoutIntent();
+	}, [
+		waiting,
+		signedIn,
+		hasAccess
+	]);
+	(0, import_react.useEffect)(() => {
+		if (autoOpenedRef.current) return;
+		if (!plan || waiting || !signedIn || hasAccess) return;
+		autoOpenedRef.current = true;
+		setModalOpen(true);
+	}, [
+		plan,
+		waiting,
+		signedIn,
+		hasAccess
+	]);
+	if (!plan) return null;
+	if (waiting) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto max-w-md px-5 pt-40",
+		"aria-busy": "true",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "animate-pulse space-y-4",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-4 w-1/3 rounded bg-white/5" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-32 rounded-2xl bg-white/5" })]
+		})
+	});
+	if (!session) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: "ΑΠΑΙΤΕΙΤΑΙ ΣΥΝΔΕΣΗ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: "Συνδέσου για να ολοκληρώσεις"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-4 text-sm leading-relaxed text-neutral-400",
+				children: [
+					"Διάλεξες ",
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "text-neutral-200",
+						children: plan.name
+					}),
+					" (",
+					plan.priceLabel,
+					"/μήνα). Μετά τη σύνδεση επιστρέφεις αυτόματα εδώ για την πληρωμή."
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/login",
+					search: { plan: plan.id },
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						children: "ΣΥΝΔΕΣΗ / ΕΓΓΡΑΦΗ"
+					})
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/pricing",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						variant: "secondary",
+						children: "ΑΛΛΑΓΗ ΠΑΚΕΤΟΥ"
+					})
+				})]
+			})
+		]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-3xl px-5 pb-24 pt-32 sm:pt-40",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: "CHECKOUT"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: plan.name
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-3 text-sm text-neutral-400",
+				children: [plan.priceLabel, " / μήνα — ακύρωση ανά πάσα στιγμή."]
+			}),
+			!modalOpen && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-8 flex flex-wrap gap-3",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+					type: "button",
+					onClick: () => setModalOpen(true),
+					children: "ΣΥΝΕΧΕΙΑ ΣΤΗΝ ΠΛΗΡΩΜΗ"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/pricing",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						variant: "secondary",
+						children: "ΑΛΛΑΓΗ ΠΑΚΕΤΟΥ"
+					})
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CheckoutModal, {
+				plan,
+				open: modalOpen,
+				onClose: () => setModalOpen(false)
+			})
+		]
+	});
+}
+//#endregion
+export { CheckoutPage as component };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/SubscriptionCard.tsx ===
+// src/components/aura/SubscriptionCard.tsx
+import { Link } from "@tanstack/react-router";
+import { getPlan } from "@/lib/plans";
+import { isActiveStatus, isCancellableStatus, useSubscription } from "@/lib/useSubscription";
+
+/** Stripe status -> ελληνική ετικέτα. */
+const STATUS_LABELS: Record<string, string> = {
+  active: "ΕΝΕΡΓΗ",
+  trialing: "ΔΟΚΙΜΑΣΤΙΚΗ",
+  past_due: "ΕΚΚΡΕΜΗΣ ΠΛΗΡΩΜΗ",
+  unpaid: "ΑΠΛΗΡΩΤΗ",
+  canceled: "ΑΚΥΡΩΜΕΝΗ",
+  incomplete: "ΗΜΙΤΕΛΗΣ",
+  incomplete_expired: "ΕΛΗΞΕ",
+  paused: "ΣΕ ΠΑΥΣΗ",
+};
+
+function formatDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  // Renders μόνο μετά το client-side fetch, άρα δεν υπάρχει SSR mismatch.
+  return new Intl.DateTimeFormat("el-GR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+interface SubscriptionCardProps {
+  userId: string | undefined;
+}
+
+export default function SubscriptionCard({ userId }: SubscriptionCardProps) {
+  const { subscription, loading, error } = useSubscription(userId, {
+    includeInactive: true,
+  });
+
+  const shell = "mt-8 rounded-2xl border border-white/10 bg-black/40 p-5 sm:p-6";
+  const cta =
+    "mt-4 inline-flex rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40";
+
+  if (loading) {
+    return (
+      <section className={shell} aria-busy="true" aria-label="Συνδρομή">
+        <div className="animate-pulse space-y-3">
+          <div className="h-3 w-24 rounded bg-white/10" />
+          <div className="h-6 w-48 rounded bg-white/10" />
+          <div className="h-3 w-32 rounded bg-white/5" />
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className={shell} aria-label="Συνδρομή">
+        <p className="text-[11px] uppercase tracking-[0.4em] text-white/40">ΣΥΝΔΡΟΜΗ</p>
+        <p className="mt-3 text-sm text-white/70" role="alert">
+          Δεν μπορέσαμε να φορτώσουμε τη συνδρομή σου. {error}
+        </p>
+      </section>
+    );
+  }
+
+  if (!subscription) {
+    return (
+      <section className={shell} aria-label="Συνδρομή">
+        <p className="text-[11px] uppercase tracking-[0.4em] text-white/40">ΣΥΝΔΡΟΜΗ</p>
+        <h2 className="mt-3 text-lg font-medium text-white/90">Δεν έχεις ενεργό πακέτο</h2>
+        <p className="mt-2 text-sm text-white/60">
+          Διάλεξε μέθοδο για να ξεκλειδώσεις την Academy.
+        </p>
+        <Link to="/pricing" className={cta}>
+          ΔΕΣ ΤΑ ΠΑΚΕΤΑ
+        </Link>
+      </section>
+    );
+  }
+
+  const plan = getPlan(subscription.plan_id);
+  const active = isActiveStatus(subscription.status);
+  const statusLabel = STATUS_LABELS[subscription.status] ?? subscription.status.toUpperCase();
+  const periodEnd = formatDate(subscription.current_period_end);
+
+  return (
+    <section className={shell} aria-label="Συνδρομή">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-[0.4em] text-white/40">ΤΟ ΠΑΚΕΤΟ ΜΟΥ</p>
+          <h2 className="mt-2 truncate text-xl font-semibold tracking-tight text-white">
+            {plan?.name ?? subscription.plan_id}
+          </h2>
+          {plan && (
+            <p className="mt-1 text-sm text-white/60">
+              {plan.priceLabel} / μήνα · {plan.haircuts} κουρέματα
+            </p>
+          )}
+        </div>
+
+        <span
+          className={
+            active
+              ? "shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white"
+              : "shrink-0 rounded-full border border-white/15 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/50"
+          }
+        >
+          {statusLabel}
+        </span>
+      </div>
+
+      <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+        {periodEnd && (
+          <div>
+            <dt className="text-xs uppercase tracking-[0.2em] text-white/40">
+              {subscription.cancel_at_period_end ? "ΛΗΓΕΙ" : "ΑΝΑΝΕΩΝΕΤΑΙ"}
+            </dt>
+            <dd className="mt-1 text-sm text-white/80">{periodEnd}</dd>
+          </div>
+        )}
+        <div>
+          <dt className="text-xs uppercase tracking-[0.2em] text-white/40">ΕΝΑΡΞΗ</dt>
+          <dd className="mt-1 text-sm text-white/80">
+            {formatDate(subscription.created_at) ?? "—"}
+          </dd>
+        </div>
+      </dl>
+
+      {subscription.cancel_at_period_end && (
+        <p className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70">
+          Η συνδρομή έχει προγραμματιστεί για ακύρωση. Διατηρείς πρόσβαση μέχρι τη λήξη της
+          τρέχουσας περιόδου.
+        </p>
+      )}
+
+      {plan && plan.features.length > 0 && (
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {plan.features.map((feature) => (
+            <li
+              key={feature}
+              className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.15em] text-white/55"
+            >
+              {feature}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!active && (
+        <Link to="/pricing" className={cta}>
+          ΕΠΑΝΕΝΕΡΓΟΠΟΙΗΣΗ
+        </Link>
+      )}
+
+      {isCancellableStatus(subscription.status) && !subscription.cancel_at_period_end && (
+        <Link
+          to="/stop-plan"
+          className="mt-4 inline-flex rounded-lg border border-red-500/25 px-4 py-2 text-sm text-red-300/80 transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
+        >
+          Stop Plan
+        </Link>
+      )}
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/billingProfile.ts ===
+// src/lib/billingProfile.ts
+//
+// The customer's personal details, asked in the checkout and kept for the admin.
+// Saved through a database function that validates every field again on the
+// server and only ever writes the signed-in customer's own row.
+import { db } from "@/lib/db";
+
+export interface BillingProfile {
+  full_name: string;
+  phone: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  postal_code: string;
+  country: string;
+  wants_invoice: boolean;
+  company_name: string;
+  vat_number: string;
+  tax_office: string;
+}
+
+export const EMPTY_BILLING_PROFILE: BillingProfile = {
+  full_name: "",
+  phone: "",
+  address_line1: "",
+  address_line2: "",
+  city: "",
+  postal_code: "",
+  country: "Ελλάδα",
+  wants_invoice: false,
+  company_name: "",
+  vat_number: "",
+  tax_office: "",
+};
+
+export type ProfileErrors = Partial<Record<keyof BillingProfile, string>>;
+
+const MESSAGES = {
+  full_name: "Γράψε το ονοματεπώνυμό σου.",
+  phone: "Γράψε ένα έγκυρο τηλέφωνο.",
+  address_line1: "Γράψε τη διεύθυνσή σου.",
+  address_line2: "Η διεύθυνση είναι πολύ μεγάλη.",
+  city: "Γράψε την πόλη σου.",
+  postal_code: "Γράψε τον ταχυδρομικό κώδικα.",
+  country: "Γράψε τη χώρα σου.",
+  company_name: "Γράψε την επωνυμία της επιχείρησης.",
+  vat_number: "Γράψε έγκυρο ΑΦΜ (8-14 χαρακτήρες).",
+  tax_office: "Γράψε τη ΔΟΥ.",
+} as const;
+
+/** The same rules the database applies, so the customer sees the problem before sending. */
+export function validateBillingProfile(p: BillingProfile): ProfileErrors {
+  const e: ProfileErrors = {};
+  const len = (v: string) => v.trim().length;
+  if (len(p.full_name) < 2 || len(p.full_name) > 120) e.full_name = MESSAGES.full_name;
+  if (!/^[0-9+()\s.-]{6,40}$/.test(p.phone.trim())) e.phone = MESSAGES.phone;
+  if (len(p.address_line1) < 3 || len(p.address_line1) > 200) e.address_line1 = MESSAGES.address_line1;
+  if (len(p.city) < 2 || len(p.city) > 100) e.city = MESSAGES.city;
+  if (len(p.postal_code) < 2 || len(p.postal_code) > 20) e.postal_code = MESSAGES.postal_code;
+  if (len(p.country) < 2 || len(p.country) > 100) e.country = MESSAGES.country;
+  if (p.wants_invoice) {
+    if (len(p.company_name) < 1 || len(p.company_name) > 200) e.company_name = MESSAGES.company_name;
+    if (!/^[A-Za-z0-9]{8,14}$/.test(p.vat_number.replace(/[\s.-]/g, ""))) e.vat_number = MESSAGES.vat_number;
+    if (len(p.tax_office) < 1 || len(p.tax_office) > 120) e.tax_office = MESSAGES.tax_office;
+  }
+  return e;
+}
+
+/** The saved details of the signed-in customer, or null if they never filled them in. */
+export async function getMyBillingProfile(): Promise<BillingProfile | null> {
+  const { data, error } = await db.rpc("get_my_billing_profile");
+  if (error) {
+    console.error("get_my_billing_profile:", error.message);
+    return null;
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as Partial<Record<string, unknown>> | null;
+  if (!row || typeof row["full_name"] !== "string" || row["full_name"].length === 0) return null;
+  const s = (k: string) => (typeof row[k] === "string" ? (row[k] as string) : "");
+  return {
+    full_name: s("full_name"),
+    phone: s("phone"),
+    address_line1: s("address_line1"),
+    address_line2: s("address_line2"),
+    city: s("city"),
+    postal_code: s("postal_code"),
+    country: s("country") || "Ελλάδα",
+    wants_invoice: row["wants_invoice"] === true,
+    company_name: s("company_name"),
+    vat_number: s("vat_number"),
+    tax_office: s("tax_office"),
+  };
+}
+
+export async function saveMyBillingProfile(p: BillingProfile): Promise<void> {
+  const { error } = await db.rpc("save_my_billing_profile", {
+    p_full_name: p.full_name,
+    p_phone: p.phone,
+    p_address_line1: p.address_line1,
+    p_address_line2: p.address_line2,
+    p_city: p.city,
+    p_postal_code: p.postal_code,
+    p_country: p.country,
+    p_wants_invoice: p.wants_invoice,
+    p_company_name: p.company_name,
+    p_vat_number: p.vat_number,
+    p_tax_office: p.tax_office,
+  });
+  if (error) {
+    const m = /invalid_billing_profile:(\w+)/.exec(error.message);
+    if (m && m[1]) throw new Error((MESSAGES as Record<string, string>)[m[1]] ?? "Έλεγξε τα στοιχεία σου.");
+    if (/not_signed_in/.test(error.message)) throw new Error("Πρέπει να συνδεθείς για να συνεχίσεις.");
+    throw new Error("Δεν ήταν δυνατή η αποθήκευση των στοιχείων. Δοκίμασε ξανά.");
+  }
+}
+
+=== END FILE ===
+
+=== FILE: src/lib/viva-return.ts ===
+// src/lib/viva-return.ts
+//
+// What Viva puts in the URL when it sends a customer back to the site:
+//   success:  ?t=<transaction id>&s=<order code>&lang=el-GR&eventId=0
+//   refused / cancelled:  ?s=<order code>&lang=el-GR&eventId=<code>      (NO t)
+// These parameters are never trusted: the checkout return page hands them to
+// the server, which asks Viva directly what happened.
+import { supabase } from "@/lib/supabase";
+
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+export interface VivaReturnParams {
+  /** Transaction id: only present when the payment went through. */
+  t: string | null;
+  /** Viva order code. */
+  s: string;
+  /** Viva event id. */
+  eventId: number | null;
+}
+
+/** Reads the parameters if (and only if) the URL looks like a return from Viva. */
+export function readVivaReturnParams(search: string | URLSearchParams): VivaReturnParams | null {
+  const sp = typeof search === "string" ? new URLSearchParams(search) : search;
+  const s = sp.get("s");
+  if (!s || !/^\d{6,20}$/.test(s)) return null;
+
+  const tRaw = sp.get("t");
+  const t = tRaw && UUID.test(tRaw) ? tRaw.toLowerCase() : null;
+  const eRaw = sp.get("eventId");
+  const eventId = eRaw !== null && /^\d{1,7}$/.test(eRaw) ? Number(eRaw) : null;
+
+  // A real Viva return has either the transaction id or an event id.
+  if (t === null && eventId === null) return null;
+  return { t, s, eventId };
+}
+
+export type VivaPageStatus = "paid" | "pending" | "failed" | "unknown";
+
+export interface VivaVerifyResult {
+  /** subscription_initial | subscription_renewal | subscription_upgrade | seminar | book */
+  kind: string;
+  status: VivaPageStatus;
+  label: string | null;
+  amountCents: number | null;
+  eventId: number | null;
+}
+
+/** Asks the server to confirm the payment with Viva (safe to call repeatedly). */
+export async function verifyVivaPayment(p: VivaReturnParams): Promise<VivaVerifyResult> {
+  const { data, error } = await supabase.functions.invoke<Partial<VivaVerifyResult> & { error?: string }>("verify-viva-payment", {
+    body: { t: p.t, s: p.s, eventId: p.eventId },
+  });
+
+  if (error) {
+    const res = (error as { context?: Response }).context;
+    // An order we do not know is a definite answer, not a glitch.
+    if (res && res.status === 404) return { kind: "unknown", status: "unknown", label: null, amountCents: null, eventId: p.eventId };
+    throw new Error(error.message || "Η επαλήθευση της πληρωμής δεν ήταν δυνατή.");
+  }
+  const status = data?.status;
+  return {
+    kind: data?.kind ?? "unknown",
+    status: status === "paid" || status === "pending" || status === "failed" ? status : "unknown",
+    label: data?.label ?? null,
+    amountCents: typeof data?.amountCents === "number" ? data.amountCents : null,
+    eventId: typeof data?.eventId === "number" ? data.eventId : p.eventId,
+  };
+}
+
+/** Plain-language explanation shown when a payment did not go through. */
+export function failureMessage(eventId: number | null | undefined): string {
+  const code = typeof eventId === "number" ? ` (κωδικός Viva: ${eventId})` : "";
+  return `Η πληρωμή δεν ολοκληρώθηκε${code}. Δεν χρεώθηκες. Έλεγξε τα στοιχεία της κάρτας, δοκίμασε άλλη κάρτα ή ξαναπροσπάθησε.`;
+}
+
+=== END FILE ===
+

@@ -1,0 +1,583 @@
+=== FILE: src/routes/delete.account.tsx ===
+// src/routes/delete.account.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useEffect, useState, type FormEvent } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "motion/react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { AlertTriangle, ArrowLeft, Check, Loader2, ShieldAlert, Trash2 } from "lucide-react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { db } from "@/lib/db";
+import { useAuth } from "@/lib/useAuth";
+import { useSubscription } from "@/lib/useSubscription";
+import { getPlan } from "@/lib/plans";
+
+export const Route = createFileRoute("/delete/account")({
+  head: () => ({
+    meta: [
+      { title: "AURA — Διαγραφή λογαριασμού" },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
+  component: DeleteAccountPage,
+});
+
+const sb = db as unknown as SupabaseClient;
+const PHRASE = "REMOVE MY ACCOUNT";
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+async function readFunctionError(error: any): Promise<string> {
+  try {
+    const body = await error?.context?.json?.();
+    if (body?.error) return String(body.error);
+  } catch {
+    /* fall through */
+  }
+  return error?.message ?? "Η διαγραφή απέτυχε.";
+}
+
+function DeleteAccountPage() {
+  const { session, loading: authLoading } = useAuth();
+  const userId = session?.user.id;
+  const { subscription, hasAccess } = useSubscription(userId);
+  const reduce = useReducedMotion();
+
+  const [phrase, setPhrase] = useState("");
+  const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  const phraseOk = phrase === PHRASE;
+  const canSubmit = phraseOk && agreed && !busy;
+  const plan = getPlan(subscription?.plan_id);
+
+  // After success: back to the home page.
+  useEffect(() => {
+    if (!done) return;
+    const t = window.setTimeout(() => window.location.assign("/"), 4500);
+    return () => window.clearTimeout(t);
+  }, [done]);
+
+  async function handleDelete(e: FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setBusy(true);
+    setError(null);
+
+    try {
+      const { error: fnError } = await sb.functions.invoke("delete-account", {
+        body: { confirmation: phrase, acceptedTerms: agreed },
+      });
+      if (fnError) throw new Error(await readFunctionError(fnError));
+
+      // The login no longer exists on the server: clear the local session only.
+      try {
+        await sb.auth.signOut({ scope: "local" });
+      } catch {
+        /* the session is already invalid */
+      }
+      try {
+        window.localStorage.removeItem("aura.checkout.intent");
+      } catch {
+        /* storage blocked */
+      }
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Η διαγραφή απέτυχε.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="da-root relative min-h-screen w-full overflow-x-clip bg-aura-bg px-5 pb-24 pt-28 text-white sm:pt-32">
+      <style>{css}</style>
+      <div className="aura-grain" aria-hidden />
+      <div className="da-glow" aria-hidden />
+      {!reduce && <div className="da-ring" aria-hidden />}
+
+      <div className="relative z-10 mx-auto max-w-2xl">
+        {authLoading ? (
+          <div className="animate-pulse space-y-4" aria-busy="true">
+            <div className="h-4 w-1/3 rounded bg-white/5" />
+            <div className="h-48 rounded-2xl bg-white/5" />
+          </div>
+        ) : done ? (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: EASE }}
+            className="da-card p-10 text-center"
+            role="status"
+          >
+            <span className="da-badge da-badge-ok">
+              <Check className="size-6" />
+            </span>
+            <h1 className="da-title mt-6 text-3xl font-bold tracking-tight">Ο λογαριασμός σου διαγράφηκε</h1>
+            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-white/55">
+              Η συνδρομή σου ακυρώθηκε και τα δεδομένα σου αφαιρέθηκαν. Αν αλλάξεις γνώμη, μπορείς να
+              δημιουργήσεις ξανά λογαριασμό όποτε θέλεις. Σε μεταφέρουμε στην αρχική…
+            </p>
+            <a href="/" className="mt-8 inline-block">
+              <ChromeButton type="button">ΑΡΧΙΚΗ</ChromeButton>
+            </a>
+          </motion.div>
+        ) : !session ? (
+          <div className="da-card p-10 text-center">
+            <h1 className="da-title text-3xl font-bold tracking-tight">Χρειάζεται σύνδεση</h1>
+            <p className="mt-4 text-sm text-white/55">Συνδέσου για να διαχειριστείς τον λογαριασμό σου.</p>
+            <Link to="/login" className="mt-8 inline-block">
+              <ChromeButton type="button">ΣΥΝΔΕΣΗ</ChromeButton>
+            </Link>
+          </div>
+        ) : (
+          <motion.form
+            onSubmit={handleDelete}
+            initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.9, ease: EASE }}
+            className="da-card p-7 sm:p-10"
+            noValidate
+          >
+            <Link to="/profile" className="da-back">
+              <ArrowLeft className="size-4" /> Πίσω στο προφίλ
+            </Link>
+
+            <div className="mt-8 flex items-center gap-4">
+              <span className="da-badge">
+                <ShieldAlert className="size-6" />
+              </span>
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.4em] text-red-300/70">Μόνιμη ενέργεια</p>
+                <h1 className="da-title mt-1 text-3xl font-bold tracking-tight">Διαγραφή λογαριασμού</h1>
+              </div>
+            </div>
+
+            {hasAccess && subscription && (
+              <div className="mt-8 flex gap-3 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100" role="alert">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-300" />
+                <p className="leading-relaxed">
+                  Έχεις ενεργή συνδρομή{plan ? <strong> {plan.name}</strong> : null}. Θα ακυρωθεί{" "}
+                  <strong>αμέσως</strong> και δεν θα γίνουν άλλες χρεώσεις. Δεν επιστρέφεται το υπόλοιπο της
+                  τρέχουσας περιόδου.
+                </p>
+              </div>
+            )}
+
+            <section className="mt-8">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.3em] text-white/50">Τι θα διαγραφεί</h2>
+              <ul className="mt-4 space-y-3 text-sm text-white/70">
+                {[
+                  "Το προφίλ σου, το username και η φωτογραφία σου",
+                  "Η πρόοδος, τα μαθήματα και οι αξιολογήσεις σου",
+                  "Τα μηνύματα και τα αρχεία σου στην κοινότητα",
+                  "Η συνδρομή σου (ακυρώνεται άμεσα)",
+                  "Ο λογαριασμός σύνδεσης (Google / Apple / email)",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <Trash2 className="mt-0.5 size-4 shrink-0 text-red-300/70" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-5 text-xs leading-relaxed text-white/40">
+                Τα στοιχεία των παραστατικών (ποσά, ημερομηνίες) διατηρούνται ανωνυμοποιημένα, χωρίς σύνδεση με
+                εσένα, όπως απαιτεί η φορολογική νομοθεσία. Μπορείς να ξαναδημιουργήσεις λογαριασμό στο μέλλον με
+                το ίδιο email ή Google/Apple λογαριασμό· θα ξεκινήσεις από την αρχή.
+              </p>
+            </section>
+
+            <div className="da-divider my-8" aria-hidden />
+
+            <label htmlFor="da-phrase" className="block text-sm text-white/70">
+              Για επιβεβαίωση γράψε <strong className="select-all font-mono tracking-wider text-white">{PHRASE}</strong>
+            </label>
+            <input
+              id="da-phrase"
+              value={phrase}
+              onChange={(e) => setPhrase(e.target.value)}
+              disabled={busy}
+              autoComplete="off"
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder={PHRASE}
+              aria-invalid={phrase.length > 0 && !phraseOk}
+              className="da-input mt-3 font-mono tracking-wider"
+            />
+            {phrase.length > 0 && !phraseOk && (
+              <p className="mt-2 text-xs text-white/40">Πρέπει να ταιριάζει ακριβώς, με κεφαλαία.</p>
+            )}
+
+            <label className="mt-6 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/40 p-4">
+              <input
+                type="checkbox"
+                checked={agreed}
+                onChange={(e) => setAgreed(e.target.checked)}
+                disabled={busy}
+                className="mt-0.5 h-4 w-4 cursor-pointer accent-white"
+              />
+              <span className="text-xs leading-relaxed text-white/60">
+                Έχω διαβάσει και αποδέχομαι τους{" "}
+                <Link to="/terms" target="_blank" className="text-white underline underline-offset-4 hover:text-neutral-300">
+                  Όρους Χρήσης
+                </Link>
+                , και κατανοώ ότι η διαγραφή του λογαριασμού μου είναι μόνιμη και δεν αναιρείται.
+              </span>
+            </label>
+
+            {error && (
+              <p className="mt-5 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200" role="alert">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <button type="submit" disabled={!canSubmit} className="da-danger">
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                {busy ? "Διαγραφή…" : "ΔΙΑΓΡΑΦΗ ΛΟΓΑΡΙΑΣΜΟΥ"}
+              </button>
+              <Link to="/profile" className="flex-1">
+                <ChromeButton type="button" variant="secondary" className="w-full" disabled={busy}>
+                  ΑΚΥΡΩΣΗ
+                </ChromeButton>
+              </Link>
+            </div>
+          </motion.form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const css = `
+@keyframes da-spin { to { transform: rotate(360deg); } }
+@keyframes da-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.da-glow { position: absolute; left: 50%; top: 8%; width: min(720px, 90vw); height: 420px; transform: translateX(-50%); pointer-events: none;
+  background: radial-gradient(60% 60% at 50% 40%, rgba(220,226,236,.12), transparent 70%); filter: blur(40px); }
+.da-ring { position: absolute; left: 50%; top: 26%; width: min(620px, 90vw); aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 9999px; pointer-events: none; opacity: .4;
+  background: conic-gradient(from 0deg, transparent 0 62%, rgba(248,113,113,.35) 82%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px)); mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  animation: da-spin 24s linear infinite; }
+.da-card { border-radius: 1.5rem; border: 1px solid rgba(255,255,255,.12);
+  background: linear-gradient(180deg, rgba(22,23,29,.95), rgba(9,10,13,.97)); box-shadow: 0 40px 90px -40px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.da-title { background: linear-gradient(110deg, #6b7280 0%, #f8fafc 25%, #9ca3af 45%, #ffffff 60%, #8b93a1 80%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: da-shimmer 8s linear infinite; }
+.da-back { display: inline-flex; align-items: center; gap: .6rem; font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.55); transition: color .25s, transform .25s; }
+.da-back:hover { color: #fff; transform: translateX(-3px); }
+.da-badge { display: grid; place-items: center; flex-shrink: 0; width: 56px; height: 56px; border-radius: 9999px; color: #fca5a5;
+  border: 1px solid rgba(248,113,113,.4); background: radial-gradient(circle at 30% 25%, rgba(248,113,113,.2), rgba(255,255,255,.02)); box-shadow: 0 0 40px -10px rgba(248,113,113,.6); }
+.da-badge-ok { margin: 0 auto; color: #f1f5f9; border-color: rgba(232,236,242,.4); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.18), rgba(255,255,255,.02)); box-shadow: 0 0 40px -10px rgba(232,236,242,.6); }
+.da-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent); }
+.da-input { width: 100%; padding: .85rem 1rem; border-radius: .8rem; font-size: 14px; color: #f3f4f6; outline: none; border: 1px solid rgba(255,255,255,.14); background: rgba(0,0,0,.45);
+  transition: border-color .25s, box-shadow .25s; }
+.da-input::placeholder { color: rgba(255,255,255,.2); }
+.da-input:focus { border-color: rgba(232,236,242,.55); box-shadow: 0 0 0 1px rgba(232,236,242,.3), 0 0 26px -8px rgba(232,236,242,.45); }
+.da-input[aria-invalid="true"] { border-color: rgba(248,113,113,.5); }
+.da-danger { display: inline-flex; flex: 1; align-items: center; justify-content: center; gap: .6rem; padding: .95rem 1.4rem; border-radius: .7rem; font-size: 12px; font-weight: 600; letter-spacing: .2em; color: #fff; cursor: pointer;
+  border: 1px solid rgba(248,113,113,.6); background: linear-gradient(180deg, rgba(220,38,38,.75), rgba(127,29,29,.85));
+  box-shadow: 0 0 34px -10px rgba(248,113,113,.7), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .15s, box-shadow .25s, opacity .2s, filter .2s; }
+.da-danger:hover:not(:disabled) { box-shadow: 0 0 46px -6px rgba(248,113,113,.9), inset 0 1px 0 rgba(255,255,255,.3); transform: translateY(-1px); }
+.da-danger:active:not(:disabled) { transform: translateY(1px); }
+.da-danger:disabled { opacity: .35; filter: grayscale(.6); cursor: not-allowed; box-shadow: none; }
+.da-root a:focus-visible, .da-root button:focus-visible, .da-root input:focus-visible { outline: 2px solid rgba(232,236,242,.8); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .da-title, .da-ring { animation: none !important; } }
+`;
+=== END FILE ===
+
+=== FILE: .output/public/assets/admin.inbox-CUP3omLV.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{D as i}from"./queries-B7Arqryn.js";import{t as a}from"./useAuth-B1WX5JkE.js";import{t as o}from"./db-DXn9ZPwL.js";var s=e(n()),c=t(),l={new:`ΝΕΟ`,in_progress:`ΣΕ ΕΞΕΛΙΞΗ`,handled:`ΟΛΟΚΛΗΡΩΜΕΝΟ`,archived:`ΑΡΧΕΙΟ`};function u(e){if(!e)return`—`;let t=new Date(e);return Number.isNaN(t.getTime())?`—`:t.toLocaleString(`el-GR`,{dateStyle:`short`,timeStyle:`short`})}function d(){let{profile:e,loading:t}=a(),n=e?i(e.role):!1,[d,f]=(0,s.useState)([]),[p,m]=(0,s.useState)(!0),[h,g]=(0,s.useState)(null),[_,v]=(0,s.useState)(`all`),[y,b]=(0,s.useState)(`new`),[x,S]=(0,s.useState)(null),C=(0,s.useCallback)(async()=>{m(!0),g(null);let{data:e,error:t}=await o.from(`contact_messages`).select(`id, created_at, kind, full_name, email, phone, message, preferred_at, status`).order(`created_at`,{ascending:!1}).limit(200);t?(g(t.message),f([])):f(e??[]),m(!1)},[]);(0,s.useEffect)(()=>{!t&&n&&C()},[t,n,C]);let w=(0,s.useMemo)(()=>d.filter(e=>(_===`all`||e.kind===_)&&(y===`all`||e.status===y)),[d,_,y]);async function T(e,t){S(e);let{error:n}=await o.from(`contact_messages`).update({status:t,handled_at:new Date().toISOString()}).eq(`id`,e);n?g(n.message):f(n=>n.map(n=>n.id===e?{...n,status:t}:n)),S(null)}if(t)return(0,c.jsx)(`main`,{className:`mx-auto max-w-5xl px-5 pt-32`,"aria-busy":`true`,children:(0,c.jsx)(`div`,{className:`h-24 animate-pulse rounded-2xl bg-white/5`})});if(!n)return(0,c.jsxs)(`main`,{className:`mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40`,children:[(0,c.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:`403`}),(0,c.jsx)(`h1`,{className:`mt-5 text-2xl font-semibold tracking-tight text-neutral-100`,children:`Δεν έχεις πρόσβαση σε αυτή τη σελίδα`}),(0,c.jsx)(r,{to:`/`,className:`mt-8 inline-flex rounded-full border border-white/20 px-6 py-2.5 text-xs uppercase tracking-[0.2em] text-neutral-200 transition-colors hover:border-white/50 hover:text-white`,children:`Αρχική`})]});let E=`rounded-lg border border-white/10 bg-[#111111] px-3 py-2 text-xs uppercase tracking-[0.15em] text-neutral-200 focus:border-white/35 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40`;return(0,c.jsxs)(`main`,{className:`mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-36`,children:[(0,c.jsxs)(`header`,{className:`flex flex-wrap items-end justify-between gap-4`,children:[(0,c.jsxs)(`div`,{children:[(0,c.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:`ADMIN`}),(0,c.jsx)(`h1`,{className:`mt-4 text-3xl font-semibold tracking-tight text-neutral-100`,children:`Μηνύματα & Ραντεβού`}),(0,c.jsxs)(`p`,{className:`mt-2 text-sm text-neutral-500`,children:[w.length,` από `,d.length,` καταχωρήσεις`]})]}),(0,c.jsxs)(`div`,{className:`flex flex-wrap gap-3`,children:[(0,c.jsx)(`label`,{className:`sr-only`,htmlFor:`filter-kind`,children:`Τύπος`}),(0,c.jsxs)(`select`,{id:`filter-kind`,className:E,value:_,onChange:e=>v(e.target.value),children:[(0,c.jsx)(`option`,{value:`all`,children:`ΟΛΑ`}),(0,c.jsx)(`option`,{value:`message`,children:`ΜΗΝΥΜΑΤΑ`}),(0,c.jsx)(`option`,{value:`appointment`,children:`ΡΑΝΤΕΒΟΥ`})]}),(0,c.jsx)(`label`,{className:`sr-only`,htmlFor:`filter-status`,children:`Κατάσταση`}),(0,c.jsxs)(`select`,{id:`filter-status`,className:E,value:y,onChange:e=>b(e.target.value),children:[(0,c.jsx)(`option`,{value:`all`,children:`ΟΛΕΣ ΟΙ ΚΑΤΑΣΤΑΣΕΙΣ`}),(0,c.jsx)(`option`,{value:`new`,children:`ΝΕΑ`}),(0,c.jsx)(`option`,{value:`in_progress`,children:`ΣΕ ΕΞΕΛΙΞΗ`}),(0,c.jsx)(`option`,{value:`handled`,children:`ΟΛΟΚΛΗΡΩΜΕΝΑ`}),(0,c.jsx)(`option`,{value:`archived`,children:`ΑΡΧΕΙΟ`})]}),(0,c.jsx)(`button`,{type:`button`,onClick:()=>void C(),className:`rounded-lg border border-white/15 px-4 py-2 text-xs uppercase tracking-[0.15em] text-neutral-300 transition-colors hover:border-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50`,children:`Ανανέωση`})]})]}),h&&(0,c.jsx)(`p`,{role:`alert`,className:`mt-6 rounded-lg border border-white/15 bg-[#111111] px-4 py-3 text-xs text-neutral-300`,children:h}),p?(0,c.jsx)(`div`,{className:`mt-10 space-y-3`,"aria-busy":`true`,children:[0,1,2].map(e=>(0,c.jsx)(`div`,{className:`h-24 animate-pulse rounded-2xl bg-white/5`},e))}):w.length===0?(0,c.jsx)(`div`,{className:`mt-10 rounded-2xl border border-white/10 bg-[#0A0A0A] p-10 text-center`,children:(0,c.jsx)(`p`,{className:`text-sm text-neutral-400`,children:`Δεν υπάρχουν καταχωρήσεις με αυτά τα φίλτρα.`})}):(0,c.jsx)(`ul`,{className:`mt-10 space-y-3`,children:w.map(e=>(0,c.jsxs)(`li`,{className:`rounded-2xl border border-white/10 bg-[#0A0A0A] p-5 transition-colors hover:border-white/20`,children:[(0,c.jsxs)(`div`,{className:`flex flex-wrap items-start justify-between gap-4`,children:[(0,c.jsxs)(`div`,{className:`min-w-0`,children:[(0,c.jsxs)(`div`,{className:`flex flex-wrap items-center gap-2`,children:[(0,c.jsx)(`span`,{className:`rounded-full border border-white/15 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em] text-neutral-300`,children:e.kind===`appointment`?`ΡΑΝΤΕΒΟΥ`:`ΜΗΝΥΜΑ`}),(0,c.jsx)(`span`,{className:`text-[10px] uppercase tracking-[0.2em] text-neutral-600`,children:l[e.status]})]}),(0,c.jsx)(`p`,{className:`mt-3 text-base font-medium text-neutral-100`,children:e.full_name}),(0,c.jsxs)(`p`,{className:`mt-1 break-all text-xs text-neutral-500`,children:[(0,c.jsx)(`a`,{className:`hover:text-neutral-300`,href:`mailto:${e.email}`,children:e.email}),e.phone&&(0,c.jsxs)(c.Fragment,{children:[` · `,(0,c.jsx)(`a`,{className:`hover:text-neutral-300`,href:`tel:${e.phone}`,children:e.phone})]})]})]}),(0,c.jsxs)(`div`,{className:`text-right text-[11px] uppercase tracking-[0.15em] text-neutral-600`,children:[(0,c.jsxs)(`p`,{children:[`ΕΛΗΦΘΗ `,u(e.created_at)]}),e.kind===`appointment`&&(0,c.jsxs)(`p`,{className:`mt-1`,children:[`ΓΙΑ `,u(e.preferred_at)]})]})]}),(0,c.jsx)(`p`,{className:`mt-4 whitespace-pre-wrap border-t border-white/5 pt-4 text-sm leading-relaxed text-neutral-400`,children:e.message}),(0,c.jsx)(`div`,{className:`mt-4 flex flex-wrap gap-2`,children:[`new`,`in_progress`,`handled`,`archived`].filter(t=>t!==e.status).map(t=>(0,c.jsx)(`button`,{type:`button`,disabled:x===e.id,onClick:()=>void T(e.id,t),className:`rounded-full border border-white/10 px-4 py-1.5 text-[10px] uppercase tracking-[0.2em] text-neutral-400 transition-colors hover:border-white/35 hover:text-white disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50`,children:l[t]},t))})]},e.id))})]})}export{d as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/admin.inbox-jOX3kqef.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { t as db } from "./db-BETNILr1.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { D as isStaffRole } from "./queries-DCA4yifx.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/admin.inbox-jOX3kqef.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var STATUS_LABEL = {
+	new: "ΝΕΟ",
+	in_progress: "ΣΕ ΕΞΕΛΙΞΗ",
+	handled: "ΟΛΟΚΛΗΡΩΜΕΝΟ",
+	archived: "ΑΡΧΕΙΟ"
+};
+function formatDate(value) {
+	if (!value) return "—";
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return "—";
+	return date.toLocaleString("el-GR", {
+		dateStyle: "short",
+		timeStyle: "short"
+	});
+}
+function AdminInboxPage() {
+	const { profile, loading: authLoading } = useAuth();
+	const staff = profile ? isStaffRole(profile.role) : false;
+	const [rows, setRows] = (0, import_react.useState)([]);
+	const [loading, setLoading] = (0, import_react.useState)(true);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [kindFilter, setKindFilter] = (0, import_react.useState)("all");
+	const [statusFilter, setStatusFilter] = (0, import_react.useState)("new");
+	const [savingId, setSavingId] = (0, import_react.useState)(null);
+	const load = (0, import_react.useCallback)(async () => {
+		setLoading(true);
+		setError(null);
+		const { data, error: queryError } = await db.from("contact_messages").select("id, created_at, kind, full_name, email, phone, message, preferred_at, status").order("created_at", { ascending: false }).limit(200);
+		if (queryError) {
+			setError(queryError.message);
+			setRows([]);
+		} else setRows(data ?? []);
+		setLoading(false);
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (!authLoading && staff) load();
+	}, [
+		authLoading,
+		staff,
+		load
+	]);
+	const visible = (0, import_react.useMemo)(() => rows.filter((row) => (kindFilter === "all" || row.kind === kindFilter) && (statusFilter === "all" || row.status === statusFilter)), [
+		rows,
+		kindFilter,
+		statusFilter
+	]);
+	async function updateStatus(id, status) {
+		setSavingId(id);
+		const { error: updateError } = await db.from("contact_messages").update({
+			status,
+			handled_at: (/* @__PURE__ */ new Date()).toISOString()
+		}).eq("id", id);
+		if (updateError) setError(updateError.message);
+		else setRows((prev) => prev.map((row) => row.id === id ? {
+			...row,
+			status
+		} : row));
+		setSavingId(null);
+	}
+	if (authLoading) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto max-w-5xl px-5 pt-32",
+		"aria-busy": "true",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-24 animate-pulse rounded-2xl bg-white/5" })
+	});
+	if (!staff) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: "403"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-2xl font-semibold tracking-tight text-neutral-100",
+				children: "Δεν έχεις πρόσβαση σε αυτή τη σελίδα"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/",
+				className: "mt-8 inline-flex rounded-full border border-white/20 px-6 py-2.5 text-xs uppercase tracking-[0.2em] text-neutral-200 transition-colors hover:border-white/50 hover:text-white",
+				children: "Αρχική"
+			})
+		]
+	});
+	const selectClass = "rounded-lg border border-white/10 bg-[#111111] px-3 py-2 text-xs uppercase tracking-[0.15em] text-neutral-200 focus:border-white/35 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-36",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "flex flex-wrap items-end justify-between gap-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+						children: "ADMIN"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+						className: "mt-4 text-3xl font-semibold tracking-tight text-neutral-100",
+						children: "Μηνύματα & Ραντεβού"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "mt-2 text-sm text-neutral-500",
+						children: [
+							visible.length,
+							" από ",
+							rows.length,
+							" καταχωρήσεις"
+						]
+					})
+				] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex flex-wrap gap-3",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+							className: "sr-only",
+							htmlFor: "filter-kind",
+							children: "Τύπος"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+							id: "filter-kind",
+							className: selectClass,
+							value: kindFilter,
+							onChange: (e) => setKindFilter(e.target.value),
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "all",
+									children: "ΟΛΑ"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "message",
+									children: "ΜΗΝΥΜΑΤΑ"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "appointment",
+									children: "ΡΑΝΤΕΒΟΥ"
+								})
+							]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+							className: "sr-only",
+							htmlFor: "filter-status",
+							children: "Κατάσταση"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("select", {
+							id: "filter-status",
+							className: selectClass,
+							value: statusFilter,
+							onChange: (e) => setStatusFilter(e.target.value),
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "all",
+									children: "ΟΛΕΣ ΟΙ ΚΑΤΑΣΤΑΣΕΙΣ"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "new",
+									children: "ΝΕΑ"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "in_progress",
+									children: "ΣΕ ΕΞΕΛΙΞΗ"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "handled",
+									children: "ΟΛΟΚΛΗΡΩΜΕΝΑ"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", {
+									value: "archived",
+									children: "ΑΡΧΕΙΟ"
+								})
+							]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: () => void load(),
+							className: "rounded-lg border border-white/15 px-4 py-2 text-xs uppercase tracking-[0.15em] text-neutral-300 transition-colors hover:border-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+							children: "Ανανέωση"
+						})
+					]
+				})]
+			}),
+			error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				role: "alert",
+				className: "mt-6 rounded-lg border border-white/15 bg-[#111111] px-4 py-3 text-xs text-neutral-300",
+				children: error
+			}),
+			loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-10 space-y-3",
+				"aria-busy": "true",
+				children: [
+					0,
+					1,
+					2
+				].map((i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-24 animate-pulse rounded-2xl bg-white/5" }, i))
+			}) : visible.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-10 rounded-2xl border border-white/10 bg-[#0A0A0A] p-10 text-center",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-sm text-neutral-400",
+					children: "Δεν υπάρχουν καταχωρήσεις με αυτά τα φίλτρα."
+				})
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+				className: "mt-10 space-y-3",
+				children: visible.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+					className: "rounded-2xl border border-white/10 bg-[#0A0A0A] p-5 transition-colors hover:border-white/20",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex flex-wrap items-start justify-between gap-4",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "min-w-0",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "flex flex-wrap items-center gap-2",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "rounded-full border border-white/15 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.2em] text-neutral-300",
+											children: row.kind === "appointment" ? "ΡΑΝΤΕΒΟΥ" : "ΜΗΝΥΜΑ"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "text-[10px] uppercase tracking-[0.2em] text-neutral-600",
+											children: STATUS_LABEL[row.status]
+										})]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "mt-3 text-base font-medium text-neutral-100",
+										children: row.full_name
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										className: "mt-1 break-all text-xs text-neutral-500",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+											className: "hover:text-neutral-300",
+											href: `mailto:${row.email}`,
+											children: row.email
+										}), row.phone && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [" · ", /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+											className: "hover:text-neutral-300",
+											href: `tel:${row.phone}`,
+											children: row.phone
+										})] })]
+									})
+								]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "text-right text-[11px] uppercase tracking-[0.15em] text-neutral-600",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", { children: ["ΕΛΗΦΘΗ ", formatDate(row.created_at)] }), row.kind === "appointment" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+									className: "mt-1",
+									children: ["ΓΙΑ ", formatDate(row.preferred_at)]
+								})]
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-4 whitespace-pre-wrap border-t border-white/5 pt-4 text-sm leading-relaxed text-neutral-400",
+							children: row.message
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "mt-4 flex flex-wrap gap-2",
+							children: [
+								"new",
+								"in_progress",
+								"handled",
+								"archived"
+							].filter((status) => status !== row.status).map((status) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+								type: "button",
+								disabled: savingId === row.id,
+								onClick: () => void updateStatus(row.id, status),
+								className: "rounded-full border border-white/10 px-4 py-1.5 text-[10px] uppercase tracking-[0.2em] text-neutral-400 transition-colors hover:border-white/35 hover:text-white disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+								children: STATUS_LABEL[status]
+							}, status))
+						})
+					]
+				}, row.id))
+			})
+		]
+	});
+}
+//#endregion
+export { AdminInboxPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/public/assets/checkout.index-BpbaWFWK.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/checkout.index-CTxlpDb9.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/useNavigate-BR9bgUfC.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/useAuth-B1WX5JkE.js","assets/queries-B7Arqryn.js","assets/plans-BkcWWgXs.js","assets/ChromeButton-CdfVnEPs.js","assets/checkout-intent-CYMuNmEZ.js","assets/react-stripe.umd-CtLSNhXm.js","assets/useSubscription-CI-f8eKe.js","assets/db-DXn9ZPwL.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";import{r}from"./plans-BkcWWgXs.js";var i=e(`/checkout/`)({validateSearch:e=>({plan:r(e.plan)?e.plan:void 0}),head:()=>({meta:[{title:`AURA — Checkout`}]}),component:t(()=>n(()=>import(`./checkout.index-CTxlpDb9.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14])),`component`)});export{i as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/online-seminars-CgPspnDP.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{i,t as a}from"./use-transform-Csj7YyAF.js";import{t as o}from"./AnimatePresence-ClHpx5iG.js";import{t as s}from"./use-reduced-motion-CNAPwhZE.js";import{t as c}from"./react-D9fOyxUn.js";import{t as l}from"./arrow-left-Brxe6F5I.js";import{t as u}from"./arrow-right-D_t5sPRj.js";import{t as d}from"./calendar-NogZYPsc.js";import{t as f}from"./check-l8y3aT-v.js";import{t as p}from"./clock-CqoNLjzH.js";import{a as m,d as h,l as g,n as _,u as v}from"./onlineSeminars-BWTplH_L.js";import{t as y}from"./loader-circle-DdNdnF6-.js";import{t as b}from"./mail-B0XmtP5t.js";import{t as x}from"./phone-CFEnp_vY.js";import{t as S}from"./shield-check-Djau1VnD.js";import{t as C}from"./user-BFT04SdI.js";import{t as w}from"./users-mt-IxESh.js";import{t as T}from"./video-Bh1cdfCM.js";import{t as E}from"./x-DCxPHqh1.js";import{t as D}from"./useAsync-CZJ1G06G.js";import{n as O,r as k}from"./States-BulpY35p.js";import{n as A,t as j}from"./react-stripe.umd-CtLSNhXm.js";var M=e(n()),N=j(),P=t(),F=A(`pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd`),I=`bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent`,L=`group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-7 py-3.5 text-sm font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 enabled:hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] enabled:hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40`;function R(){let e=s(),t=(0,M.useRef)(null),{scrollYProgress:n}=i({target:t,offset:[`start start`,`end start`]}),u=a(n,[0,1],[-60,140]),d=a(n,[0,1],[0,80]),[f,p]=(0,M.useState)(0),{data:g,error:_,loading:v}=D(m,[f]),[y,b]=(0,M.useState)(null);return(0,P.jsxs)(`main`,{ref:t,className:`relative min-h-screen overflow-hidden bg-black pb-24 pt-28 text-white selection:bg-white selection:text-black`,children:[(0,P.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-0 -z-10 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]`}),(0,P.jsx)(c.div,{"aria-hidden":!0,style:{y:u},className:`pointer-events-none absolute -right-40 top-20 -z-10 h-[520px] w-[520px] rounded-full bg-white/[0.06] blur-[140px]`}),(0,P.jsx)(c.div,{"aria-hidden":!0,style:{rotate:d},className:`pointer-events-none absolute -left-44 top-64 -z-10 h-[480px] w-[480px] rounded-full border border-dashed border-white/10`}),(0,P.jsx)(`div`,{"aria-hidden":!0,className:`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent`}),(0,P.jsxs)(`div`,{className:`mx-auto max-w-6xl px-4 sm:px-6 md:px-10`,children:[(0,P.jsxs)(c.div,{initial:{opacity:0,y:20},animate:{opacity:1,y:0},transition:{duration:.6,ease:[.16,1,.3,1]},children:[(0,P.jsxs)(r,{to:`/seminars`,className:`mb-6 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white`,children:[(0,P.jsx)(l,{className:`size-3.5`}),` Σεμινάρια επί τόπου`]}),(0,P.jsxs)(`div`,{className:`mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50`,children:[(0,P.jsx)(`span`,{className:`h-px w-10 bg-gradient-to-r from-white/60 to-transparent`}),`Online σεμινάρια`]}),(0,P.jsx)(`h1`,{className:`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${I}`,children:`Μάθε από οπουδήποτε.`}),(0,P.jsx)(`p`,{className:`mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg`,children:`Live online σεμινάρια με τον Theopistos. Κλείσε τη θέση σου, πλήρωσε με ασφάλεια και θα επικοινωνήσουμε μαζί σου με όλες τις λεπτομέρειες.`})]}),(0,P.jsxs)(`div`,{className:`mt-12`,children:[v&&(0,P.jsx)(k,{rows:3}),_&&(0,P.jsx)(O,{message:_}),g&&g.length===0&&(0,P.jsxs)(`div`,{className:`rounded-3xl border border-white/10 bg-zinc-950/70 p-12 text-center`,children:[(0,P.jsx)(h,{className:`mx-auto size-8 text-zinc-500`}),(0,P.jsx)(`p`,{className:`mt-4 text-zinc-400`,children:`Δεν υπάρχουν προγραμματισμένα online σεμινάρια αυτή τη στιγμή.`}),(0,P.jsx)(`p`,{className:`mt-1 text-sm text-zinc-600`,children:`Ξανάλεγξε σύντομα.`})]}),g&&g.length>0&&(0,P.jsx)(`div`,{className:`grid gap-6 md:grid-cols-2`,children:g.map((t,n)=>(0,P.jsx)(z,{s:t,index:n,reduce:!!e,onBook:()=>b(t)},t.id))})]})]}),(0,P.jsx)(o,{children:y&&(0,P.jsx)(B,{seminar:y,onClose:()=>{b(null),p(e=>e+1)}})})]})}function z({s:e,index:t,reduce:n,onBook:r}){let i=e.capacity?e.capacity-e.taken:null,a=i!==null&&i<=0,o=new Date(e.starts_at);return(0,P.jsxs)(c.article,{initial:{opacity:0,y:28},whileInView:{opacity:1,y:0},viewport:{once:!0,margin:`-60px`},transition:{duration:.6,delay:t*.08,ease:[.16,1,.3,1]},whileHover:n?void 0:{y:-6},className:`group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-7 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/35`,children:[(0,P.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-white/[0.07] blur-[70px] transition-opacity duration-500 group-hover:opacity-100`}),(0,P.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100`}),(0,P.jsxs)(`div`,{className:`relative flex items-start justify-between gap-4`,children:[(0,P.jsx)(`div`,{className:`flex size-12 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]`,children:(0,P.jsx)(T,{className:`size-6`})}),(0,P.jsx)(`span`,{className:`bg-clip-text text-2xl font-extrabold text-transparent bg-gradient-to-b from-white to-zinc-400`,children:_(e.price_cents,e.currency)})]}),(0,P.jsx)(`h2`,{className:`relative mt-5 text-2xl font-bold ${I}`,children:e.title}),e.description&&(0,P.jsx)(`p`,{className:`relative mt-3 line-clamp-4 text-sm leading-relaxed text-zinc-400`,children:e.description}),(0,P.jsxs)(`ul`,{className:`relative mt-5 space-y-2 text-sm text-zinc-300`,children:[(0,P.jsxs)(`li`,{className:`flex items-center gap-2`,children:[(0,P.jsx)(d,{className:`size-4 text-zinc-500`}),o.toLocaleDateString(`el-GR`,{weekday:`long`,day:`numeric`,month:`long`})]}),(0,P.jsxs)(`li`,{className:`flex items-center gap-2`,children:[(0,P.jsx)(p,{className:`size-4 text-zinc-500`}),o.toLocaleTimeString(`el-GR`,{hour:`2-digit`,minute:`2-digit`}),` · `,e.duration_minutes,` λεπτά`]}),i!==null&&(0,P.jsxs)(`li`,{className:`flex items-center gap-2 ${i<=3&&!a?`text-amber-400`:``}`,children:[(0,P.jsx)(w,{className:`size-4 text-zinc-500`}),a?`Sold out`:`${i} θέσεις διαθέσιμες`]})]}),(0,P.jsx)(`div`,{className:`relative mt-7`,children:(0,P.jsxs)(`button`,{type:`button`,disabled:a,onClick:r,className:L,children:[(0,P.jsx)(`span`,{className:`relative`,children:a?`Γεμάτο`:`Κλείσε θέση`}),(0,P.jsx)(u,{className:`relative size-4 transition-transform duration-300 group-enabled:group-hover:translate-x-1`})]})})]})}function B({seminar:e,onClose:t}){let[n,r]=(0,M.useState)(`details`),[i,a]=(0,M.useState)(``),[s,d]=(0,M.useState)(``),[p,m]=(0,M.useState)(``),[h,w]=(0,M.useState)(!1),[T,D]=(0,M.useState)(null),[O,k]=(0,M.useState)(null),[A,j]=(0,M.useState)(!0),R=i.trim().length>=2&&/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s)&&p.trim().length>=6;async function z(){if(!(!R||h)){w(!0),D(null);try{let{clientSecret:t,sessionId:n}=await g({seminarId:e.id,fullName:i,email:s,phone:p});k(t),B.current=n,r(`pay`)}catch(e){D(e instanceof Error&&e.message===`sold_out`?`Δυστυχώς οι θέσεις εξαντλήθηκαν.`:`Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.`)}finally{w(!1)}}}let B=(0,M.useRef)(``);async function V(){r(`verifying`),j(await v(B.current)),r(`done`)}return(0,P.jsx)(c.div,{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},className:`fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md`,onClick:n===`details`||n===`done`?t:void 0,children:(0,P.jsxs)(c.div,{initial:{opacity:0,y:30,scale:.97},animate:{opacity:1,y:0,scale:1},exit:{opacity:0,y:30,scale:.97},transition:{duration:.35,ease:[.16,1,.3,1]},onClick:e=>e.stopPropagation(),className:`relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-black to-zinc-950 p-6 shadow-[0_0_100px_-30px_rgba(255,255,255,0.3)] sm:p-8`,children:[(0,P.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-white/[0.07] blur-[80px]`}),n!==`verifying`&&(0,P.jsx)(`button`,{type:`button`,onClick:t,"aria-label":`Κλείσιμο`,className:`absolute right-4 top-4 z-10 text-zinc-500 transition hover:text-white`,children:(0,P.jsx)(E,{className:`size-5`})}),(0,P.jsx)(`div`,{className:`relative`,children:(0,P.jsxs)(o,{mode:`wait`,children:[n===`details`&&(0,P.jsxs)(c.div,{initial:{opacity:0,x:20},animate:{opacity:1,x:0},exit:{opacity:0,x:-20},children:[(0,P.jsx)(`p`,{className:`text-xs uppercase tracking-[0.25em] text-zinc-500`,children:`Κράτηση θέσης`}),(0,P.jsx)(`h3`,{className:`mt-2 text-2xl font-bold ${I}`,children:e.title}),(0,P.jsxs)(`p`,{className:`mt-1 text-sm text-zinc-400`,children:[new Date(e.starts_at).toLocaleString(`el-GR`,{dateStyle:`long`,timeStyle:`short`}),` ·`,` `,_(e.price_cents,e.currency)]}),(0,P.jsx)(`div`,{className:`mt-6 space-y-4`,children:[{icon:C,label:`Ονοματεπώνυμο`,v:i,set:a,type:`text`,ac:`name`},{icon:b,label:`Email`,v:s,set:d,type:`email`,ac:`email`},{icon:x,label:`Τηλέφωνο`,v:p,set:m,type:`tel`,ac:`tel`}].map(e=>(0,P.jsxs)(`label`,{className:`block`,children:[(0,P.jsx)(`span`,{className:`mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500`,children:e.label}),(0,P.jsxs)(`div`,{className:`flex items-center gap-2 rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 transition-colors focus-within:border-white/40 focus-within:ring-2 focus-within:ring-white/10`,children:[(0,P.jsx)(e.icon,{className:`size-4 shrink-0 text-zinc-500`}),(0,P.jsx)(`input`,{type:e.type,value:e.v,autoComplete:e.ac,onChange:t=>e.set(t.target.value),className:`w-full bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none`})]})]},e.label))}),T&&(0,P.jsx)(`p`,{className:`mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300`,children:T}),(0,P.jsx)(`button`,{type:`button`,disabled:!R||h,onClick:z,className:`${L} mt-6 w-full`,children:h?(0,P.jsx)(y,{className:`relative size-5 animate-spin`}):(0,P.jsxs)(P.Fragment,{children:[(0,P.jsx)(`span`,{className:`relative`,children:`Συνέχεια στην πληρωμή`}),(0,P.jsx)(u,{className:`relative size-4`})]})}),(0,P.jsxs)(`p`,{className:`mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600`,children:[(0,P.jsx)(S,{className:`size-3.5`}),` Ασφαλής πληρωμή μέσω Stripe`]})]},`d`),n===`pay`&&O&&(0,P.jsxs)(c.div,{initial:{opacity:0,x:20},animate:{opacity:1,x:0},exit:{opacity:0,x:-20},children:[(0,P.jsxs)(`button`,{type:`button`,onClick:()=>r(`details`),className:`mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white`,children:[(0,P.jsx)(l,{className:`size-3.5`}),` Πίσω`]}),(0,P.jsx)(`div`,{className:`overflow-hidden rounded-2xl bg-white`,children:(0,P.jsx)(N.EmbeddedCheckoutProvider,{stripe:F,options:{clientSecret:O,onComplete:V},children:(0,P.jsx)(N.EmbeddedCheckout,{})})})]},`p`),n===`verifying`&&(0,P.jsxs)(c.div,{initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},className:`flex flex-col items-center py-14 text-center`,children:[(0,P.jsx)(y,{className:`size-10 animate-spin text-zinc-300`}),(0,P.jsx)(`p`,{className:`mt-5 text-zinc-300`,children:`Επιβεβαίωση πληρωμής…`})]},`v`),n===`done`&&(0,P.jsxs)(c.div,{initial:{opacity:0},animate:{opacity:1},className:`flex flex-col items-center py-6 text-center`,children:[(0,P.jsx)(c.div,{initial:{scale:.6,opacity:0},animate:{scale:1,opacity:1},transition:{type:`spring`,stiffness:260,damping:18},className:`flex size-20 items-center justify-center rounded-full border border-white/25 bg-black shadow-[0_0_40px_rgba(255,255,255,0.3)]`,children:(0,P.jsx)(f,{className:`size-9 text-zinc-100`})}),(0,P.jsx)(`h3`,{className:`mt-6 text-2xl font-bold ${I}`,children:A?`Η πληρωμή ολοκληρώθηκε!`:`Λάβαμε την πληρωμή σου!`}),(0,P.jsxs)(`p`,{className:`mt-3 max-w-sm text-sm leading-relaxed text-zinc-400`,children:[`Ο διαχειριστής θα επικοινωνήσει σύντομα μαζί σου στο `,(0,P.jsx)(`span`,{className:`text-zinc-200`,children:s}),` με όλες τις πληροφορίες για το σεμινάριο.`,!A&&` Η επιβεβαίωση μπορεί να διαρκέσει λίγα λεπτά.`]}),(0,P.jsx)(`button`,{type:`button`,onClick:t,className:`${L} mt-7`,children:(0,P.jsx)(`span`,{className:`relative`,children:`Τέλεια`})})]},`x`)]})})]})})}export{R as component};
+=== END FILE ===
+

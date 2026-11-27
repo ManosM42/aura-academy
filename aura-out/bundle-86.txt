@@ -1,0 +1,1769 @@
+=== FILE: src/components/aura/DiscountPrice.tsx ===
+// src/components/aura/DiscountPrice.tsx
+// Chrome-silver member pricing: badge, struck list price and the new price.
+import { motion, useReducedMotion } from "motion/react";
+import { BadgeCheck, Crown } from "lucide-react";
+import { getPlan, type PlanId } from "@/lib/plans";
+import { CHROME_FILL } from "@/components/aura/chrome";
+
+/** Metallic silver text (vertical chrome, with a soft glow). */
+const silverText = {
+  backgroundImage: CHROME_FILL,
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+} as const;
+
+/** "AURA ELITE | -25%" pill with a slow light sweep. */
+export function MemberBadge({
+  planId,
+  percent,
+  className = "",
+}: {
+  planId: PlanId | null;
+  percent: number;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+  if (percent <= 0) return null;
+  const Icon = planId === "high" ? Crown : BadgeCheck;
+  const name = getPlan(planId)?.name ?? "AURA MEMBER";
+
+  return (
+    <span
+      className={`relative inline-flex items-center gap-1.5 overflow-hidden rounded-full border border-white/60 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-neutral-950 shadow-[0_0_26px_rgba(255,255,255,0.28),inset_0_1px_0_rgba(255,255,255,0.95)] ${className}`}
+      style={{ backgroundImage: CHROME_FILL }}
+    >
+      <Icon className="relative size-3" strokeWidth={2.6} aria-hidden />
+      <span className="relative">{name}</span>
+      <span aria-hidden className="relative h-3 w-px bg-black/25" />
+      <span className="relative">−{percent}%</span>
+      {!reduce && (
+        <motion.span
+          aria-hidden
+          className="absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-white/80 blur-md"
+          animate={{ x: ["0%", "420%"] }}
+          transition={{ duration: 2.4, repeat: Infinity, repeatDelay: 3.4, ease: "easeInOut" }}
+        />
+      )}
+    </span>
+  );
+}
+
+const SIZES = {
+  sm: { list: "text-[11px]", final: "text-base" },
+  md: { list: "text-xs", final: "text-2xl" },
+  lg: { list: "text-sm", final: "text-4xl" },
+} as const;
+
+/**
+ * Shows the list price struck through and the member price in silver.
+ * With no discount it renders just the price (no strike-through).
+ */
+export function DiscountedPrice({
+  listCents,
+  finalCents,
+  format,
+  size = "md",
+  align = "end",
+  layout = "stacked",
+  className = "",
+}: {
+  listCents: number;
+  finalCents: number;
+  format: (cents: number) => string;
+  size?: keyof typeof SIZES;
+  align?: "start" | "end";
+  layout?: "stacked" | "inline";
+  className?: string;
+}) {
+  const s = SIZES[size];
+  const discounted = finalCents < listCents;
+
+  const final = (
+    <span
+      className={`${s.final} font-extrabold tracking-tight drop-shadow-[0_0_18px_rgba(255,255,255,0.45)]`}
+      style={silverText}
+    >
+      {format(finalCents)}
+    </span>
+  );
+
+  if (!discounted) {
+    return <span className={`inline-block ${className}`}>{final}</span>;
+  }
+
+  const list = (
+    <s className={`${s.list} font-medium text-zinc-500 decoration-zinc-500/80`} aria-label={`Initial price ${format(listCents)}`}>
+      {format(listCents)}
+    </s>
+  );
+
+  if (layout === "inline") {
+    return (
+      <span className={`inline-flex items-baseline gap-2 ${className}`}>
+        {list}
+        {final}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={`inline-flex flex-col leading-none ${align === "end" ? "items-end text-right" : "items-start text-left"} ${className}`}
+    >
+      {list}
+      <span className="mt-1.5">{final}</span>
+    </span>
+  );
+}
+
+/** Small silver line: "You save 12,50 €". */
+export function SavingsLine({ label, amount, className = "" }: { label: string; amount: string; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-2 text-xs font-semibold ${className}`}>
+      <span aria-hidden className="h-px w-6 bg-gradient-to-r from-transparent to-white/60" />
+      <span style={silverText}>
+        {label} {amount}
+      </span>
+    </span>
+  );
+}
+
+=== END FILE ===
+
+=== FILE: src/components/aura/LanguageToggle.tsx ===
+// src/components/aura/LanguageToggle.tsx
+import { LANGS, useI18n, type Lang } from "@/lib/i18n";
+
+const LABELS: Record<Lang, { short: string; full: string }> = {
+  el: { short: "EL", full: "Ελληνικά" },
+  en: { short: "EN", full: "English" },
+};
+
+interface LanguageToggleProps {
+  className?: string;
+}
+
+export default function LanguageToggle({ className = "" }: LanguageToggleProps) {
+  const { lang, setLang, t } = useI18n();
+
+  return (
+    <div
+      role="group"
+      aria-label={t("nav.language")}
+      className={`inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#0A0A0A] p-1 ${className}`}
+    >
+      {LANGS.map((code) => {
+        const active = code === lang;
+        return (
+          <button
+            key={code}
+            type="button"
+            lang={code}
+            aria-pressed={active}
+            title={LABELS[code].full}
+            onClick={() => setLang(code)}
+            className={[
+              "rounded-full px-3.5 py-1.5 text-[10px] uppercase tracking-[0.2em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+              active
+                ? "bg-white/10 text-white"
+                : "text-neutral-500 hover:bg-white/[0.04] hover:text-neutral-200",
+            ].join(" ")}
+          >
+            <span aria-hidden>{LABELS[code].short}</span>
+            <span className="sr-only">{LABELS[code].full}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/MediaThumb.tsx ===
+import { useEffect, useState } from "react";
+import { signedMediaUrl } from "@/lib/queries";
+
+const VIDEO_RE = /\.(mp4|mov|webm|m4v)$/i;
+
+export function MediaThumb({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setUrl(null);
+    setError(false);
+    signedMediaUrl(path)
+      .then((u) => active && setUrl(u))
+      .catch(() => active && setError(true));
+    return () => {
+      active = false;
+    };
+  }, [path]);
+
+  if (error) {
+    return (
+      <div className="flex h-28 w-full items-center justify-center rounded-lg border border-red-500/30 bg-red-500/5 text-xs text-red-300">
+        Αποτυχία φόρτωσης
+      </div>
+    );
+  }
+
+  if (!url) {
+    return <div className="h-28 w-full animate-pulse rounded-lg bg-white/5" />;
+  }
+
+  if (VIDEO_RE.test(path)) {
+    return (
+      <video
+        src={url}
+        controls
+        className="h-28 w-full rounded-lg bg-black object-cover"
+      />
+    );
+  }
+
+  return (
+    <img
+      src={url}
+      alt="Submission media"
+      className="h-28 w-full rounded-lg object-cover"
+      loading="lazy"
+    />
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/portfolio/NewPostModal.tsx ===
+// src/components/aura/portfolio/NewPostModal.tsx
+import { useEffect, useRef, useState, type DragEvent } from "react";
+import { motion } from "motion/react";
+import { ImagePlus, Loader2, X } from "lucide-react";
+import { CAPTION_MAX, publishPost, type PortfolioPost } from "@/lib/portfolio";
+
+const MAX_INPUT_BYTES = 25 * 1024 * 1024;
+const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif";
+
+export default function NewPostModal({
+  userId,
+  onClose,
+  onPublished,
+}: {
+  userId: string;
+  onClose: () => void;
+  onPublished: (post: PortfolioPost) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [caption, setCaption] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, busy]);
+
+  function pick(f: File | undefined | null) {
+    setError(null);
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setError("Διάλεξε αρχείο εικόνας (JPG, PNG ή WebP).");
+      return;
+    }
+    if (f.size > MAX_INPUT_BYTES) {
+      setError("Η φωτογραφία είναι πολύ μεγάλη (έως 25 MB).");
+      return;
+    }
+    setFile(f);
+  }
+
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragging(false);
+    pick(e.dataTransfer.files?.[0]);
+  }
+
+  async function publish() {
+    if (!file || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const post = await publishPost(userId, file, caption);
+      onPublished(post);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Το post δεν δημοσιεύτηκε.");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="pf-modal-layer" onPointerDown={() => !busy && onClose()}>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pf-newpost-title"
+        initial={{ opacity: 0, y: 24, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="pf-modal pf-modal-wide"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h2 id="pf-newpost-title" className="pf-title text-xl font-bold tracking-tight">
+            Νέο post
+          </h2>
+          <button type="button" className="pf-iconbtn" style={{ width: 34, height: 34 }} onClick={onClose} disabled={busy} aria-label="Κλείσιμο">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <input ref={inputRef} type="file" accept={ACCEPT} hidden onChange={(e) => pick(e.target.files?.[0])} />
+
+        <div className="mt-5">
+          {preview ? (
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-black">
+              <img src={preview} alt="Προεπισκόπηση" className="mx-auto max-h-[46vh] w-auto object-contain" />
+              <button
+                type="button"
+                className="pf-btn absolute bottom-3 right-3"
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+              >
+                Αλλαγή
+              </button>
+            </div>
+          ) : (
+            <div
+              role="button"
+              tabIndex={0}
+              className={`pf-drop ${dragging ? "pf-drop-on" : ""}`}
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+            >
+              <div>
+                <ImagePlus className="mx-auto size-9 text-white/70" />
+                <p className="mt-3 text-sm text-white/80">Σύρε εδώ μια φωτογραφία ή πάτα για επιλογή</p>
+                <p className="mt-1 text-xs text-white/40">JPG, PNG ή WebP · θα βελτιστοποιηθεί αυτόματα</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <label className="mt-5 block">
+          <span className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.22em] text-white/45">
+            Περιγραφή
+            <span className="normal-case tracking-normal">
+              {caption.length}/{CAPTION_MAX}
+            </span>
+          </span>
+          <textarea
+            className="pf-input min-h-[96px] resize-y"
+            placeholder="Πες λίγα λόγια: τεχνική, εργαλεία, ιστορία του κουρέματος…"
+            value={caption}
+            maxLength={CAPTION_MAX}
+            onChange={(e) => setCaption(e.target.value)}
+            disabled={busy}
+          />
+        </label>
+
+        {error && (
+          <p className="pf-toast mt-4" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="mt-6 flex gap-3">
+          <button type="button" className="pf-btn pf-btn-solid flex-1 py-3" onClick={() => void publish()} disabled={!file || busy}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+            {busy ? "Δημοσίευση…" : "ΔΗΜΟΣΙΕΥΣΗ"}
+          </button>
+          <button type="button" className="pf-btn" onClick={onClose} disabled={busy}>
+            Άκυρο
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/StoryViewer.tsx ===
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { Trash2, Volume2, VolumeX, X } from "lucide-react";
+import { markStoryViewed, deleteStory, type StoryGroup } from "@/lib/queries";
+
+const STORY_DURATION_MS = 5000;
+
+export default function StoryViewer({
+  groups,
+  startGroupIndex,
+  currentUserId,
+  onClose,
+  onDeleted,
+}: {
+  groups: StoryGroup[];
+  startGroupIndex: number;
+  currentUserId: string;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [groupIndex, setGroupIndex] = useState(startGroupIndex);
+  const [storyIndex, setStoryIndex] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const rafRef = useRef<number>();
+  const startRef = useRef<number>(0);
+  const viewedRef = useRef<Set<string>>(new Set());
+
+  const group = groups[groupIndex];
+  const story = group?.stories[storyIndex];
+
+  function goNextStory() {
+    if (!group) return;
+    if (storyIndex < group.stories.length - 1) {
+      setStoryIndex((i) => i + 1);
+    } else if (groupIndex < groups.length - 1) {
+      setGroupIndex((g) => g + 1);
+      setStoryIndex(0);
+    } else {
+      onClose();
+    }
+  }
+
+  function goPrevStory() {
+    if (storyIndex > 0) {
+      setStoryIndex((i) => i - 1);
+    } else if (groupIndex > 0) {
+      const prevGroup = groups[groupIndex - 1];
+      setGroupIndex((g) => g - 1);
+      setStoryIndex(prevGroup.stories.length - 1);
+    }
+  }
+
+  // Mark as viewed once, drive the progress bar, and (re)start any attached audio.
+  useEffect(() => {
+    if (!story) return;
+    if (!viewedRef.current.has(story.id)) {
+      viewedRef.current.add(story.id);
+      markStoryViewed(story.id).catch(() => {});
+    }
+
+    setProgress(0);
+    startRef.current = performance.now();
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      if (story.audio_url) {
+        audioRef.current.src = story.audio_url;
+        audioRef.current.muted = muted;
+        audioRef.current.loop = true;
+        audioRef.current.play().catch(() => {});
+      }
+    }
+
+    const isVideo = story.media_type === "video";
+    if (isVideo) return; // videos drive their own progress via timeupdate
+
+    function tick(now: number) {
+      if (paused) {
+        startRef.current = now - (progress / 100) * STORY_DURATION_MS;
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      const elapsed = now - startRef.current;
+      const pct = Math.min(100, (elapsed / STORY_DURATION_MS) * 100);
+      setProgress(pct);
+      if (pct >= 100) {
+        goNextStory();
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [story?.id, paused]);
+
+  // Stop any playing audio on unmount (closing the viewer).
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") goNextStory();
+      if (e.key === "ArrowLeft") goPrevStory();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupIndex, storyIndex]);
+
+  function toggleMute() {
+    setMuted((m) => {
+      const next = !m;
+      if (audioRef.current) audioRef.current.muted = next;
+      if (videoRef.current) videoRef.current.muted = next;
+      return next;
+    });
+  }
+
+  async function handleDelete() {
+    if (!story) return;
+    await deleteStory(story.id);
+    onDeleted();
+    goNextStory();
+  }
+
+  if (!group || !story) return null;
+  const isOwn = group.author.id === currentUserId;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-black"
+      >
+        <motion.div
+          drag="y"
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={0.6}
+          onDragEnd={(_, info) => {
+            if (info.offset.y > 100) onClose();
+          }}
+          className="relative h-full w-full max-w-md overflow-hidden bg-black sm:h-[92vh] sm:rounded-2xl"
+        >
+          {/* progress bars */}
+          <div className="absolute inset-x-0 top-0 z-10 flex gap-1 p-2">
+            {group.stories.map((s, i) => (
+              <div key={s.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
+                <div
+                  className="h-full bg-white"
+                  style={{
+                    width: i < storyIndex ? "100%" : i === storyIndex ? `${progress}%` : "0%",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* header */}
+          <div className="absolute inset-x-0 top-4 z-10 flex items-center justify-between px-3">
+            <div className="flex items-center gap-2">
+              {group.author.avatar_url ? (
+                <img src={group.author.avatar_url} className="h-8 w-8 rounded-full object-cover ring-1 ring-white/30" alt="" />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-semibold text-white">
+                  {group.author.full_name?.[0]?.toUpperCase() ?? "A"}
+                </div>
+              )}
+              <span className="text-sm font-semibold text-white drop-shadow">
+                {group.author.full_name ?? "Χρήστης"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              {(story.audio_url || story.media_type === "video") && (
+                <button
+                  onClick={toggleMute}
+                  className="rounded-full p-2 text-white/80 hover:bg-white/10 hover:text-white"
+                >
+                  {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                </button>
+              )}
+              {isOwn && (
+                <button
+                  onClick={handleDelete}
+                  className="rounded-full p-2 text-white/80 hover:bg-white/10 hover:text-white"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="rounded-full p-2 text-white/80 hover:bg-white/10 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* media */}
+          <div className="flex h-full w-full items-center justify-center">
+            {story.media_type === "video" ? (
+              <video
+                ref={videoRef}
+                src={story.media_url}
+                className="h-full w-full object-contain"
+                autoPlay
+                muted={muted}
+                playsInline
+                onTimeUpdate={(e) => {
+                  const v = e.currentTarget;
+                  if (v.duration) setProgress((v.currentTime / v.duration) * 100);
+                }}
+                onEnded={goNextStory}
+              />
+            ) : (
+              <img src={story.media_url} className="h-full w-full object-contain" alt="" />
+            )}
+          </div>
+
+          {/* attached audio (image stories only — video has its own soundtrack) */}
+          <audio ref={audioRef} className="hidden" />
+
+          {story.audio_title && (
+            <div className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white backdrop-blur">
+              🎵 <span className="max-w-[160px] truncate">{story.audio_title}</span>
+            </div>
+          )}
+
+          {/* tap zones */}
+          <button
+            aria-label="Previous"
+            onClick={goPrevStory}
+            onMouseDown={() => setPaused(true)}
+            onMouseUp={() => setPaused(false)}
+            onTouchStart={() => setPaused(true)}
+            onTouchEnd={() => setPaused(false)}
+            className="absolute inset-y-0 left-0 z-[5] w-1/3"
+          />
+          <button
+            aria-label="Next"
+            onClick={goNextStory}
+            onMouseDown={() => setPaused(true)}
+            onMouseUp={() => setPaused(false)}
+            onTouchStart={() => setPaused(true)}
+            onTouchEnd={() => setPaused(false)}
+            className="absolute inset-y-0 right-0 z-[5] w-2/3"
+          />
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/ui/checkbox.tsx ===
+import * as React from "react";
+import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
+import { Check } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const Checkbox = React.forwardRef<
+  React.ElementRef<typeof CheckboxPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <CheckboxPrimitive.Root
+    ref={ref}
+    className={cn(
+      "grid place-content-center peer h-4 w-4 shrink-0 rounded-sm border border-primary shadow cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
+      className,
+    )}
+    {...props}
+  >
+    <CheckboxPrimitive.Indicator className={cn("grid place-content-center text-current")}>
+      <Check className="h-4 w-4" />
+    </CheckboxPrimitive.Indicator>
+  </CheckboxPrimitive.Root>
+));
+Checkbox.displayName = CheckboxPrimitive.Root.displayName;
+
+export { Checkbox };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/command.tsx ===
+"use client";
+
+import * as React from "react";
+import { type DialogProps } from "@radix-ui/react-dialog";
+import { Command as CommandPrimitive } from "cmdk";
+import { Search } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+
+const Command = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive
+    ref={ref}
+    className={cn(
+      "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
+      className,
+    )}
+    {...props}
+  />
+));
+Command.displayName = CommandPrimitive.displayName;
+
+const CommandDialog = ({ children, ...props }: DialogProps) => {
+  return (
+    <Dialog {...props}>
+      <DialogContent className="overflow-hidden p-0">
+        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+          {children}
+        </Command>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const CommandInput = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Input>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
+>(({ className, ...props }, ref) => (
+  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+    <CommandPrimitive.Input
+      ref={ref}
+      className={cn(
+        "flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
+      {...props}
+    />
+  </div>
+));
+
+CommandInput.displayName = CommandPrimitive.Input.displayName;
+
+const CommandList = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.List
+    ref={ref}
+    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    {...props}
+  />
+));
+
+CommandList.displayName = CommandPrimitive.List.displayName;
+
+const CommandEmpty = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Empty>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
+>((props, ref) => (
+  <CommandPrimitive.Empty ref={ref} className="py-6 text-center text-sm" {...props} />
+));
+
+CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
+
+const CommandGroup = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Group>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Group>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.Group
+    ref={ref}
+    className={cn(
+      "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
+      className,
+    )}
+    {...props}
+  />
+));
+
+CommandGroup.displayName = CommandPrimitive.Group.displayName;
+
+const CommandSeparator = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 h-px bg-border", className)}
+    {...props}
+  />
+));
+CommandSeparator.displayName = CommandPrimitive.Separator.displayName;
+
+const CommandItem = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default gap-2 select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      className,
+    )}
+    {...props}
+  />
+));
+
+CommandItem.displayName = CommandPrimitive.Item.displayName;
+
+const CommandShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
+  return (
+    <span
+      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
+      {...props}
+    />
+  );
+};
+CommandShortcut.displayName = "CommandShortcut";
+
+export {
+  Command,
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandShortcut,
+  CommandSeparator,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/dropdown-menu.tsx ===
+"use client";
+
+import * as React from "react";
+import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronRight, Circle } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const DropdownMenu = DropdownMenuPrimitive.Root;
+
+const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+
+const DropdownMenuGroup = DropdownMenuPrimitive.Group;
+
+const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
+
+const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+
+const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+
+const DropdownMenuSubTrigger = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> & {
+    inset?: boolean;
+  }
+>(({ className, inset, children, ...props }, ref) => (
+  <DropdownMenuPrimitive.SubTrigger
+    ref={ref}
+    className={cn(
+      "flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+      inset && "pl-8",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+    <ChevronRight className="ml-auto" />
+  </DropdownMenuPrimitive.SubTrigger>
+));
+DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
+
+const DropdownMenuSubContent = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.SubContent
+    ref={ref}
+    className={cn(
+      "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
+      className,
+    )}
+    {...props}
+  />
+));
+DropdownMenuSubContent.displayName = DropdownMenuPrimitive.SubContent.displayName;
+
+const DropdownMenuContent = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
+>(({ className, sideOffset = 4, ...props }, ref) => (
+  <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Content
+      ref={ref}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-dropdown-menu-content-transform-origin)",
+        className,
+      )}
+      {...props}
+    />
+  </DropdownMenuPrimitive.Portal>
+));
+DropdownMenuContent.displayName = DropdownMenuPrimitive.Content.displayName;
+
+const DropdownMenuItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> & {
+    inset?: boolean;
+  }
+>(({ className, inset, ...props }, ref) => (
+  <DropdownMenuPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&>svg]:size-4 [&>svg]:shrink-0",
+      inset && "pl-8",
+      className,
+    )}
+    {...props}
+  />
+));
+DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
+
+const DropdownMenuCheckboxItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.CheckboxItem>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem>
+>(({ className, children, ...props }, ref) => (
+  <DropdownMenuPrimitive.CheckboxItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <DropdownMenuPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </DropdownMenuPrimitive.CheckboxItem>
+));
+DropdownMenuCheckboxItem.displayName = DropdownMenuPrimitive.CheckboxItem.displayName;
+
+const DropdownMenuRadioItem = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.RadioItem>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem>
+>(({ className, children, ...props }, ref) => (
+  <DropdownMenuPrimitive.RadioItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <DropdownMenuPrimitive.ItemIndicator>
+        <Circle className="h-2 w-2 fill-current" />
+      </DropdownMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </DropdownMenuPrimitive.RadioItem>
+));
+DropdownMenuRadioItem.displayName = DropdownMenuPrimitive.RadioItem.displayName;
+
+const DropdownMenuLabel = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & {
+    inset?: boolean;
+  }
+>(({ className, inset, ...props }, ref) => (
+  <DropdownMenuPrimitive.Label
+    ref={ref}
+    className={cn("px-2 py-1.5 text-sm font-semibold", inset && "pl-8", className)}
+    {...props}
+  />
+));
+DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
+
+const DropdownMenuSeparator = React.forwardRef<
+  React.ElementRef<typeof DropdownMenuPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <DropdownMenuPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    {...props}
+  />
+));
+DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
+
+const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
+  return (
+    <span className={cn("ml-auto text-xs tracking-widest opacity-60", className)} {...props} />
+  );
+};
+DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
+
+export {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuShortcut,
+  DropdownMenuGroup,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/navigation-menu.tsx ===
+import * as React from "react";
+import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu";
+import { cva } from "class-variance-authority";
+import { ChevronDown } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const NavigationMenu = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Root>
+>(({ className, children, ...props }, ref) => (
+  <NavigationMenuPrimitive.Root
+    ref={ref}
+    className={cn("relative z-10 flex max-w-max flex-1 items-center justify-center", className)}
+    {...props}
+  >
+    {children}
+    <NavigationMenuViewport />
+  </NavigationMenuPrimitive.Root>
+));
+NavigationMenu.displayName = NavigationMenuPrimitive.Root.displayName;
+
+const NavigationMenuList = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.List>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.List>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.List
+    ref={ref}
+    className={cn("group flex flex-1 list-none items-center justify-center space-x-1", className)}
+    {...props}
+  />
+));
+NavigationMenuList.displayName = NavigationMenuPrimitive.List.displayName;
+
+const NavigationMenuItem = NavigationMenuPrimitive.Item;
+
+const navigationMenuTriggerStyle = cva(
+  "group inline-flex h-9 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium cursor-pointer transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed data-[state=open]:text-accent-foreground data-[state=open]:bg-accent/50 data-[state=open]:hover:bg-accent data-[state=open]:focus:bg-accent",
+);
+
+const NavigationMenuTrigger = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <NavigationMenuPrimitive.Trigger
+    ref={ref}
+    className={cn(navigationMenuTriggerStyle(), "group", className)}
+    {...props}
+  >
+    {children}{" "}
+    <ChevronDown
+      className="relative top-[1px] ml-1 h-3 w-3 transition duration-300 group-data-[state=open]:rotate-180"
+      aria-hidden="true"
+    />
+  </NavigationMenuPrimitive.Trigger>
+));
+NavigationMenuTrigger.displayName = NavigationMenuPrimitive.Trigger.displayName;
+
+const NavigationMenuContent = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Content
+    ref={ref}
+    className={cn(
+      "left-0 top-0 w-full data-[motion^=from-]:animate-in data-[motion^=to-]:animate-out data-[motion^=from-]:fade-in data-[motion^=to-]:fade-out data-[motion=from-end]:slide-in-from-right-52 data-[motion=from-start]:slide-in-from-left-52 data-[motion=to-end]:slide-out-to-right-52 data-[motion=to-start]:slide-out-to-left-52 md:absolute md:w-auto ",
+      className,
+    )}
+    {...props}
+  />
+));
+NavigationMenuContent.displayName = NavigationMenuPrimitive.Content.displayName;
+
+const NavigationMenuLink = NavigationMenuPrimitive.Link;
+
+const NavigationMenuViewport = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Viewport>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Viewport>
+>(({ className, ...props }, ref) => (
+  <div className={cn("absolute left-0 top-full flex justify-center")}>
+    <NavigationMenuPrimitive.Viewport
+      className={cn(
+        "origin-top-center relative mt-1.5 h-[var(--radix-navigation-menu-viewport-height)] w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-90 md:w-[var(--radix-navigation-menu-viewport-width)]",
+        className,
+      )}
+      ref={ref}
+      {...props}
+    />
+  </div>
+));
+NavigationMenuViewport.displayName = NavigationMenuPrimitive.Viewport.displayName;
+
+const NavigationMenuIndicator = React.forwardRef<
+  React.ElementRef<typeof NavigationMenuPrimitive.Indicator>,
+  React.ComponentPropsWithoutRef<typeof NavigationMenuPrimitive.Indicator>
+>(({ className, ...props }, ref) => (
+  <NavigationMenuPrimitive.Indicator
+    ref={ref}
+    className={cn(
+      "top-full z-[1] flex h-1.5 items-end justify-center overflow-hidden data-[state=visible]:animate-in data-[state=hidden]:animate-out data-[state=hidden]:fade-out data-[state=visible]:fade-in",
+      className,
+    )}
+    {...props}
+  >
+    <div className="relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm bg-border shadow-md" />
+  </NavigationMenuPrimitive.Indicator>
+));
+NavigationMenuIndicator.displayName = NavigationMenuPrimitive.Indicator.displayName;
+
+export {
+  navigationMenuTriggerStyle,
+  NavigationMenu,
+  NavigationMenuList,
+  NavigationMenuItem,
+  NavigationMenuContent,
+  NavigationMenuTrigger,
+  NavigationMenuLink,
+  NavigationMenuIndicator,
+  NavigationMenuViewport,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/radio-group.tsx ===
+import * as React from "react";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
+import { Circle } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const RadioGroup = React.forwardRef<
+  React.ElementRef<typeof RadioGroupPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>
+>(({ className, ...props }, ref) => {
+  return <RadioGroupPrimitive.Root className={cn("grid gap-2", className)} {...props} ref={ref} />;
+});
+RadioGroup.displayName = RadioGroupPrimitive.Root.displayName;
+
+const RadioGroupItem = React.forwardRef<
+  React.ElementRef<typeof RadioGroupPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
+>(({ className, ...props }, ref) => {
+  return (
+    <RadioGroupPrimitive.Item
+      ref={ref}
+      className={cn(
+        "aspect-square h-4 w-4 rounded-full border border-primary text-primary shadow cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+        className,
+      )}
+      {...props}
+    >
+      <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
+        <Circle className="h-3.5 w-3.5 fill-primary" />
+      </RadioGroupPrimitive.Indicator>
+    </RadioGroupPrimitive.Item>
+  );
+});
+RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName;
+
+export { RadioGroup, RadioGroupItem };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/slider.tsx ===
+import * as React from "react";
+import * as SliderPrimitive from "@radix-ui/react-slider";
+
+import { cn } from "@/lib/utils";
+
+const Slider = React.forwardRef<
+  React.ElementRef<typeof SliderPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <SliderPrimitive.Root
+    ref={ref}
+    className={cn("relative flex w-full touch-none select-none items-center", className)}
+    {...props}
+  >
+    <SliderPrimitive.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-primary/20">
+      <SliderPrimitive.Range className="absolute h-full bg-primary" />
+    </SliderPrimitive.Track>
+    <SliderPrimitive.Thumb className="block h-4 w-4 rounded-full border border-primary/50 bg-background shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
+  </SliderPrimitive.Root>
+));
+Slider.displayName = SliderPrimitive.Root.displayName;
+
+export { Slider };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/sonner.tsx ===
+import { Toaster as Sonner } from "sonner";
+
+type ToasterProps = React.ComponentProps<typeof Sonner>;
+
+const Toaster = ({ ...props }: ToasterProps) => {
+  return (
+    <Sonner
+      className="toaster group"
+      toastOptions={{
+        classNames: {
+          toast:
+            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
+          description: "group-[.toast]:text-muted-foreground",
+          actionButton: "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+          cancelButton: "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+        },
+      }}
+      {...props}
+    />
+  );
+};
+
+export { Toaster };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/switch.tsx ===
+import * as React from "react";
+import * as SwitchPrimitives from "@radix-ui/react-switch";
+
+import { cn } from "@/lib/utils";
+
+const Switch = React.forwardRef<
+  React.ElementRef<typeof SwitchPrimitives.Root>,
+  React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
+>(({ className, ...props }, ref) => (
+  <SwitchPrimitives.Root
+    className={cn(
+      "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
+      className,
+    )}
+    {...props}
+    ref={ref}
+  >
+    <SwitchPrimitives.Thumb
+      className={cn(
+        "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0",
+      )}
+    />
+  </SwitchPrimitives.Root>
+));
+Switch.displayName = SwitchPrimitives.Root.displayName;
+
+export { Switch };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/textarea.tsx ===
+import * as React from "react";
+
+import { cn } from "@/lib/utils";
+
+const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"textarea">>(
+  ({ className, ...props }, ref) => {
+    return (
+      <textarea
+        className={cn(
+          "flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          className,
+        )}
+        ref={ref}
+        {...props}
+      />
+    );
+  },
+);
+Textarea.displayName = "Textarea";
+
+export { Textarea };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/toggle.tsx ===
+import * as React from "react";
+import * as TogglePrimitive from "@radix-ui/react-toggle";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const toggleVariants = cva(
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium cursor-pointer transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "bg-transparent",
+        outline:
+          "border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground",
+      },
+      size: {
+        default: "h-9 px-2 min-w-9",
+        sm: "h-8 px-1.5 min-w-8",
+        lg: "h-10 px-2.5 min-w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  },
+);
+
+const Toggle = React.forwardRef<
+  React.ElementRef<typeof TogglePrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof TogglePrimitive.Root> & VariantProps<typeof toggleVariants>
+>(({ className, variant, size, ...props }, ref) => (
+  <TogglePrimitive.Root
+    ref={ref}
+    className={cn(toggleVariants({ variant, size, className }))}
+    {...props}
+  />
+));
+
+Toggle.displayName = TogglePrimitive.Root.displayName;
+
+export { Toggle, toggleVariants };
+
+=== END FILE ===
+
+=== FILE: src/hooks/useAuraSpeech.ts ===
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CLOSED, visemesForText, type Viseme } from "@/lib/visemes";
+
+const CHARS_PER_SEC = 14;
+
+// ⚙️ Το edge function aura-tts (Gemini TTS). Προσαρμόσε αν τα env σου λέγονται αλλιώς.
+const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/aura-tts`;
+const TTS_KEY: string =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? import.meta.env.VITE_SUPABASE_ANON_KEY ?? "";
+const TTS_TIMEOUT_MS = 15000;
+
+export type VoiceIssue = null | "no-greek-voice" | "no-audio";
+
+const hasGreek = (t: string) => /[\u0370-\u03FF\u1F00-\u1FFF]/.test(t);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ── Ήχος: ένα μόνιμο <audio> που «ξεκλειδώνει» με την πρώτη χειρονομία (iOS) ──
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+let audioEl: HTMLAudioElement | null = null;
+const getAudio = () => {
+  if (!audioEl) {
+    audioEl = new Audio();
+    audioEl.preload = "auto";
+    (audioEl as any).playsInline = true;
+  }
+  return audioEl;
+};
+const unlockAudio = () => {
+  const a = getAudio();
+  if (a.src) return;
+  a.src = SILENT_WAV;
+  a.play()
+    .then(() => {
+      if (a.src.startsWith("data:")) a.pause();
+    })
+    .catch(() => {});
+};
+
+// ── Ανάλυση WAV: περιβάλλουσα έντασης (για να κλείνει το στόμα στις παύσεις) ──
+const FRAME = 0.02; // 20ms
+type Clip = { url: string; env: Float32Array; start: number; end: number };
+
+function analyseWav(buf: ArrayBuffer): Omit<Clip, "url"> {
+  const dv = new DataView(buf);
+  const sr = dv.getUint32(24, true) || 24000;
+  const n = Math.floor((buf.byteLength - 44) / 2);
+  const per = Math.max(1, Math.round(sr * FRAME));
+  const frames = Math.max(1, Math.ceil(n / per));
+  const env = new Float32Array(frames);
+
+  for (let f = 0; f < frames; f++) {
+    let sum = 0;
+    let cnt = 0;
+    for (let i = f * per; i < Math.min(n, (f + 1) * per); i++, cnt++) {
+      const x = dv.getInt16(44 + i * 2, true) / 32768;
+      sum += x * x;
+    }
+    env[f] = cnt ? Math.sqrt(sum / cnt) : 0;
+  }
+
+  const sorted = Array.from(env).sort((a, b) => a - b);
+  const ref = Math.max(1e-4, sorted[Math.floor(sorted.length * 0.95)]);
+  for (let f = 0; f < frames; f++) env[f] = Math.min(1, env[f] / ref);
+  // ελαφρύ εξομάλυνση 3 καρέ
+  const sm = new Float32Array(frames);
+  for (let f = 0; f < frames; f++) {
+    sm[f] = ((env[f - 1] ?? env[f]) + env[f] * 2 + (env[f + 1] ?? env[f])) / 4;
+  }
+
+  let a = 0;
+  let b = frames - 1;
+  while (a < frames - 1 && sm[a] < 0.12) a++;
+  while (b > a && sm[b] < 0.12) b--;
+  return { env: sm, start: a * FRAME, end: (b + 1) * FRAME };
+}
+
+const clipCache = new Map<string, Clip>();
+async function fetchClip(text: string): Promise<Clip> {
+  const hit = clipCache.get(text);
+  if (hit) return hit;
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TTS_TIMEOUT_MS);
+  try {
+    const res = await fetch(TTS_URL, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { "Content-Type": "application/json", apikey: TTS_KEY, Authorization: `[REDACTED]` },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("audio")) throw new Error("tts-unavailable");
+    const buf = await res.arrayBuffer();
+    const clip: Clip = {
+      ...analyseWav(buf),
+      url: URL.createObjectURL(new Blob([buf], { type: "audio/wav" })),
+    };
+    if (clipCache.size >= 20) {
+      const k = clipCache.keys().next().value!;
+      URL.revokeObjectURL(clipCache.get(k)!.url);
+      clipCache.delete(k);
+    }
+    clipCache.set(text, clip);
+    return clip;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function loadVoices(): Promise<SpeechSynthesisVoice[]> {
+  const synth = window.speechSynthesis;
+  const now = synth.getVoices();
+  if (now.length) return Promise.resolve(now);
+  return new Promise((resolve) => {
+    const done = () => {
+      synth.removeEventListener("voiceschanged", done);
+      resolve(synth.getVoices());
+    };
+    synth.addEventListener("voiceschanged", done);
+    setTimeout(done, 1000);
+  });
+}
+
+export function useAuraSpeech() {
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceIssue, setVoiceIssue] = useState<VoiceIssue>(null);
+  const st = useRef({
+    text: "",
+    visemes: [] as Viseme[],
+    pos: 0,
+    lastTick: 0,
+    rate: 1,
+    active: false,
+    hasBoundary: false,
+    token: 0,
+    clip: null as Clip | null,
+  });
+  const uttRef = useRef<SpeechSynthesisUtterance | null>(null); // κρατάμε αναφορά (το Chrome κάνει GC στα utterances)
+  const timers = useRef<number[]>([]);
+
+  const clearTimers = useCallback(() => {
+    timers.current.forEach((t) => clearTimeout(t));
+    timers.current = [];
+  }, []);
+
+  const finish = useCallback(() => {
+    st.current.active = false;
+    st.current.clip = null;
+    setSpeaking(false);
+    clearTimers();
+  }, [clearTimers]);
+
+  const stop = useCallback(() => {
+    st.current.token++;
+    if (typeof window !== "undefined") {
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      if (audioEl && !audioEl.src.startsWith("data:")) audioEl.pause();
+    }
+    finish();
+  }, [finish]);
+
+  useEffect(() => () => stop(), [stop]);
+
+  // ξεκλείδωμα ήχου στην πρώτη χειρονομία του χρήστη (απαραίτητο σε iOS/Safari)
+  useEffect(() => {
+    const events = ["pointerdown", "touchend", "keydown", "click"] as const;
+    const h = () => {
+      unlockAudio();
+      events.forEach((e) => window.removeEventListener(e, h));
+    };
+    events.forEach((e) => window.addEventListener(e, h, { passive: true }));
+    return () => events.forEach((e) => window.removeEventListener(e, h));
+  }, []);
+
+  const speak = useCallback(
+    async (text: string) => {
+      if (typeof window === "undefined") return;
+      const s = st.current;
+      const token = ++s.token;
+      clearTimers();
+      s.text = text;
+      s.visemes = visemesForText(text);
+      s.pos = 0;
+      s.hasBoundary = false;
+      s.active = false;
+      s.clip = null;
+      s.rate = 1;
+      setVoiceIssue(null);
+      if (audioEl) audioEl.pause();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+
+      // Το avatar κινείται και χωρίς ήχο (όταν δεν υπάρχει φωνή)
+      const startSilent = () => {
+        if (s.token !== token) return;
+        s.hasBoundary = false;
+        s.clip = null;
+        s.pos = 0;
+        s.lastTick = performance.now();
+        s.active = true;
+        setSpeaking(true);
+        const ms = (text.length / CHARS_PER_SEC) * 1000 + 300;
+        timers.current.push(window.setTimeout(() => s.token === token && finish(), ms));
+      };
+
+      // ── Φωνή της συσκευής (εφεδρική) ─────────────────────────────────────
+      const speakWithBrowser = async () => {
+        if (!("speechSynthesis" in window)) {
+          setVoiceIssue("no-audio");
+          startSilent();
+          return;
+        }
+        const synth = window.speechSynthesis;
+        synth.cancel();
+
+        const greek = hasGreek(text);
+        const voices = await loadVoices();
+        if (s.token !== token) return;
+        const voice = voices.find((v) =>
+          v.lang.toLowerCase().replace("_", "-").startsWith(greek ? "el" : "en"),
+        );
+        if (greek && !voice) {
+          setVoiceIssue("no-greek-voice");
+          startSilent();
+          return;
+        }
+
+        await sleep(80); // Chrome: speak() αμέσως μετά το cancel() χάνεται
+        if (s.token !== token) return;
+
+        const u = new SpeechSynthesisUtterance(text);
+        u.lang = greek ? "el-GR" : "en-US";
+        if (voice) u.voice = voice;
+        u.rate = s.rate;
+
+        u.onstart = () => {
+          if (s.token !== token) return;
+          s.active = true;
+          s.pos = 0;
+          s.lastTick = performance.now();
+          setSpeaking(true);
+        };
+        u.onboundary = (e) => {
+          if (s.token !== token) return;
+          s.hasBoundary = true;
+          s.pos = e.charIndex; // ξανασυγχρονισμός στην αρχή της λέξης
+        };
+        u.onend = () => {
+          if (s.token === token) finish();
+        };
+        u.onerror = (e) => {
+          if (s.token !== token) return;
+          if (e.error === "canceled" || e.error === "interrupted") return;
+          setVoiceIssue("no-audio");
+          if (!s.active) startSilent();
+          else finish();
+        };
+
+        uttRef.current = u;
+        synth.resume();
+        synth.speak(u);
+
+        // Αν σε 2s δεν ξεκίνησε ήχος, πέφτουμε σε σιωπηλό animation
+        timers.current.push(
+          window.setTimeout(() => {
+            if (s.token === token && !s.active) {
+              synth.cancel();
+              setVoiceIssue("no-audio");
+              startSilent();
+            }
+          }, 2000),
+        );
+      };
+
+      // ── Κύρια φωνή: ρεαλιστική φωνή από το edge function ────────────────
+      let clip: Clip | null = null;
+      try {
+        clip = await fetchClip(text);
+      } catch (e) {
+        console.warn("aura-tts:", String(e));
+      }
+      if (s.token !== token) return;
+      if (!clip) return speakWithBrowser();
+
+      const a = getAudio();
+      a.onplaying = () => {
+        if (s.token !== token) return;
+        s.clip = clip;
+        s.active = true;
+        setSpeaking(true);
+      };
+      a.onended = () => {
+        if (s.token === token) finish();
+      };
+      a.onerror = () => {
+        if (s.token === token) {
+          finish();
+          void speakWithBrowser();
+        }
+      };
+      a.src = clip.url;
+      a.currentTime = 0;
+      try {
+        await a.play();
+      } catch {
+        // αυτόματη αναπαραγωγή μπλοκαρίστηκε από τον browser
+        if (s.token === token) {
+          setVoiceIssue("no-audio");
+          startSilent();
+        }
+      }
+    },
+    [finish, clearTimers],
+  );
+
+  /** Καλείται σε κάθε frame από το avatar. */
+  const getViseme = useCallback((now: number): Viseme => {
+    const s = st.current;
+    if (!s.active) return CLOSED;
+
+    // Πραγματικός ήχος: χρόνος αναπαραγωγής → γράμμα, με ένταση που ανοίγει/κλείνει το στόμα
+    if (s.clip) {
+      const a = audioEl;
+      if (!a || a.paused) return CLOSED;
+      const t = a.currentTime;
+      const c = s.clip;
+      const level = c.env[Math.min(c.env.length - 1, Math.floor(t / FRAME))] ?? 0;
+      const prog = Math.min(1, Math.max(0, (t - c.start) / Math.max(0.2, c.end - c.start)));
+      const idx = Math.min(s.visemes.length - 1, Math.floor(prog * s.visemes.length));
+      const v = s.visemes[idx] ?? CLOSED;
+      const gate = Math.min(1, level * 1.5);
+      return gate < 0.06 ? CLOSED : ({ ...v, open: v.open * (0.35 + 0.65 * gate) } as Viseme);
+    }
+
+    const dt = (now - s.lastTick) / 1000;
+    s.lastTick = now;
+
+    const ch = s.text[Math.floor(s.pos)] ?? "";
+    const hold = s.hasBoundary && /[\s.,;:!?·…]/.test(ch);
+    if (!hold) s.pos += dt * CHARS_PER_SEC * s.rate;
+
+    const idx = Math.floor(s.pos);
+    return idx >= s.visemes.length ? CLOSED : (s.visemes[idx] ?? CLOSED);
+  }, []);
+
+  return { speak, stop, speaking, voiceIssue, getViseme };
+}
+=== END FILE ===
+
+=== FILE: src/lib/db.ts ===
+// src/lib/db.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+
+/**
+ * The generated Database type comes from the previous Supabase project and may
+ * not describe the AURA tables. We access those tables through a non-generic
+ * client so the app compiles regardless, and type the *results* ourselves below.
+ * (Runtime behaviour is identical — this only relaxes compile-time table names.)
+ */
+export const db = supabase as unknown as SupabaseClient;
+
+export interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SkillProgressRow {
+  id: string;
+  user_id: string;
+  skill_id: string;
+  verified: boolean;
+  verified_at: string;
+}
+
+export interface CertificateRow {
+  id: string;
+  user_id: string;
+  certificate_id: string;
+  title: string;
+  holder_name: string | null;
+  issued_at: string;
+}
+
+export interface VerifiedCertificate {
+  certificate_id: string;
+  title: string;
+  holder_name: string | null;
+  issued_at: string;
+}
+
+/** AURA-XXXX-XXXX-XXXX */
+export function generateCertificateId(): string {
+  const seg = () =>
+    Math.random().toString(36).slice(2, 6).toUpperCase().padEnd(4, "0");
+  return `AURA-${seg()}-${seg()}-${seg()}`;
+}
+=== END FILE ===
+

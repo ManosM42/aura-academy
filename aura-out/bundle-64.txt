@@ -1,0 +1,799 @@
+=== FILE: src/routes/admin.jobs.tsx ===
+// src/routes/admin.jobs.tsx
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import {
+  AlertCircle,
+  Eye,
+  EyeOff,
+  Loader2,
+  Pencil,
+  Plus,
+  ShieldAlert,
+  Store,
+  Trash2,
+  Upload,
+  X,
+} from "lucide-react";
+import {
+  EMPLOYMENT_TYPES,
+  LEVELS,
+  LOGO_BUCKET,
+  LOGO_TYPES,
+  MAX_LOGO_BYTES,
+  errText,
+  logoUrl,
+  sb,
+  uid,
+  type JobListing,
+} from "@/lib/jobs";
+import { jobsCss } from "@/components/aura/jobs/jobsTheme";
+
+export const Route = createFileRoute("/admin/jobs")({
+  head: () => ({ meta: [{ title: "Admin · Job listings" }] }),
+  component: AdminJobsPage,
+});
+
+/* ------------------------------------------------------------------ */
+/* Form model                                                          */
+/* ------------------------------------------------------------------ */
+
+interface Draft {
+  shop_name: string;
+  title: string;
+  address: string;
+  city: string;
+  salary: string;
+  experience: string;
+  level: string;
+  employment_type: string;
+  phone: string;
+  email: string;
+  website: string;
+  instagram: string;
+  maps_url: string;
+  description: string;
+  is_active: boolean;
+}
+
+const EMPTY: Draft = {
+  shop_name: "",
+  title: "Barber",
+  address: "",
+  city: "",
+  salary: "",
+  experience: "",
+  level: "",
+  employment_type: "",
+  phone: "",
+  email: "",
+  website: "",
+  instagram: "",
+  maps_url: "",
+  description: "",
+  is_active: true,
+};
+
+function toDraft(j: JobListing): Draft {
+  return {
+    shop_name: j.shop_name,
+    title: j.title,
+    address: j.address,
+    city: j.city,
+    salary: j.salary,
+    experience: j.experience ?? "",
+    level: j.level ?? "",
+    employment_type: j.employment_type ?? "",
+    phone: j.phone ?? "",
+    email: j.email,
+    website: j.website ?? "",
+    instagram: j.instagram ?? "",
+    maps_url: j.maps_url ?? "",
+    description: j.description,
+    is_active: j.is_active,
+  };
+}
+
+function validate(d: Draft): Record<string, string> {
+  const e: Record<string, string> = {};
+  const need = (k: keyof Draft, label: string) => {
+    if (!String(d[k]).trim()) e[k] = `${label} is required`;
+  };
+  need("shop_name", "Barbershop name");
+  need("title", "Job title");
+  need("address", "Address");
+  need("city", "City");
+  need("salary", "Salary");
+  need("description", "Description");
+  if (!d.email.trim()) e.email = "Email is required";
+  else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email.trim())) e.email = "Enter a valid email";
+  if (d.description.length > 6000) e.description = "Maximum 6000 characters";
+  return e;
+}
+
+const orNull = (v: string): string | null => (v.trim() ? v.trim() : null);
+
+/* ------------------------------------------------------------------ */
+/* Small UI pieces                                                     */
+/* ------------------------------------------------------------------ */
+
+function Logo({ path, name, size, preview }: { path: string | null; name: string; size: number; preview?: string | null }) {
+  const [broken, setBroken] = useState(false);
+  const url = preview ?? logoUrl(path);
+  return (
+    <span className="fj-logo" style={{ width: size, height: size }}>
+      <span className="fj-logo-in">
+        {url && !broken ? (
+          <img src={url} alt="" onError={() => setBroken(true)} />
+        ) : (
+          <span className="fj-chrome" style={{ fontSize: size * 0.42 }}>
+            {name.trim().slice(0, 1).toUpperCase() || <Store className="size-5" />}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+function Field({
+  label,
+  required,
+  optional,
+  error,
+  wide,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  optional?: boolean;
+  error?: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`fa-field ${wide ? "fa-wide" : ""}`}>
+      <label>
+        {label} {required && <b>*</b>} {optional && <em>(optional)</em>}
+      </label>
+      {children}
+      {error && <span className="fa-err">{error}</span>}
+    </div>
+  );
+}
+
+function Dialog({
+  title,
+  busy,
+  onClose,
+  children,
+  footer,
+}: {
+  title: string;
+  busy?: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  footer: ReactNode;
+}) {
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [busy, onClose]);
+
+  return (
+    <div className="fj-layer" onPointerDown={() => !busy && onClose()}>
+      <div className="fj-modal" role="dialog" aria-modal="true" aria-label={title} onPointerDown={(e) => e.stopPropagation()}>
+        <div className="fj-modal-head">
+          <h2 className="fj-shop fj-chrome" style={{ fontSize: "1.6rem" }}>
+            {title}
+          </h2>
+          <button type="button" className="fj-iconbtn" onClick={onClose} disabled={busy} aria-label="Close">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="fj-modal-body" style={{ padding: 0 }}>
+          {children}
+        </div>
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Create / edit form                                                  */
+/* ------------------------------------------------------------------ */
+
+function JobForm({
+  editing,
+  onClose,
+  onSaved,
+}: {
+  editing: JobListing | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [d, setD] = useState<Draft>(editing ? toDraft(editing) : EMPTY);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setD((prev) => ({ ...prev, [k]: v }));
+    setErrors((prev) => {
+      if (!prev[k]) return prev;
+      const next = { ...prev };
+      delete next[k];
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    const u = URL.createObjectURL(file);
+    setPreview(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+
+  const pickLogo = (f: File | undefined) => {
+    setFormError(null);
+    if (!f) return;
+    if (!LOGO_TYPES.includes(f.type)) {
+      setFormError("The logo must be a JPG, PNG or WebP image.");
+      return;
+    }
+    if (f.size > MAX_LOGO_BYTES) {
+      setFormError("The logo must be 2 MB or smaller.");
+      return;
+    }
+    setRemoveLogo(false);
+    setFile(f);
+  };
+
+  const save = async () => {
+    const errs = validate(d);
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setFormError("Please fix the highlighted fields.");
+      return;
+    }
+
+    setSaving(true);
+    setFormError(null);
+    let newPath: string | null = null;
+
+    try {
+      if (file) {
+        const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+        newPath = `logos/${uid()}.${ext}`;
+        const up = await sb.storage.from(LOGO_BUCKET).upload(newPath, file, { contentType: file.type, upsert: false });
+        if (up.error) throw up.error;
+      }
+
+      const keepPath = removeLogo ? null : editing?.logo_path ?? null;
+      const payload = {
+        shop_name: d.shop_name.trim(),
+        title: d.title.trim(),
+        address: d.address.trim(),
+        city: d.city.trim(),
+        salary: d.salary.trim(),
+        experience: orNull(d.experience),
+        level: orNull(d.level),
+        employment_type: orNull(d.employment_type),
+        phone: orNull(d.phone),
+        email: d.email.trim(),
+        website: orNull(d.website),
+        instagram: orNull(d.instagram),
+        maps_url: orNull(d.maps_url),
+        description: d.description.trim(),
+        is_active: d.is_active,
+        logo_path: newPath ?? keepPath,
+      };
+
+      const res = editing
+        ? await sb.from("job_listings").update(payload).eq("id", editing.id)
+        : await sb.from("job_listings").insert(payload);
+      if (res.error) throw res.error;
+
+      // the old logo is no longer used
+      if (editing?.logo_path && (newPath || removeLogo)) {
+        void sb.storage.from(LOGO_BUCKET).remove([editing.logo_path]);
+      }
+      onSaved();
+    } catch (e) {
+      if (newPath) void sb.storage.from(LOGO_BUCKET).remove([newPath]);
+      setFormError(errText(e, "Could not save the listing."));
+      setSaving(false);
+    }
+  };
+
+  const showExisting = !file && !removeLogo && Boolean(editing?.logo_path);
+
+  return (
+    <Dialog
+      title={editing ? "Edit listing" : "New listing"}
+      busy={saving}
+      onClose={onClose}
+      footer={
+        <div className="fa-modal-foot">
+          <button type="button" className="fj-btn" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button type="button" className="fj-btn fj-btn-chrome" onClick={() => void save()} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+            {editing ? "Save changes" : "Publish listing"}
+          </button>
+        </div>
+      }
+    >
+      {formError && (
+        <p className="fa-note" role="alert" style={{ marginTop: 18 }}>
+          {formError}
+        </p>
+      )}
+
+      <div className="fa-form">
+        {/* logo */}
+        <div className="fa-field fa-wide">
+          <label>
+            Barbershop logo <em>(optional, JPG / PNG / WebP, max 2 MB)</em>
+          </label>
+          <div className="fa-logo-row">
+            <Logo path={showExisting ? editing?.logo_path ?? null : null} name={d.shop_name} size={76} preview={preview} />
+            <input
+              ref={fileRef}
+              type="file"
+              hidden
+              accept={LOGO_TYPES.join(",")}
+              onChange={(e) => {
+                pickLogo(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button type="button" className="fj-btn fj-btn-sm" onClick={() => fileRef.current?.click()} disabled={saving}>
+              <Upload className="size-4" /> {file || showExisting ? "Replace" : "Upload logo"}
+            </button>
+            {(file || showExisting) && (
+              <button
+                type="button"
+                className="fj-btn fj-btn-sm fj-btn-danger"
+                onClick={() => {
+                  setFile(null);
+                  setRemoveLogo(true);
+                }}
+                disabled={saving}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+
+        <Field label="Barbershop name" required error={errors.shop_name}>
+          <input className="fa-input" value={d.shop_name} maxLength={120} onChange={(e) => set("shop_name", e.target.value)} placeholder="e.g. Royal Cuts" />
+        </Field>
+        <Field label="Job title" required error={errors.title}>
+          <input className="fa-input" value={d.title} maxLength={120} onChange={(e) => set("title", e.target.value)} placeholder="Barber" />
+        </Field>
+
+        <Field label="Address" required error={errors.address}>
+          <input className="fa-input" value={d.address} maxLength={240} onChange={(e) => set("address", e.target.value)} placeholder="Street and number" />
+        </Field>
+        <Field label="City / area" required error={errors.city}>
+          <input className="fa-input" value={d.city} maxLength={80} onChange={(e) => set("city", e.target.value)} placeholder="e.g. Heraklion" />
+        </Field>
+
+        <Field label="Salary" required error={errors.salary}>
+          <input className="fa-input" value={d.salary} maxLength={120} onChange={(e) => set("salary", e.target.value)} placeholder="e.g. 900–1.200€ / month" />
+        </Field>
+        <Field label="Employment" optional>
+          <select className="fa-input" value={d.employment_type} onChange={(e) => set("employment_type", e.target.value)}>
+            <option value="">Not specified</option>
+            {EMPLOYMENT_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Level" optional>
+          <select className="fa-input" value={d.level} onChange={(e) => set("level", e.target.value)}>
+            <option value="">Not specified</option>
+            {LEVELS.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Experience" optional>
+          <input className="fa-input" value={d.experience} maxLength={80} onChange={(e) => set("experience", e.target.value)} placeholder="e.g. 2+ years" />
+        </Field>
+
+        <Field label="Email (applications go here)" required error={errors.email}>
+          <input className="fa-input" type="email" inputMode="email" value={d.email} maxLength={200} onChange={(e) => set("email", e.target.value)} placeholder="shop@example.com" />
+        </Field>
+        <Field label="Phone" optional>
+          <input className="fa-input" type="tel" inputMode="tel" value={d.phone} maxLength={40} onChange={(e) => set("phone", e.target.value)} placeholder="+30 28100 00000" />
+        </Field>
+
+        <Field label="Website" optional>
+          <input className="fa-input" value={d.website} maxLength={200} onChange={(e) => set("website", e.target.value)} placeholder="https://" />
+        </Field>
+        <Field label="Instagram" optional>
+          <input className="fa-input" value={d.instagram} maxLength={120} onChange={(e) => set("instagram", e.target.value)} placeholder="@barbershop" />
+        </Field>
+
+        <Field label="Google Maps link" optional wide>
+          <input className="fa-input" value={d.maps_url} maxLength={400} onChange={(e) => set("maps_url", e.target.value)} placeholder="https://maps.google.com/…  (if empty, a map search from the address is used)" />
+        </Field>
+
+        <Field label="Barbershop description" required error={errors.description} wide>
+          <textarea
+            className="fa-input"
+            value={d.description}
+            maxLength={6000}
+            onChange={(e) => set("description", e.target.value)}
+            placeholder="Tell students about the barbershop, the team, what you are looking for, working hours, benefits…"
+          />
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,.35)", textAlign: "right" }}>{d.description.length} / 6000</span>
+        </Field>
+
+        <label className="fa-wide" style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer", fontSize: 14 }}>
+          <input type="checkbox" checked={d.is_active} onChange={(e) => set("is_active", e.target.checked)} style={{ width: 18, height: 18, accentColor: "#e5e7eb" }} />
+          Visible to students
+        </label>
+      </div>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
+type Gate = "loading" | "denied" | "ok";
+
+function AdminJobsPage() {
+  const [gate, setGate] = useState<Gate>("loading");
+  const [jobs, setJobs] = useState<JobListing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState<{ job: JobListing | null } | null>(null);
+  const [confirmDel, setConfirmDel] = useState<JobListing | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data: session } = await sb.auth.getSession();
+      if (!session.session) {
+        if (!cancelled) setGate("denied");
+        return;
+      }
+      const { data, error: e } = await sb.rpc("is_admin_user");
+      if (!cancelled) setGate(!e && data === true ? "ok" : "denied");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: e } = await sb.from("job_listings").select("*").order("created_at", { ascending: false });
+    if (e) {
+      setError(errText(e, "Could not load listings."));
+      setLoading(false);
+      return;
+    }
+    setJobs((data ?? []) as JobListing[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (gate === "ok") void load();
+  }, [gate, load]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const toggle = async (job: JobListing) => {
+    const next = !job.is_active;
+    setJobs((prev) => prev.map((j) => (j.id === job.id ? { ...j, is_active: next } : j)));
+    const { error: e } = await sb.from("job_listings").update({ is_active: next }).eq("id", job.id);
+    if (e) {
+      setJobs((prev) => prev.map((j) => (j.id === job.id ? job : j)));
+      setToast(errText(e, "Could not update the listing."));
+    }
+  };
+
+  const remove = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    const { error: e } = await sb.from("job_listings").delete().eq("id", confirmDel.id);
+    setDeleting(false);
+    if (e) {
+      setToast(errText(e, "Could not delete the listing."));
+      return;
+    }
+    if (confirmDel.logo_path) void sb.storage.from(LOGO_BUCKET).remove([confirmDel.logo_path]);
+    setJobs((prev) => prev.filter((j) => j.id !== confirmDel.id));
+    setConfirmDel(null);
+  };
+
+  const activeCount = useMemo(() => jobs.filter((j) => j.is_active).length, [jobs]);
+
+  // Sits inside your admin layout, so it does not add the big top padding the public pages use.
+  const embedded = { "--fj-nav": "28px", minHeight: "auto" } as CSSProperties;
+
+  if (gate === "loading") {
+    return (
+      <div className="grid min-h-[40vh] place-items-center text-white/60">
+        <Loader2 className="size-6 animate-spin" aria-label="Loading" />
+      </div>
+    );
+  }
+
+  if (gate === "denied") {
+    return (
+      <div className="fj-root" style={embedded}>
+        <style>{jobsCss}</style>
+        <div className="fj-wrap">
+          <div className="fj-state">
+            <ShieldAlert className="size-10 opacity-70" />
+            <h3>Admins only</h3>
+            <p>You need an admin or super admin account to manage job listings.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fj-root" style={embedded}>
+      <style>{jobsCss}</style>
+
+      <div className="fj-wrap" style={{ maxWidth: 980 }}>
+        <div className="fa-top">
+          <div>
+            <h1 className="fa-title fj-chrome">Job listings</h1>
+            <p style={{ marginTop: 6, fontSize: 13, color: "rgba(255,255,255,.5)" }}>
+              {jobs.length} total · {activeCount} visible to students on Find Job
+            </p>
+          </div>
+          <button type="button" className="fj-btn fj-btn-chrome" onClick={() => setForm({ job: null })}>
+            <Plus className="size-4" /> New listing
+          </button>
+        </div>
+
+        {toast && (
+          <p className="fa-note" role="alert" style={{ margin: "0 0 16px" }}>
+            {toast}
+          </p>
+        )}
+
+        {error ? (
+          <div className="fj-state">
+            <AlertCircle className="size-9 opacity-70" />
+            <h3>Could not load the listings</h3>
+            <p style={{ fontSize: 13 }}>{error}</p>
+            <button type="button" className="fj-btn" onClick={() => void load()}>
+              Try again
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="fa-list" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <span key={i} className="fj-skel" style={{ height: 92 }} />
+            ))}
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="fj-state">
+            <Store className="size-10 opacity-60" />
+            <h3>No listings yet</h3>
+            <p>Create the first job listing and it will appear on the Find Job page.</p>
+            <button type="button" className="fj-btn fj-btn-chrome" onClick={() => setForm({ job: null })}>
+              <Plus className="size-4" /> New listing
+            </button>
+          </div>
+        ) : (
+          <div className="fa-list">
+            {jobs.map((job) => (
+              <div key={job.id} className="fa-row">
+                <Logo path={job.logo_path} name={job.shop_name} size={56} />
+                <div className="fa-info">
+                  <b>{job.shop_name}</b>
+                  <span>
+                    {job.title} · {job.city} · {job.salary}
+                  </span>
+                </div>
+                <span className={`fa-badge ${job.is_active ? "" : "fa-badge-off"}`}>{job.is_active ? "Visible" : "Hidden"}</span>
+                <div className="fa-actions">
+                  <button type="button" className="fj-btn fj-btn-sm" onClick={() => void toggle(job)}>
+                    {job.is_active ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    {job.is_active ? "Hide" : "Show"}
+                  </button>
+                  <button type="button" className="fj-btn fj-btn-sm" onClick={() => setForm({ job })}>
+                    <Pencil className="size-4" /> Edit
+                  </button>
+                  <button type="button" className="fj-btn fj-btn-sm fj-btn-danger" onClick={() => setConfirmDel(job)}>
+                    <Trash2 className="size-4" /> Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {form && (
+        <JobForm
+          key={form.job?.id ?? "new"}
+          editing={form.job}
+          onClose={() => setForm(null)}
+          onSaved={() => {
+            setForm(null);
+            void load();
+          }}
+        />
+      )}
+
+      {confirmDel && (
+        <Dialog
+          title="Delete listing?"
+          busy={deleting}
+          onClose={() => setConfirmDel(null)}
+          footer={
+            <div className="fa-modal-foot">
+              <button type="button" className="fj-btn" onClick={() => setConfirmDel(null)} disabled={deleting}>
+                Cancel
+              </button>
+              <button type="button" className="fj-btn fj-btn-danger" onClick={() => void remove()} disabled={deleting}>
+                {deleting ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                Delete
+              </button>
+            </div>
+          }
+        >
+          <p style={{ padding: "22px 24px", fontSize: 15, lineHeight: 1.7, color: "rgba(255,255,255,.75)" }}>
+            “{confirmDel.shop_name} – {confirmDel.title}” will be removed for everyone. This cannot be undone. If you only want to hide it from
+            students, use <b>Hide</b> instead.
+          </p>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/courses._slug-Bi8l0Fjl.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./use-reduced-motion-CNAPwhZE.js";import{t as a}from"./react-D9fOyxUn.js";import{t as o}from"./arrow-left-Brxe6F5I.js";import{t as s}from"./lock-DHD2dW60.js";import{t as c}from"./play-BfnBKg7d.js";import{t as l}from"./sparkles-gf6_8K8H.js";import{n as u}from"./plans-BkcWWgXs.js";import{t as d}from"./courses._slug-CYu-mVBG.js";import{t as f}from"./useAsync-CZJ1G06G.js";import{c as p,d as m,v as h}from"./courses-LEqLhg7m.js";import{t as g}from"./ChromeButton-CdfVnEPs.js";import{t as _}from"./ChromeCursor-Bd--RrJo.js";var v=e(n()),y=t(),b=[.22,1,.36,1],x={hidden:{},show:{transition:{staggerChildren:.1,delayChildren:.1}}},S={hidden:{opacity:0,y:22,filter:`blur(6px)`},show:{opacity:1,y:0,filter:`blur(0px)`,transition:{duration:.9,ease:b}}};function C(){let e=i();return(0,y.jsxs)(y.Fragment,{children:[(0,y.jsx)(`div`,{className:`aura-grain`,"aria-hidden":!0}),(0,y.jsx)(`div`,{className:`hero-atmosphere absolute inset-0`,"aria-hidden":!0}),(0,y.jsx)(`div`,{className:`cv-grid absolute inset-0`,"aria-hidden":!0}),!e&&(0,y.jsxs)(y.Fragment,{children:[(0,y.jsx)(a.div,{className:`cv-orb left-[6%] top-[10%] h-80 w-80`,animate:{y:[0,-34,0],x:[0,18,0]},transition:{duration:15,repeat:1/0,ease:`easeInOut`},"aria-hidden":!0}),(0,y.jsx)(a.div,{className:`cv-orb bottom-[6%] right-[4%] h-[26rem] w-[26rem]`,animate:{y:[0,28,0],x:[0,-22,0]},transition:{duration:19,repeat:1/0,ease:`easeInOut`},"aria-hidden":!0})]})]})}function w(){let{slug:e}=d.useParams(),{data:t,error:n,loading:i}=f(()=>p(e),[e]),[w,E]=(0,v.useState)(null),[D,O]=(0,v.useState)(null),k=(0,v.useRef)(null),A=t?.course??null,j=t?.locked??!1;(0,v.useEffect)(()=>{let e=!1;if(O(null),!A||j||!A.video_path){E(null);return}return m(A.video_path,A.id).then(t=>{e||E(t)}).catch(t=>{e||(E(null),O(t instanceof Error?t.message:`Το preview απέτυχε.`))}),()=>{e=!0}},[A,j]);function M(e){let t=k.current;if(!t)return;let n=t.getBoundingClientRect();t.style.setProperty(`--mx`,`${e.clientX-n.left}px`),t.style.setProperty(`--my`,`${e.clientY-n.top}px`)}if(i)return(0,y.jsxs)(`div`,{className:`cv-root relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-5`,children:[(0,y.jsx)(`style`,{children:T}),(0,y.jsx)(C,{}),(0,y.jsxs)(`div`,{className:`relative z-10 flex w-full max-w-4xl flex-col gap-6`,children:[(0,y.jsx)(`div`,{className:`cv-skeleton h-6 w-40 rounded-full`}),(0,y.jsx)(`div`,{className:`cv-skeleton aspect-video w-full rounded-2xl`}),(0,y.jsx)(`div`,{className:`cv-skeleton h-10 w-2/3 rounded-lg`}),(0,y.jsx)(`div`,{className:`cv-skeleton h-4 w-full rounded`}),(0,y.jsx)(`div`,{className:`cv-skeleton h-4 w-4/5 rounded`})]})]});if(n||!A)return(0,y.jsxs)(`div`,{className:`cv-root relative flex min-h-screen flex-col items-center justify-center gap-4 overflow-hidden bg-aura-bg px-5 text-center text-white`,children:[(0,y.jsx)(`style`,{children:T}),(0,y.jsx)(C,{}),(0,y.jsxs)(a.div,{variants:x,initial:`hidden`,animate:`show`,className:`relative z-10 flex flex-col items-center gap-4`,children:[(0,y.jsx)(a.h1,{variants:S,className:`cv-title text-3xl font-bold tracking-tight`,children:`Δεν βρέθηκε`}),(0,y.jsx)(a.p,{variants:S,className:`text-sm text-white/50`,children:n instanceof Error?n.message:`Άγνωστο σφάλμα.`}),(0,y.jsx)(a.div,{variants:S,children:(0,y.jsxs)(r,{to:`/courses`,className:`cv-back mt-4`,children:[(0,y.jsx)(o,{className:`size-4`}),`ΟΛΑ ΤΑ VIDEOS`]})})]})]});let N=h.find(e=>e.key===A.category)?.label,P=u(A.required_plan);return(0,y.jsxs)(`div`,{className:`cv-root relative min-h-screen w-full overflow-x-clip bg-aura-bg pt-24 text-white sm:pt-28`,children:[(0,y.jsx)(`style`,{children:T}),(0,y.jsx)(_,{}),(0,y.jsx)(C,{}),(0,y.jsxs)(a.header,{initial:{opacity:0,y:-16},animate:{opacity:1,y:0},transition:{duration:.8,ease:b},className:`cv-bar relative z-20`,children:[(0,y.jsxs)(`div`,{className:`mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8`,children:[(0,y.jsxs)(r,{to:`/courses`,className:`cv-back`,children:[(0,y.jsx)(o,{className:`size-4`}),`ΟΛΑ ΤΑ VIDEOS`]}),(0,y.jsxs)(`div`,{className:`flex items-center gap-2`,children:[P?(0,y.jsx)(`span`,{className:`cv-chip cv-chip-plan`,children:P.name}):null,N?(0,y.jsx)(`span`,{className:`cv-chip`,children:N}):null]})]}),(0,y.jsx)(`div`,{className:`chrome-line h-px w-full`,"aria-hidden":!0})]}),j?(0,y.jsxs)(a.div,{variants:x,initial:`hidden`,animate:`show`,className:`relative z-10 mx-auto flex max-w-lg flex-col items-center gap-6 px-5 py-28 text-center sm:py-36`,children:[(0,y.jsxs)(a.div,{variants:S,className:`cv-lock`,children:[(0,y.jsx)(`span`,{className:`cv-lock-ring`,"aria-hidden":!0}),(0,y.jsx)(s,{className:`relative size-7 text-white/80`})]}),(0,y.jsx)(a.h1,{variants:S,className:`cv-title text-3xl font-bold tracking-tight sm:text-4xl`,children:A.title}),(0,y.jsxs)(a.p,{variants:S,className:`max-w-sm text-sm leading-relaxed text-white/55`,children:[`Αυτό το video χρειάζεται πλάνο`,` `,(0,y.jsx)(`span`,{className:`text-white`,children:P?.name??A.required_plan}),` ή ανώτερο.`]}),(0,y.jsx)(a.div,{variants:S,children:(0,y.jsx)(r,{to:`/pricing`,children:(0,y.jsx)(g,{type:`button`,children:`ΔΕΣ ΤΑ ΠΛΑΝΑ`})})})]}):(0,y.jsxs)(a.div,{variants:x,initial:`hidden`,animate:`show`,className:`relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-0 pb-28 pt-0 sm:px-8 sm:pt-10`,children:[(0,y.jsxs)(a.div,{variants:S,className:`relative`,children:[(0,y.jsx)(`div`,{className:`cv-glow`,"aria-hidden":!0}),(0,y.jsxs)(`div`,{className:`cv-frame sm:rounded-[1.4rem]`,children:[(0,y.jsx)(`div`,{className:`cv-frame-border`,"aria-hidden":!0}),(0,y.jsx)(`div`,{className:`relative aspect-video w-full overflow-hidden bg-black sm:rounded-[calc(1.4rem-1px)]`,children:w?(0,y.jsx)(`video`,{src:w,controls:!0,playsInline:!0,className:`h-full w-full object-contain`}):D?(0,y.jsx)(`div`,{className:`flex h-full flex-col items-center justify-center gap-2 px-6 text-center`,children:(0,y.jsx)(`span`,{className:`text-sm text-red-300/90`,children:D})}):(0,y.jsx)(`div`,{className:`flex h-full flex-col items-center justify-center gap-4 text-center`,children:A.video_path?(0,y.jsxs)(y.Fragment,{children:[(0,y.jsx)(`span`,{className:`cv-spinner`,"aria-hidden":!0}),(0,y.jsx)(`span`,{className:`text-xs uppercase tracking-[0.3em] text-white/40`,children:`Φόρτωση βίντεο`})]}):(0,y.jsxs)(y.Fragment,{children:[(0,y.jsx)(`div`,{className:`cv-play`,"aria-hidden":!0,children:(0,y.jsx)(c,{className:`size-6 text-white/60`})}),(0,y.jsx)(`span`,{className:`text-sm text-white/35`,children:`Δεν έχει ανέβει ακόμη βίντεο.`})]})})})]})]}),(0,y.jsx)(a.div,{variants:S,className:`px-5 sm:px-0`,children:(0,y.jsxs)(`div`,{ref:k,onMouseMove:M,className:`cv-info p-7 sm:p-10`,children:[(0,y.jsx)(`div`,{className:`cv-spot`,"aria-hidden":!0}),(0,y.jsxs)(`div`,{className:`relative`,children:[(0,y.jsxs)(`div`,{className:`mb-5 flex items-center gap-3`,children:[(0,y.jsx)(l,{className:`size-4 text-white/60`}),(0,y.jsx)(`span`,{className:`chrome-text text-[11px] font-semibold uppercase tracking-[0.45em]`,children:`Aura`}),(0,y.jsx)(`span`,{className:`h-px flex-1 bg-gradient-to-r from-white/25 to-transparent`,"aria-hidden":!0})]}),(0,y.jsx)(`h1`,{className:`cv-title text-3xl font-bold tracking-tight sm:text-5xl`,children:A.title}),A.summary?(0,y.jsx)(`p`,{className:`mt-6 max-w-3xl whitespace-pre-line text-sm leading-[1.85] text-white/65 sm:text-base`,children:A.summary}):null]})]})})]})]})}var T=`
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+@keyframes cv-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes cv-pulse { 0%,100% { opacity: .5; transform: scale(1); } 50% { opacity: .95; transform: scale(1.03); } }
+@keyframes cv-skel { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes cv-ring { 0% { transform: scale(.85); opacity: .7; } 100% { transform: scale(1.7); opacity: 0; } }
+
+.cv-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 15%, transparent 75%);
+          mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 15%, transparent 75%);
+  pointer-events: none;
+}
+.cv-orb {
+  position: absolute; border-radius: 9999px; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, rgba(232,236,242,.15), rgba(160,168,180,.05) 45%, transparent 70%);
+  filter: blur(44px);
+}
+
+/* top bar */
+.cv-bar {
+  background: linear-gradient(180deg, rgba(8,8,10,.82), rgba(8,8,10,.55));
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.cv-back {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.6);
+  transition: color .25s, transform .25s, text-shadow .25s;
+}
+.cv-back:hover { color: #fff; transform: translateX(-3px); text-shadow: 0 0 18px rgba(232,236,242,.7); }
+.cv-chip {
+  border-radius: 9999px; padding: .35rem .85rem; font-size: 10px; letter-spacing: .3em; text-transform: uppercase;
+  color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.14);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.015));
+}
+.cv-chip-plan {
+  color: #f1f5f9; border-color: rgba(232,236,242,.4);
+  box-shadow: 0 0 18px -4px rgba(232,236,242,.5);
+}
+
+/* chrome title */
+.cv-title {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 22%, #9ca3af 42%, #ffffff 58%, #8b93a1 78%, #f1f5f9 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: cv-shimmer 7s linear infinite;
+}
+
+/* player frame */
+.cv-glow {
+  position: absolute; inset: -6% -4%; pointer-events: none; z-index: 0;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(214,222,235,.22), transparent 72%);
+  filter: blur(46px); animation: cv-pulse 6s ease-in-out infinite;
+}
+.cv-frame { position: relative; z-index: 1; overflow: hidden; isolation: isolate; padding: 1px; background: rgba(255,255,255,.07); }
+.cv-frame-border {
+  position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.95) 74%, rgba(255,255,255,0) 90%, transparent 100%);
+  animation: cv-spin 8s linear infinite;
+}
+
+/* info card */
+.cv-info {
+  position: relative; overflow: hidden; border-radius: 1.4rem;
+  border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(180deg, rgba(22,23,29,.92), rgba(9,10,13,.95));
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  box-shadow: 0 30px 80px -40px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.cv-spot {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(460px circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,.08), transparent 60%);
+}
+
+/* locked */
+.cv-lock {
+  position: relative; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 1.2rem;
+  border: 1px solid rgba(255,255,255,.18);
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.16), rgba(255,255,255,.02));
+  box-shadow: 0 0 46px -8px rgba(232,236,242,.5);
+}
+.cv-lock-ring {
+  position: absolute; inset: 0; border-radius: 1.2rem; border: 1px solid rgba(232,236,242,.5);
+  animation: cv-ring 2.8s ease-out infinite;
+}
+
+/* misc states */
+.cv-spinner {
+  width: 38px; height: 38px; border-radius: 9999px;
+  border: 2px solid rgba(255,255,255,.12); border-top-color: #fff;
+  animation: cv-spin .9s linear infinite; box-shadow: 0 0 22px rgba(255,255,255,.22);
+}
+.cv-play {
+  display: grid; place-items: center; width: 64px; height: 64px; border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.16); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.12), rgba(255,255,255,.02));
+  box-shadow: 0 0 36px -8px rgba(232,236,242,.45); animation: cv-pulse 4s ease-in-out infinite;
+}
+.cv-skeleton {
+  background: linear-gradient(100deg, rgba(255,255,255,.04) 30%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.04) 70%);
+  background-size: 200% 100%; animation: cv-skel 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-frame-border, .cv-title, .cv-glow, .cv-play, .cv-lock-ring, .cv-spinner, .cv-skeleton { animation: none !important; }
+}
+`;export{w as component};
+=== END FILE ===
+

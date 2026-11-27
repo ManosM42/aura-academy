@@ -1,0 +1,1665 @@
+=== FILE: src/routes/elite.tsx ===
+// src/routes/community.tsx
+import { lazy, Suspense, useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { Loader2 } from "lucide-react";
+import { db } from "@/lib/db";
+import  EliteLocked  from "@/components/aura/elite/EliteLocked";
+
+// Chat code (and its heavy CSS) only downloads for Elite members.
+const EliteCommunity = lazy(() => import("@/components/aura/elite/EliteCommunity"));
+
+const sb = db as unknown as SupabaseClient;
+
+export const Route = createFileRoute("/elite")({
+  head: () => ({ meta: [{ title: "AURA Elite Community" }] }),
+  component: CommunityPage,
+});
+
+type Gate =
+  | { status: "loading" }
+  | { status: "signed-out" }
+  | { status: "locked" }
+  | { status: "elite"; id: string; name: string };
+
+function CommunityPage() {
+  const [gate, setGate] = useState<Gate>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const check = async () => {
+      const { data } = await sb.auth.getSession();
+      const user = data.session?.user;
+      if (cancelled) return;
+      if (!user) {
+        setGate({ status: "signed-out" });
+        return;
+      }
+
+      // Server-side truth: the same function every RLS policy uses.
+      const { data: isElite, error } = await sb.rpc("is_elite_member");
+      if (cancelled) return;
+
+      if (error || isElite !== true) {
+        setGate({ status: "locked" });
+        return;
+      }
+
+      const meta = (user.user_metadata ?? {}) as { full_name?: string; name?: string };
+      setGate({
+        status: "elite",
+        id: user.id,
+        name: meta.full_name || meta.name || user.email?.split("@")[0] || "Member",
+      });
+    };
+
+    void check();
+
+    // Re-check on login/logout/token refresh (e.g. plan changed in another tab).
+    const { data: sub } = sb.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") void check();
+    });
+
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  if (gate.status === "loading") {
+    return (
+      <div className="fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60">
+        <Loader2 className="size-6 animate-spin" aria-label="Loading" />
+      </div>
+    );
+  }
+
+  if (gate.status === "signed-out") return <EliteLocked signedOut />;
+  if (gate.status === "locked") return <EliteLocked />;
+
+  return (
+    <Suspense
+      fallback={
+        <div className="fixed inset-0 z-10 grid place-items-center bg-[#050505] text-white/60">
+          <Loader2 className="size-6 animate-spin" aria-label="Loading" />
+        </div>
+      }
+    >
+      {/* key = user id so the chat fully resets if the account changes */}
+      <EliteCommunity key={gate.id} meId={gate.id} meName={gate.name} />
+    </Suspense>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/method.tsx ===
+import { createFileRoute, Link } from "@tanstack/react-router";
+import MethodSteps from "@/components/aura/MethodSteps";
+import ChromeButton from "@/components/aura/ChromeButton";
+import Footer from "@/components/aura/Footer";
+
+export const Route = createFileRoute("/method")({
+  head: () => ({
+    meta: [
+      { title: "AURA — Η Μέθοδος" },
+      {
+        name: "description",
+        content: "OBSERVE → ANALYZE → DESIGN → EXECUTE → EVALUATE → EVOLVE.",
+      },
+    ],
+  }),
+  component: MethodPage,
+});
+
+function MethodPage() {
+  return (
+    <>
+      <main className="mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-40">
+        <header className="max-w-3xl">
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">THE METHOD</p>
+          <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-neutral-100 sm:text-6xl">
+            LEARN. PRACTICE.
+            <br />
+            PROVE.
+          </h1>
+          <p className="mt-7 text-base leading-relaxed text-neutral-400">
+            Η μέθοδος AURA είναι ένας κλειστός κύκλος έξι βημάτων. Δεν αντιγράφεις κουρέματα —
+            μαθαίνεις να παίρνεις αποφάσεις και να τις υπερασπίζεσαι με αποτέλεσμα.
+          </p>
+          <p className="mt-4 font-mono text-xs uppercase tracking-[0.2em] text-neutral-500">
+            OBSERVE → ANALYZE → DESIGN → EXECUTE → EVALUATE → EVOLVE
+          </p>
+        </header>
+
+        <section className="mt-24">
+          <MethodSteps />
+        </section>
+
+        <section className="mt-24 rounded-2xl border border-white/10 bg-[#0A0A0A] p-8 text-center sm:p-12">
+          <h2 className="text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl">
+            Έτοιμος να μπεις στη μέθοδο;
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-neutral-400">
+            Διάλεξε το πακέτο που ταιριάζει στο επίπεδό σου. Ακύρωση ανά πάσα στιγμή.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <Link to="/pricing">
+              <ChromeButton type="button">ΔΕΣ ΤΙΣ ΤΙΜΕΣ</ChromeButton>
+            </Link>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
+}
+=== END FILE ===
+
+=== FILE: supabase/config.toml ===
+project_id = "kvnpixezrebxuvgbznqr"
+
+[functions.create-checkout-session]
+verify_jwt = false
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.course-file-init-upload]
+verify_jwt = false
+
+[functions.course-file-complete-upload]
+verify_jwt = false
+
+[functions.course-file-abort-upload]
+verify_jwt = false
+
+[functions.course-file-delete]
+verify_jwt = false
+
+[functions.course-file-url]
+verify_jwt = false
+=== END FILE ===
+
+=== FILE: supabase/functions/aura-tts/index.ts ===
+// supabase/functions/aura-tts/index.ts
+// Φωνή AURA μέσω Gemini TTS (δωρεάν tier του Google AI Studio). Επιστρέφει WAV.
+// Secrets:  GEMINI_API_KEY (απαραίτητο)
+//           GEMINI_TTS_MODEL (προαιρετικό, λίστα με κόμμα· default: gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts)
+//           AURA_VOICE (προαιρετικό, default Aoede)  – γυναικείες: Aoede, Kore, Leda, Zephyr, Callirrhoe, Despina, Vindemiatrix
+//           AURA_STYLE (προαιρετικό, οδηγία ύφους στα αγγλικά)
+
+const cors = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const MODELS = (Deno.env.get("GEMINI_TTS_MODEL") ?? "gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+const VOICE = Deno.env.get("AURA_VOICE") ?? "Aoede";
+const STYLE = Deno.env.get("AURA_STYLE") ??
+  "Say in a warm, calm, elegant and confident female voice, at a natural unhurried pace";
+
+const fallback = () =>
+  new Response(JSON.stringify({ fallback: true }), {
+    status: 200,
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
+
+// μικρή cache στη μνήμη: ίδιο κείμενο => καμία νέα κλήση (το free tier έχει αυστηρά όρια)
+const cache = new Map<string, Uint8Array>();
+const MAX_CACHE = 60;
+
+function wavFromPcm(pcm: Uint8Array, sampleRate: number) {
+  const h = new ArrayBuffer(44);
+  const v = new DataView(h);
+  const w = (o: number, s: string) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+  w(0, "RIFF");
+  v.setUint32(4, 36 + pcm.length, true);
+  w(8, "WAVE");
+  w(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, 1, true); // mono
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  w(36, "data");
+  v.setUint32(40, pcm.length, true);
+  const out = new Uint8Array(44 + pcm.length);
+  out.set(new Uint8Array(h), 0);
+  out.set(pcm, 44);
+  return out;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
+  try {
+    const apiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!apiKey) {
+      console.error("Λείπει το GEMINI_API_KEY");
+      return fallback();
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const text = String(body.text ?? "").replace(/[*_#`~>]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 600);
+    if (!text) return fallback();
+
+    const key = `${VOICE}|${text}`;
+    const hit = cache.get(key);
+    if (hit) {
+      return new Response(hit, { headers: { ...cors, "Content-Type": "audio/wav", "Cache-Control": "private, max-age=3600" } });
+    }
+
+    for (const model of MODELS) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 20000);
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+          {
+            method: "POST",
+            signal: ctrl.signal,
+            headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `${STYLE}: ${text}` }] }],
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } },
+              },
+            }),
+          },
+        );
+
+        if (!res.ok) {
+          console.error(`${model}: HTTP ${res.status}`, (await res.text()).slice(0, 200));
+          continue;
+        }
+
+        const data = await res.json();
+        const part = data?.candidates?.[0]?.content?.parts?.find((p: any) => p?.inlineData?.data);
+        const b64: string | undefined = part?.inlineData?.data;
+        if (!b64) {
+          console.error(`${model}: χωρίς ήχο στην απάντηση`);
+          continue;
+        }
+
+        const rate = Number(/rate=(\d+)/.exec(part.inlineData.mimeType ?? "")?.[1] ?? 24000);
+        const pcm = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const wav = wavFromPcm(pcm, rate);
+
+        if (cache.size >= MAX_CACHE) cache.delete(cache.keys().next().value!);
+        cache.set(key, wav);
+
+        return new Response(wav, {
+          headers: { ...cors, "Content-Type": "audio/wav", "Cache-Control": "private, max-age=3600" },
+        });
+      } catch (e) {
+        console.error(`${model}:`, String(e));
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    return fallback(); // το front-end περνά στη φωνή του browser
+  } catch (e) {
+    console.error(e);
+    return fallback();
+  }
+});
+=== END FILE ===
+
+=== FILE: .output/public/assets/auth.callback-J8TDGUE9.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/auth.callback-DWZY6muH.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/useNavigate-BR9bgUfC.js","assets/ChromeButton-CdfVnEPs.js","assets/useAuth-CfZB9gr3.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/checkout-intent-CYMuNmEZ.js","assets/plans-BkcWWgXs.js"])))=>i.map(i=>d[i]);
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{n as r,t as i}from"./lazyRouteComponent-CNoRSiag.js";import{t as a}from"./preload-helper-Czpn1I53.js";import{r as o}from"./plans-BkcWWgXs.js";var s=e(n(),1),c=t(),l=[`el`,`en`],u=`aura.lang`;function d(e){return typeof e==`string`&&l.includes(e)}var f={el:{"nav.mainNav":`Κύρια πλοήγηση`,"nav.home":`AURA — Αρχική`,"nav.menu":`Μενού`,"nav.openMenu":`Άνοιγμα μενού`,"nav.closeMenu":`Κλείσιμο μενού`,"nav.language":`Γλώσσα`,"nav.about":`ΕΜΕΙΣ`,"nav.contact":`ΕΠΙΚΟΙΝΩΝΙΑ`,"nav.method":`ΜΕΘΟΔΟΣ`,"nav.prices":`ΤΙΜΕΣ`,"nav.dashboard":`Dashboard`,"nav.academy":`Ακαδημία`,"nav.courses":`Courses`,"nav.skills":`Δεξιότητες`,"nav.reviewQueue":`Ουρά αξιολόγησης`,"nav.adminPanel":`Πάνελ Admin`,"nav.inbox":`Μηνύματα`,"nav.start":`ΞΕΚΙΝΑ`,"nav.startNow":`ΞΕΚΙΝΑ ΤΩΡΑ`,"nav.signIn":`Σύνδεση`,"nav.signOut":`Αποσύνδεση`,"nav.myProfile":`Το προφίλ μου`,"nav.viewProfile":`Προβολή προφίλ`,"nav.tagline":`AURA — HAIR METHOD`,"auth.finishingTitle":`Ολοκληρώνουμε τη σύνδεση…`,"auth.finishingKicker":`ΣΥΝΔΕΣΗ`,"auth.timeoutKicker":`ΚΑΘΥΣΤΕΡΗΣΗ`,"auth.timeoutTitle":`Η σύνδεση δεν ολοκληρώθηκε`,"auth.timeoutBody":`Δεν καταφέραμε να επιβεβαιώσουμε τη σύνδεσή σου. Δοκίμασε ξανά από τη σελίδα σύνδεσης.`,"auth.errorKicker":`ΣΦΑΛΜΑ`,"auth.errorTitle":`Η σύνδεση απέτυχε`,"auth.backToLogin":`ΠΙΣΩ ΣΤΗ ΣΥΝΔΕΣΗ`,"auth.goHome":`Αρχική`},en:{"nav.mainNav":`Main navigation`,"nav.home":`AURA — Home`,"nav.menu":`Menu`,"nav.openMenu":`Open menu`,"nav.closeMenu":`Close menu`,"nav.language":`Language`,"nav.about":`ABOUT US`,"nav.contact":`CONTACT`,"nav.method":`METHOD`,"nav.prices":`PRICES`,"nav.dashboard":`Dashboard`,"nav.academy":`Academy`,"nav.courses":`Courses`,"nav.skills":`Skills`,"nav.reviewQueue":`Review Queue`,"nav.adminPanel":`Admin Panel`,"nav.inbox":`Inbox`,"nav.start":`START`,"nav.startNow":`START NOW`,"nav.signIn":`Sign in`,"nav.signOut":`Sign out`,"nav.myProfile":`My profile`,"nav.viewProfile":`View profile`,"nav.tagline":`AURA — HAIR METHOD`,"auth.finishingTitle":`Finishing your sign-in…`,"auth.finishingKicker":`SIGNING IN`,"auth.timeoutKicker":`TAKING TOO LONG`,"auth.timeoutTitle":`Sign-in did not complete`,"auth.timeoutBody":`We could not confirm your session. Please try again from the login page.`,"auth.errorKicker":`ERROR`,"auth.errorTitle":`Sign-in failed`,"auth.backToLogin":`BACK TO LOGIN`,"auth.goHome":`Home`}},p=(0,s.createContext)(null);function m(){try{let e=window.localStorage.getItem(u);return d(e)?e:null}catch{return null}}function h(){let e=navigator.languages?.length?navigator.languages:[navigator.language];for(let t of e){if(typeof t!=`string`)continue;let e=t.slice(0,2).toLowerCase();if(e===`el`)return`el`;if(e===`en`)return`en`}return`el`}function g({children:e}){let[t,n]=(0,s.useState)(`el`);(0,s.useEffect)(()=>{let e=m()??h();e!==`el`&&n(e)},[]),(0,s.useEffect)(()=>{typeof document<`u`&&(document.documentElement.lang=t)},[t]);let r=(0,s.useCallback)(e=>{n(e);try{window.localStorage.setItem(u,e)}catch{}},[]),i=(0,s.useCallback)((e,n)=>{let r=f[t][e]??f.el[e]??e;return n?r.replace(/\{(\w+)\}/g,(e,t)=>{let r=n[t];return r===void 0?e:String(r)}):r},[t]),a=(0,s.useMemo)(()=>({lang:t,setLang:r,t:i}),[t,r,i]);return(0,c.jsx)(p.Provider,{value:a,children:e})}function _(){let e=(0,s.useContext)(p);if(!e)throw Error(`useI18n must be used inside <I18nProvider>.`);return e}var v=r(`/auth/callback`)({validateSearch:e=>({...e,plan:o(e.plan)?e.plan:void 0}),head:()=>({meta:[{title:`AURA — Sign in`}]}),component:i(()=>a(()=>import(`./auth.callback-DWZY6muH.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10])),`component`)});export{g as n,_ as r,v as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/login-BGRel2QT.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/login-CkVMxxjA.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/useNavigate-BR9bgUfC.js","assets/AnimatePresence-ClHpx5iG.js","assets/proxy-ftrNcNdG.js","assets/use-reduced-motion-CNAPwhZE.js","assets/react-D9fOyxUn.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/ChromeButton-CdfVnEPs.js","assets/useAuth-CfZB9gr3.js","assets/checkout-intent-CYMuNmEZ.js","assets/plans-BkcWWgXs.js","assets/ChromeCursor-Bd--RrJo.js","assets/AuraMark-BT6lLCpe.js","assets/aura-DdP8jhxG.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";import{r}from"./plans-BkcWWgXs.js";var i=e(`/login`)({validateSearch:e=>({plan:r(e.plan)?e.plan:void 0,mode:e.mode===`reset`?`reset`:void 0}),component:t(()=>n(()=>import(`./login-CkVMxxjA.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17])),`component`)});export{i as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/useAuth-B1WX5JkE.js ===
+import{r as e}from"./jsx-runtime-BkSabwWG.js";import{r as t}from"./useRouter-C8taXhX3.js";import{t as n}from"./supabase-DXn9ZPwL.js";import{y as r}from"./queries-B7Arqryn.js";var i=e(t(),1);function a(){let[e,t]=(0,i.useState)(null),[a,o]=(0,i.useState)(null),[s,c]=(0,i.useState)(!0),[l,u]=(0,i.useState)(0);return(0,i.useEffect)(()=>{let e=!0;n.auth.getSession().then(({data:n})=>{e&&t(n.session)});let{data:r}=n.auth.onAuthStateChange((n,r)=>{e&&t(r)});return()=>{e=!1,r.subscription.unsubscribe()}},[]),(0,i.useEffect)(()=>{let t=!0;if(!e){o(null),c(!1);return}return c(!0),r().then(e=>t&&o(e)).catch(()=>t&&o(null)).finally(()=>t&&c(!1)),()=>{t=!1}},[e,l]),{session:e,profile:a,loading:s,refresh:()=>u(e=>e+1)}}export{a as t};
+=== END FILE ===
+
+=== FILE: .output/public/sw.js ===
+/* public/sw.js  ->  served at /sw.js
+   Receives web-push messages and shows the Chrome notification. */
+
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: "AURA", body: event.data ? event.data.text() : "" };
+  }
+
+  const options = {
+    body: data.body || "",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    // one tag per notification id so they stack instead of replacing each other
+    tag: data.id || data.tag || undefined,
+    data: { url: data.url || "/admin" },
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title || "AURA", options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/admin", self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (new URL(client.url).origin === self.location.origin && "focus" in client) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
+});
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/supabase-CShTThZh.mjs ===
+import { t as supabase$1 } from "./client-DO3FmCD9.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/supabase-CShTThZh.js
+/**
+* ΜΙΑ μόνο instance Supabase για όλη την εφαρμογή.
+*
+* Πριν υπήρχαν δύο: αυτό το αρχείο έφτιαχνε δικό του client με
+* VITE_SUPABASE_ANON_KEY + localStorage, ενώ το generated client
+* χρησιμοποιεί VITE_SUPABASE_PUBLISHABLE_KEY + brokeredPreviewStorage()
+* (απαραίτητο μέσα στο preview iframe). Αποτέλεσμα: το session της Google
+* γραφόταν στον έναν και το /checkout διάβαζε τον άλλον.
+*
+* Το cast υπάρχει επειδή το generated client είναι τυποποιημένο με το
+* ./integrations/supabase/types, ενώ τα queries.ts βασίζονται στο
+* @/lib/database.types. Το ίδιο σχήμα, δύο generated αρχεία.
+*/
+var supabase = supabase$1;
+//#endregion
+export { supabase as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/useAuth-CcQ0JkjK.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { y as getMyProfile } from "./queries-DCA4yifx.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/useAuth-CcQ0JkjK.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+/**
+* Session + profile. Το signInWithGoogle ζει ΜΟΝΟ στο @/hooks/useAuth.
+* Το dead paste που υπήρχε στο τέλος αυτού του αρχείου αφαιρέθηκε — δεν
+* το έκανε import κανείς, γι' αυτό το redirect έμενε σπασμένο.
+*/
+function useAuth() {
+	const [session, setSession] = (0, import_react.useState)(null);
+	const [profile, setProfile] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(true);
+	const [tick, setTick] = (0, import_react.useState)(0);
+	(0, import_react.useEffect)(() => {
+		let active = true;
+		supabase.auth.getSession().then(({ data }) => {
+			if (active) setSession(data.session);
+		});
+		const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+			if (active) setSession(next);
+		});
+		return () => {
+			active = false;
+			sub.subscription.unsubscribe();
+		};
+	}, []);
+	(0, import_react.useEffect)(() => {
+		let active = true;
+		if (!session) {
+			setProfile(null);
+			setLoading(false);
+			return;
+		}
+		setLoading(true);
+		getMyProfile().then((p) => active && setProfile(p)).catch(() => active && setProfile(null)).finally(() => active && setLoading(false));
+		return () => {
+			active = false;
+		};
+	}, [session, tick]);
+	return {
+		session,
+		profile,
+		loading,
+		refresh: () => setTick((n) => n + 1)
+	};
+}
+//#endregion
+export { useAuth as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/package.json ===
+{
+  "name": "traced-node-modules",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "tslib": "2.8.1"
+  }
+}
+=== END FILE ===
+
+=== FILE: public/sw.js ===
+/* public/sw.js  ->  served at /sw.js
+   Receives web-push messages and shows the Chrome notification. */
+
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: "AURA", body: event.data ? event.data.text() : "" };
+  }
+
+  const options = {
+    body: data.body || "",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    // one tag per notification id so they stack instead of replacing each other
+    tag: data.id || data.tag || undefined,
+    data: { url: data.url || "/admin" },
+  };
+
+  event.waitUntil(self.registration.showNotification(data.title || "AURA", options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/admin", self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (new URL(client.url).origin === self.location.origin && "focus" in client) {
+          client.navigate(target);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(target);
+    }),
+  );
+});
+=== END FILE ===
+
+=== FILE: src/components/ui/accordion.tsx ===
+import * as React from "react";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import { ChevronDown } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const Accordion = AccordionPrimitive.Root;
+
+const AccordionItem = React.forwardRef<
+  React.ElementRef<typeof AccordionPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>
+>(({ className, ...props }, ref) => (
+  <AccordionPrimitive.Item ref={ref} className={cn("border-b", className)} {...props} />
+));
+AccordionItem.displayName = "AccordionItem";
+
+const AccordionTrigger = React.forwardRef<
+  React.ElementRef<typeof AccordionPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <AccordionPrimitive.Header className="flex">
+    <AccordionPrimitive.Trigger
+      ref={ref}
+      className={cn(
+        "flex flex-1 items-center justify-between py-4 text-sm font-medium cursor-pointer transition-all hover:underline text-left [&[data-state=open]>svg]:rotate-180",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+    </AccordionPrimitive.Trigger>
+  </AccordionPrimitive.Header>
+));
+AccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName;
+
+const AccordionContent = React.forwardRef<
+  React.ElementRef<typeof AccordionPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <AccordionPrimitive.Content
+    ref={ref}
+    className="overflow-hidden text-sm data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+    {...props}
+  >
+    <div className={cn("pb-4 pt-0", className)}>{children}</div>
+  </AccordionPrimitive.Content>
+));
+AccordionContent.displayName = AccordionPrimitive.Content.displayName;
+
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/alert-dialog.tsx ===
+import * as React from "react";
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
+
+import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+
+const AlertDialog = AlertDialogPrimitive.Root;
+
+const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
+
+const AlertDialogPortal = AlertDialogPrimitive.Portal;
+
+const AlertDialogOverlay = React.forwardRef<
+  React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <AlertDialogPrimitive.Overlay
+    className={cn(
+      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className,
+    )}
+    {...props}
+    ref={ref}
+  />
+));
+AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
+
+const AlertDialogContent = React.forwardRef<
+  React.ElementRef<typeof AlertDialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <AlertDialogPortal>
+    <AlertDialogOverlay />
+    <AlertDialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        className,
+      )}
+      {...props}
+    />
+  </AlertDialogPortal>
+));
+AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
+
+const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />
+);
+AlertDialogHeader.displayName = "AlertDialogHeader";
+
+const AlertDialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    {...props}
+  />
+);
+AlertDialogFooter.displayName = "AlertDialogFooter";
+
+const AlertDialogTitle = React.forwardRef<
+  React.ElementRef<typeof AlertDialogPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>
+>(({ className, ...props }, ref) => (
+  <AlertDialogPrimitive.Title
+    ref={ref}
+    className={cn("text-lg font-semibold", className)}
+    {...props}
+  />
+));
+AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName;
+
+const AlertDialogDescription = React.forwardRef<
+  React.ElementRef<typeof AlertDialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <AlertDialogPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayName;
+
+const AlertDialogAction = React.forwardRef<
+  React.ElementRef<typeof AlertDialogPrimitive.Action>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action>
+>(({ className, ...props }, ref) => (
+  <AlertDialogPrimitive.Action ref={ref} className={cn(buttonVariants(), className)} {...props} />
+));
+AlertDialogAction.displayName = AlertDialogPrimitive.Action.displayName;
+
+const AlertDialogCancel = React.forwardRef<
+  React.ElementRef<typeof AlertDialogPrimitive.Cancel>,
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Cancel>
+>(({ className, ...props }, ref) => (
+  <AlertDialogPrimitive.Cancel
+    ref={ref}
+    className={cn(buttonVariants({ variant: "outline" }), "mt-2 sm:mt-0", className)}
+    {...props}
+  />
+));
+AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName;
+
+export {
+  AlertDialog,
+  AlertDialogPortal,
+  AlertDialogOverlay,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/card.tsx ===
+import * as React from "react";
+
+import { cn } from "@/lib/utils";
+
+const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("rounded-xl border bg-card text-card-foreground shadow", className)}
+      {...props}
+    />
+  ),
+);
+Card.displayName = "Card";
+
+const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("flex flex-col space-y-1.5 p-6", className)} {...props} />
+  ),
+);
+CardHeader.displayName = "CardHeader";
+
+const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("font-semibold leading-none tracking-tight", className)}
+      {...props}
+    />
+  ),
+);
+CardTitle.displayName = "CardTitle";
+
+const CardDescription = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  ),
+);
+CardDescription.displayName = "CardDescription";
+
+const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+  ),
+);
+CardContent.displayName = "CardContent";
+
+const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, ...props }, ref) => (
+    <div ref={ref} className={cn("flex items-center p-6 pt-0", className)} {...props} />
+  ),
+);
+CardFooter.displayName = "CardFooter";
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/dialog.tsx ===
+"use client";
+
+import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const Dialog = DialogPrimitive.Root;
+
+const DialogTrigger = DialogPrimitive.Trigger;
+
+const DialogPortal = DialogPrimitive.Portal;
+
+const DialogClose = DialogPrimitive.Close;
+
+const DialogOverlay = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Overlay
+    ref={ref}
+    className={cn(
+      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className,
+    )}
+    {...props}
+  />
+));
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
+
+const DialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DialogPortal>
+    <DialogOverlay />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    </DialogPrimitive.Content>
+  </DialogPortal>
+));
+DialogContent.displayName = DialogPrimitive.Content.displayName;
+
+const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
+);
+DialogHeader.displayName = "DialogHeader";
+
+const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    {...props}
+  />
+);
+DialogFooter.displayName = "DialogFooter";
+
+const DialogTitle = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Title
+    ref={ref}
+    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+));
+DialogTitle.displayName = DialogPrimitive.Title.displayName;
+
+const DialogDescription = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+DialogDescription.displayName = DialogPrimitive.Description.displayName;
+
+export {
+  Dialog,
+  DialogPortal,
+  DialogOverlay,
+  DialogTrigger,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogFooter,
+  DialogTitle,
+  DialogDescription,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/drawer.tsx ===
+import * as React from "react";
+import { Drawer as DrawerPrimitive } from "vaul";
+
+import { cn } from "@/lib/utils";
+
+const Drawer = ({
+  shouldScaleBackground = true,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
+  <DrawerPrimitive.Root shouldScaleBackground={shouldScaleBackground} {...props} />
+);
+Drawer.displayName = "Drawer";
+
+const DrawerTrigger = DrawerPrimitive.Trigger;
+
+const DrawerPortal = DrawerPrimitive.Portal;
+
+const DrawerClose = DrawerPrimitive.Close;
+
+const DrawerOverlay = React.forwardRef<
+  React.ElementRef<typeof DrawerPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <DrawerPrimitive.Overlay
+    ref={ref}
+    className={cn("fixed inset-0 z-50 bg-black/80", className)}
+    {...props}
+  />
+));
+DrawerOverlay.displayName = DrawerPrimitive.Overlay.displayName;
+
+const DrawerContent = React.forwardRef<
+  React.ElementRef<typeof DrawerPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Content>
+>(({ className, children, ...props }, ref) => (
+  <DrawerPortal>
+    <DrawerOverlay />
+    <DrawerPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-[10px] border bg-background",
+        className,
+      )}
+      {...props}
+    >
+      <div className="mx-auto mt-4 h-2 w-[100px] rounded-full bg-muted" />
+      {children}
+    </DrawerPrimitive.Content>
+  </DrawerPortal>
+));
+DrawerContent.displayName = "DrawerContent";
+
+const DrawerHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("grid gap-1.5 p-4 text-center sm:text-left", className)} {...props} />
+);
+DrawerHeader.displayName = "DrawerHeader";
+
+const DrawerFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("mt-auto flex flex-col gap-2 p-4", className)} {...props} />
+);
+DrawerFooter.displayName = "DrawerFooter";
+
+const DrawerTitle = React.forwardRef<
+  React.ElementRef<typeof DrawerPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Title>
+>(({ className, ...props }, ref) => (
+  <DrawerPrimitive.Title
+    ref={ref}
+    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
+    {...props}
+  />
+));
+DrawerTitle.displayName = DrawerPrimitive.Title.displayName;
+
+const DrawerDescription = React.forwardRef<
+  React.ElementRef<typeof DrawerPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DrawerPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <DrawerPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+DrawerDescription.displayName = DrawerPrimitive.Description.displayName;
+
+export {
+  Drawer,
+  DrawerPortal,
+  DrawerOverlay,
+  DrawerTrigger,
+  DrawerClose,
+  DrawerContent,
+  DrawerHeader,
+  DrawerFooter,
+  DrawerTitle,
+  DrawerDescription,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/hover-card.tsx ===
+import * as React from "react";
+import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
+
+import { cn } from "@/lib/utils";
+
+const HoverCard = HoverCardPrimitive.Root;
+
+const HoverCardTrigger = HoverCardPrimitive.Trigger;
+
+const HoverCardContent = React.forwardRef<
+  React.ElementRef<typeof HoverCardPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Content>
+>(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  <HoverCardPrimitive.Content
+    ref={ref}
+    align={align}
+    sideOffset={sideOffset}
+    className={cn(
+      "z-50 w-64 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-hover-card-content-transform-origin)",
+      className,
+    )}
+    {...props}
+  />
+));
+HoverCardContent.displayName = HoverCardPrimitive.Content.displayName;
+
+export { HoverCard, HoverCardTrigger, HoverCardContent };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/popover.tsx ===
+import * as React from "react";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+
+import { cn } from "@/lib/utils";
+
+const Popover = PopoverPrimitive.Root;
+
+const PopoverTrigger = PopoverPrimitive.Trigger;
+
+const PopoverAnchor = PopoverPrimitive.Anchor;
+
+const PopoverContent = React.forwardRef<
+  React.ElementRef<typeof PopoverPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
+>(({ className, align = "center", sideOffset = 4, ...props }, ref) => (
+  <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Content
+      ref={ref}
+      align={align}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-popover-content-transform-origin)",
+        className,
+      )}
+      {...props}
+    />
+  </PopoverPrimitive.Portal>
+));
+PopoverContent.displayName = PopoverPrimitive.Content.displayName;
+
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/separator.tsx ===
+import * as React from "react";
+import * as SeparatorPrimitive from "@radix-ui/react-separator";
+
+import { cn } from "@/lib/utils";
+
+const Separator = React.forwardRef<
+  React.ElementRef<typeof SeparatorPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SeparatorPrimitive.Root>
+>(({ className, orientation = "horizontal", decorative = true, ...props }, ref) => (
+  <SeparatorPrimitive.Root
+    ref={ref}
+    decorative={decorative}
+    orientation={orientation}
+    className={cn(
+      "shrink-0 bg-border",
+      orientation === "horizontal" ? "h-[1px] w-full" : "h-full w-[1px]",
+      className,
+    )}
+    {...props}
+  />
+));
+Separator.displayName = SeparatorPrimitive.Root.displayName;
+
+export { Separator };
+
+=== END FILE ===
+
+=== FILE: src/hooks/useAcademy.tsx ===
+// src/hooks/useAcademy.tsx
+import { useCallback, useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { db, generateCertificateId, type CertificateRow } from "@/lib/db";
+
+interface UseAcademy {
+  verifiedSkills: Set<string>;
+  certificates: CertificateRow[];
+  loading: boolean;
+  error: string | null;
+  verifySkill: (skillId: string) => Promise<void>;
+  claimCertificate: (
+    title: string,
+    holderName: string | null,
+  ) => Promise<CertificateRow>;
+  refresh: () => Promise<void>;
+}
+
+export function useAcademy(user: User | null): UseAcademy {
+  const [verifiedSkills, setVerifiedSkills] = useState<Set<string>>(new Set());
+  const [certificates, setCertificates] = useState<CertificateRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setVerifiedSkills(new Set());
+      setCertificates([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const [skillRes, certRes] = await Promise.all([
+      db
+        .from("skill_progress")
+        .select("skill_id")
+        .eq("user_id", user.id)
+        .eq("verified", true),
+      db
+        .from("certificates")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("issued_at", { ascending: false }),
+    ]);
+
+    if (skillRes.error) {
+      setError(skillRes.error.message);
+    } else {
+      const rows = (skillRes.data ?? []) as { skill_id: string }[];
+      setVerifiedSkills(new Set(rows.map((r) => r.skill_id)));
+    }
+
+    if (certRes.error) setError((prev) => prev ?? certRes.error!.message);
+    else setCertificates((certRes.data as CertificateRow[]) ?? []);
+
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const verifySkill = useCallback(
+    async (skillId: string) => {
+      if (!user) return;
+
+      // Optimistic update.
+      setVerifiedSkills((prev) => new Set(prev).add(skillId));
+
+      const { error: upsertErr } = await db
+        .from("skill_progress")
+        .upsert(
+          { user_id: user.id, skill_id: skillId, verified: true },
+          { onConflict: "user_id,skill_id" },
+        );
+
+      if (upsertErr) {
+        // Roll back on failure.
+        setVerifiedSkills((prev) => {
+          const next = new Set(prev);
+          next.delete(skillId);
+          return next;
+        });
+        throw upsertErr;
+      }
+    },
+    [user],
+  );
+
+  const claimCertificate = useCallback(
+    async (title: string, holderName: string | null): Promise<CertificateRow> => {
+      if (!user) throw new Error("You must be signed in.");
+
+      // Don't issue a duplicate for the same title.
+      const existing = certificates.find((c) => c.title === title);
+      if (existing) return existing;
+
+      const certificate_id = generateCertificateId();
+      const { data, error: insertErr } = await db
+        .from("certificates")
+        .insert({
+          user_id: user.id,
+          certificate_id,
+          title,
+          holder_name: holderName,
+        })
+        .select("*")
+        .single();
+
+      if (insertErr) throw insertErr;
+
+      const row = data as CertificateRow;
+      setCertificates((prev) => [row, ...prev]);
+      return row;
+    },
+    [user, certificates],
+  );
+
+  return {
+    verifiedSkills,
+    certificates,
+    loading,
+    error,
+    verifySkill,
+    claimCertificate,
+    refresh: load,
+  };
+}
+=== END FILE ===
+
+=== FILE: src/lib/call-logs.ts ===
+// src/lib/call-logs.ts
+import { supabase } from "@/lib/supabase";
+
+export type CallStatus = "ringing" | "answered" | "declined" | "missed" | "cancelled" | "ended";
+
+export interface CallLog {
+  id: string;
+  conversation_id: string;
+  caller_id: string;
+  callee_id: string;
+  kind: "audio" | "video";
+  status: CallStatus;
+  created_at: string;
+  answered_at: string | null;
+  ended_at: string | null;
+}
+
+export async function getCallLogs(conversationId: string): Promise<CallLog[]> {
+  const { data, error } = await supabase
+    .from("call_logs")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (error) return []; // table missing before the SQL is applied: show no calls
+  return (data ?? []) as CallLog[];
+}
+
+export function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  const mm = String(m).padStart(h > 0 ? 2 : 1, "0");
+  const ss = String(sec).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/** The line shown inside the chat for a call. */
+export function describeCall(log: CallLog, myId: string): { label: string; missed: boolean } {
+  const kind = log.kind === "video" ? "Βιντεοκλήση" : "Ηχητική κλήση";
+  const iCalled = log.caller_id === myId;
+
+  if (log.answered_at) {
+    if (!log.ended_at) return { label: `${kind} σε εξέλιξη`, missed: false };
+    const secs = (new Date(log.ended_at).getTime() - new Date(log.answered_at).getTime()) / 1000;
+    return { label: `${kind} · ${formatDuration(secs)}`, missed: false };
+  }
+  if (log.status === "declined") {
+    return { label: iCalled ? "Η κλήση απορρίφθηκε" : "Απέρριψες την κλήση", missed: false };
+  }
+  // still "ringing" after a minute = nobody picked up
+  const stale = log.status === "ringing" && Date.now() - new Date(log.created_at).getTime() < 60_000;
+  if (stale) return { label: `${kind}…`, missed: false };
+  return { label: iCalled ? "Δεν απάντησε" : "Αναπάντητη κλήση", missed: !iCalled };
+}
+=== END FILE ===
+
+=== FILE: src/lib/courses.types.ts ===
+// src/lib/courses.types.ts
+import type { AuraLevel, CourseStatus } from "@/lib/database.types";
+import type { PlanId } from "@/lib/plans";
+
+export type CourseCategory = "graduation" | "layers" | "fade" | "creative";
+
+export const COURSE_CATEGORIES: { key: CourseCategory; label: string }[] = [
+  { key: "graduation", label: "Graduation" },
+  { key: "layers", label: "Layers" },
+  { key: "fade", label: "Fade" },
+  { key: "creative", label: "Creative" },
+];
+
+export interface AuraCourse {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string | null;
+  outcome: string | null;
+  audience: string | null;
+  level: AuraLevel;
+  status: CourseStatus;
+  required_plan: PlanId;
+  estimated_hours: number | null;
+  cover_url: string | null;
+  sort_order: number;
+  step_count: number;
+  created_by: string | null;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  category: CourseCategory | null;
+  video_path: string | null;
+  video_duration_seconds: number | null;
+  video_storage_provider: "backblaze_b2" | "supabase_storage" | null;
+  video_status: "pending" | "uploading" | "uploaded" | "processing" | "ready" | "failed" | null;
+  video_size_bytes: number | null;
+  video_mime_type: string | null;
+  video_original_filename: string | null;
+  video_uploaded_at: string | null;
+}
+
+export interface CourseStep {
+  id: string;
+  course_id: string;
+  position: number;
+  title: string;
+  description: string | null;
+  video_path: string | null;
+  video_duration_seconds: number | null;
+  /** "backblaze_b2" for new uploads, "supabase_storage" for legacy rows, null if no video yet. */
+  video_storage_provider: "backblaze_b2" | "supabase_storage" | null;
+  video_status: "pending" | "uploading" | "uploaded" | "processing" | "ready" | "failed" | null;
+  video_size_bytes: number | null;
+  video_mime_type: string | null;
+  video_original_filename: string | null;
+  video_uploaded_at: string | null;
+}
+
+export interface CourseProgress {
+  user_id: string;
+  course_id: string;
+  completed_step_ids: string[];
+  last_step_index: number;
+  replays: number;
+  started_at: string;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+/** Ό,τι χρειάζεται μια κάρτα στο /courses. */
+export interface CourseListItem {
+  course: AuraCourse;
+  progress: CourseProgress | null;
+  locked: boolean;
+}
+
+export interface CoursesPageData {
+  items: CourseListItem[];
+  planId: PlanId | null;
+  planRank: number;
+  isContent: boolean;
+  signedIn: boolean;
+}
+
+export interface CourseWithVideo {
+  course: AuraCourse;
+  locked: boolean;
+  isContent: boolean;
+}
+
+/** Draft βήματος μέσα στον builder — δεν έχει ακόμα id στη βάση. */
+export interface StepDraft {
+  key: string;
+  id: string | null;
+  title: string;
+  description: string;
+  videoPath: string | null;
+  videoDurationSeconds: number | null;
+  videoStorageProvider: "backblaze_b2" | "supabase_storage" | null;
+  videoSizeBytes: number | null;
+  videoMimeType: string | null;
+  videoOriginalFilename: string | null;
+  videoUploadedAt: string | null;
+}
+
+// Matches the real PlanId values in src/lib/plans.ts (the four actual
+// Stripe products: low/mid/high/limited). "limited" (physical book) sits
+// on top since its feature list is a strict superset of "high"'s.
+export const PLAN_RANK: Record<PlanId, number> = {
+  low: 1,
+  mid: 2,
+  high: 3,
+  limited: 4,
+};
+
+export function planRank(plan: string | null | undefined): number {
+  if (!plan) return 0;
+  const key = plan.trim().toLowerCase();
+  return key in PLAN_RANK ? PLAN_RANK[key as PlanId] : 0;
+}
+
+/** Ίδια λογική με το public.can_access_course, για instant UI. */
+export function planUnlocks(
+  userPlan: string | null | undefined,
+  requiredPlan: string | null | undefined,
+): boolean {
+  return planRank(userPlan) >= planRank(requiredPlan);
+}
+=== END FILE ===
+
+=== FILE: src/lib/i18n.tsx ===
+// src/lib/i18n.tsx
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+
+export const LANGS = ["el", "en"] as const;
+export type Lang = (typeof LANGS)[number];
+
+export const DEFAULT_LANG: Lang = "el";
+const STORAGE_KEY = "aura.lang";
+
+function isLang(value: unknown): value is Lang {
+  return typeof value === "string" && (LANGS as readonly string[]).includes(value);
+}
+
+/** Πηγή αλήθειας για τα κλειδιά. Ό,τι μπαίνει εδώ, απαιτείται και στα αγγλικά. */
+const el = {
+  "nav.mainNav": "Κύρια πλοήγηση",
+  "nav.home": "AURA — Αρχική",
+  "nav.menu": "Μενού",
+  "nav.openMenu": "Άνοιγμα μενού",
+  "nav.closeMenu": "Κλείσιμο μενού",
+  "nav.language": "Γλώσσα",
+  "nav.about": "ΕΜΕΙΣ",
+  "nav.contact": "ΕΠΙΚΟΙΝΩΝΙΑ",
+  "nav.method": "ΜΕΘΟΔΟΣ",
+  "nav.prices": "ΤΙΜΕΣ",
+  "nav.dashboard": "Dashboard",
+  "nav.academy": "Ακαδημία",
+  "nav.courses": "Courses",
+  "nav.skills": "Δεξιότητες",
+  "nav.reviewQueue": "Ουρά αξιολόγησης",
+  "nav.adminPanel": "Πάνελ Admin",
+  "nav.inbox": "Μηνύματα",
+  "nav.start": "ΞΕΚΙΝΑ",
+  "nav.startNow": "ΞΕΚΙΝΑ ΤΩΡΑ",
+  "nav.signIn": "Σύνδεση",
+  "nav.signOut": "Αποσύνδεση",
+  "nav.myProfile": "Το προφίλ μου",
+  "nav.viewProfile": "Προβολή προφίλ",
+  "nav.tagline": "AURA — HAIR METHOD",
+  "auth.finishingTitle": "Ολοκληρώνουμε τη σύνδεση…",
+  "auth.finishingKicker": "ΣΥΝΔΕΣΗ",
+  "auth.timeoutKicker": "ΚΑΘΥΣΤΕΡΗΣΗ",
+  "auth.timeoutTitle": "Η σύνδεση δεν ολοκληρώθηκε",
+  "auth.timeoutBody":
+    "Δεν καταφέραμε να επιβεβαιώσουμε τη σύνδεσή σου. Δοκίμασε ξανά από τη σελίδα σύνδεσης.",
+  "auth.errorKicker": "ΣΦΑΛΜΑ",
+  "auth.errorTitle": "Η σύνδεση απέτυχε",
+  "auth.backToLogin": "ΠΙΣΩ ΣΤΗ ΣΥΝΔΕΣΗ",
+  "auth.goHome": "Αρχική",
+} as const;
+
+export type TranslationKey = keyof typeof el;
+
+const en: Record<TranslationKey, string> = {
+  "nav.mainNav": "Main navigation",
+  "nav.home": "AURA — Home",
+  "nav.menu": "Menu",
+  "nav.openMenu": "Open menu",
+  "nav.closeMenu": "Close menu",
+  "nav.language": "Language",
+  "nav.about": "ABOUT US",
+  "nav.contact": "CONTACT",
+  "nav.method": "METHOD",
+  "nav.prices": "PRICES",
+  "nav.dashboard": "Dashboard",
+  "nav.academy": "Academy",
+ "nav.courses": "Courses",
+  "nav.skills": "Skills",
+  "nav.reviewQueue": "Review Queue",
+  "nav.adminPanel": "Admin Panel",
+  "nav.inbox": "Inbox",
+  "nav.start": "START",
+  "nav.startNow": "START NOW",
+  "nav.signIn": "Sign in",
+  "nav.signOut": "Sign out",
+  "nav.myProfile": "My profile",
+  "nav.viewProfile": "View profile",
+  "nav.tagline": "AURA — HAIR METHOD",
+  "auth.finishingTitle": "Finishing your sign-in…",
+  "auth.finishingKicker": "SIGNING IN",
+  "auth.timeoutKicker": "TAKING TOO LONG",
+  "auth.timeoutTitle": "Sign-in did not complete",
+  "auth.timeoutBody": "We could not confirm your session. Please try again from the login page.",
+  "auth.errorKicker": "ERROR",
+  "auth.errorTitle": "Sign-in failed",
+  "auth.backToLogin": "BACK TO LOGIN",
+  "auth.goHome": "Home",
+};
+
+const DICTIONARIES: Record<Lang, Record<TranslationKey, string>> = { el, en };
+
+export type Translate = (key: TranslationKey, vars?: Record<string, string | number>) => string;
+
+interface I18nValue {
+  lang: Lang;
+  setLang: (lang: Lang) => void;
+  t: Translate;
+}
+
+const I18nContext = createContext<I18nValue | null>(null);
+
+function readStoredLang(): Lang | null {
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    return isLang(stored) ? stored : null;
+  } catch {
+    // localStorage μπλοκαρισμένο (private mode) — αγνοούμε σιωπηλά.
+    return null;
+  }
+}
+
+function detectBrowserLang(): Lang {
+  const candidates = navigator.languages?.length ? navigator.languages : [navigator.language];
+  for (const value of candidates) {
+    if (typeof value !== "string") continue;
+    const base = value.slice(0, 2).toLowerCase();
+    if (base === "el") return "el";
+    if (base === "en") return "en";
+  }
+  return DEFAULT_LANG;
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  // Ο server δεν έχει localStorage: ξεκινάμε ντετερμινιστικά και συγχρονίζουμε στον client.
+  const [lang, setLangState] = useState<Lang>(DEFAULT_LANG);
+
+  useEffect(() => {
+    const next = readStoredLang() ?? detectBrowserLang();
+    if (next !== DEFAULT_LANG) setLangState(next);
+  }, []);
+
+  useEffect(() => {
+    if (typeof document !== "undefined") document.documentElement.lang = lang;
+  }, [lang]);
+
+  const setLang = useCallback((next: Lang) => {
+    setLangState(next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Δεν είναι κρίσιμο· η γλώσσα απλά δεν θυμάται μεταξύ sessions.
+    }
+  }, []);
+
+  const t = useCallback<Translate>(
+    (key, vars) => {
+      const template = DICTIONARIES[lang][key] ?? DICTIONARIES[DEFAULT_LANG][key] ?? key;
+      if (!vars) return template;
+      return template.replace(/\{(\w+)\}/g, (match, name: string) => {
+        const value = vars[name];
+        return value === undefined ? match : String(value);
+      });
+    },
+    [lang],
+  );
+
+  const value = useMemo<I18nValue>(() => ({ lang, setLang, t }), [lang, setLang, t]);
+
+  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+}
+
+export function useI18n(): I18nValue {
+  const ctx = useContext(I18nContext);
+  if (!ctx) throw new Error("useI18n must be used inside <I18nProvider>.");
+  return ctx;
+}
+=== END FILE ===
+
+=== FILE: src/lib/messaging.types.ts ===
+// src/lib/messaging.types.ts
+import type { Profile } from "@/lib/database.types";
+
+export interface Message {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+}
+
+export type ConversationOtherUser = Pick<
+  Profile,
+  "id" | "full_name" | "avatar_url" | "role"
+>;
+
+export interface ConversationSummary {
+  conversationId: string;
+  otherUser: ConversationOtherUser | null;
+  lastMessage: Message | null;
+  unread: boolean;
+}
+
+export interface TypingBroadcastPayload {
+  user_id: string;
+  is_typing: boolean;
+}
+=== END FILE ===
+
+=== FILE: src/lib/supabase.ts ===
+// src/lib/supabase.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/database.types";
+import { supabase as generatedClient } from "@/integrations/supabase/client";
+
+/**
+ * ΜΙΑ μόνο instance Supabase για όλη την εφαρμογή.
+ *
+ * Πριν υπήρχαν δύο: αυτό το αρχείο έφτιαχνε δικό του client με
+ * VITE_SUPABASE_ANON_KEY + localStorage, ενώ το generated client
+ * χρησιμοποιεί VITE_SUPABASE_PUBLISHABLE_KEY + brokeredPreviewStorage()
+ * (απαραίτητο μέσα στο preview iframe). Αποτέλεσμα: το session της Google
+ * γραφόταν στον έναν και το /checkout διάβαζε τον άλλον.
+ *
+ * Το cast υπάρχει επειδή το generated client είναι τυποποιημένο με το
+ * ./integrations/supabase/types, ενώ τα queries.ts βασίζονται στο
+ * @/lib/database.types. Το ίδιο σχήμα, δύο generated αρχεία.
+ */
+export const supabase = generatedClient as unknown as SupabaseClient<Database>;
+=== END FILE ===
+
+=== FILE: src/lib/useAuth.ts ===
+// src/lib/useAuth.ts
+import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import { getMyProfile } from "@/lib/queries";
+import type { Profile } from "@/lib/database.types";
+
+export interface AuthState {
+  session: Session | null;
+  profile: Profile | null;
+  loading: boolean;
+  refresh: () => void;
+}
+
+/**
+ * Session + profile. Το signInWithGoogle ζει ΜΟΝΟ στο @/hooks/useAuth.
+ * Το dead paste που υπήρχε στο τέλος αυτού του αρχείου αφαιρέθηκε — δεν
+ * το έκανε import κανείς, γι' αυτό το redirect έμενε σπασμένο.
+ */
+export function useAuth(): AuthState {
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSession(data.session);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (active) setSession(next);
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!session) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    getMyProfile()
+      .then((p) => active && setProfile(p))
+      .catch(() => active && setProfile(null))
+      .finally(() => active && setLoading(false));
+
+    return () => {
+      active = false;
+    };
+  }, [session, tick]);
+
+  return { session, profile, loading, refresh: () => setTick((n) => n + 1) };
+}
+=== END FILE ===
+

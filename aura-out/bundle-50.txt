@@ -1,0 +1,1175 @@
+=== FILE: .output/server/_ssr/gallery-g0pf5WwB.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { E as Scissors, Et as ChevronLeft, K as Maximize, M as Play, Tt as ChevronRight, V as Minimize, n as X, pt as Expand, zt as ArrowRight } from "../_libs/lucide-react.mjs";
+import { a as useTransform, c as useScroll, n as animate, r as useReducedMotion, t as useInView, u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { a as VIDEO_COUNT, i as PHOTO_COUNT, n as GALLERY_BLOCKS, r as GALLERY_FINALE, t as GALLERY } from "./gallery-B93qOO1b.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/gallery-g0pf5WwB.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+var glow = "bg-[radial-gradient(circle,rgba(255,255,255,0.09),transparent_68%)]";
+var shimmerBtn = "group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-8 py-4 text-base font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+var indexOfItem = (id) => GALLERY.findIndex((g) => g.id === id);
+/** One cheap IntersectionObserver per block (instead of one animation engine per tile). */
+function useShown() {
+	const ref = (0, import_react.useRef)(null);
+	const [shown, setShown] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		const el = ref.current;
+		if (!el) return;
+		const io = new IntersectionObserver(([e]) => {
+			if (e.isIntersecting) {
+				setShown(true);
+				io.disconnect();
+			}
+		}, { rootMargin: "0px 0px -6% 0px" });
+		io.observe(el);
+		return () => io.disconnect();
+	}, []);
+	return [ref, shown];
+}
+function GalleryRoute() {
+	const reduce = !!useReducedMotion();
+	const ref = (0, import_react.useRef)(null);
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start start", "end end"]
+	});
+	const glowY = useTransform(scrollYProgress, [0, 1], [0, 1500]);
+	const orbY = useTransform(scrollYProgress, [0, 1], [0, -900]);
+	const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 240]);
+	const [open, setOpen] = (0, import_react.useState)(null);
+	const openItem = (item) => setOpen(indexOfItem(item.id));
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		ref,
+		className: "relative min-h-screen overflow-hidden bg-black pb-28 pt-28 text-white selection:bg-white selection:text-black",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute inset-0 -z-10 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px]"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				style: { y: reduce ? 0 : glowY },
+				className: `pointer-events-none absolute -right-60 top-0 -z-10 h-[800px] w-[800px] rounded-full ${glow}`
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				style: { y: reduce ? 0 : orbY },
+				className: `pointer-events-none absolute -left-60 top-[2200px] -z-10 h-[800px] w-[800px] rounded-full ${glow}`
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				style: { rotate: reduce ? 0 : ringRotate },
+				className: "pointer-events-none absolute -left-48 top-72 -z-10 h-[520px] w-[520px] rounded-full border border-dashed border-white/10"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mx-auto max-w-7xl px-4 sm:px-6 md:px-10",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.header, {
+						initial: {
+							opacity: 0,
+							y: 24
+						},
+						animate: {
+							opacity: 1,
+							y: 0
+						},
+						transition: {
+							duration: .7,
+							ease: [
+								.16,
+								1,
+								.3,
+								1
+							]
+						},
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-px w-10 bg-gradient-to-r from-white/60 to-transparent" }), "Portfolio"]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+								className: "text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
+									className: "inline-block bg-clip-text text-transparent",
+									style: {
+										backgroundImage: "linear-gradient(110deg,#52525b 0%,#fafafa 25%,#a1a1aa 45%,#fafafa 60%,#52525b 100%)",
+										backgroundSize: "250% 100%"
+									},
+									animate: reduce ? void 0 : { backgroundPositionX: ["0%", "-250%"] },
+									transition: {
+										duration: 8,
+										repeat: Infinity,
+										ease: "linear"
+									},
+									children: "Barbers' Gallery"
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg",
+								children: "AURA is a home for barbers who live for the craft. These are the people, the work and the moments behind our academy. Open any piece to view it full screen."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "mt-8 flex flex-wrap gap-3",
+								children: [{
+									n: PHOTO_COUNT,
+									label: "Photos"
+								}, {
+									n: VIDEO_COUNT,
+									label: "Films"
+								}].map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "flex items-baseline gap-2 rounded-full border border-white/15 bg-white/[0.04] px-5 py-2",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: `text-xl font-bold ${chromeText}`,
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CountUp, { to: s.n })
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "text-xs uppercase tracking-[0.2em] text-zinc-500",
+										children: s.label
+									})]
+								}, s.label))
+							})
+						]
+					}),
+					GALLERY.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-16 rounded-3xl border border-white/10 bg-zinc-950/70 p-12 text-center text-zinc-500",
+						children: "Add p1.jpg to p31.jpg and p.mp4, p2.mp4 to p8.mp4 in src/assets to fill the gallery."
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mt-14",
+						children: [GALLERY_BLOCKS.map((b, bi) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Block, {
+								block: b,
+								reduce,
+								onOpen: openItem
+							}),
+							bi === 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Marquee, { reduce }),
+							bi === 3 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Statement, { reduce }),
+							bi === 5 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Marquee, {
+								reduce,
+								reverse: true
+							}),
+							bi !== 1 && bi !== 3 && bi !== 5 && bi < GALLERY_BLOCKS.length - 1 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-1.5 sm:h-3 md:h-4" })
+						] }, b.feature.id)), GALLERY_FINALE.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Finale, {
+							items: GALLERY_FINALE,
+							onOpen: openItem
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						initial: {
+							opacity: 0,
+							y: 30
+						},
+						whileInView: {
+							opacity: 1,
+							y: 0
+						},
+						viewport: {
+							once: true,
+							margin: "-80px"
+						},
+						transition: {
+							duration: .7,
+							ease: [
+								.16,
+								1,
+								.3,
+								1
+							]
+						},
+						className: "relative mt-24 overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900/90 via-black to-zinc-950 p-10 text-center shadow-[0_0_80px_-30px_rgba(255,255,255,0.25)] sm:p-14",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								"aria-hidden": true,
+								className: `pointer-events-none absolute left-1/2 top-0 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Scissors, { className: "relative mx-auto size-7 text-zinc-300" }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+								className: `relative mt-4 text-3xl font-bold sm:text-4xl ${chromeText}`,
+								children: "Your chair is waiting."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "relative mx-auto mt-3 max-w-md text-sm text-zinc-400",
+								children: "Train hands-on with Theopistos and become part of the AURA story, in person or online."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "relative mt-8 flex flex-wrap items-center justify-center gap-4",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+									to: "/seminars",
+									className: shimmerBtn,
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "relative",
+										children: "Book a seminar"
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "relative size-5 transition-transform duration-300 group-hover:translate-x-1" })]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+									to: "/online-seminars",
+									className: "inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-7 py-4 text-base font-medium text-zinc-200 transition hover:border-white/50 hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]",
+									children: "Online seminars"
+								})]
+							})
+						]
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: open !== null && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lightbox, {
+				items: GALLERY,
+				index: open,
+				setIndex: setOpen,
+				onClose: () => setOpen(null)
+			}) })
+		]
+	});
+}
+function Block({ block, reduce, onOpen }) {
+	const [ref, shown] = useShown();
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start end", "end start"]
+	});
+	const py = useTransform(scrollYProgress, [0, 1], ["-4%", "4%"]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		ref,
+		className: "grid aspect-[8/5] grid-flow-dense grid-cols-4 grid-rows-2 gap-1.5 sm:gap-3 md:gap-4",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: `col-span-2 row-span-2 min-h-0 min-w-0 ${block.side === "right" ? "col-start-3" : "col-start-1"}`,
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tile, {
+				item: block.feature,
+				feature: true,
+				i: 0,
+				shown,
+				py: reduce ? void 0 : py,
+				onOpen: () => onOpen(block.feature)
+			})
+		}), block.smalls.map((s, si) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "min-h-0 min-w-0",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tile, {
+				item: s,
+				i: si + 1,
+				shown,
+				py: reduce ? void 0 : py,
+				onOpen: () => onOpen(s)
+			})
+		}, s.id))]
+	});
+}
+function Finale({ items, onOpen }) {
+	const [ref, shown] = useShown();
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		ref,
+		className: "mt-1.5 flex flex-wrap justify-center gap-1.5 sm:mt-3 sm:gap-3 md:mt-4 md:gap-4",
+		children: items.map((f, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "aspect-[4/5] basis-[calc(25%-0.28125rem)] sm:basis-[calc(25%-0.5625rem)] md:basis-[calc(25%-0.75rem)]",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Tile, {
+				item: f,
+				i,
+				shown,
+				onOpen: () => onOpen(f)
+			})
+		}, f.id))
+	});
+}
+function Tile({ item, feature = false, i, shown, py, onOpen }) {
+	const vref = (0, import_react.useRef)(null);
+	const ease = "cubic-bezier(.16,1,.3,1)";
+	const delay = `${Math.min(i, 5) * 70}ms`;
+	const media = "size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "h-full w-full",
+		style: {
+			opacity: shown ? 1 : 0,
+			transform: shown ? "none" : "translateY(28px) scale(0.97)",
+			transition: `opacity 700ms ${ease} ${delay}, transform 700ms ${ease} ${delay}`
+		},
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			onClick: onOpen,
+			onPointerEnter: (e) => {
+				if (e.pointerType === "mouse") vref.current?.play().catch(() => {});
+			},
+			onPointerLeave: () => vref.current?.pause(),
+			"aria-label": `Open item ${item.no} full screen`,
+			className: "group relative h-full w-full cursor-zoom-in overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-left sm:rounded-2xl outline-none transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-white/50 hover:shadow-[0_0_36px_-8px_rgba(255,255,255,0.3)] focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98]",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					style: py ? { y: py } : void 0,
+					className: "absolute inset-x-0 -top-[6%] h-[112%]",
+					children: item.type === "image" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+						src: item.thumb,
+						alt: `AURA gallery ${item.no}`,
+						loading: "lazy",
+						decoding: "async",
+						className: media
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+						ref: vref,
+						src: `${item.src}#t=0.1`,
+						muted: true,
+						loop: true,
+						playsInline: true,
+						preload: "metadata",
+						className: media
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					"aria-hidden": true,
+					className: "absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-100"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					"aria-hidden": true,
+					className: "pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-all duration-1000 group-hover:translate-x-[450%] group-hover:opacity-100"
+				}),
+				item.type === "video" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: "absolute left-1.5 top-1.5 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/70 p-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-200 sm:left-3 sm:top-3 sm:px-3 sm:py-1",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { className: "size-2.5 fill-current sm:size-3" }),
+						" ",
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "hidden sm:inline",
+							children: "Film"
+						})
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "absolute right-3 top-3 flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/70 text-zinc-200 opacity-0 transition-all duration-300 group-hover:scale-110 group-hover:opacity-100 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Expand, { className: "size-4" })
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: `absolute inset-x-0 bottom-0 p-2 transition-all duration-300 sm:p-4 ${feature ? "opacity-100 sm:translate-y-2 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100" : "translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"}`,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "font-mono text-[8px] uppercase tracking-[0.2em] text-zinc-400 sm:text-[10px] sm:tracking-[0.25em]",
+						children: ["AURA · ", item.no]
+					}), feature && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: `mt-0.5 text-xs font-bold sm:mt-1 sm:text-2xl ${chromeText}`,
+						children: item.title
+					})]
+				})
+			]
+		})
+	});
+}
+function CountUp({ to }) {
+	const ref = (0, import_react.useRef)(null);
+	const inView = useInView(ref, { once: true });
+	const [v, setV] = (0, import_react.useState)(0);
+	(0, import_react.useEffect)(() => {
+		if (!inView) return;
+		const c = animate(0, to, {
+			duration: 1.4,
+			ease: [
+				.16,
+				1,
+				.3,
+				1
+			],
+			onUpdate: (l) => setV(Math.round(l))
+		});
+		return () => c.stop();
+	}, [inView, to]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		ref,
+		children: v
+	});
+}
+function Marquee({ reduce, reverse }) {
+	const ref = (0, import_react.useRef)(null);
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start end", "end start"]
+	});
+	const x = useTransform(scrollYProgress, [0, 1], reverse ? ["-40%", "0%"] : ["0%", "-40%"]);
+	const text = "AURA · BARBER ACADEMY · CRAFT · PRECISION · PRIDE · ";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		ref,
+		"aria-hidden": true,
+		className: "my-10 overflow-hidden sm:my-14",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+			style: { x: reduce ? 0 : x },
+			className: "flex w-max whitespace-nowrap will-change-transform",
+			children: [
+				0,
+				1,
+				2
+			].map((i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "select-none pr-6 text-6xl font-black uppercase tracking-tight text-transparent sm:text-8xl",
+				style: { WebkitTextStroke: "1px rgba(255,255,255,0.2)" },
+				children: text
+			}, i))
+		})
+	});
+}
+function Statement({ reduce }) {
+	const ref = (0, import_react.useRef)(null);
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start end", "end start"]
+	});
+	const y = useTransform(scrollYProgress, [0, 1], [30, -30]);
+	const rot = useTransform(scrollYProgress, [0, 1], [0, 50]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		ref,
+		className: "relative my-16 overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/70 px-6 py-16 text-center sm:my-24 sm:py-24",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				style: { rotate: reduce ? 0 : rot },
+				className: "pointer-events-none absolute left-1/2 top-1/2 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/10"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: `pointer-events-none absolute left-1/2 top-1/2 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				style: { y: reduce ? 0 : y },
+				className: "relative mx-auto max-w-3xl",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-xs uppercase tracking-[0.3em] text-zinc-500",
+					children: "The AURA way"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: `mt-5 text-2xl font-bold leading-snug sm:text-4xl ${chromeText}`,
+					children: "Barbering is more than a haircut. It is confidence, trust and craft, delivered one client at a time."
+				})]
+			})
+		]
+	});
+}
+var slide = {
+	enter: (d) => ({
+		opacity: 0,
+		x: d * 70
+	}),
+	center: {
+		opacity: 1,
+		x: 0
+	},
+	exit: (d) => ({
+		opacity: 0,
+		x: d * -70
+	})
+};
+function Lightbox({ items, index, setIndex, onClose }) {
+	const item = items[index];
+	const box = (0, import_react.useRef)(null);
+	const thumbs = (0, import_react.useRef)([]);
+	const [dir, setDir] = (0, import_react.useState)(1);
+	const [fs, setFs] = (0, import_react.useState)(false);
+	function go(d) {
+		setDir(d);
+		setIndex((index + d + items.length) % items.length);
+	}
+	(0, import_react.useEffect)(() => {
+		function onKey(e) {
+			if (e.key === "Escape") onClose();
+			else if (e.key === "ArrowRight") go(1);
+			else if (e.key === "ArrowLeft") go(-1);
+		}
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, [index]);
+	(0, import_react.useEffect)(() => {
+		thumbs.current[index]?.scrollIntoView({
+			inline: "center",
+			block: "nearest",
+			behavior: "smooth"
+		});
+		for (const d of [1, -1]) {
+			const n = items[(index + d + items.length) % items.length];
+			if (n.type === "image") new Image().src = n.src;
+		}
+	}, [index, items]);
+	(0, import_react.useEffect)(() => {
+		const prev = document.body.style.overflow;
+		document.body.style.overflow = "hidden";
+		const onFs = () => setFs(!!document.fullscreenElement);
+		document.addEventListener("fullscreenchange", onFs);
+		return () => {
+			document.body.style.overflow = prev;
+			document.removeEventListener("fullscreenchange", onFs);
+			if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+		};
+	}, []);
+	function toggleFs() {
+		if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+		else box.current?.requestFullscreen?.().catch(() => {});
+	}
+	const iconBtn = "flex size-10 items-center justify-center rounded-full border border-white/20 bg-black/70 sm:size-11 text-zinc-200 transition hover:border-white/60 hover:bg-white hover:text-black hover:shadow-[0_0_28px_rgba(255,255,255,0.4)]";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+		ref: box,
+		initial: { opacity: 0 },
+		animate: { opacity: 1 },
+		exit: { opacity: 0 },
+		transition: { duration: .2 },
+		className: "fixed inset-0 z-[100] flex flex-col bg-black",
+		role: "dialog",
+		"aria-modal": "true",
+		"aria-label": "Gallery viewer",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: `pointer-events-none absolute left-1/2 top-1/3 size-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative z-10 flex items-center justify-between gap-4 p-4 sm:p-6",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-[10px] uppercase tracking-[0.25em] text-zinc-500",
+					children: "AURA Barber Academy"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: `text-lg font-bold ${chromeText}`,
+					children: item.title
+				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-3",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "font-mono text-xs text-zinc-500",
+							children: [
+								String(index + 1).padStart(2, "0"),
+								" / ",
+								String(items.length).padStart(2, "0")
+							]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: toggleFs,
+							"aria-label": fs ? "Exit full screen" : "Full screen",
+							className: iconBtn,
+							children: fs ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Minimize, { className: "size-5" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Maximize, { className: "size-5" })
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: onClose,
+							"aria-label": "Close",
+							className: iconBtn,
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5" })
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative z-10 flex min-h-0 flex-1 items-center justify-center px-3 sm:px-20",
+				onClick: onClose,
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: (e) => {
+							e.stopPropagation();
+							go(-1);
+						},
+						"aria-label": "Previous",
+						className: `${iconBtn} absolute left-3 top-1/2 z-20 -translate-y-1/2 sm:left-6`,
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronLeft, { className: "size-5" })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: (e) => {
+							e.stopPropagation();
+							go(1);
+						},
+						"aria-label": "Next",
+						className: `${iconBtn} absolute right-3 top-1/2 z-20 -translate-y-1/2 sm:right-6`,
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { className: "size-5" })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+						mode: "wait",
+						custom: dir,
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+							custom: dir,
+							variants: slide,
+							initial: "enter",
+							animate: "center",
+							exit: "exit",
+							transition: {
+								duration: .22,
+								ease: "easeOut"
+							},
+							drag: "x",
+							dragConstraints: {
+								left: 0,
+								right: 0
+							},
+							dragElastic: .25,
+							onDragEnd: (_, info) => {
+								if (info.offset.x < -80) go(1);
+								else if (info.offset.x > 80) go(-1);
+							},
+							onClick: (e) => e.stopPropagation(),
+							className: "flex max-h-full max-w-full items-center justify-center",
+							children: item.type === "image" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: item.src,
+								alt: `AURA gallery ${item.no}`,
+								draggable: false,
+								decoding: "async",
+								className: "max-h-[calc(100dvh-12rem)] max-w-full rounded-xl object-contain"
+							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+								src: item.src,
+								controls: true,
+								autoPlay: true,
+								loop: true,
+								playsInline: true,
+								className: "max-h-[calc(100dvh-12rem)] max-w-full rounded-xl"
+							})
+						}, item.id)
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "relative z-10 flex gap-2 overflow-x-auto p-4 sm:justify-center sm:p-6",
+				children: items.map((t, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					ref: (el) => {
+						thumbs.current[i] = el;
+					},
+					type: "button",
+					onClick: () => {
+						setDir(i > index ? 1 : -1);
+						setIndex(i);
+					},
+					"aria-label": `Show item ${t.no}`,
+					className: `relative size-14 shrink-0 overflow-hidden rounded-lg border transition-all duration-300 sm:size-16 ${i === index ? "scale-110 border-white shadow-[0_0_20px_rgba(255,255,255,0.4)]" : "border-white/15 opacity-50 hover:opacity-100"}`,
+					children: t.type === "image" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+						src: t.thumb,
+						alt: "",
+						loading: "lazy",
+						decoding: "async",
+						className: "size-full object-cover"
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "flex size-full items-center justify-center bg-gradient-to-b from-zinc-700 to-zinc-900",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Play, { className: "size-4 fill-white text-white" })
+					})
+				}, t.id))
+			})
+		]
+	});
+}
+//#endregion
+export { GalleryRoute as component };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/CourseBuilder.tsx ===
+// src/components/aura/CourseBuilder.tsx
+import { useCallback, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import VideoDropzone from "@/components/aura/VideoDropzone";
+import type { PlanId } from "@/lib/plans";
+import type { AuraLevel } from "@/lib/database.types";
+import type { AuraCourse, CourseStep, StepDraft } from "@/lib/courses.types";
+import type { CourseInput } from "@/lib/courses";
+
+const LEVELS: { value: AuraLevel; label: string }[] = [
+  { value: "foundation", label: "Foundation" },
+  { value: "professional", label: "Professional" },
+  { value: "advanced", label: "Advanced" },
+  { value: "master", label: "Master" },
+  { value: "educator", label: "Educator" },
+];
+
+// Simplified to 2 real-world choices instead of listing all 4 AURA_PLANS:
+// "low" gates a course to every paying subscriber (low/mid/high all rank
+// >= low, per planUnlocks in courses.types.ts), while "limited" gates a
+// course exclusively to Limited Edition Physical Book buyers.
+const PLAN_CHOICES: { value: PlanId; label: string }[] = [
+  { value: "low", label: "ALL" },
+  { value: "limited", label: "LIMITED" },
+];
+
+const STATUSES: { value: CourseInput["status"]; label: string }[] = [
+  { value: "draft", label: "ΠΡΟΧΕΙΡΟ" },
+  { value: "published", label: "ΔΗΜΟΣΙΕΥΜΕΝΟ" },
+  { value: "archived", label: "ΑΡΧΕΙΟ" },
+];
+
+const fieldClass =
+  "w-full rounded-lg border border-white/12 bg-black/40 px-4 py-3 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-600 focus:border-white/40 focus:ring-1 focus:ring-white/20";
+const labelClass = "text-[10px] uppercase tracking-[0.4em] text-neutral-500";
+
+function newKey(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function emptyStep(): StepDraft {
+  return {
+    key: newKey(),
+    id: null,
+    title: "",
+    description: "",
+    videoPath: null,
+    videoDurationSeconds: null,
+    videoStorageProvider: null,
+    videoSizeBytes: null,
+    videoMimeType: null,
+    videoOriginalFilename: null,
+    videoUploadedAt: null,
+  };
+}
+
+export interface CourseBuilderProps {
+  /** Το course πρέπει να υπάρχει πριν ανέβει βίντεο (χρειάζεται id για path). */
+  course: AuraCourse | null;
+  initialSteps: CourseStep[];
+  saving: boolean;
+  error: string | null;
+  notice: string | null;
+  onSave: (input: CourseInput, steps: StepDraft[]) => void | Promise<void>;
+  onDelete?: () => void | Promise<void>;
+}
+
+export default function CourseBuilder({
+  course,
+  initialSteps,
+  saving,
+  error,
+  notice,
+  onSave,
+  onDelete,
+}: CourseBuilderProps) {
+  const [title, setTitle] = useState(course?.title ?? "");
+  const [summary, setSummary] = useState(course?.summary ?? "");
+  const [outcome, setOutcome] = useState(course?.outcome ?? "");
+  const [level, setLevel] = useState<AuraLevel>(course?.level ?? "foundation");
+  const [requiredPlan, setRequiredPlan] = useState<PlanId>(
+    course?.required_plan ?? "low",
+  );
+  const [status, setStatus] = useState<CourseInput["status"]>(() => {
+    const current = course?.status;
+    return current === "published" || current === "archived" ? current : "draft";
+  });
+  const [sortOrder, setSortOrder] = useState(String(course?.sort_order ?? 0));
+  const [estimatedHours, setEstimatedHours] = useState(
+    course?.estimated_hours != null ? String(course.estimated_hours) : "",
+  );
+
+  const [steps, setSteps] = useState<StepDraft[]>(() =>
+    initialSteps.length > 0
+      ? initialSteps.map((step) => ({
+          key: step.id,
+          id: step.id,
+          title: step.title,
+          description: step.description ?? "",
+          videoPath: step.video_path,
+          videoDurationSeconds: step.video_duration_seconds,
+          videoStorageProvider: step.video_storage_provider,
+          videoSizeBytes: step.video_size_bytes,
+          videoMimeType: step.video_mime_type,
+          videoOriginalFilename: step.video_original_filename,
+          videoUploadedAt: step.video_uploaded_at,
+        }))
+      : [emptyStep()],
+  );
+
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  const patchStep = useCallback((key: string, patch: Partial<StepDraft>) => {
+    setSteps((prev) =>
+      prev.map((step) => (step.key === key ? { ...step, ...patch } : step)),
+    );
+  }, []);
+
+  const move = useCallback((index: number, direction: -1 | 1) => {
+    setSteps((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const [item] = next.splice(index, 1);
+      next.splice(target, 0, item);
+      return next;
+    });
+  }, []);
+
+  const remove = useCallback((key: string) => {
+    setSteps((prev) => (prev.length <= 1 ? prev : prev.filter((s) => s.key !== key)));
+  }, []);
+
+  const invalidStepIndex = useMemo(
+    () =>
+      steps.findIndex(
+        (step) => step.description.trim().length === 0 && step.videoPath === null,
+      ),
+    [steps],
+  );
+
+  const handleSubmit = async () => {
+    setLocalError(null);
+
+    if (title.trim().length < 3) {
+      setLocalError("Ο τίτλος θέλει τουλάχιστον 3 χαρακτήρες.");
+      return;
+    }
+    if (steps.length === 0) {
+      setLocalError("Το course χρειάζεται τουλάχιστον ένα βήμα.");
+      return;
+    }
+    if (invalidStepIndex >= 0) {
+      setLocalError(
+        `Το βήμα ${invalidStepIndex + 1} είναι κενό: βάλε περιγραφή ή βίντεο.`,
+      );
+      return;
+    }
+
+    const hours = estimatedHours.trim();
+    const parsedHours = hours === "" ? null : Number(hours);
+    if (parsedHours !== null && (!Number.isFinite(parsedHours) || parsedHours < 0)) {
+      setLocalError("Οι ώρες πρέπει να είναι θετικός αριθμός.");
+      return;
+    }
+
+    const parsedSort = Number(sortOrder.trim() || "0");
+
+    await onSave(
+      {
+        title,
+        summary,
+        outcome,
+        level,
+        requiredPlan,
+        status,
+        sortOrder: Number.isFinite(parsedSort) ? Math.trunc(parsedSort) : 0,
+        estimatedHours: parsedHours,
+      },
+      steps,
+    );
+  };
+
+  return (
+    <div className="space-y-12">
+      {/* ── Στοιχεία course ─────────────────────────────────── */}
+      <section className="space-y-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-6 sm:p-8">
+        <h2 className="text-[11px] uppercase tracking-[0.5em] text-neutral-500">
+          ΣΤΟΙΧΕΙΑ COURSE
+        </h2>
+
+        <div className="space-y-2">
+          <label className={labelClass} htmlFor="course-title">
+            ΤΙΤΛΟΣ
+          </label>
+          <input
+            id="course-title"
+            className={fieldClass}
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="π.χ. Fade Foundations"
+            maxLength={140}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className={labelClass} htmlFor="course-summary">
+            ΠΕΡΙΓΡΑΦΗ
+          </label>
+          <textarea
+            id="course-summary"
+            className={`${fieldClass} min-h-32 resize-y`}
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            placeholder="Τι μαθαίνει ο μαθητής σε αυτό το course."
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label className={labelClass} htmlFor="course-outcome">
+            ΑΠΟΤΕΛΕΣΜΑ (ΠΡΟΑΙΡΕΤΙΚΟ)
+          </label>
+          <input
+            id="course-outcome"
+            className={fieldClass}
+            value={outcome}
+            onChange={(event) => setOutcome(event.target.value)}
+            placeholder="π.χ. Καθαρό skin fade σε 25 λεπτά"
+            maxLength={200}
+          />
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-2">
+            <label className={labelClass} htmlFor="course-plan">
+              ΑΠΑΙΤΟΥΜΕΝΟ ΠΛΑΝΟ
+            </label>
+            <select
+              id="course-plan"
+              className={fieldClass}
+              value={requiredPlan}
+              onChange={(event) => setRequiredPlan(event.target.value as PlanId)}
+            >
+              {PLAN_CHOICES.map((choice) => (
+                <option key={choice.value} value={choice.value} className="bg-black">
+                  {choice.label}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] leading-relaxed text-neutral-500">
+              «Κανονικό πλάνο» το βλέπουν όλοι οι ενεργοί συνδρομητές (low/mid/high).
+              «Limited Edition» το βλέπουν αποκλειστικά όσοι έχουν το φυσικό βιβλίο.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className={labelClass} htmlFor="course-level">
+              ΕΠΙΠΕΔΟ
+            </label>
+            <select
+              id="course-level"
+              className={fieldClass}
+              value={level}
+              onChange={(event) => setLevel(event.target.value as AuraLevel)}
+            >
+              {LEVELS.map((option) => (
+                <option key={option.value} value={option.value} className="bg-black">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className={labelClass} htmlFor="course-status">
+              ΚΑΤΑΣΤΑΣΗ
+            </label>
+            <select
+              id="course-status"
+              className={fieldClass}
+              value={status}
+              onChange={(event) =>
+                setStatus(event.target.value as CourseInput["status"])
+              }
+            >
+              {STATUSES.map((option) => (
+                <option key={option.value} value={option.value} className="bg-black">
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <label className={labelClass} htmlFor="course-hours">
+                ΩΡΕΣ
+              </label>
+              <input
+                id="course-hours"
+                className={fieldClass}
+                value={estimatedHours}
+                onChange={(event) => setEstimatedHours(event.target.value)}
+                inputMode="decimal"
+                placeholder="2.5"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className={labelClass} htmlFor="course-sort">
+                ΣΕΙΡΑ
+              </label>
+              <input
+                id="course-sort"
+                className={fieldClass}
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+                inputMode="numeric"
+                placeholder="0"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Βήματα ──────────────────────────────────────────── */}
+      <section className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-[11px] uppercase tracking-[0.5em] text-neutral-500">
+            ΒΗΜΑΤΑ — {steps.length}
+          </h2>
+          <button
+            type="button"
+            onClick={() => setSteps((prev) => [...prev, emptyStep()])}
+            className="rounded-full border border-white/15 px-5 py-2 text-[10px] uppercase tracking-[0.3em] text-neutral-300 transition hover:border-white/40 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+          >
+            + ΠΡΟΣΘΕΣΕ ΒΗΜΑ
+          </button>
+        </div>
+
+        {!course ? (
+          <p className="rounded-lg border border-white/10 bg-white/[0.03] px-5 py-4 text-xs leading-relaxed text-neutral-400">
+            Αποθήκευσε πρώτα το course για να ενεργοποιηθεί το ανέβασμα βίντεο —
+            τα αρχεία αποθηκεύονται κάτω από το id του course.
+          </p>
+        ) : null}
+
+        <AnimatePresence initial={false}>
+          {steps.map((step, index) => (
+            <motion.article
+              key={step.key}
+              layout
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.28 }}
+              className="space-y-6 rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.05] to-transparent p-6"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-[10px] uppercase tracking-[0.5em] text-neutral-500">
+                  ΒΗΜΑ {String(index + 1).padStart(2, "0")}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => move(index, -1)}
+                    disabled={index === 0}
+                    aria-label={`Μετακίνηση βήματος ${index + 1} πάνω`}
+                    className="rounded-full border border-white/12 px-3 py-1 text-xs text-neutral-300 transition hover:border-white/40 disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(index, 1)}
+                    disabled={index === steps.length - 1}
+                    aria-label={`Μετακίνηση βήματος ${index + 1} κάτω`}
+                    className="rounded-full border border-white/12 px-3 py-1 text-xs text-neutral-300 transition hover:border-white/40 disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(step.key)}
+                    disabled={steps.length <= 1}
+                    className="rounded-full border border-white/12 px-4 py-1 text-[10px] uppercase tracking-[0.3em] text-neutral-400 transition hover:border-red-400/50 hover:text-red-300 disabled:opacity-30"
+                  >
+                    ΔΙΑΓΡΑΦΗ
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass} htmlFor={`step-title-${step.key}`}>
+                  ΤΙΤΛΟΣ ΒΗΜΑΤΟΣ
+                </label>
+                <input
+                  id={`step-title-${step.key}`}
+                  className={fieldClass}
+                  value={step.title}
+                  onChange={(event) => patchStep(step.key, { title: event.target.value })}
+                  placeholder={`Βήμα ${index + 1}`}
+                  maxLength={140}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={labelClass} htmlFor={`step-desc-${step.key}`}>
+                  ΠΕΡΙΓΡΑΦΗ
+                </label>
+                <textarea
+                  id={`step-desc-${step.key}`}
+                  className={`${fieldClass} min-h-36 resize-y`}
+                  value={step.description}
+                  onChange={(event) =>
+                    patchStep(step.key, { description: event.target.value })
+                  }
+                  placeholder="Οδηγίες, σημεία προσοχής, εργαλεία…"
+                />
+              </div>
+
+              {course ? (
+                <VideoDropzone
+                  courseId={course.id}
+                  videoPath={step.videoPath}
+                  onUploaded={(path, duration) =>
+                    patchStep(step.key, {
+                      videoPath: path,
+                      videoDurationSeconds: duration,
+                    })
+                  }
+                  onCleared={() =>
+                    patchStep(step.key, { videoPath: null, videoDurationSeconds: null })
+                  }
+                  disabled={saving}
+                />
+              ) : null}
+            </motion.article>
+          ))}
+        </AnimatePresence>
+      </section>
+
+      {/* ── Ενέργειες ───────────────────────────────────────── */}
+      <div className="space-y-4">
+        {localError || error ? (
+          <p className="text-sm text-red-400" role="alert">
+            {localError ?? error}
+          </p>
+        ) : null}
+        {notice ? (
+          <p className="text-sm text-neutral-300" role="status">
+            {notice}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <ChromeButton type="button" onClick={() => void handleSubmit()} disabled={saving}>
+            {saving ? "ΑΠΟΘΗΚΕΥΣΗ…" : "ΑΠΟΘΗΚΕΥΣΗ COURSE"}
+          </ChromeButton>
+
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={() => void onDelete()}
+              disabled={saving}
+              className="rounded-full border border-white/12 px-6 py-2.5 text-[10px] uppercase tracking-[0.35em] text-neutral-400 transition hover:border-red-400/50 hover:text-red-300 disabled:opacity-40"
+            >
+              ΔΙΑΓΡΑΦΗ COURSE
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/cancel-subscription.ts ===
+// src/lib/cancel-subscription.ts
+import { supabase } from "@/lib/supabase";
+
+export interface CancelSubscriptionResult {
+  status: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+/**
+ * Calls the cancel-subscription Edge Function. Schedules the CALLER'S OWN
+ * subscription to stop renewing at the end of the current, already-paid
+ * period — never an immediate cancel, never touches anyone else's plan.
+ * Throws an Error whose message is the function's own error text.
+ */
+export async function cancelMySubscription(): Promise<CancelSubscriptionResult> {
+  const { data, error } = await supabase.functions.invoke<{
+    success?: boolean;
+    subscription?: CancelSubscriptionResult;
+    error?: string;
+  }>("cancel-subscription", { body: {} });
+
+  if (error) {
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) throw new Error(payload.error);
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message) throw parseErr;
+      }
+    }
+    throw new Error(error.message || "Η ακύρωση απέτυχε.");
+  }
+
+  if (data?.error) throw new Error(data.error);
+  if (!data?.subscription) throw new Error("Δεν επιστράφηκε η κατάσταση της συνδρομής.");
+
+  return data.subscription;
+}
+=== END FILE ===
+

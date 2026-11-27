@@ -1,0 +1,858 @@
+=== FILE: .output/server/_ssr/admin.index-lTIKzMQH.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { A as RefreshCw, At as Calendar, C as ShieldCheck, E as Scissors, Et as ChevronLeft, Ht as Activity, I as Pencil, J as Mail, Lt as BadgeCheck, Mt as BookOpen, N as Phone, Ot as Check, St as CircleCheck, Tt as ChevronRight, X as LockOpen, Y as Lock, c as User, dt as Eye, ft as EyeOff, g as Trash2, j as Plus, n as X, ot as GraduationCap, q as MapPin, s as Users, st as Globe, tt as Inbox, v as SquareCheckBig, wt as CircleAlert, x as Shield, xt as Circle } from "../_libs/lucide-react.mjs";
+import { R as updateUserRole, c as getAdminOverview, d as getAuditLog, l as getAllProfiles, y as getMyProfile, z as updateUserStatus } from "./queries-DCA4yifx.mjs";
+import { n as isAdminRole, t as hasAtLeastRole } from "./roles-DmnR1ATT.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { i as LockedState, n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { r as ChromeCTALink } from "./chrome-CqNlZkJS.mjs";
+import { a as adminUnblock, d as indexAvailability, f as rowsFromBookings, i as adminSetBookingStatus, l as getDayAvailability, m as toISO, n as adminGetBlocked, p as startOfMonth, r as adminGetBookings, s as fromISO, t as adminBlockDate, u as getDayStatus } from "./seminars-C-eiLJy4.mjs";
+import { c as setOnlineSeminarPublished, i as getOnlineBookings, n as formatPrice, o as saveOnlineSeminar, r as getAdminOnlineSeminars, s as setOnlineBookingStatus, t as deleteOnlineSeminar } from "./onlineSeminars-BIk1PE2V.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/admin.index-lTIKzMQH.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var MONTHS_EL = [
+	"Ιανουάριος",
+	"Φεβρουάριος",
+	"Μάρτιος",
+	"Απρίλιος",
+	"Μάιος",
+	"Ιούνιος",
+	"Ιούλιος",
+	"Αύγουστος",
+	"Σεπτέμβριος",
+	"Οκτώβριος",
+	"Νοέμβριος",
+	"Δεκέμβριος"
+];
+var WEEKDAYS_EL = [
+	"Δ",
+	"Τ",
+	"Τ",
+	"Π",
+	"Π",
+	"Σ",
+	"Κ"
+];
+var STATUS_META = {
+	new: {
+		label: "Νέο",
+		cls: "bg-sky-500/15 border-sky-500/30 text-sky-300",
+		icon: Circle
+	},
+	read: {
+		label: "Διαβάστηκε",
+		cls: "bg-amber-500/15 border-amber-500/30 text-amber-300",
+		icon: Eye
+	},
+	verified: {
+		label: "Επιβεβαιώθηκε",
+		cls: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
+		icon: CircleCheck
+	},
+	cancelled: {
+		label: "Ακυρώθηκε",
+		cls: "bg-red-500/15 border-red-500/30 text-red-300",
+		icon: X
+	}
+};
+function AdminSeminars({ adminId }) {
+	const [reload, setReload] = (0, import_react.useState)(0);
+	const bookingsQ = useAsync(adminGetBookings, [reload]);
+	const blockedQ = useAsync(adminGetBlocked, [reload]);
+	const [tab, setTab] = (0, import_react.useState)("bookings");
+	const [statusFilter, setStatusFilter] = (0, import_react.useState)("all");
+	const [selected, setSelected] = (0, import_react.useState)(null);
+	const [busyId, setBusyId] = (0, import_react.useState)(null);
+	const [msg, setMsg] = (0, import_react.useState)(null);
+	const bookings = bookingsQ.data ?? [];
+	const blocked = blockedQ.data ?? [];
+	const counts = (0, import_react.useMemo)(() => {
+		const c = {
+			new: 0,
+			read: 0,
+			verified: 0,
+			cancelled: 0
+		};
+		for (const b of bookings) c[b.status]++;
+		return c;
+	}, [bookings]);
+	const filtered = (0, import_react.useMemo)(() => statusFilter === "all" ? bookings : bookings.filter((b) => b.status === statusFilter), [bookings, statusFilter]);
+	function refresh() {
+		setReload((n) => n + 1);
+	}
+	async function setStatus(b, status) {
+		setBusyId(b.id);
+		setMsg(null);
+		try {
+			await adminSetBookingStatus(b.id, status);
+			setMsg(`${b.full_name}: η κράτηση μπήκε σε κατάσταση "${STATUS_META[status].label}".`);
+			refresh();
+			setSelected((cur) => cur && cur.id === b.id ? {
+				...cur,
+				status
+			} : cur);
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		} finally {
+			setBusyId(null);
+		}
+	}
+	async function openAndMarkRead(b) {
+		setSelected(b);
+		if (b.status === "new") await setStatus(b, "read");
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "space-y-5",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap items-center justify-between gap-4 px-1",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+					className: "flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/60",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "size-1.5 rounded-full bg-white/60" }), "Σεμινάρια"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inline-flex rounded-full border border-white/15 bg-black/60 p-1",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabBtn, {
+						active: tab === "bookings",
+						onClick: () => setTab("bookings"),
+						icon: Users,
+						children: "Κρατήσεις"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(TabBtn, {
+						active: tab === "calendar",
+						onClick: () => setTab("calendar"),
+						icon: Calendar,
+						children: "Ημερολόγιο"
+					})]
+				})]
+			}),
+			msg && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-950/80 p-4 text-sm text-zinc-300 shadow-lg backdrop-blur-xl",
+				role: "status",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleAlert, { className: "size-5 shrink-0 text-white/70" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: msg })]
+			}),
+			(bookingsQ.loading || blockedQ.loading) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 4 }),
+			bookingsQ.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: bookingsQ.error }),
+			blockedQ.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: blockedQ.error }),
+			!bookingsQ.loading && !blockedQ.loading && bookingsQ.data && blockedQ.data && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [tab === "bookings" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex flex-wrap gap-2",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FilterChip, {
+						active: statusFilter === "all",
+						onClick: () => setStatusFilter("all"),
+						label: `Όλα (${bookings.length})`
+					}), Object.keys(STATUS_META).map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(FilterChip, {
+						active: statusFilter === s,
+						onClick: () => setStatusFilter(s),
+						label: `${STATUS_META[s].label} (${counts[s]})`
+					}, s))]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BookingsTable, {
+					bookings: filtered,
+					busyId,
+					onOpen: openAndMarkRead,
+					onVerify: (b) => setStatus(b, "verified")
+				})]
+			}), tab === "calendar" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AdminCalendar, {
+				bookings,
+				blocked,
+				adminId,
+				onChanged: refresh,
+				setMsg
+			})] }),
+			selected && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BookingDrawer, {
+				booking: selected,
+				busy: busyId === selected.id,
+				onClose: () => setSelected(null),
+				onSetStatus: (s) => setStatus(selected, s)
+			})
+		]
+	});
+}
+function TabBtn({ active, onClick, icon: Icon, children }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		type: "button",
+		onClick,
+		className: `relative flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-colors duration-300 ${active ? "bg-white text-black" : "text-zinc-400 hover:text-white"}`,
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { className: "size-3.5" }), children]
+	});
+}
+function FilterChip({ active, onClick, label }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+		type: "button",
+		onClick,
+		className: `rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors duration-200 ${active ? "border-white/60 bg-white/10 text-white" : "border-white/10 bg-white/[0.02] text-zinc-400 hover:border-white/30 hover:text-white"}`,
+		children: label
+	});
+}
+function BookingsTable({ bookings, busyId, onOpen, onVerify }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "overflow-x-auto rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("table", {
+			className: "w-full min-w-[920px] text-left text-sm",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("thead", {
+				className: "border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wider text-white/50",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+						scope: "col",
+						className: "p-4 font-semibold",
+						children: "Πελάτης"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+						scope: "col",
+						className: "p-4 font-semibold",
+						children: "Format"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+						scope: "col",
+						className: "p-4 font-semibold",
+						children: "Ημερομηνία"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+						scope: "col",
+						className: "p-4 font-semibold",
+						children: "Επικοινωνία"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+						scope: "col",
+						className: "p-4 font-semibold",
+						children: "Status"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("th", {
+						scope: "col",
+						className: "p-4 font-semibold text-right",
+						children: "Ενέργειες"
+					})
+				] })
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tbody", {
+				className: "divide-y divide-white/5",
+				children: [bookings.map((b) => {
+					const meta = STATUS_META[b.status];
+					const busy = busyId === b.id;
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("tr", {
+						className: "align-middle transition-colors hover:bg-white/[0.02]",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", {
+								className: "p-4",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-medium text-white/90",
+									children: b.full_name
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "mt-0.5 font-mono text-xs text-white/40",
+									children: b.reference
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+								className: "p-4",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+									className: "inline-flex items-center gap-1.5 text-zinc-300",
+									children: [b.format === "group" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Users, { className: "size-3.5 text-zinc-500" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(User, { className: "size-3.5 text-zinc-500" }), b.format === "group" ? `Group · ${b.participants}` : "Private"]
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+								className: "p-4 text-zinc-300",
+								children: fromISO(b.seminar_date).toLocaleDateString("el-GR", {
+									day: "numeric",
+									month: "short"
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("td", {
+								className: "p-4",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "text-zinc-300",
+									children: b.email
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "text-xs text-zinc-500",
+									children: b.phone
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+								className: "p-4",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+									className: `inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider ${meta.cls}`,
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(meta.icon, { className: "size-3.5" }), meta.label]
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+								className: "p-4",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "flex items-center justify-end gap-2",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										onClick: () => onOpen(b),
+										className: "rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-white/30 hover:bg-white/15",
+										children: "Λεπτομέρειες"
+									}), b.status !== "verified" && b.status !== "cancelled" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+										type: "button",
+										disabled: busy,
+										onClick: () => onVerify(b),
+										className: "inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-3.5" }), " Verify"]
+									})]
+								})
+							})
+						]
+					}, b.id);
+				}), bookings.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tr", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("td", {
+					colSpan: 6,
+					className: "p-8 text-center text-white/40",
+					children: "Καμία κράτηση."
+				}) })]
+			})]
+		})
+	});
+}
+function BookingDrawer({ booking, busy, onClose, onSetStatus }) {
+	const meta = STATUS_META[booking.status];
+	const names = booking.participant_names?.split("\n").map((n) => n.trim()).filter(Boolean);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "fixed inset-0 z-50 flex justify-end",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+			initial: { opacity: 0 },
+			animate: { opacity: 1 },
+			exit: { opacity: 0 },
+			onClick: onClose,
+			className: "absolute inset-0 bg-black/70 backdrop-blur-sm"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			initial: {
+				x: 420,
+				opacity: 0
+			},
+			animate: {
+				x: 0,
+				opacity: 1
+			},
+			exit: {
+				x: 420,
+				opacity: 0
+			},
+			transition: {
+				type: "spring",
+				stiffness: 300,
+				damping: 32
+			},
+			className: "relative flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-white/15 bg-gradient-to-b from-zinc-950 to-black p-6 shadow-[0_0_60px_rgba(0,0,0,0.9)]",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-start justify-between",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "font-mono text-xs text-zinc-500",
+						children: booking.reference
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+						className: "mt-1 text-xl font-bold text-white",
+						children: booking.full_name
+					})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: onClose,
+						className: "flex size-8 items-center justify-center rounded-full border border-white/15 text-zinc-400 transition hover:border-white/40 hover:text-white",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-4" })
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+					className: `mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wider ${meta.cls}`,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(meta.icon, { className: "size-3.5" }), meta.label]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-6 space-y-1 rounded-2xl border border-white/10 bg-white/[0.02] p-4",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DetailRow, {
+						icon: booking.format === "group" ? Users : User,
+						label: "Format",
+						children: booking.format === "group" ? `Group · ${booking.participants} άτομα` : "Private"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DetailRow, {
+						icon: Calendar,
+						label: "Ημερομηνία",
+						children: fromISO(booking.seminar_date).toLocaleDateString("el-GR", {
+							weekday: "long",
+							day: "numeric",
+							month: "long"
+						})
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-4 space-y-1 rounded-2xl border border-white/10 bg-white/[0.02] p-4",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DetailRow, {
+							icon: Mail,
+							label: "Email",
+							children: booking.email
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DetailRow, {
+							icon: Phone,
+							label: "Τηλέφωνο",
+							children: booking.phone
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DetailRow, {
+							icon: MapPin,
+							label: "Πόλη",
+							children: booking.city
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(DetailRow, {
+							icon: ShieldCheck,
+							label: "Επίπεδο",
+							children: booking.experience_level
+						})
+					]
+				}),
+				booking.format === "group" && (booking.group_name || names?.length) && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-4 space-y-2 rounded-2xl border border-white/10 bg-white/[0.02] p-4",
+					children: [booking.group_name && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "text-sm text-zinc-300",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "text-zinc-500",
+							children: "Ομάδα: "
+						}), booking.group_name]
+					}), !!names?.length && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-xs uppercase tracking-wider text-zinc-500",
+						children: "Συμμετέχοντες"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "mt-1.5 space-y-1 text-sm text-zinc-300",
+						children: names.map((n, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+							className: "flex items-center gap-2",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "size-1 rounded-full bg-zinc-600" }),
+								" ",
+								n
+							]
+						}, i))
+					})] })]
+				}),
+				booking.goals && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Note, {
+					label: "Στόχοι",
+					children: booking.goals
+				}),
+				booking.notes && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Note, {
+					label: "Σημειώσεις",
+					children: booking.notes
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+					className: "mt-4 text-xs text-zinc-600",
+					children: ["Αποδοχή όρων: ", new Date(booking.terms_accepted_at).toLocaleString("el-GR")]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-auto flex flex-col gap-2 pt-6",
+					children: [booking.status !== "verified" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActionBtn, {
+						label: "Σήμανση ως verified",
+						icon: CircleCheck,
+						busy,
+						cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20",
+						onClick: () => onSetStatus("verified")
+					}), booking.status !== "cancelled" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ActionBtn, {
+						label: "Ακύρωση κράτησης",
+						icon: X,
+						busy,
+						cls: "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20",
+						onClick: () => onSetStatus("cancelled")
+					})]
+				})
+			]
+		})]
+	});
+}
+function DetailRow({ icon: Icon, label, children }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "flex items-center justify-between gap-3 border-b border-white/5 py-2.5 text-sm last:border-0",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+			className: "flex items-center gap-2 text-zinc-500",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { className: "size-3.5" }),
+				" ",
+				label
+			]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "text-right font-medium text-zinc-200",
+			children
+		})]
+	});
+}
+function Note({ label, children }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "text-xs uppercase tracking-wider text-zinc-500",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "mt-1.5 text-sm leading-relaxed text-zinc-300",
+			children
+		})]
+	});
+}
+function ActionBtn({ label, icon: Icon, busy, cls, onClick }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		type: "button",
+		disabled: busy,
+		onClick,
+		className: `flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition disabled:opacity-50 ${cls}`,
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Icon, { className: "size-4" }), label]
+	});
+}
+function AdminCalendar({ bookings, blocked, adminId, onChanged, setMsg }) {
+	const [month, setMonth] = (0, import_react.useState)(() => startOfMonth(/* @__PURE__ */ new Date()));
+	const [selected, setSelected] = (0, import_react.useState)(null);
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const [reason, setReason] = (0, import_react.useState)("");
+	const avail = (0, import_react.useMemo)(() => indexAvailability(rowsFromBookings(bookings, blocked)), [bookings, blocked]);
+	const cells = (0, import_react.useMemo)(() => buildMonthGrid(month), [month]);
+	const selectedDay = selected ? avail.get(selected) : void 0;
+	const dayInfo = getDayAvailability(selectedDay, "group", 1);
+	const selectedBlocked = selected ? blocked.filter((b) => b.blocked_date === selected) : [];
+	const selectedBookings = selected ? bookings.filter((b) => b.seminar_date === selected && b.status !== "cancelled") : [];
+	async function blockDay() {
+		if (!selected) return;
+		setBusy(true);
+		try {
+			await adminBlockDate(selected, reason, adminId);
+			setMsg("Η ημερομηνία μπλοκαρίστηκε.");
+			setReason("");
+			onChanged();
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function unblockDay() {
+		setBusy(true);
+		try {
+			await Promise.all(selectedBlocked.map((b) => adminUnblock(b.id)));
+			setMsg("Το μπλοκάρισμα αφαιρέθηκε.");
+			onChanged();
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		} finally {
+			setBusy(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "grid gap-6 lg:grid-cols-[1fr_340px]",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-6",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center justify-between",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: () => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1)),
+							className: "flex size-8 items-center justify-center rounded-full border border-white/15 text-zinc-300 transition hover:border-white/40 hover:text-white",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronLeft, { className: "size-4" })
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", {
+							className: "text-sm font-semibold uppercase tracking-[0.2em] text-zinc-200",
+							children: [
+								MONTHS_EL[month.getMonth()],
+								" ",
+								month.getFullYear()
+							]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							type: "button",
+							onClick: () => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1)),
+							className: "flex size-8 items-center justify-center rounded-full border border-white/15 text-zinc-300 transition hover:border-white/40 hover:text-white",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { className: "size-4" })
+						})
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-5 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wider text-zinc-600",
+					children: WEEKDAYS_EL.map((w, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: w }, `${w}-${i}`))
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-2 grid grid-cols-7 gap-1.5",
+					children: cells.map((cell, i) => {
+						if (!cell) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {}, i);
+						const iso = toISO(cell);
+						const day = avail.get(iso);
+						const status = getDayStatus(day, "group", 2);
+						const isSelected = selected === iso;
+						const hasBookings = bookings.some((b) => b.seminar_date === iso && b.status !== "cancelled");
+						return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							onClick: () => setSelected(iso),
+							className: `relative flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg border text-xs font-medium transition-all duration-200 ${isSelected ? "border-white bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]" : status === "blocked" ? "border-red-500/20 bg-red-500/[0.05] text-zinc-400 hover:border-red-500/40" : status === "full" ? "border-amber-500/20 bg-amber-500/[0.05] text-zinc-300 hover:border-amber-500/40" : "border-white/10 bg-white/[0.02] text-zinc-200 hover:border-white/40 hover:bg-white/[0.06]"}`,
+							children: [
+								cell.getDate(),
+								hasBookings && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `size-1 rounded-full ${isSelected ? "bg-black" : "bg-emerald-400"}` }),
+								status === "blocked" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: `absolute bottom-1 right-1 size-2.5 ${isSelected ? "text-black" : "text-red-400"}` })
+							]
+						}, iso);
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-5 flex flex-wrap items-center gap-4 text-[11px] text-zinc-500",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Legend, {
+							color: "bg-emerald-400",
+							label: "Έχει κρατήσεις"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Legend, {
+							color: "bg-amber-500/60",
+							label: "Γεμάτο"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Legend, {
+							color: "bg-red-500/60",
+							label: "Μπλοκαρισμένο"
+						})
+					]
+				})
+			]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "rounded-2xl border border-white/10 bg-black/50 p-5",
+			children: !selected ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-sm text-zinc-500",
+				children: "Επίλεξε μια ημερομηνία για να δεις κρατήσεις και να διαχειριστείς μπλοκαρίσματα."
+			}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-5",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-xs uppercase tracking-wider text-zinc-500",
+						children: "Επιλεγμένη ημέρα"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+						className: "mt-1 text-lg font-semibold text-white",
+						children: fromISO(selected).toLocaleDateString("el-GR", {
+							weekday: "long",
+							day: "numeric",
+							month: "long"
+						})
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "rounded-xl border border-white/10 bg-white/[0.02] px-3.5 py-2.5",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "text-[11px] uppercase tracking-wider text-zinc-500",
+							children: dayInfo.status === "blocked" ? "Μπλοκαρισμένη" : dayInfo.status === "full" ? "Γεμάτη" : `${dayInfo.remaining}/8 διαθέσιμα`
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3.5",
+						children: selectedBlocked.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							disabled: busy,
+							onClick: unblockDay,
+							className: "flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/5 py-2 text-xs font-medium text-zinc-300 transition hover:border-white/30 disabled:opacity-50",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockOpen, { className: "size-3.5" }), " Ξεμπλόκαρε όλη τη μέρα"]
+						}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							value: reason,
+							onChange: (e) => setReason(e.target.value),
+							placeholder: "Λόγος (προαιρετικό)",
+							className: "w-full rounded-lg border border-white/15 bg-black/60 px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:border-white/40 focus:outline-none"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							type: "button",
+							disabled: busy,
+							onClick: blockDay,
+							className: "flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-500/30 bg-red-500/10 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/20 disabled:opacity-50",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: "size-3.5" }), " Μπλόκαρε όλη τη μέρα"]
+						})] })
+					}),
+					selectedBookings.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "text-xs uppercase tracking-wider text-zinc-500",
+						children: [
+							"Κρατήσεις (",
+							selectedBookings.length,
+							")"
+						]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "mt-2 space-y-1.5",
+						children: selectedBookings.map((b) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+							className: "flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-xs",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-zinc-300",
+								children: b.full_name
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-zinc-500",
+								children: b.format === "group" ? `${b.participants}p` : "1-1"
+							})]
+						}, b.id))
+					})] })
+				]
+			})
+		})]
+	});
+}
+function Legend({ color, label }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		className: "flex items-center gap-1.5",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `size-1.5 rounded-full ${color}` }), label]
+	});
+}
+function buildMonthGrid(month) {
+	const firstWeekday = (startOfMonth(month).getDay() + 6) % 7;
+	const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+	const cells = Array(firstWeekday).fill(null);
+	for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(month.getFullYear(), month.getMonth(), d));
+	while (cells.length % 7 !== 0) cells.push(null);
+	return cells;
+}
+var chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+var inputCls = "w-full rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 outline-none transition focus:border-white/40 focus:ring-2 focus:ring-white/10";
+var labelCls = "mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500";
+var empty = {
+	title: "",
+	description: "",
+	starts_at: "",
+	duration_minutes: "90",
+	price: "",
+	capacity: "",
+	published: true
+};
+function toLocalInput(iso) {
+	const d = new Date(iso);
+	const pad = (n) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function AdminOnlineSeminars() {
+	const [reload, setReload] = (0, import_react.useState)(0);
+	const seminars = useAsync(getAdminOnlineSeminars, [reload]);
+	const bookings = useAsync(getOnlineBookings, [reload]);
+	const [editing, setEditing] = (0, import_react.useState)(null);
+	const [open, setOpen] = (0, import_react.useState)(false);
+	const [form, setForm] = (0, import_react.useState)(empty);
+	const [saving, setSaving] = (0, import_react.useState)(false);
+	const [msg, setMsg] = (0, import_react.useState)(null);
+	const [filter, setFilter] = (0, import_react.useState)("paid");
+	const refresh = () => setReload((n) => n + 1);
+	function openNew() {
+		setEditing(null);
+		setForm(empty);
+		setOpen(true);
+	}
+	function openEdit(s) {
+		setEditing(s);
+		setForm({
+			title: s.title,
+			description: s.description,
+			starts_at: toLocalInput(s.starts_at),
+			duration_minutes: String(s.duration_minutes),
+			price: (s.price_cents / 100).toString(),
+			capacity: s.capacity?.toString() ?? "",
+			published: s.published
+		});
+		setOpen(true);
+	}
+	const valid = form.title.trim().length >= 3 && form.starts_at && Number(form.price) >= 0 && form.price !== "" && Number(form.duration_minutes) > 0;
+	async function submit() {
+		if (!valid || saving) return;
+		setSaving(true);
+		setMsg(null);
+		try {
+			await saveOnlineSeminar({
+				title: form.title.trim(),
+				description: form.description.trim(),
+				starts_at: new Date(form.starts_at).toISOString(),
+				duration_minutes: Number(form.duration_minutes),
+				price_cents: Math.round(Number(form.price) * 100),
+				currency: "eur",
+				capacity: form.capacity ? Number(form.capacity) : null,
+				published: form.published
+			}, editing?.id);
+			setOpen(false);
+			setMsg(editing ? "Το σεμινάριο ενημερώθηκε." : "Το σεμινάριο δημιουργήθηκε.");
+			refresh();
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		} finally {
+			setSaving(false);
+		}
+	}
+	async function togglePublish(s) {
+		try {
+			await setOnlineSeminarPublished(s.id, !s.published);
+			refresh();
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		}
+	}
+	async function changeBooking(b, status) {
+		const text = status === "paid" ? `Μαρκάρισμα του ${b.full_name} ως πληρωμένου;` : `Αναίρεση πληρωμής για τον ${b.full_name};`;
+		if (!window.confirm(text)) return;
+		try {
+			await setOnlineBookingStatus(b.id, status);
+			setMsg(status === "paid" ? `Ο ${b.full_name} μαρκαρίστηκε ως πληρωμένος.` : "Η πληρωμή αναιρέθηκε.");
+			refresh();
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		}
+	}
+	async function remove(s) {
+		if (!window.confirm(`Διαγραφή "${s.title}" και όλων των κρατήσεών του;`)) return;
+		try {
+			await deleteOnlineSeminar(s.id);
+			refresh();
+		} catch (e) {
+			setMsg("Αποτυχία: " + (e instanceof Error ? e.message : "άγνωστο σφάλμα"));
+		}
+	}
+	const rows = (bookings.data ?? []).filter((b) => filter === "all" || b.status === "paid");
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "space-y-6",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap items-center justify-between gap-4 px-1",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+					className: "flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/60",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "size-1.5 rounded-full bg-white/60" }), "Online Σεμινάρια"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.button, {
+					type: "button",
+					onClick: openNew,
+					whileHover: { scale: 1.03 },
+					whileTap: { scale: .97 },
+					className: "group relative inline-flex items-center gap-2 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-5 py-2.5 text-sm font-semibold text-black shadow-[0_0_24px_rgba(255,255,255,0.2)] transition-shadow before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 hover:shadow-[0_0_40px_rgba(255,255,255,0.4)] hover:before:translate-x-[300%]",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, { className: "relative size-4" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "relative",
+						children: "Νέο online σεμινάριο"
+					})]
+				})]
+			}),
+			msg && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				role: "status",
+				className: "rounded-2xl border border-white/10 bg-zinc-950/80 p-4 text-sm text-zinc-300",
+				children: msg
+			}),
+			seminars.loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 2 }),
+			seminars.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: seminars.error }),
+			seminars.data && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "grid gap-4 md:grid-cols-2",
+				children: [seminars.data.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "px-1 text-sm text-white/40",
+					children: "Δεν υπάρχουν online σεμινάρια ακόμη."
+				}), seminars.data.map((s) => {
+					const paid = (bookings.data ?? []).filter((b) => b.seminar_id === s.id && b.status === "paid").length;
+					return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						whileHover: { y: -3 },
+						className: "group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-5 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors hover:border-white/30",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute -right-10 -top-10 size-32 rounded-full bg-white/[0.06] blur-[60px]" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "relative",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "flex items-start justify-between gap-3",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "flex items-center gap-3",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+											className: "flex size-10 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition group-hover:shadow-[0_0_20px_rgba(255,255,255,0.3)]",
+											children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Globe, { className: "size-5" })
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+											className: `text-lg font-bold ${chromeText}`,
+											children: s.title
+										})]
+									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: `rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${s.published ? "border-emerald-500/30 bg-emerald-500/15 text-emerald-300" : "border-white/15 bg-white/5 text-zinc-400"}`,
+										children: s.published ? "Ορατό" : "Πρόχειρο"
+									})]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+									className: "mt-3 text-sm text-zinc-400",
+									children: [
+										new Date(s.starts_at).toLocaleString("el-GR", {
+											dateStyle: "long",
+											timeStyle: "short"
+										}),
+										" ·",
+										" ",
+										s.duration_minutes,
+										"′ · ",
+										formatPrice(s.price_cent
+[TRUNCATED: file is 75604 bytes, first 40960 included]
+=== END FILE ===
+

@@ -1,0 +1,1184 @@
+=== FILE: src/routes/review.$submissionId.tsx ===
+import { useState } from "react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { getSubmissionForReview, submitReview } from "@/lib/queries";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import { MediaThumb } from "@/components/aura/MediaThumb";
+import type { ReviewDecision } from "@/lib/database.types";
+import {
+  Sparkles,
+  ArrowLeft,
+  CheckCircle2,
+  AlertCircle,
+  Award,
+  FileText,
+  ShieldCheck,
+} from "lucide-react";
+
+export const Route = createFileRoute("/review/$submissionId")({
+  component: ReviewDetailPage,
+});
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+const CHROME_TEXT =
+  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+const CHROME_FILL =
+  "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)";
+const FRAME_BORDER =
+  "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))";
+
+const DECISIONS: { value: ReviewDecision; label: string }[] = [
+  { value: "passed", label: "Verified" },
+  { value: "needs_revision", label: "Needs revision" },
+  { value: "failed", label: "Not passed" },
+];
+
+function Frame({ children, className = "", inner = "p-6 sm:p-8" }: { children: React.ReactNode; className?: string; inner?: string }) {
+  return (
+    <div className={`relative rounded-3xl p-px ${className}`} style={{ background: FRAME_BORDER, boxShadow: "0 0 60px rgba(0,0,0,0.9)" }}>
+      <div className={`relative overflow-hidden rounded-[23px] bg-[#0a0a0b] ${inner}`}>
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-24" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }} />
+        <div className="relative">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function CardTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <h2 className="mb-6 flex items-center gap-3 text-xs font-bold uppercase tracking-[0.3em] text-white/65">
+      <span className="text-white">{icon}</span>
+      {children}
+    </h2>
+  );
+}
+
+function ReviewDetailPage() {
+  const reduce = useReducedMotion();
+  const { submissionId } = Route.useParams();
+  const navigate = useNavigate();
+  const { data, error, loading } = useAsync(
+    () => getSubmissionForReview(submissionId),
+    [submissionId],
+  );
+
+  const [text, setText] = useState({
+    strengths: "",
+    technical_gaps: "",
+    method_gaps: "",
+    next_actions: "",
+  });
+  const [decision, setDecision] = useState<ReviewDecision>("passed");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await submitReview({
+        submissionId,
+        // No numeric grading any more: the decision is the result.
+        // "Verified" is stored as a full pass, anything else as 0.
+        score: decision === "passed" ? 100 : 0,
+        rubricScores: [],
+        strengths: text.strengths,
+        technicalGaps: text.technical_gaps,
+        methodGaps: text.method_gaps,
+        nextActions: text.next_actions,
+        decision,
+      });
+      navigate({ to: "/review" });
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const field =
+    "w-full rounded-2xl border border-white/10 bg-black/60 p-4 text-sm text-white/90 outline-none transition-all duration-300 placeholder:text-white/25 focus:border-white/50 focus:bg-black/80 focus:shadow-[0_0_28px_rgba(255,255,255,0.1)] focus:ring-2 focus:ring-white/15";
+
+  const verified = decision === "passed";
+
+  return (
+    <main className="relative mx-auto min-h-screen max-w-5xl overflow-hidden px-4 py-16 text-white sm:px-6">
+      {/* ambient glow */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(800px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* back */}
+      <motion.div initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, ease: EASE }} className="relative mb-8">
+        <motion.div whileHover={{ x: -3 }} whileTap={{ scale: 0.97 }} className="inline-block">
+          <Link
+            to="/review"
+            className="group inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-5 py-2.5 text-xs font-semibold text-white/80 outline-none backdrop-blur-md transition-all hover:border-white/60 hover:bg-white/[0.09] hover:text-white hover:shadow-[0_0_26px_rgba(255,255,255,0.15)] focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-1" />
+            Επιστροφή στην Ουρά
+          </Link>
+        </motion.div>
+      </motion.div>
+
+      {loading && <LoadingSkeleton rows={4} />}
+      {error && <ErrorState message={error} />}
+
+      {data && (
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{ hidden: {}, show: { transition: { staggerChildren: 0.1 } } }}
+          className="relative space-y-8"
+        >
+          {/* header */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+            <Frame>
+              <div className="flex flex-col justify-between gap-6 md:flex-row md:items-center">
+                <div>
+                  <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.05] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.3em] text-white/80">
+                    <Sparkles className="size-3.5" />
+                    Submission Evaluation
+                  </div>
+                  <h1 className="text-2xl font-extrabold sm:text-4xl">
+                    <motion.span
+                      initial={{ backgroundPosition: "0% 50%" }}
+                      animate={reduce ? undefined : { backgroundPosition: "100% 50%" }}
+                      transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+                      style={{
+                        backgroundImage: CHROME_TEXT,
+                        backgroundSize: "300% auto",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}
+                      className="inline-block drop-shadow-[0_0_26px_rgba(255,255,255,0.45)]"
+                    >
+                      {data.submission.assignment?.title ?? "Υποβολή"}
+                    </motion.span>
+                  </h1>
+                  {(data.submission.assignment as any)?.skill?.name && (
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-[0.25em] text-white/55">
+                      Skill: {(data.submission.assignment as any).skill.name}
+                    </p>
+                  )}
+                  <p className="mt-3 flex items-center gap-2 text-sm text-white/50">
+                    <span className="font-medium text-white">{data.submission.student?.full_name ?? "Μαθητής"}</span>
+                    <span>·</span>
+                    <span>Attempt {data.submission.attempt}</span>
+                  </p>
+                </div>
+
+                {/* live result preview */}
+                <div className="min-w-[170px] rounded-2xl border border-white/10 bg-black/50 p-5 text-center">
+                  <span className="mb-3 block text-[10px] uppercase tracking-[0.3em] text-white/45">Αποτέλεσμα</span>
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={decision}
+                      initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
+                      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                      exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
+                      transition={{ duration: 0.3, ease: EASE }}
+                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-bold uppercase tracking-wider ${
+                        verified
+                          ? "border-white bg-white text-neutral-950 shadow-[0_0_28px_rgba(255,255,255,0.6)]"
+                          : "border-white/25 bg-white/[0.06] text-white/75"
+                      }`}
+                    >
+                      {verified && <ShieldCheck className="size-4" />}
+                      {DECISIONS.find((d) => d.value === decision)?.label}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </Frame>
+          </motion.div>
+
+          {/* media */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+            <Frame>
+              <CardTitle icon={<FileText className="size-4" />}>Υλικό Υποβολής (Media Files)</CardTitle>
+              <div className="grid gap-5 md:grid-cols-3">
+                <MediaColumn title="Before" paths={data.submission.before_media} />
+                <MediaColumn title="Process" paths={data.submission.process_media} />
+                <MediaColumn title="After" paths={data.submission.after_media} />
+              </div>
+            </Frame>
+          </motion.div>
+
+          {/* context */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+            <Frame>
+              <CardTitle icon={<Award className="size-4" />}>Αναφορά Μαθητή & Πλαισίου</CardTitle>
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                <Reasoning label="Client context" value={data.submission.client_context} />
+                <Reasoning label="Παρατηρήσεις" value={data.submission.observations} />
+                <Reasoning label="Τεχνική" value={data.submission.technique} />
+                <Reasoning label="Αυτο-αξιολόγηση" value={data.submission.self_evaluation} />
+              </div>
+            </Frame>
+          </motion.div>
+
+          {/* feedback + decision */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+            <Frame>
+              <CardTitle icon={<CheckCircle2 className="size-4" />}>Φόρμα Ανατροφοδότησης & Απόφασης</CardTitle>
+
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <Labeled label="Δυνατά σημεία">
+                  <textarea rows={3} className={field} placeholder="Γράψτε τα θετικά στοιχεία της εργασίας..." value={text.strengths} onChange={(e) => setText({ ...text, strengths: e.target.value })} />
+                </Labeled>
+                <Labeled label="Τεχνικά κενά">
+                  <textarea rows={3} className={field} placeholder="Επισημάνετε τεχνικές αδυναμίες..." value={text.technical_gaps} onChange={(e) => setText({ ...text, technical_gaps: e.target.value })} />
+                </Labeled>
+                <Labeled label="Κενά μεθόδου">
+                  <textarea rows={3} className={field} placeholder="Σημεία βελτίωσης στη μεθοδολογία..." value={text.method_gaps} onChange={(e) => setText({ ...text, method_gaps: e.target.value })} />
+                </Labeled>
+                <Labeled label="Επόμενες ενέργειες">
+                  <textarea rows={3} className={field} placeholder="Τι πρέπει να προσέξει στην επόμενη προσπάθεια..." value={text.next_actions} onChange={(e) => setText({ ...text, next_actions: e.target.value })} />
+                </Labeled>
+              </div>
+
+              {/* decision picker */}
+              <div className="mt-8">
+                <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.25em] text-white/45">Τελική Απόφαση</span>
+                <div role="radiogroup" aria-label="Τελική Απόφαση" className="grid gap-2 rounded-2xl border border-white/10 bg-black/50 p-1.5 sm:grid-cols-3">
+                  {DECISIONS.map((d) => {
+                    const on = decision === d.value;
+                    return (
+                      <button
+                        key={d.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => setDecision(d.value)}
+                        className="relative rounded-xl px-4 py-3 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/60"
+                        style={{ color: on ? "#0a0a0a" : "rgba(255,255,255,0.6)" }}
+                      >
+                        {on && (
+                          <motion.span
+                            layoutId="decision-pill"
+                            className="absolute inset-0 rounded-xl"
+                            style={{ backgroundImage: CHROME_FILL, boxShadow: "0 0 26px rgba(255,255,255,0.4), inset 0 1px 0 rgba(255,255,255,0.95)" }}
+                            transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                          />
+                        )}
+                        <span className="relative">{d.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </Frame>
+          </motion.div>
+
+          {err && (
+            <div role="alert" className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/[0.05] p-4 text-sm text-white/85">
+              <AlertCircle className="size-5 shrink-0" />
+              <span>{err}</span>
+            </div>
+          )}
+
+          {/* submit */}
+          <motion.div variants={{ hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+            <motion.button
+              type="button"
+              onClick={handleSubmit}
+              disabled={busy}
+              whileHover={{ y: -3, scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="group relative inline-flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-full px-10 py-4 text-sm font-bold text-neutral-950 outline-none transition-shadow duration-300 hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:pointer-events-none disabled:opacity-50 sm:w-auto"
+              style={{ backgroundImage: CHROME_FILL, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.18)" }}
+            >
+              {!reduce && (
+                <motion.span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent"
+                  animate={{ x: ["-160%", "420%"] }}
+                  transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 3, ease: "easeInOut" }}
+                  style={{ skewX: -18 }}
+                />
+              )}
+              <CheckCircle2 className="relative size-5" />
+              <span className="relative">{busy ? "Καταχώρηση..." : "Καταχώρηση Αξιολόγησης"}</span>
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      )}
+    </main>
+  );
+}
+
+function MediaColumn({ title, paths }: { title: string; paths: string[] }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/40 p-4">
+      <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.3em] text-white/60">{title}</h3>
+      {paths.length === 0 ? (
+        <p className="text-xs text-white/25">—</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {paths.map((p) => (
+            <MediaThumb key={p} path={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Reasoning({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-black/40 p-4">
+      <p className="text-xs font-bold uppercase tracking-[0.3em] text-white/60">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-white/75">{value}</p>
+    </div>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.25em] text-white/45">{label}</span>
+      {children}
+    </label>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/stop-plan.tsx ===
+// src/routes/stop-plan.tsx
+import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { useAuth } from "@/lib/useAuth";
+import { isCancellableStatus, useSubscription } from "@/lib/useSubscription";
+import { getPlan } from "@/lib/plans";
+import { cancelMySubscription } from "@/lib/cancel-subscription";
+import ChromeButton from "@/components/aura/ChromeButton";
+
+export const Route = createFileRoute("/stop-plan")({
+  head: () => ({ meta: [{ title: "AURA — Stop my plan" }] }),
+  component: StopPlanPage,
+});
+
+const CONFIRM_PHRASE = "STOP MY PLAN";
+
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return new Intl.DateTimeFormat("el-GR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(d);
+}
+
+function StopPlanPage() {
+  const navigate = useNavigate();
+  const { session, loading: authLoading } = useAuth();
+  const userId = session?.user.id;
+  const {
+    subscription,
+    loading: subLoading,
+    error: subError,
+    refresh,
+  } = useSubscription(userId, { includeInactive: true });
+
+  const [agreed, setAgreed] = useState(false);
+  const [phrase, setPhrase] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ currentPeriodEnd: string | null } | null>(
+    null,
+  );
+
+  // Χωρίς session δεν υπάρχει τι να σταματήσουμε — πίσω στο login.
+  useEffect(() => {
+    if (!authLoading && !session) {
+      navigate({ to: "/login", replace: true });
+    }
+  }, [authLoading, session, navigate]);
+
+  const waiting = authLoading || (Boolean(userId) && subLoading);
+  const plan = getPlan(subscription?.plan_id);
+  const eligible = subscription != null && isCancellableStatus(subscription.status);
+  const alreadyScheduled = subscription?.cancel_at_period_end ?? false;
+
+  const phraseMatches = phrase.trim() === CONFIRM_PHRASE;
+  const canConfirm = agreed && phraseMatches && !submitting;
+
+  async function handleConfirm() {
+    if (!canConfirm) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await cancelMySubscription();
+      setResult({ currentPeriodEnd: res.currentPeriodEnd });
+      refresh();
+    } catch (e) {
+      setSubmitError((e as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (waiting) {
+    return (
+      <main className="mx-auto max-w-lg px-5 pb-24 pt-32 sm:pt-40" aria-busy="true">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 w-1/3 rounded bg-white/5" />
+          <div className="h-40 rounded-2xl bg-white/5" />
+        </div>
+      </main>
+    );
+  }
+
+  if (!session) return null;
+
+  if (!eligible) {
+    return (
+      <main className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40">
+        <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΤΟ ΠΑΚΕΤΟ ΜΟΥ</p>
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-neutral-100">
+          Δεν υπάρχει ενεργή συνδρομή προς ακύρωση
+        </h1>
+        <p className="mt-3 text-sm text-neutral-400">
+          {subError ?? "Δεν βρέθηκε πακέτο συνδεδεμένο με τον λογαριασμό σου."}
+        </p>
+        <Link to="/profile" className="mt-8 inline-block">
+          <ChromeButton type="button" variant="secondary">
+            Πίσω στο προφίλ
+          </ChromeButton>
+        </Link>
+      </main>
+    );
+  }
+
+  const periodEndLabel = formatDate(subscription!.current_period_end);
+
+  if (result || alreadyScheduled) {
+    const untilLabel = result ? formatDate(result.currentPeriodEnd) : periodEndLabel;
+    return (
+      <main className="mx-auto max-w-lg px-5 pb-24 pt-32 sm:pt-40">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          className="rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center"
+        >
+          <CheckCircle2 className="mx-auto size-10 text-emerald-400" />
+          <h1 className="mt-4 text-2xl font-semibold text-white">
+            Το πακέτο σου θα σταματήσει
+          </h1>
+          <p className="mt-3 text-sm text-white/70">
+            Κρατάς πλήρη πρόσβαση μέχρι{" "}
+            <span className="font-semibold text-white">{untilLabel}</span>. Μετά από
+            αυτή την ημερομηνία δεν θα χρεωθείς ξανά και η συνδρομή δεν θα ανανεωθεί.
+          </p>
+          <Link to="/profile" className="mt-8 inline-block">
+            <ChromeButton type="button">Πίσω στο προφίλ</ChromeButton>
+          </Link>
+        </motion.div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-lg px-5 pb-24 pt-32 sm:pt-40">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      >
+        <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">
+          ΤΟ ΠΑΚΕΤΟ ΜΟΥ
+        </p>
+        <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+          Σταμάτησε το πακέτο σου
+        </h1>
+
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+          <p className="text-sm text-white/60">Τρέχον πακέτο</p>
+          <p className="mt-1 text-lg font-semibold text-white">
+            {plan?.name ?? subscription!.plan_id}
+          </p>
+          {plan && <p className="mt-1 text-sm text-white/50">{plan.priceLabel} / μήνα</p>}
+        </div>
+
+        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-400" />
+          <p className="text-sm leading-relaxed text-amber-100/90">
+            Δεν χρεώνεσαι ξανά και δεν χάνεις τίποτα από ό,τι έχεις ήδη πληρώσει: κρατάς
+            πρόσβαση μέχρι{" "}
+            <span className="font-semibold text-white">{periodEndLabel}</span>. Από την
+            επόμενη περίοδο χρέωσης η συνδρομή απλώς δεν θα ανανεωθεί.
+          </p>
+        </div>
+
+        <div className="mt-6 space-y-5">
+          <label className="flex items-start gap-3 text-sm text-white/80">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 rounded border-white/20 bg-transparent accent-white"
+            />
+            <span>
+              Διάβασα και συμφωνώ με τους{" "}
+              <Link
+                to="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-4 hover:text-white"
+              >
+                Όρους Χρήσης
+              </Link>
+              .
+            </span>
+          </label>
+
+          <div>
+            <label
+              htmlFor="stop-phrase"
+              className="mb-1.5 block text-xs uppercase tracking-[0.2em] text-white/40"
+            >
+              Γράψε «{CONFIRM_PHRASE}» για επιβεβαίωση
+            </label>
+            <input
+              id="stop-phrase"
+              type="text"
+              value={phrase}
+              onChange={(e) => setPhrase(e.target.value)}
+              placeholder={CONFIRM_PHRASE}
+              autoComplete="off"
+              spellCheck={false}
+              className="w-full rounded-lg border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-white/30"
+            />
+          </div>
+        </div>
+
+        {submitError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-300"
+          >
+            {submitError}
+          </p>
+        )}
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <ChromeButton type="button" onClick={handleConfirm} disabled={!canConfirm}>
+            {submitting && <Loader2 className="mr-2 size-4 animate-spin" />}
+            Confirm
+          </ChromeButton>
+          <Link to="/profile">
+            <ChromeButton type="button" variant="secondary">
+              Άσε το πακέτο μου όπως είναι
+            </ChromeButton>
+          </Link>
+        </div>
+      </motion.div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: viva-renew-cron.sql ===
+-- Run this ONCE in the Supabase SQL editor, then DELETE this file.
+-- Needs the pg_cron and pg_net extensions (Dashboard > Database > Extensions).
+select cron.schedule(
+  'viva-renew-hourly',
+  '7 * * * *',
+  $$
+  select net.http_post(
+    url := 'https://kvnpixezrebxuvgbznqr.supabase.co/functions/v1/viva-renew',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', 'e124dd164dc122ee2e12ca0d1e9532b108e5ce8b3f6dd88491e19ef2944a76b2'),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  );
+  $$
+);
+-- To stop ALL Viva renewals at any time:  select cron.unschedule('viva-renew-hourly');
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/checkout.return-CuDd3lzf.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/checkout.return-CuDd3lzf.js
+var $$splitComponentImporter = () => import("./checkout.return-m46Bfk_c.mjs");
+var Route = createFileRoute("/checkout/return")({
+	validateSearch: (search) => ({ session_id: typeof search["session_id"] === "string" && search["session_id"].length > 0 ? search["session_id"] : void 0 }),
+	head: () => ({ meta: [{ title: "AURA — Επιβεβαίωση πληρωμής" }] }),
+	component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: src/components/aura-home.tsx ===
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { ArrowDown, ArrowRight, Check, Instagram, LockKeyhole, Menu, Scissors, X } from "lucide-react";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+
+import heroImage from "@/assets/aura-hero.jpg";
+import toolsImage from "@/assets/aura-tools.jpg";
+import { Button } from "@/components/ui/button";
+
+function AuraMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-3" aria-label="AURA">
+      <span className={compact ? "aura-mark aura-mark-sm" : "aura-mark"} aria-hidden="true">
+        <span />
+      </span>
+      <span className={compact ? "chrome-type text-base font-semibold" : "chrome-type text-2xl font-semibold"}>
+        AURA
+      </span>
+    </span>
+  );
+}
+
+function Intro({ onComplete }: { onComplete: () => void }) {
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const seen = window.sessionStorage.getItem("aura-intro-seen");
+    if (seen || reduceMotion) {
+      onComplete();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      window.sessionStorage.setItem("aura-intro-seen", "true");
+      onComplete();
+    }, 3100);
+    return () => window.clearTimeout(timer);
+  }, [onComplete, reduceMotion]);
+
+  return (
+    <motion.div
+      className="intro fixed inset-0 z-[100] grid place-items-center bg-background overflow-hidden"
+      exit={{ opacity: 0, transition: { duration: 0.7, ease: "easeInOut" } }}
+    >
+      <div className="intro-glow" />
+      <div className="relative flex flex-col items-center px-4 text-center">
+        <div className="intro-ring" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5, duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <AuraMark />
+        </motion.div>
+        <motion.p
+          className="mt-12 text-[0.58rem] font-medium uppercase tracking-[0.42em] text-muted-foreground"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.65, duration: 0.8 }}
+        >
+          Precision in practice
+        </motion.p>
+      </div>
+    </motion.div>
+  );
+}
+
+function ChromeField({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const handleMove = (event: MouseEvent<HTMLDivElement>) => {
+    const bounds = ref.current?.getBoundingClientRect();
+    if (!bounds || !ref.current) return;
+    ref.current.style.setProperty("--light-x", `${event.clientX - bounds.left}px`);
+    ref.current.style.setProperty("--light-y", `${event.clientY - bounds.top}px`);
+  };
+
+  return (
+    <div ref={ref} onMouseMove={handleMove} className={`chrome-field ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+const steps = [
+  { n: "01", title: "LEARN.", text: "Technique distilled by working masters. Every movement, angle and decision made clear." },
+  { n: "02", title: "PRACTICE.", text: "Purpose-built drills turn knowledge into repeatable, professional precision." },
+  { n: "03", title: "PROVE.", text: "Submit your craft, receive expert assessment and earn credentials that carry weight." },
+];
+
+const skillNodes = [
+  { label: "Foundation", state: "verified", x: "8%", y: "58%" },
+  { label: "Control", state: "verified", x: "30%", y: "31%" },
+  { label: "Shape", state: "active", x: "52%", y: "58%" },
+  { label: "Texture", state: "locked", x: "74%", y: "29%" },
+  { label: "Mastery", state: "locked", x: "91%", y: "58%" },
+];
+
+export function AuraHome() {
+  const [intro, setIntro] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const reduceMotion = useReducedMotion();
+  const { scrollYProgress } = useScroll();
+  const imageY = useTransform(scrollYProgress, [0, 0.35], [0, reduceMotion ? 0 : 90]);
+  const textY = useTransform(scrollYProgress, [0, 0.35], [0, reduceMotion ? 0 : 42]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  return (
+    <main className="w-full overflow-x-hidden bg-background text-foreground selection:bg-foreground selection:text-background">
+      {intro && <Intro onComplete={() => setIntro(false)} />}
+
+      <header className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${scrolled ? "nav-scrolled" : ""}`}>
+        <nav className="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-4 sm:px-6 md:px-10" aria-label="Main navigation">
+          <a href="#top" className="focus-ring"><AuraMark compact /></a>
+          <div className="hidden items-center gap-9 md:flex">
+            <a href="#method" className="nav-link">Method</a>
+            <a href="#skill-tree" className="nav-link">Skill tree</a>
+            <a href="#certification" className="nav-link">Certification</a>
+          </div>
+          <div className="hidden md:block">
+            <Button variant="chrome" size="lg" asChild><a href="#start">Start learning <ArrowRight /></a></Button>
+          </div>
+          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMenuOpen((v) => !v)} aria-label="Toggle navigation">
+            {menuOpen ? <X /> : <Menu />}
+          </Button>
+        </nav>
+        {menuOpen && (
+          <div className="border-t border-border bg-background/95 px-5 py-6 backdrop-blur-xl md:hidden">
+            <div className="flex flex-col gap-5 text-sm uppercase tracking-[0.16em]">
+              <a href="#method" onClick={() => setMenuOpen(false)}>Method</a>
+              <a href="#skill-tree" onClick={() => setMenuOpen(false)}>Skill tree</a>
+              <a href="#certification" onClick={() => setMenuOpen(false)}>Certification</a>
+            </div>
+          </div>
+        )}
+      </header>
+
+      <section id="top" className="hero relative min-h-[92svh] overflow-hidden border-b border-subtle">
+        <motion.div className="absolute inset-0 md:left-[30%]" style={{ y: imageY }}>
+          <img src={heroImage} alt="A master barber executing a precision scissor cut" width={1920} height={1280} className="h-full w-full object-cover object-[64%_center] opacity-70" />
+          <div className="hero-image-fade absolute inset-0" />
+        </motion.div>
+        <div className="hero-atmosphere absolute inset-0" />
+        <motion.div className="relative z-10 mx-auto flex min-h-[92svh] max-w-[1440px] flex-col justify-end px-4 sm:px-6 pb-16 pt-32 md:px-10 md:pb-20" style={{ y: textY }}>
+          <p className="mb-6 flex items-center gap-4 text-[0.63rem] font-semibold uppercase tracking-[0.3em] text-secondary-foreground">
+            <span className="h-px w-10 bg-chrome-mid" /> The modern barber's academy
+          </p>
+          <h1 className="max-w-5xl text-[clamp(2.8rem,8vw,8.8rem)] font-semibold uppercase leading-[0.82]">
+            Master<br /><span className="chrome-type">the craft.</span>
+          </h1>
+          <div className="mt-9 flex max-w-3xl flex-col gap-8 border-t border-border pt-7 md:flex-row md:items-center md:justify-between">
+            <p className="max-w-md text-sm leading-7 text-secondary-foreground md:text-base">
+              The operating system for barbers who refuse ordinary. Learn with intent. Practice with precision. Prove your standard.
+            </p>
+            <Button variant="chrome" size="xl" asChild><a href="#method">Enter the academy <ArrowDown /></a></Button>
+          </div>
+        </motion.div>
+        <div className="absolute bottom-0 right-4 sm:right-8 hidden text-[0.58rem] uppercase tracking-[0.28em] text-muted-foreground md:block">AURA / 001</div>
+      </section>
+
+      <section id="method" className="section-shell border-b border-subtle overflow-x-hidden">
+        <div className="section-heading px-4 sm:px-6 md:px-0">
+          <p className="eyebrow">The ΛURΛ method</p>
+          <h2 className="text-[clamp(2.2rem,6vw,5.5rem)] uppercase leading-[1.18]">
+            <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">LEARN.</span><br />
+            <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">PRACTICE.</span><br />
+            <span className="chrome-type inline-block origin-left scale-x-125 font-extralight tracking-[0.45em]">PROVE.</span>
+          </h2>
+        </div>
+        <div className="mt-20 grid border-t border-border grid-cols-1 md:grid-cols-3">
+          {steps.map((step) => (
+            <ChromeField key={step.n} className="method-step group">
+              <span className="font-mono text-[0.62rem] text-muted-foreground">/{step.n}</span>
+              <h3 className="mt-24 text-2xl font-semibold">{step.title}</h3>
+              <p className="mt-4 max-w-xs text-sm leading-7 text-secondary-foreground">{step.text}</p>
+              <ArrowRight className="mt-10 size-4 text-chrome-mid transition-transform duration-300 group-hover:translate-x-2" />
+            </ChromeField>
+          ))}
+        </div>
+      </section>
+
+      <section id="skill-tree" className="section-shell grid items-center gap-16 border-b border-subtle grid-cols-1 lg:grid-cols-[0.8fr_1.2fr] overflow-x-hidden">
+        <div>
+          <p className="eyebrow">Measured progression</p>
+          <h2 className="section-title">YOUR CRAFT.<br /><span className="chrome-type">MAPPED.</span></h2>
+          <p className="mt-8 max-w-md text-base leading-8 text-secondary-foreground">
+            A professional competency system that makes every strength visible and every next step deliberate.
+          </p>
+        </div>
+        <ChromeField className="skill-map w-full overflow-hidden" aria-label="AURA professional skill progression">
+          <div className="skill-line" />
+          {skillNodes.map((node) => (
+            <div key={node.label} className={`skill-node skill-node-${node.state}`} style={{ left: node.x, top: node.y }}>
+              <span className="skill-dot">
+                {node.state === "verified" ? <Check /> : node.state === "locked" ? <LockKeyhole /> : <Scissors />}
+              </span>
+              <span className="skill-label">{node.label}</span>
+              {node.state === "verified" && <span className="skill-state">Verified</span>}
+            </div>
+          ))}
+        </ChromeField>
+      </section>
+
+      <section id="certification" className="section-shell border-b border-subtle overflow-x-hidden">
+        <div className="grid items-center gap-14 grid-cols-1 lg:grid-cols-[1fr_1fr]">
+          <div className="relative overflow-hidden">
+            <img src={toolsImage} alt="Polished professional barber tools arranged on a black surface" width={1600} height={1072} loading="lazy" className="aspect-[4/3] w-full object-cover grayscale transition-transform duration-700 hover:scale-[1.025]" />
+            <div className="image-vignette absolute inset-0" />
+          </div>
+          <div className="lg:pl-12">
+            <p className="eyebrow">A standard recognized</p>
+            <h2 className="section-title">PROOF HAS<br /><span className="chrome-type">A PRESENCE.</span></h2>
+            <p className="mt-7 max-w-lg text-base leading-8 text-secondary-foreground">
+              ΛURΛ certification is a precise record of demonstrated skill—not attendance. Built to be checked, trusted and carried forward.
+            </p>
+            <div className="certificate-strip mt-10 flex flex-wrap items-center gap-4">
+              <AuraMark compact />
+              <div className="h-10 w-px bg-border hidden sm:block" />
+              <div><p className="text-[0.58rem] uppercase tracking-[0.22em] text-muted-foreground">Credential ID</p><p className="mt-1 font-mono text-xs text-foreground">ΛURΛ—MASTER—0001</p></div>
+              <div className="ml-auto hidden size-8 items-center justify-center rounded-full border border-chrome-mid text-chrome-light sm:flex"><Check className="size-3" /></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="start" className="relative px-4 sm:px-6 py-28 text-center md:px-10 md:py-44 overflow-x-hidden">
+        <div className="cta-light absolute inset-0" />
+        <div className="relative mx-auto max-w-5xl">
+          <p className="eyebrow justify-center">Begin with intent</p>
+          <h2 className="mt-8 text-[clamp(2.6rem,7vw,7rem)] font-semibold uppercase leading-[0.88]">Set a higher<br /><span className="chrome-type">standard.</span></h2>
+          <Button variant="chrome" size="xl" className="mt-12" asChild><a href="mailto:academy@aura.barber">Start learning <ArrowRight /></a></Button>
+        </div>
+      </section>
+
+      <footer className="border-t border-border px-4 sm:px-6 py-8 md:px-10 overflow-x-hidden">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-5 text-[0.6rem] uppercase tracking-[0.2em] text-muted-foreground sm:flex-row sm:items-center sm:justify-between text-center sm:text-left">
+          <div className="flex justify-center sm:justify-start"><AuraMark compact /></div>
+          <p>Precision. Practice. Proof.</p>
+          <div className="flex items-center justify-center gap-6 sm:justify-end">
+            <a 
+              href="https://www.instagram.com/aura_.method/?__pwa=1" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Instagram"
+            >
+              <Instagram className="size-4" />
+              <span>Instagram</span>
+            </a>
+            <p>© 2026 ΛURΛ Academy</p>
+          </div>
+        </div>
+      </footer>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/OurTeam.tsx ===
+// src/components/aura/OurTeam.tsx
+import { useState, useRef } from "react";
+import { motion, PanInfo } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
+import founderImg from "@/assets/founder.jpg";
+import cofounderImg from "@/assets/cofounder.jpg";
+import developerImg from "@/assets/developer.jpg";
+
+interface TeamMemberPreview {
+  id: string;
+  name: string;
+  role: string;
+  image: string;
+  excerpt: string;
+  motto: string;
+}
+
+const teamMembers: TeamMemberPreview[] = [
+  {
+    id: "01",
+    name: "ΘΕΟΠΙΣΤΟΣ",
+    role: "FOUNDER • CREATIVE DIRECTOR",
+    image: founderImg,
+    excerpt:
+      "Δημιουργική δύναμη και εμπνευστής της AURA. Εστιάζει στην ουσιαστική κατανόηση, την παρατήρηση και τη διαμόρφωση μιας νέας γενιάς επαγγελματιών.",
+    motto: "OBSERVE. ANALYZE. EVOLVE.",
+  },
+  {
+    id: "02",
+    name: "ΑΓΓΕΛΟΣ",
+    role: "PARTNER • HEAD EDUCATOR",
+    image: cofounderImg,
+    excerpt:
+      "Καθοδηγεί την εξέλιξη της εκπαιδευτικής κουλτούρας. Πιστεύει στη συνεχή βελτίωση και στη βαθιά μεταφορά τεχνικής γνώσης.",
+    motto: "KNOWLEDGE CREATES EXCELLENCE.",
+  },
+  {
+    id: "03",
+    name: "ΜΑΝΟΣ",
+    role: "PROGRAMMER • DIGITAL CREATOR",
+    image: developerImg,
+    excerpt:
+      "Η κινητήριος δύναμη πίσω από την Online Academy, μετατρέποντας το όραμα και το εκπαιδευτικό σύστημα σε μια σύγχρονη ψηφιακή εμπειρία.",
+    motto: "BUILDING THE DIGITAL FUTURE.",
+  },
+];
+
+export default function OurTeam() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % teamMembers.length);
+  };
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + teamMembers.length) % teamMembers.length);
+  };
+
+  const handleDragEnd = (_: unknown, info: PanInfo) => {
+    const swipeThreshold = 50;
+    if (info.offset.x < -swipeThreshold) {
+      handleNext();
+    } else if (info.offset.x > swipeThreshold) {
+      handlePrev();
+    }
+  };
+
+  return (
+    <section className="relative py-24 md:py-32 bg-[#050505] overflow-hidden text-zinc-100 select-none border-t border-zinc-900">
+      {/* Background Ambient Chrome Backlight */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[500px] w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200/10 via-black/80 to-black blur-[130px]" />
+
+      <div className="mx-auto max-w-7xl px-5 sm:px-8">
+        {/* Section Header */}
+        <div className="text-center mb-10 md:mb-16">
+          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-950 px-4 py-1 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)] mb-4">
+            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+            <span className="inline-block scale-x-110 origin-center text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400">
+              MEET THE CREATORS
+            </span>
+          </div>
+
+          <h2 className="text-3xl font-extrabold uppercase tracking-tight sm:text-5xl lg:text-6xl">
+            <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]">
+              Our Team
+            </span>
+          </h2>
+        </div>
+
+        {/* 3D Perspective Slider Container */}
+        <div
+          ref={containerRef}
+          className="relative flex items-center justify-center min-h-[480px] sm:min-h-[520px] perspective-1000"
+        >
+          {/* Desktop Left Arrow */}
+          <button
+            onClick={handlePrev}
+            aria-label="Previous Team Member"
+            className="hidden md:flex absolute left-2 lg:left-12 z-30 items-center justify-center w-12 h-12 rounded-full border border-white/30 bg-black/60 text-white backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:bg-white hover:text-black hover:border-white hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] transition-all duration-300 cursor-pointer group"
+          >
+            <svg
+              className="w-5 h-5 transform group-hover:-translate-x-0.5 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          {/* Cards Stack with Touch Dragging for Mobile */}
+          <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.2}
+            onDragEnd={handleDragEnd}
+            className="relative w-full max-w-sm sm:max-w-md h-full flex items-center justify-center cursor-grab active:cursor-grabbing touch-pan-y"
+          >
+            {teamMembers.map((member, index) => {
+              // Calculate index offset relative to current active index (-1, 0, 1)
+              let offset = index - currentIndex;
+              if (offset < -1) offset += teamMembers.length;
+              if (offset > 1) offset -= teamMembers.length;
+
+              const isActive = offset === 0;
+
+              return (
+                <motion.div
+                  key={member.id}
+                  initial={false}
+                  animate={{
+                    scale: isActive ? 1 : 0.85,
+                    rotateY: offset === -1 ? 22 : offset === 1 ? -22 : 0,
+                    x: offset === -1 ? "-60%" : offset === 1 ? "60%" : "0%",
+                    z: isActive ? 0 : -140,
+                    opacity: isActive ? 1 : 0.45,
+                    filter: isActive ? "blur(0px)" : "blur(2px)",
+                  }}
+                  transition={{
+                    duration: 0.6,
+                    ease: [0.22, 1, 0.36, 1],
+                  }}
+                  onClick={() => setCurrentIndex(index)}
+                  style={{
+                    transformStyle: "preserve-3d",
+                    zIndex: isActive ? 20 : 10 - Math.abs(offset),
+                  }}
+                  className={`absolute w-full rounded-2xl border border-zinc-800 bg-zinc-950/85 backdrop-blur-xl p-6 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.9),inset_0_1px_1px_rgba(255,255,255,0.15)] transition-colors duration-300 ${
+                    isActive
+                      ? "border-zinc-500/80 shadow-[0_0_35px_rgba(255,255,255,0.08)]"
+                      : "pointer-events-auto hover:border-zinc-700"
+                  }`}
+                >
+                  {/* Chrome Specular Top Highlight */}
+                  <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-200/60 to-transparent" />
+
+                  {/* ID Badge */}
+                  <div className="absolute top-4 right-5 font-mono text-xs text-zinc-600 tracking-widest">
+                    // {member.id}
+                  </div>
+
+                  {/* Profile Header */}
+                  <div className="flex items-center gap-4 sm:gap-5">
+                    {/* Metallic Photo Frame */}
+                    <div className="relative shrink-0 w-20 h-24 sm:w-24 sm:h-28 rounded-xl overflow-hidden border border-zinc-700/60 bg-zinc-900 shadow-md">
+                      <img
+                        src={member.image}
+                        alt={member.name}
+                        className="w-full h-full object-cover grayscale contrast-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                    </div>
+
+                    {/* Member Title */}
+                    <div className="flex-1 text-left">
+                      <span className="inline-block text-[9px] sm:text-[10px] font-extralight uppercase tracking-[0.25em] text-zinc-400">
+                        {member.role}
+                      </span>
+                      <h3 className="mt-0.5 text-2xl sm:text-3xl font-extrabold uppercase tracking-tight text-white">
+                        <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">
+                          {member.name}
+                        </span>
+                      </h3>
+                    </div>
+                  </div>
+
+                  {/* Excerpt Bio */}
+                  <p className="mt-5 text-xs sm:text-sm font-extralight text-zinc-300 leading-relaxed text-left">
+                    {member.excerpt}
+                  </p>
+
+                  {/* Single Motto Box */}
+                  <div className="mt-4 rounded-lg border border-zinc-800/80 bg-zinc-900/40 px-3 py-2 text-center">
+                    <p className="text-[10px] sm:text-xs font-extralight uppercase tracking-[0.25em] text-zinc-300">
+                      {member.motto}
+                    </p>
+                  </div>
+
+                  {/* VIEW MORE Chrome Button */}
+                  <div className="mt-6 pt-4 border-t border-zinc-900/80 flex justify-center">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate({ to: "/about" });
+                      }}
+                      className="group relative overflow-hidden rounded-full py-2.5 px-6 backdrop-blur-md bg-white/10 hover:bg-white/20 text-white font-aura text-[10px] sm:text-xs font-bold uppercase tracking-[0.25em] border border-white/40 hover:border-white/80 shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:shadow-[0_0_20px_rgba(255,255,255,0.35)] transition-all duration-300 cursor-pointer"
+                    >
+                      {/* Specular Shimmer Beam */}
+                      <motion.span
+                        className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-[-25deg] pointer-events-none"
+                        animate={{ x: ["-150%", "300%"] }}
+                        transition={{
+                          duration: 2.8,
+                          repeat: Infinity,
+                          repeatDelay: 1.2,
+                          ease: "easeInOut",
+                        }}
+                      />
+                      <span className="relative z-10 flex items-center justify-center gap-2">
+                        VIEW MORE
+                        <svg
+                          className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M14 5l7 7m0 0l-7 7m7-7H3"
+                          />
+                        </svg>
+                      </span>
+                    </motion.button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+
+          {/* Desktop Right Arrow */}
+          <button
+            onClick={handleNext}
+            aria-label="Next Team Member"
+            className="hidden md:flex absolute right-2 lg:right-12 z-30 items-center justify-center w-12 h-12 rounded-full border border-white/30 bg-black/60 text-white backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.3)] hover:bg-white hover:text-black hover:border-white hover:shadow-[0_0_30px_rgba(255,255,255,0.5)] transition-all duration-300 cursor-pointer group"
+          >
+            <svg
+              className="w-5 h-5 transform group-hover:translate-x-0.5 transition-transform"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Mobile Swipe Hint & Page Bullets */}
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 md:hidden">
+            ← Swipe to explore →
+          </p>
+
+          <div className="flex items-center gap-2">
+            {teamMembers.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                  currentIndex === idx
+                    ? "w-8 bg-white shadow-[0_0_10px_rgba(255,255,255,0.8)]"
+                    : "w-2 bg-zinc-800 hover:bg-zinc-600"
+                }`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/haircuts-B61qYPwn.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{g as n,y as r}from"./queries-B7Arqryn.js";import{n as i}from"./roles-D-HGCJsI.js";import{t as a}from"./chevron-right-LS5pF-bM.js";import{t as o}from"./clock-CqoNLjzH.js";import{t as s}from"./scissors-CHiVLmLi.js";import{t as c}from"./shield-alert-B8o1doM_.js";import{t as l}from"./user-BFT04SdI.js";import{t as u}from"./useAsync-CZJ1G06G.js";import{i as d,n as f,r as p,t as m}from"./States-BulpY35p.js";var h=e();function g(){let e=u(r,[]),g=e.data?i(e.data.role):!1,_=u(async()=>g?n():[],[g]);return(0,h.jsxs)(`main`,{className:`mx-auto min-h-screen max-w-5xl px-4 sm:px-6 py-16 text-white relative`,children:[(0,h.jsx)(`div`,{className:`absolute top-10 left-1/2 -translate-x-1/2 w-[500px] h-[250px] bg-orange-600/10 blur-[120px] pointer-events-none rounded-full`}),(0,h.jsxs)(`header`,{className:`mb-12 relative z-10 border-b border-white/10 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4`,children:[(0,h.jsxs)(`div`,{children:[(0,h.jsxs)(`div`,{className:`inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner`,children:[(0,h.jsx)(s,{className:`w-3.5 h-3.5`}),`Admin Hub`]}),(0,h.jsx)(`h1`,{className:`text-3xl sm:text-4xl font-extrabold tracking-tight text-white`,children:`Ουρά Αξιολόγησης Κουρεμάτων`})]}),_.data&&_.data.length>0&&(0,h.jsxs)(`div`,{className:`px-4 py-2 rounded-2xl bg-zinc-900/80 border border-white/10 text-xs text-zinc-400 backdrop-blur-md flex items-center gap-2`,children:[(0,h.jsx)(`span`,{className:`w-2 h-2 rounded-full bg-orange-500 animate-ping`}),(0,h.jsx)(`strong`,{className:`text-white font-bold`,children:_.data.length}),` εκκρεμείς αξιολογήσεις`]})]}),(0,h.jsxs)(`div`,{className:`relative z-10`,children:[e.loading&&(0,h.jsx)(p,{rows:3}),e.error&&(0,h.jsx)(f,{message:e.error}),e.data&&!g&&(0,h.jsxs)(`div`,{className:`p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center`,children:[(0,h.jsx)(`div`,{className:`w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4`,children:(0,h.jsx)(c,{className:`w-6 h-6`})}),(0,h.jsx)(d,{reason:`Μόνο admins έχουν πρόσβαση στην ουρά αξιολόγησης κουρεμάτων.`})]}),g&&(0,h.jsxs)(h.Fragment,{children:[_.loading&&(0,h.jsx)(p,{rows:4}),_.error&&(0,h.jsx)(f,{message:_.error}),_.data&&_.data.length===0&&(0,h.jsx)(`div`,{className:`p-12 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center`,children:(0,h.jsx)(m,{title:`Καμία εκκρεμής υποβολή`,hint:`Όταν ένας student υποβάλει review κουρέματος, θα εμφανιστεί εδώ.`})}),_.data&&_.data.length>0&&(0,h.jsx)(`div`,{className:`rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl overflow-hidden`,children:(0,h.jsx)(`ul`,{className:`divide-y divide-white/5`,children:_.data.map(e=>(0,h.jsx)(`li`,{className:`group`,children:(0,h.jsxs)(t,{to:`/review/haircuts/$haircutId`,params:{haircutId:e.id},className:`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 transition-all duration-300 hover:bg-gradient-to-r hover:from-white/[0.04] hover:to-white/[0.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50`,children:[(0,h.jsxs)(`div`,{className:`flex items-start gap-4 min-w-0`,children:[(0,h.jsx)(`div`,{className:`p-3 rounded-2xl bg-black/60 border border-white/10 text-orange-400 group-hover:border-orange-500/40 group-hover:scale-105 transition-all duration-300 shrink-0`,children:(0,h.jsx)(o,{className:`w-5 h-5`})}),(0,h.jsxs)(`div`,{className:`min-w-0`,children:[(0,h.jsxs)(`p`,{className:`truncate text-base font-bold text-white group-hover:text-orange-400 transition-colors`,children:[e.method_description.slice(0,60),e.method_description.length>60?`…`:``]}),(0,h.jsx)(`p`,{className:`flex items-center gap-2 truncate text-xs text-zinc-400 mt-1`,children:(0,h.jsxs)(`span`,{className:`flex items-center gap-1 text-zinc-300`,children:[(0,h.jsx)(l,{className:`w-3.5 h-3.5 text-zinc-500`}),e.student?.full_name??`Άγνωστος μαθητής`]})})]})]}),(0,h.jsxs)(`div`,{className:`flex items-center gap-4 self-end sm:self-center shrink-0`,children:[(0,h.jsx)(`span`,{className:`rounded-full bg-orange-500/10 border border-orange-500/20 px-3.5 py-1 text-xs font-semibold tracking-wide text-orange-400 uppercase`,children:e.status}),(0,h.jsx)(`div`,{className:`w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500 transition-all duration-300`,children:(0,h.jsx)(a,{className:`w-4 h-4`})})]})]})},e.id))})})]})]})]})}export{g as component};
+=== END FILE ===
+

@@ -1,0 +1,1309 @@
+=== FILE: src/components/aura/CookieConsentBanner.tsx ===
+// src/components/aura/CookieConsentBanner.tsx
+import { AnimatePresence, motion } from "motion/react";
+import { Link } from "@tanstack/react-router";
+import { useCookieConsent } from "@/lib/cookieConsent";
+
+export function CookieConsentBanner() {
+  const { status, accept, reject } = useCookieConsent();
+  const visible = status === null;
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ y: 80, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 80, opacity: 0 }}
+          transition={{ type: "tween", duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          role="dialog"
+          aria-live="polite"
+          aria-label="Πολιτική Cookies"
+          className="fixed inset-x-0 bottom-0 z-[60] px-4 pb-4 sm:px-6 sm:pb-6"
+        >
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 rounded-2xl border border-white/15 bg-[#050505]/95 p-5 shadow-[0_0_40px_-10px_rgba(255,255,255,0.12)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="max-w-xl">
+              <p className="text-[10px] font-extralight uppercase tracking-[0.35em] text-neutral-400">
+                Cookies
+              </p>
+              <p className="mt-2 text-sm font-extralight leading-relaxed text-neutral-200">
+                Χρησιμοποιούμε cookies για τη σωστή λειτουργία της πλατφόρμας (σύνδεση χρήστη,
+                προτίμηση γλώσσας) και, εφόσον το επιτρέψετε, για στατιστικά χρήσης. Δείτε την{" "}
+                <Link
+                  to="/cookie-policy"
+                  className="underline decoration-white/30 underline-offset-2 transition-colors hover:text-white"
+                >
+                  πολιτική cookies
+                </Link>
+                .
+              </p>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={reject}
+                className="rounded-full border border-white/20 px-5 py-2.5 text-[10px] font-extralight uppercase tracking-[0.3em] text-neutral-300 transition-all duration-300 hover:border-white/45 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              >
+                Απόρριψη
+              </button>
+              <button
+                type="button"
+                onClick={accept}
+                className="rounded-full border border-white/20 bg-neutral-100 px-5 py-2.5 text-[10px] font-medium uppercase tracking-[0.3em] text-black transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0_24px_-8px_rgba(255,255,255,0.5)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              >
+                Αποδοχή
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/jobs/FindJob.tsx ===
+// src/components/aura/jobs/FindJob.tsx
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  Banknote,
+  Briefcase,
+  Clock,
+  Gem,
+  Globe,
+  Instagram,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCw,
+  Search,
+  Send,
+  Store,
+  X,
+} from "lucide-react";
+import {
+  LEVELS,
+  applyMailto,
+  errText,
+  instagramUrl,
+  isNew,
+  logoUrl,
+  mapsLink,
+  safeUrl,
+  sb,
+  telHref,
+  type JobListing,
+} from "@/lib/jobs";
+import { jobsCss } from "./jobsTheme";
+
+const DESCRIPTION = "Σε συνεργασία με διάφορα barbershops βοηθάμε τους μαθητές μας να βρουν εύκολα δουλειά.";
+
+/* ------------------------------------------------------------------ */
+/* Small pieces                                                        */
+/* ------------------------------------------------------------------ */
+
+function Logo({ job, size }: { job: JobListing; size: number }) {
+  const [broken, setBroken] = useState(false);
+  const url = useMemo(() => logoUrl(job.logo_path), [job.logo_path]);
+  return (
+    <span className="fj-logo" style={{ width: size, height: size }}>
+      <span className="fj-logo-in">
+        {url && !broken ? (
+          <img src={url} alt={`${job.shop_name} logo`} loading="lazy" onError={() => setBroken(true)} />
+        ) : (
+          <span className="fj-chrome" style={{ fontSize: size * 0.42 }}>
+            {job.shop_name.trim().slice(0, 1).toUpperCase() || <Store className="size-5" />}
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+const JobCard = memo(function JobCard({
+  job,
+  index,
+  onOpen,
+}: {
+  job: JobListing;
+  index: number;
+  onOpen: (job: JobListing) => void;
+}) {
+  return (
+    <div
+      className="fj-card"
+      role="button"
+      tabIndex={0}
+      style={{ "--i": Math.min(index, 12) } as CSSProperties}
+      onClick={() => onOpen(job)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(job);
+        }
+      }}
+      aria-label={`${job.shop_name} – ${job.title}. View details`}
+    >
+      {isNew(job.created_at) && <span className="fj-new">NEW</span>}
+
+      <div className="fj-card-top">
+        <Logo job={job} size={64} />
+        <div className="min-w-0">
+          <h3 className="fj-shop">{job.shop_name}</h3>
+          <p className="fj-role">{job.title}</p>
+        </div>
+      </div>
+
+      <div className="fj-meta">
+        <span>
+          <MapPin className="size-4" aria-hidden />
+          {job.city}
+        </span>
+        {job.employment_type && (
+          <span>
+            <Clock className="size-4" aria-hidden />
+            {job.employment_type}
+          </span>
+        )}
+      </div>
+
+      {(job.level || job.experience) && (
+        <div className="fj-tags">
+          {job.level && (
+            <span className="fj-chip">
+              <Gem className="size-3" aria-hidden />
+              {job.level}
+            </span>
+          )}
+          {job.experience && (
+            <span className="fj-chip">
+              <Briefcase className="size-3" aria-hidden />
+              {job.experience}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="fj-card-foot">
+        <span className="fj-salary fj-chrome">
+          <Banknote className="size-5" style={{ color: "#cfd4dc" }} aria-hidden />
+          {job.salary}
+        </span>
+        <span className="fj-more">
+          Details <ArrowUpRight className="size-4" aria-hidden />
+        </span>
+      </div>
+    </div>
+  );
+});
+
+function Fact({
+  icon,
+  label,
+  value,
+  href,
+  external,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  href?: string;
+  external?: boolean;
+}) {
+  const inner = (
+    <>
+      {icon}
+      <div className="min-w-0">
+        <small>{label}</small>
+        <span>{value}</span>
+      </div>
+    </>
+  );
+  return href ? (
+    <a className="fj-fact" href={href} {...(external ? { target: "_blank", rel: "noreferrer noopener" } : {})}>
+      {inner}
+    </a>
+  ) : (
+    <div className="fj-fact">{inner}</div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Details modal                                                       */
+/* ------------------------------------------------------------------ */
+
+function JobModal({
+  job,
+  applicant,
+  onClose,
+}: {
+  job: JobListing;
+  applicant: { name: string; email: string };
+  onClose: () => void;
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const website = safeUrl(job.website);
+  const insta = instagramUrl(job.instagram);
+
+  return (
+    <div className="fj-layer" onPointerDown={onClose}>
+      <div
+        className="fj-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${job.shop_name} – ${job.title}`}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="fj-modal-head">
+          <Logo job={job} size={72} />
+          <div className="min-w-0 pr-10">
+            <h2 className="fj-shop fj-chrome" style={{ fontSize: "1.7rem" }}>
+              {job.shop_name}
+            </h2>
+            <p className="fj-role">{job.title}</p>
+          </div>
+          <button ref={closeRef} type="button" className="fj-iconbtn" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="fj-modal-body">
+          <div className="fj-tags" style={{ marginBottom: 20 }}>
+            <span className="fj-chip">
+              <Banknote className="size-3" aria-hidden />
+              {job.salary}
+            </span>
+            {job.employment_type && <span className="fj-chip">{job.employment_type}</span>}
+            {job.level && (
+              <span className="fj-chip">
+                <Gem className="size-3" aria-hidden />
+                {job.level}
+              </span>
+            )}
+            {job.experience && (
+              <span className="fj-chip">
+                <Briefcase className="size-3" aria-hidden />
+                {job.experience}
+              </span>
+            )}
+          </div>
+
+          <h3 className="fj-h">About the barbershop</h3>
+          <p className="fj-desc">{job.description}</p>
+
+          <div className="fj-facts">
+            <Fact
+              icon={<MapPin className="size-4" />}
+              label="Location"
+              value={`${job.address}, ${job.city}`}
+              href={mapsLink(job)}
+              external
+            />
+            {job.phone && <Fact icon={<Phone className="size-4" />} label="Phone" value={job.phone} href={telHref(job.phone)} />}
+            <Fact icon={<Mail className="size-4" />} label="Email" value={job.email} href={`mailto:${job.email}`} />
+            {website && (
+              <Fact
+                icon={<Globe className="size-4" />}
+                label="Website"
+                value={website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                href={website}
+                external
+              />
+            )}
+            {insta && (
+              <Fact
+                icon={<Instagram className="size-4" />}
+                label="Instagram"
+                value={job.instagram?.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "@").replace(/\/$/, "") ?? ""}
+                href={insta}
+                external
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="fj-modal-foot">
+          <a className="fj-btn fj-btn-chrome fj-apply" href={applyMailto(job, applicant)}>
+            <Send className="size-4" aria-hidden />
+            Apply for this job
+          </a>
+          <p className="fj-foot-note">Opens your email app with a ready message to {job.shop_name}.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
+export default function FindJob({ applicant }: { applicant: { name: string; email: string } }) {
+  const [jobs, setJobs] = useState<JobListing[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState("");
+  const [city, setCity] = useState("all");
+  const [level, setLevel] = useState<string>("all");
+  const [open, setOpen] = useState<JobListing | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const { data, error: e } = await sb
+      .from("job_listings")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+    if (e) {
+      setError(errText(e, "Could not load the job listings."));
+      setLoading(false);
+      return;
+    }
+    setJobs((data ?? []) as JobListing[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const cities = useMemo(
+    () => Array.from(new Set(jobs.map((j) => j.city.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [jobs],
+  );
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return jobs.filter((j) => {
+      if (city !== "all" && j.city.trim() !== city) return false;
+      if (level !== "all" && j.level !== level) return false;
+      if (!needle) return true;
+      return [j.shop_name, j.title, j.city, j.address, j.description].some((s) => s.toLowerCase().includes(needle));
+    });
+  }, [jobs, q, city, level]);
+
+  const closeModal = useCallback(() => setOpen(null), []);
+
+  return (
+    <div className="fj-root">
+      <style>{jobsCss}</style>
+
+      <div className="fj-wrap">
+        <header className="fj-head">
+          <h1 className="fj-title fj-chrome">Find Job with ΛURΛ</h1>
+          <span className="fj-rule" aria-hidden />
+          <p className="fj-sub">{DESCRIPTION}</p>
+          {!loading && !error && (
+            <span className="fj-count">
+              <i aria-hidden />
+              {jobs.length} open {jobs.length === 1 ? "position" : "positions"}
+            </span>
+          )}
+        </header>
+
+        {!loading && !error && jobs.length > 0 && (
+          <div className="fj-toolbar">
+            <label className="fj-search">
+              <Search className="size-4 shrink-0" aria-hidden />
+              <input
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search barbershop, city or role…"
+                aria-label="Search job listings"
+              />
+            </label>
+
+            {cities.length > 1 && (
+              <select className="fj-select" value={city} onChange={(e) => setCity(e.target.value)} aria-label="Filter by city">
+                <option value="all">All cities</option>
+                {cities.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            <div className="fj-pills" role="group" aria-label="Filter by level">
+              {["all", ...LEVELS].map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  className={`fj-pill ${level === l ? "fj-pill-on" : ""}`}
+                  aria-pressed={level === l}
+                  onClick={() => setLevel(l)}
+                >
+                  {l === "all" ? "All levels" : l}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {error ? (
+          <div className="fj-state">
+            <AlertCircle className="size-9 opacity-70" />
+            <h3>We couldn’t load the listings</h3>
+            <p style={{ fontSize: 13 }}>{error}</p>
+            <button type="button" className="fj-btn" onClick={() => void load()}>
+              <RefreshCw className="size-4" /> Try again
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="fj-grid" style={{ marginTop: 34 }} aria-busy="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <span key={i} className="fj-skel" />
+            ))}
+          </div>
+        ) : jobs.length === 0 ? (
+          <div className="fj-state">
+            <Store className="size-10 opacity-60" />
+            <h3>New opportunities are coming</h3>
+            <p style={{ maxWidth: 420 }}>No positions are open right now. Check back soon, new barbershops join ΛURΛ regularly.</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="fj-state">
+            <Search className="size-9 opacity-60" />
+            <h3>No matches</h3>
+            <p>Try a different search or clear the filters.</p>
+            <button
+              type="button"
+              className="fj-btn"
+              onClick={() => {
+                setQ("");
+                setCity("all");
+                setLevel("all");
+              }}
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="fj-grid">
+            {filtered.map((job, i) => (
+              <JobCard key={job.id} job={job} index={i} onOpen={setOpen} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {open && <JobModal job={open} applicant={applicant} onClose={closeModal} />}
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/hooks/useProfile.tsx ===
+// src/hooks/useProfile.tsx
+import { useCallback, useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { db, type Profile } from "@/lib/db";
+
+interface UseProfile {
+  profile: Profile | null;
+  loading: boolean;
+  error: string | null;
+  updateProfile: (
+    patch: Partial<Pick<Profile, "full_name" | "avatar_url">>,
+  ) => Promise<void>;
+  refresh: () => Promise<void>;
+}
+
+export function useProfile(user: User | null): UseProfile {
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const { data, error: selectErr } = await db
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (selectErr) {
+      setError(selectErr.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
+      setProfile(data as Profile);
+      setLoading(false);
+      return;
+    }
+
+    // No row yet — create one from the auth metadata (email or Google).
+    const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
+    const seed = {
+      id: user.id,
+      email: user.email ?? null,
+      full_name:
+        (meta.full_name as string | undefined) ??
+        (meta.name as string | undefined) ??
+        null,
+      avatar_url: (meta.avatar_url as string | undefined) ?? null,
+    };
+
+    const { data: created, error: upsertErr } = await db
+      .from("profiles")
+      .upsert(seed, { onConflict: "id" })
+      .select("*")
+      .single();
+
+    if (upsertErr) setError(upsertErr.message);
+    else setProfile(created as Profile);
+
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const updateProfile = useCallback(
+    async (patch: Partial<Pick<Profile, "full_name" | "avatar_url">>) => {
+      if (!user) return;
+      const { data, error: updateErr } = await db
+        .from("profiles")
+        .update(patch)
+        .eq("id", user.id)
+        .select("*")
+        .single();
+      if (updateErr) throw updateErr;
+      setProfile(data as Profile);
+    },
+    [user],
+  );
+
+  return { profile, loading, error, updateProfile, refresh: load };
+}
+=== END FILE ===
+
+=== FILE: src/lib/portfolio.ts ===
+// src/lib/portfolio.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCallback, useEffect, useState } from "react";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+import { useSubscription } from "@/lib/useSubscription";
+
+// The portfolio tables/functions are not in the generated types yet.
+const sb = db as unknown as SupabaseClient;
+
+export const PORTFOLIO_BUCKET = "portfolio";
+export const MAX_POSTS = 120;
+export const CAPTION_MAX = 2200;
+
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+
+export interface BoardEntry {
+  slug: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  headline: string;
+  city: string;
+  posts_count: number;
+  likes_count: number;
+  cover_path: string | null;
+  created_at: string;
+}
+
+export interface PortfolioInfo {
+  user_id: string;
+  slug: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  headline: string;
+  bio: string;
+  city: string;
+  instagram: string;
+  posts_count: number;
+  likes_count: number;
+  created_at: string;
+  is_live: boolean;
+  is_owner: boolean;
+}
+
+export interface PortfolioPost {
+  id: string;
+  image_path: string;
+  caption: string;
+  created_at: string;
+  like_count: number;
+  liked_by_me: boolean;
+}
+
+export interface MyPortfolio {
+  slug: string;
+  headline: string;
+  bio: string;
+  city: string;
+  instagram: string;
+}
+
+export interface PortfolioForm {
+  headline: string;
+  bio: string;
+  city: string;
+  instagram: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function errMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "message" in e && typeof (e as any).message === "string") {
+    return (e as any).message as string;
+  }
+  return fallback;
+}
+
+/**
+ * Short random id for file names.
+ * crypto.randomUUID() only exists on HTTPS / localhost, so we fall back safely.
+ */
+function randomId(): string {
+  try {
+    if (typeof crypto !== "undefined") {
+      if (typeof crypto.randomUUID === "function") return crypto.randomUUID().slice(0, 8);
+      if (typeof crypto.getRandomValues === "function") {
+        const bytes = new Uint8Array(4);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return Math.random().toString(36).slice(2, 10);
+}
+
+/* ------------------------------------------------------------------ */
+/* Reads                                                               */
+/* ------------------------------------------------------------------ */
+
+export function imageUrl(path: string): string {
+  return sb.storage.from(PORTFOLIO_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
+export async function fetchBoard(): Promise<BoardEntry[]> {
+  const { data, error } = await sb.rpc("portfolio_board");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as BoardEntry[];
+}
+
+export async function fetchPortfolio(slug: string): Promise<PortfolioInfo | null> {
+  const { data, error } = await sb.rpc("portfolio_get", { p_slug: slug });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as PortfolioInfo[];
+  return rows[0] ?? null;
+}
+
+export async function fetchPosts(userId: string, offset = 0, limit = 60): Promise<PortfolioPost[]> {
+  const { data, error } = await sb.rpc("portfolio_posts", {
+    p_user: userId,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as PortfolioPost[];
+}
+
+export async function fetchMyPortfolio(userId: string): Promise<MyPortfolio | null> {
+  const { data, error } = await sb
+    .from("portfolios")
+    .select("slug, headline, bio, city, instagram")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as MyPortfolio | null) ?? null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Writes                                                              */
+/* ------------------------------------------------------------------ */
+
+export async function createPortfolio(form: PortfolioForm): Promise<string> {
+  const { data, error } = await sb.rpc("create_my_portfolio", {
+    p_headline: form.headline,
+    p_bio: form.bio,
+    p_city: form.city,
+    p_instagram: form.instagram,
+  });
+  if (error) throw new Error(error.message);
+  if (typeof data !== "string" || !data) throw new Error("Το portfolio δεν δημιουργήθηκε.");
+  return data;
+}
+
+export async function updatePortfolio(userId: string, form: PortfolioForm): Promise<void> {
+  const { error } = await sb
+    .from("portfolios")
+    .update({
+      headline: form.headline.trim().slice(0, 80),
+      bio: form.bio.trim().slice(0, 500),
+      city: form.city.trim().slice(0, 60),
+      instagram: form.instagram.replace(/[^A-Za-z0-9._]/g, "").slice(0, 40),
+    })
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+}
+
+/** Returns the new like state with the exact server count. */
+export async function toggleLike(postId: string): Promise<{ liked: boolean; like_count: number }> {
+  const { data, error } = await sb.rpc("toggle_portfolio_like", { p_post: postId });
+  if (error) throw new Error(error.message);
+  const row = (Array.isArray(data) ? data[0] : data) as { liked: boolean; like_count: number } | undefined;
+  if (!row) throw new Error("Το like δεν αποθηκεύτηκε.");
+  return row;
+}
+
+/** Shrinks a photo in the browser (max side, JPEG) so uploads are fast and light. */
+export async function compressImage(file: File, maxSide = 1600, quality = 0.86): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Η εικόνα δεν μπόρεσε να διαβαστεί. Δοκίμασε JPG, PNG ή WebP."));
+      el.src = url;
+    });
+
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Ο browser δεν υποστηρίζει επεξεργασία εικόνας.");
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (!blob) throw new Error("Η συμπίεση της εικόνας απέτυχε.");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+export async function publishPost(userId: string, file: File, caption: string): Promise<PortfolioPost> {
+  const blob = await compressImage(file);
+  const path = `${userId}/${Date.now()}-${randomId()}.jpg`;
+
+  const up = await sb.storage.from(PORTFOLIO_BUCKET).upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: false,
+  });
+  if (up.error) throw new Error(up.error.message);
+
+  const { data, error } = await sb
+    .from("portfolio_posts")
+    .insert({ user_id: userId, image_path: path, caption: caption.trim().slice(0, CAPTION_MAX) })
+    .select("id, image_path, caption, created_at")
+    .single();
+
+  if (error) {
+    void sb.storage.from(PORTFOLIO_BUCKET).remove([path]); // don't leave an orphan file
+    throw new Error(errMessage(error, "Το post δεν δημοσιεύτηκε."));
+  }
+
+  return { ...(data as Omit<PortfolioPost, "like_count" | "liked_by_me">), like_count: 0, liked_by_me: false };
+}
+
+export async function deletePost(post: PortfolioPost): Promise<void> {
+  const { error } = await sb.from("portfolio_posts").delete().eq("id", post.id);
+  if (error) throw new Error(error.message);
+  void sb.storage.from(PORTFOLIO_BUCKET).remove([post.image_path]);
+}
+
+/* ------------------------------------------------------------------ */
+/* Hooks                                                               */
+/* ------------------------------------------------------------------ */
+
+/** Is this user on the active AURA ELITE plan (plan id "high")? */
+export function useIsElite(userId: string | undefined): { isElite: boolean; loading: boolean } {
+  const { subscription, hasAccess, loading } = useSubscription(userId);
+  return { isElite: Boolean(hasAccess) && subscription?.plan_id === "high", loading };
+}
+
+/** The signed-in user's own portfolio (null = none yet). Pass undefined to skip loading. */
+export function useMyPortfolio(userId: string | undefined): {
+  portfolio: MyPortfolio | null;
+  loading: boolean;
+  refresh: () => void;
+} {
+  const [portfolio, setPortfolio] = useState<MyPortfolio | null>(null);
+  const [loading, setLoading] = useState<boolean>(Boolean(userId));
+  const [tick, setTick] = useState(0);
+
+  const refresh = useCallback(() => setTick((n) => n + 1), []);
+
+  useEffect(() => {
+    let active = true;
+    if (!userId) {
+      setPortfolio(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    fetchMyPortfolio(userId)
+      .then((p) => {
+        if (active) setPortfolio(p);
+      })
+      .catch(() => {
+        if (active) setPortfolio(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [userId, tick]);
+
+  return { portfolio, loading, refresh };
+}
+=== END FILE ===
+
+=== FILE: src/lib/push.ts ===
+// src/lib/push.ts  — browser side of the admin push notifications
+import { supabase } from "@/lib/supabase";
+
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined;
+
+export type PushState = "unsupported" | "insecure" | "denied" | "enabled" | "disabled";
+
+export interface AdminNotification {
+  id: string;
+  created_at: string;
+  type: string;
+  title: string;
+  body: string;
+  url: string | null;
+}
+
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+/** Notifications need HTTPS (or localhost): plain http sites cannot use them. */
+export function pushState(): PushState | "check" {
+  if (typeof window === "undefined") return "unsupported";
+  if (!window.isSecureContext) return "insecure";
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    return "unsupported";
+  }
+  if (Notification.permission === "denied") return "denied";
+  return "check";
+}
+
+/** Is THIS browser currently subscribed? */
+export async function getPushState(): Promise<PushState> {
+  const quick = pushState();
+  if (quick !== "check") return quick;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+    const sub = await reg?.pushManager.getSubscription();
+    return sub && Notification.permission === "granted" ? "enabled" : "disabled";
+  } catch {
+    return "disabled";
+  }
+}
+
+export async function enablePush(): Promise<void> {
+  const quick = pushState();
+  if (quick === "insecure") throw new Error("Οι ειδοποιήσεις χρειάζονται HTTPS. Το site τρέχει σε http.");
+  if (quick === "unsupported") throw new Error("Ο browser δεν υποστηρίζει push ειδοποιήσεις.");
+  if (quick === "denied") {
+    throw new Error("Οι ειδοποιήσεις είναι μπλοκαρισμένες. Επίτρεψέ τες από το εικονίδιο κλειδαριάς δίπλα στη διεύθυνση.");
+  }
+  if (!VAPID_PUBLIC_KEY) throw new Error("Λείπει το VITE_VAPID_PUBLIC_KEY.");
+
+  const reg = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.ready;
+
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") throw new Error("Δεν δόθηκε άδεια για ειδοποιήσεις.");
+
+  const sub =
+    (await reg.pushManager.getSubscription()) ??
+    (await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+    }));
+
+  const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+  if (!json.endpoint || !json.keys?.p256dh || !json.keys.auth) {
+    throw new Error("Η εγγραφή στις ειδοποιήσεις δεν ολοκληρώθηκε.");
+  }
+
+  const { error } = await supabase.rpc("register_push_subscription", {
+    p_endpoint: json.endpoint,
+    p_p256dh: json.keys.p256dh,
+    p_auth: json.keys.auth,
+    p_user_agent: navigator.userAgent,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function disablePush(): Promise<void> {
+  const reg = await navigator.serviceWorker.getRegistration("/sw.js");
+  const sub = await reg?.pushManager.getSubscription();
+  if (!sub) return;
+  await supabase.rpc("unregister_push_subscription", { p_endpoint: sub.endpoint });
+  await sub.unsubscribe();
+}
+
+/** Creates a test row: the database webhook then pushes it like a real event. */
+export async function sendTestNotification(): Promise<void> {
+  const { error } = await supabase.from("admin_notifications").insert({
+    type: "test",
+    title: "Δοκιμαστική ειδοποίηση",
+    body: "Οι ειδοποιήσεις του AURA λειτουργούν σωστά.",
+    url: "/admin/notifications",
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function getRecentNotifications(limit = 30): Promise<AdminNotification[]> {
+  const { data, error } = await supabase
+    .from("admin_notifications")
+    .select("id, created_at, type, title, body, url")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as AdminNotification[];
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/admin.courses.index-Cw0jMneg.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{t as n}from"./react-D9fOyxUn.js";import{y as r}from"./queries-B7Arqryn.js";import{r as i}from"./roles-D-HGCJsI.js";import{n as a}from"./plans-BkcWWgXs.js";import{t as o}from"./useAsync-CZJ1G06G.js";import{f as s}from"./courses-LEqLhg7m.js";import{t as c}from"./ChromeButton-CdfVnEPs.js";var l=e();async function u(){let e=await r();if(!i(e.role))throw Error(`Δεν έχεις δικαίωμα διαχείρισης courses.`);return s()}function d(){let{data:e,error:r,loading:i}=o(u,[]);return(0,l.jsxs)(`main`,{className:`mx-auto max-w-5xl px-5 pb-28 pt-28 sm:pt-32`,children:[(0,l.jsxs)(`div`,{className:`flex flex-wrap items-end justify-between gap-5`,children:[(0,l.jsxs)(`div`,{children:[(0,l.jsx)(t,{to:`/admin`,className:`text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200`,children:`← ADMIN`}),(0,l.jsx)(`h1`,{className:`mt-3 text-3xl font-semibold tracking-tight text-neutral-100`,children:`Courses`})]}),(0,l.jsx)(t,{to:`/admin/courses/new`,children:(0,l.jsx)(c,{type:`button`,children:`+ ΝΕΟ COURSE`})})]}),i?(0,l.jsx)(`div`,{className:`mt-12 space-y-3`,children:[0,1,2].map(e=>(0,l.jsx)(`div`,{className:`h-16 animate-pulse rounded-xl bg-white/[0.04]`},e))}):null,r?(0,l.jsx)(`p`,{className:`mt-12 text-sm text-red-400`,role:`alert`,children:r instanceof Error?r.message:String(r)}):null,e&&e.length===0?(0,l.jsx)(`p`,{className:`mt-12 text-sm text-neutral-500`,children:`Δεν υπάρχει κανένα course ακόμη.`}):null,e&&e.length>0?(0,l.jsx)(`ul`,{className:`mt-12 space-y-3`,children:e.map((e,r)=>(0,l.jsx)(n.li,{initial:{opacity:0,y:12},animate:{opacity:1,y:0},transition:{duration:.35,delay:Math.min(r*.04,.3)},children:(0,l.jsxs)(t,{to:`/admin/courses/$courseId`,params:{courseId:e.id},className:`flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4 transition hover:border-white/30 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60`,children:[(0,l.jsxs)(`div`,{className:`min-w-0`,children:[(0,l.jsx)(`p`,{className:`truncate text-sm font-medium text-neutral-100`,children:e.title}),(0,l.jsxs)(`p`,{className:`mt-1 text-[10px] uppercase tracking-[0.3em] text-neutral-500`,children:[`/`,e.slug,` · `,e.step_count,` ΒΗΜΑΤΑ ·`,` `,a(e.required_plan)?.name??e.required_plan]})]}),(0,l.jsx)(`span`,{className:[`shrink-0 rounded-full border px-3 py-1 text-[9px] uppercase tracking-[0.3em]`,e.status===`published`?`border-white/30 text-neutral-100`:`border-white/10 text-neutral-500`].join(` `),children:e.status})]})},e.id))}):null]})}export{d as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/chrome-DYZby3h2.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{t as n}from"./use-reduced-motion-CNAPwhZE.js";import{t as r}from"./react-D9fOyxUn.js";import{t as i}from"./arrow-right-D_t5sPRj.js";var a=e(),o=[.22,1,.36,1],s=`linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)`,c=`linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)`,l=`linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))`,u=`w-full rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/90 outline-none transition-all duration-300 placeholder:text-white/25 focus:border-white/50 focus:bg-black/80 focus:shadow-[0_0_26px_rgba(255,255,255,0.1)] focus:ring-2 focus:ring-white/15 disabled:opacity-50`;function d({children:e,className:t=``}){let i=n();return(0,a.jsx)(r.span,{initial:{backgroundPosition:`0% 50%`},animate:i?void 0:{backgroundPosition:`100% 50%`},transition:{duration:4,repeat:1/0,repeatType:`reverse`,ease:`easeInOut`},style:{backgroundImage:s,backgroundSize:`300% auto`,WebkitBackgroundClip:`text`,backgroundClip:`text`,WebkitTextFillColor:`transparent`},className:`inline-block drop-shadow-[0_0_28px_rgba(255,255,255,0.45)] ${t}`,children:e})}function f({children:e,className:t=``,inner:n=`p-6`}){return(0,a.jsx)(`div`,{className:`relative rounded-3xl p-px ${t}`,style:{background:l,boxShadow:`0 0 60px rgba(0,0,0,0.9)`},children:(0,a.jsxs)(`div`,{className:`relative h-full overflow-hidden rounded-[23px] bg-[#0a0a0b] ${n}`,children:[(0,a.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-x-0 top-0 h-24`,style:{background:`linear-gradient(180deg, rgba(255,255,255,0.05), transparent)`}}),(0,a.jsx)(`div`,{className:`relative`,children:e})]})})}function p(){return n()?null:(0,a.jsx)(r.span,{"aria-hidden":!0,className:`pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent`,animate:{x:[`-160%`,`420%`]},transition:{duration:1.8,repeat:1/0,repeatDelay:3.2,ease:`easeInOut`},style:{skewX:-18}})}var m={backgroundImage:c,boxShadow:`inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.18)`},h=`group relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full px-8 py-3.5 text-sm font-bold outline-none transition-shadow duration-300 focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:pointer-events-none disabled:opacity-40`,g=`text-neutral-950 hover:shadow-[0_0_50px_rgba(255,255,255,0.4)]`,_=`border border-white/25 bg-white/[0.04] text-white hover:border-white/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.14)]`;function v({children:e,solid:t=!0,className:n=``,...i}){return(0,a.jsx)(r.div,{whileHover:i.disabled?void 0:{y:-2,scale:1.03},whileTap:i.disabled?void 0:{scale:.97},className:`inline-block ${n}`,children:(0,a.jsxs)(`button`,{...i,className:`${h} ${t?g:_} w-full`,style:t?m:void 0,children:[t&&(0,a.jsx)(p,{}),(0,a.jsx)(`span`,{className:`relative inline-flex items-center gap-2.5`,children:e})]})})}function y({to:e,children:n,solid:o=!0,arrow:s=!0,className:c=``}){return(0,a.jsx)(r.div,{whileHover:{y:-2,scale:1.03},whileTap:{scale:.97},className:`inline-block ${c}`,children:(0,a.jsxs)(t,{to:e,className:`${h} ${o?g:_}`,style:o?m:void 0,children:[o&&(0,a.jsx)(p,{}),(0,a.jsxs)(`span`,{className:`relative inline-flex items-center gap-2.5`,children:[n,s&&(0,a.jsx)(i,{className:`size-4 transition-transform duration-300 group-hover:translate-x-1`})]})]})})}export{o as a,u as c,d as i,v as n,l as o,y as r,f as s,c as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/ChromeButton-CdfVnEPs.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";var r=e(n(),1),i=t(),a=(0,r.forwardRef)(({variant:e=`primary`,className:t=``,children:n,...r},a)=>(0,i.jsx)(`button`,{ref:a,className:`font-aura relative inline-flex items-center justify-center rounded-full px-7 py-3 text-sm font-medium tracking-wide transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/40 disabled:opacity-50 ${e===`primary`?`btn-sweep bg-aura-surface text-aura-white border border-white/15 hover:-translate-y-0.5 hover:border-white/40 hover:shadow-[0_0_28px_-6px_rgba(255,255,255,0.22)]`:`bg-transparent text-aura-text-secondary border border-white/10 hover:-translate-y-0.5 hover:text-aura-white hover:border-white/25`} ${t}`,...r,children:n}));a.displayName=`ChromeButton`;export{a as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/method-BzRLtaFi.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./Footer-Bkdzkq98.js";import{t as a}from"./ChromeButton-CdfVnEPs.js";var o=e(n(),1),s=t(),c=[{index:`01`,title:`OBSERVE`,subtitle:`Παρατήρησε πριν αγγίξεις`,body:`Κάθε κεφάλι είναι διαφορετικό. Πριν πιάσεις ψαλίδι, μαθαίνεις να διαβάζεις σχήμα κρανίου, γραμμή μαλλιών, πυκνότητα, κατεύθυνση φυσικής πτώσης και αναλογίες προσώπου. Η παρατήρηση είναι δεξιότητα, όχι ταλέντο.`,image:`/images/method/observe.jpg`},{index:`02`,title:`ANALYZE`,subtitle:`Κατάλαβε το γιατί`,body:`Μετατρέπεις αυτό που βλέπεις σε δεδομένα: τι δουλεύει, τι δημιουργεί πρόβλημα, τι περιορίζει το αποτέλεσμα. Εδώ σταματάει η αντιγραφή και ξεκινάει η κρίση.`,image:`/images/method/analyze.jpg`},{index:`03`,title:`DESIGN`,subtitle:`Σχεδίασε το αποτέλεσμα`,body:`Πριν το πρώτο πέρασμα, υπάρχει πλάνο: γραμμές, βάρη, μεταβάσεις, τελικό σχήμα. Ένα κούρεμα σχεδιάζεται στο μυαλό και μετά εκτελείται στα χέρια.`,image:`/images/method/design.jpg`},{index:`04`,title:`EXECUTE`,subtitle:`Εκτέλεσε με ακρίβεια`,body:`Τεχνική, σειρά κινήσεων, έλεγχος πίεσης, σωστό εργαλείο στη σωστή στιγμή. Η εκτέλεση κρίνεται στη συνέπεια, όχι στην ταχύτητα.`,image:`/images/method/execute.jpg`},{index:`05`,title:`EVALUATE`,subtitle:`Αξιολόγησε με στοιχεία`,body:`Ανεβάζεις before / process / after, εξηγείς τι επέλεξες και γιατί, και παίρνεις δομημένο feedback από AURA educator πάνω σε συγκεκριμένο rubric. Αποδείξεις, όχι εντυπώσεις.`,image:`/images/method/evaluate.jpg`},{index:`06`,title:`EVOLVE`,subtitle:`Εξελίξου μετρήσιμα`,body:`Κάθε verified skill ξεκλειδώνει το επόμενο βήμα. Το επίπεδό σου δεν προχωράει επειδή πλήρωσες, αλλά επειδή αποδείχθηκε.`,image:`/images/method/evolve.jpg`}];function l({step:e}){let[t,n]=(0,o.useState)(!1);return(0,s.jsx)(`div`,{className:`relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A]`,children:t?(0,s.jsx)(`div`,{"aria-hidden":!0,className:`flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.10),transparent_60%)]`,children:(0,s.jsx)(`span`,{className:`text-5xl font-semibold tracking-[0.3em] text-white/10`,children:e.index})}):(0,s.jsx)(`img`,{src:e.image,alt:`AURA Method — ${e.title}`,loading:`lazy`,onError:()=>n(!0),className:`h-full w-full object-cover grayscale transition-all duration-700 hover:scale-[1.03] hover:grayscale-0`})})}function u(){return(0,s.jsx)(`ol`,{className:`space-y-20`,children:c.map((e,t)=>(0,s.jsxs)(`li`,{className:`grid items-center gap-8 lg:grid-cols-2 lg:gap-14`,children:[(0,s.jsx)(`div`,{className:t%2==1?`lg:order-2`:void 0,children:(0,s.jsx)(l,{step:e})}),(0,s.jsxs)(`div`,{className:t%2==1?`lg:order-1`:void 0,children:[(0,s.jsxs)(`span`,{className:`text-xs uppercase tracking-[0.4em] text-neutral-600`,children:[`STEP `,e.index]}),(0,s.jsx)(`h3`,{className:`mt-3 text-3xl font-semibold tracking-tight text-neutral-100 sm:text-4xl`,children:e.title}),(0,s.jsx)(`p`,{className:`mt-2 text-sm uppercase tracking-[0.2em] text-neutral-500`,children:e.subtitle}),(0,s.jsx)(`p`,{className:`mt-5 max-w-prose text-base leading-relaxed text-neutral-400`,children:e.body})]})]},e.title))})}function d(){return(0,s.jsxs)(s.Fragment,{children:[(0,s.jsxs)(`main`,{className:`mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-40`,children:[(0,s.jsxs)(`header`,{className:`max-w-3xl`,children:[(0,s.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:`THE METHOD`}),(0,s.jsxs)(`h1`,{className:`mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-neutral-100 sm:text-6xl`,children:[`LEARN. PRACTICE.`,(0,s.jsx)(`br`,{}),`PROVE.`]}),(0,s.jsx)(`p`,{className:`mt-7 text-base leading-relaxed text-neutral-400`,children:`Η μέθοδος AURA είναι ένας κλειστός κύκλος έξι βημάτων. Δεν αντιγράφεις κουρέματα — μαθαίνεις να παίρνεις αποφάσεις και να τις υπερασπίζεσαι με αποτέλεσμα.`}),(0,s.jsx)(`p`,{className:`mt-4 font-mono text-xs uppercase tracking-[0.2em] text-neutral-500`,children:`OBSERVE → ANALYZE → DESIGN → EXECUTE → EVALUATE → EVOLVE`})]}),(0,s.jsx)(`section`,{className:`mt-24`,children:(0,s.jsx)(u,{})}),(0,s.jsxs)(`section`,{className:`mt-24 rounded-2xl border border-white/10 bg-[#0A0A0A] p-8 text-center sm:p-12`,children:[(0,s.jsx)(`h2`,{className:`text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl`,children:`Έτοιμος να μπεις στη μέθοδο;`}),(0,s.jsx)(`p`,{className:`mx-auto mt-4 max-w-xl text-sm leading-relaxed text-neutral-400`,children:`Διάλεξε το πακέτο που ταιριάζει στο επίπεδό σου. Ακύρωση ανά πάσα στιγμή.`}),(0,s.jsx)(`div`,{className:`mt-8 flex justify-center`,children:(0,s.jsx)(r,{to:`/pricing`,children:(0,s.jsx)(a,{type:`button`,children:`ΔΕΣ ΤΙΣ ΤΙΜΕΣ`})})})]})]}),(0,s.jsx)(i,{})]})}export{d as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/admin.courses.index-ys7_idH1.mjs ===
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { y as getMyProfile } from "./queries-DCA4yifx.mjs";
+import { r as isContentRole } from "./roles-DmnR1ATT.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { n as getPlan } from "./plans-sHsWJraA.mjs";
+import { p as listAllCourses } from "./courses-A6CEttdz.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/admin.courses.index-ys7_idH1.js
+var import_jsx_runtime = require_jsx_runtime();
+async function loadAdminCourses() {
+	const profile = await getMyProfile();
+	if (!isContentRole(profile.role)) throw new Error("Δεν έχεις δικαίωμα διαχείρισης courses.");
+	return listAllCourses();
+}
+function AdminCoursesPage() {
+	const { data, error, loading } = useAsync(loadAdminCourses, []);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-5xl px-5 pb-28 pt-28 sm:pt-32",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap items-end justify-between gap-5",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/admin",
+					className: "text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200",
+					children: "← ADMIN"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+					className: "mt-3 text-3xl font-semibold tracking-tight text-neutral-100",
+					children: "Courses"
+				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/admin/courses/new",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						children: "+ ΝΕΟ COURSE"
+					})
+				})]
+			}),
+			loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-12 space-y-3",
+				children: [
+					0,
+					1,
+					2
+				].map((i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-16 animate-pulse rounded-xl bg-white/[0.04]" }, i))
+			}) : null,
+			error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-12 text-sm text-red-400",
+				role: "alert",
+				children: error instanceof Error ? error.message : String(error)
+			}) : null,
+			data && data.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-12 text-sm text-neutral-500",
+				children: "Δεν υπάρχει κανένα course ακόμη."
+			}) : null,
+			data && data.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+				className: "mt-12 space-y-3",
+				children: data.map((course, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.li, {
+					initial: {
+						opacity: 0,
+						y: 12
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					transition: {
+						duration: .35,
+						delay: Math.min(i * .04, .3)
+					},
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+						to: "/admin/courses/$courseId",
+						params: { courseId: course.id },
+						className: "flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4 transition hover:border-white/30 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "min-w-0",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "truncate text-sm font-medium text-neutral-100",
+								children: course.title
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+								className: "mt-1 text-[10px] uppercase tracking-[0.3em] text-neutral-500",
+								children: [
+									"/",
+									course.slug,
+									" · ",
+									course.step_count,
+									" ΒΗΜΑΤΑ ·",
+									" ",
+									getPlan(course.required_plan)?.name ?? course.required_plan
+								]
+							})]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: ["shrink-0 rounded-full border px-3 py-1 text-[9px] uppercase tracking-[0.3em]", course.status === "published" ? "border-white/30 text-neutral-100" : "border-white/10 text-neutral-500"].join(" "),
+							children: course.status
+						})]
+					})
+				}, course.id))
+			}) : null
+		]
+	});
+}
+//#endregion
+export { AdminCoursesPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/method-DZn8BolK.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as Footer } from "./Footer-CDaciXSR.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/method-DZn8BolK.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var STEPS = [
+	{
+		index: "01",
+		title: "OBSERVE",
+		subtitle: "Παρατήρησε πριν αγγίξεις",
+		body: "Κάθε κεφάλι είναι διαφορετικό. Πριν πιάσεις ψαλίδι, μαθαίνεις να διαβάζεις σχήμα κρανίου, γραμμή μαλλιών, πυκνότητα, κατεύθυνση φυσικής πτώσης και αναλογίες προσώπου. Η παρατήρηση είναι δεξιότητα, όχι ταλέντο.",
+		image: "/images/method/observe.jpg"
+	},
+	{
+		index: "02",
+		title: "ANALYZE",
+		subtitle: "Κατάλαβε το γιατί",
+		body: "Μετατρέπεις αυτό που βλέπεις σε δεδομένα: τι δουλεύει, τι δημιουργεί πρόβλημα, τι περιορίζει το αποτέλεσμα. Εδώ σταματάει η αντιγραφή και ξεκινάει η κρίση.",
+		image: "/images/method/analyze.jpg"
+	},
+	{
+		index: "03",
+		title: "DESIGN",
+		subtitle: "Σχεδίασε το αποτέλεσμα",
+		body: "Πριν το πρώτο πέρασμα, υπάρχει πλάνο: γραμμές, βάρη, μεταβάσεις, τελικό σχήμα. Ένα κούρεμα σχεδιάζεται στο μυαλό και μετά εκτελείται στα χέρια.",
+		image: "/images/method/design.jpg"
+	},
+	{
+		index: "04",
+		title: "EXECUTE",
+		subtitle: "Εκτέλεσε με ακρίβεια",
+		body: "Τεχνική, σειρά κινήσεων, έλεγχος πίεσης, σωστό εργαλείο στη σωστή στιγμή. Η εκτέλεση κρίνεται στη συνέπεια, όχι στην ταχύτητα.",
+		image: "/images/method/execute.jpg"
+	},
+	{
+		index: "05",
+		title: "EVALUATE",
+		subtitle: "Αξιολόγησε με στοιχεία",
+		body: "Ανεβάζεις before / process / after, εξηγείς τι επέλεξες και γιατί, και παίρνεις δομημένο feedback από AURA educator πάνω σε συγκεκριμένο rubric. Αποδείξεις, όχι εντυπώσεις.",
+		image: "/images/method/evaluate.jpg"
+	},
+	{
+		index: "06",
+		title: "EVOLVE",
+		subtitle: "Εξελίξου μετρήσιμα",
+		body: "Κάθε verified skill ξεκλειδώνει το επόμενο βήμα. Το επίπεδό σου δεν προχωράει επειδή πλήρωσες, αλλά επειδή αποδείχθηκε.",
+		image: "/images/method/evolve.jpg"
+	}
+];
+function StepMedia({ step }) {
+	const [failed, setFailed] = (0, import_react.useState)(false);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: "relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A]",
+		children: failed ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			"aria-hidden": true,
+			className: "flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.10),transparent_60%)]",
+			children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "text-5xl font-semibold tracking-[0.3em] text-white/10",
+				children: step.index
+			})
+		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+			src: step.image,
+			alt: `AURA Method — ${step.title}`,
+			loading: "lazy",
+			onError: () => setFailed(true),
+			className: "h-full w-full object-cover grayscale transition-all duration-700 hover:scale-[1.03] hover:grayscale-0"
+		})
+	});
+}
+function MethodSteps() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ol", {
+		className: "space-y-20",
+		children: STEPS.map((step, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+			className: "grid items-center gap-8 lg:grid-cols-2 lg:gap-14",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: i % 2 === 1 ? "lg:order-2" : void 0,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StepMedia, { step })
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: i % 2 === 1 ? "lg:order-1" : void 0,
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "text-xs uppercase tracking-[0.4em] text-neutral-600",
+						children: ["STEP ", step.index]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+						className: "mt-3 text-3xl font-semibold tracking-tight text-neutral-100 sm:text-4xl",
+						children: step.title
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-2 text-sm uppercase tracking-[0.2em] text-neutral-500",
+						children: step.subtitle
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-5 max-w-prose text-base leading-relaxed text-neutral-400",
+						children: step.body
+					})
+				]
+			})]
+		}, step.title))
+	});
+}
+function MethodPage() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-40",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "max-w-3xl",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+						children: "THE METHOD"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h1", {
+						className: "mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-neutral-100 sm:text-6xl",
+						children: [
+							"LEARN. PRACTICE.",
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("br", {}),
+							"PROVE."
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-7 text-base leading-relaxed text-neutral-400",
+						children: "Η μέθοδος AURA είναι ένας κλειστός κύκλος έξι βημάτων. Δεν αντιγράφεις κουρέματα — μαθαίνεις να παίρνεις αποφάσεις και να τις υπερασπίζεσαι με αποτέλεσμα."
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-4 font-mono text-xs uppercase tracking-[0.2em] text-neutral-500",
+						children: "OBSERVE → ANALYZE → DESIGN → EXECUTE → EVALUATE → EVOLVE"
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+				className: "mt-24",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MethodSteps, {})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "mt-24 rounded-2xl border border-white/10 bg-[#0A0A0A] p-8 text-center sm:p-12",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-2xl font-semibold tracking-tight text-neutral-100 sm:text-3xl",
+						children: "Έτοιμος να μπεις στη μέθοδο;"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mx-auto mt-4 max-w-xl text-sm leading-relaxed text-neutral-400",
+						children: "Διάλεξε το πακέτο που ταιριάζει στο επίπεδό σου. Ακύρωση ανά πάσα στιγμή."
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-8 flex justify-center",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+							to: "/pricing",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+								type: "button",
+								children: "ΔΕΣ ΤΙΣ ΤΙΜΕΣ"
+							})
+						})
+					})
+				]
+			})
+		]
+	}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Footer, {})] });
+}
+//#endregion
+export { MethodPage as component };
+
+=== END FILE ===
+

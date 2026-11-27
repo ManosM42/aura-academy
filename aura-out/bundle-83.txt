@@ -1,0 +1,1448 @@
+=== FILE: src/components/ui/sheet.tsx ===
+"use client";
+
+import * as React from "react";
+import * as SheetPrimitive from "@radix-ui/react-dialog";
+import { cva, type VariantProps } from "class-variance-authority";
+import { X } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const Sheet = SheetPrimitive.Root;
+
+const SheetTrigger = SheetPrimitive.Trigger;
+
+const SheetClose = SheetPrimitive.Close;
+
+const SheetPortal = SheetPrimitive.Portal;
+
+const SheetOverlay = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Overlay>,
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Overlay
+    className={cn(
+      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      className,
+    )}
+    {...props}
+    ref={ref}
+  />
+));
+SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
+
+const sheetVariants = cva(
+  "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
+  {
+    variants: {
+      side: {
+        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        bottom:
+          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+        right:
+          "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+      },
+    },
+    defaultVariants: {
+      side: "right",
+    },
+  },
+);
+
+interface SheetContentProps
+  extends
+    React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
+    VariantProps<typeof sheetVariants> {}
+
+const SheetContent = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Content>,
+  SheetContentProps
+>(({ side = "right", className, children, ...props }, ref) => (
+  <SheetPortal>
+    <SheetOverlay />
+    <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </SheetPrimitive.Close>
+      {children}
+    </SheetPrimitive.Content>
+  </SheetPortal>
+));
+SheetContent.displayName = SheetPrimitive.Content.displayName;
+
+const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col space-y-2 text-center sm:text-left", className)} {...props} />
+);
+SheetHeader.displayName = "SheetHeader";
+
+const SheetFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
+    {...props}
+  />
+);
+SheetFooter.displayName = "SheetFooter";
+
+const SheetTitle = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Title
+    ref={ref}
+    className={cn("text-lg font-semibold text-foreground", className)}
+    {...props}
+  />
+));
+SheetTitle.displayName = SheetPrimitive.Title.displayName;
+
+const SheetDescription = React.forwardRef<
+  React.ElementRef<typeof SheetPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>
+>(({ className, ...props }, ref) => (
+  <SheetPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+));
+SheetDescription.displayName = SheetPrimitive.Description.displayName;
+
+export {
+  Sheet,
+  SheetPortal,
+  SheetOverlay,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+};
+
+=== END FILE ===
+
+=== FILE: src/lib/useGuestPromo.ts ===
+// src/lib/useGuestPromo.ts
+//
+// Decides WHEN to show a "join AURA, members save" pop-up to visitors who are
+// not signed in. Two triggers, whichever comes first, once per browser session:
+//   1. a timer (skipped while `paused`, e.g. while a checkout window is open)
+//   2. the moment a guest presses Order / Book: `guard(action)` shows the pop-up
+//      first and runs `action` as soon as they close it or choose to continue.
+// Signed-in users never see it.
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuthUser } from "@/lib/useAuthUser";
+
+export function useGuestPromo({
+  storageKey,
+  delayMs = 9000,
+  enabled = true,
+  paused = false,
+}: {
+  storageKey: string;
+  delayMs?: number;
+  /** Turn the pop-up off entirely (e.g. when no plan has a discount any more). */
+  enabled?: boolean;
+  paused?: boolean;
+}) {
+  const { user, loading } = useAuthUser();
+  const eligible = enabled && !loading && !user;
+
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<(() => void) | null>(null);
+  const shownRef = useRef(false);
+
+  const seen = useCallback((): boolean => {
+    if (shownRef.current) return true;
+    try {
+      return sessionStorage.getItem(storageKey) === "1";
+    } catch {
+      return false;
+    }
+  }, [storageKey]);
+
+  const markSeen = useCallback(() => {
+    shownRef.current = true;
+    try {
+      sessionStorage.setItem(storageKey, "1");
+    } catch {
+      /* storage blocked: the ref still keeps it to once per page visit */
+    }
+  }, [storageKey]);
+
+  // Timer trigger
+  useEffect(() => {
+    if (!eligible || paused || seen()) return;
+    const timer = window.setTimeout(() => {
+      if (seen()) return;
+      markSeen();
+      setOpen(true);
+    }, delayMs);
+    return () => window.clearTimeout(timer);
+  }, [eligible, paused, delayMs, seen, markSeen]);
+
+  // If they sign in while it is open, close it and let their action through.
+  useEffect(() => {
+    if (!eligible && open) {
+      setOpen(false);
+      setPending(null);
+    }
+  }, [eligible, open]);
+
+  /** Wrap the Order / Book click. */
+  const guard = useCallback(
+    (action: () => void) => {
+      if (eligible && !seen()) {
+        markSeen();
+        setPending(() => action);
+        setOpen(true);
+        return;
+      }
+      action();
+    },
+    [eligible, seen, markSeen],
+  );
+
+  /** Close (X, Esc, backdrop or "continue"): if they were ordering, carry on. */
+  const close = useCallback(() => {
+    const action = pending;
+    setOpen(false);
+    setPending(null);
+    action?.();
+  }, [pending]);
+
+  return { open, close, guard, canContinue: pending !== null };
+}
+
+=== END FILE ===
+
+=== FILE: .output/public/assets/messagingQueries-DN5myh0K.js ===
+import{t as e}from"./supabase-DXn9ZPwL.js";import{p as t}from"./queries-B7Arqryn.js";async function n(t){let{data:n,error:r}=await e.from(`profiles`).select(`*`).eq(`id`,t).single();if(r)throw r;return n}async function r(t){let{data:n,error:r}=await e.rpc(`get_or_create_direct_conversation`,{other_user_id:t});if(r)throw r;return n}async function i(){let n=await t(),{data:r,error:i}=await e.from(`conversation_participants`).select(`conversation_id, last_read_at`).eq(`user_id`,n);if(i)throw i;let a=(r??[]).map(e=>e.conversation_id);if(a.length===0)return[];let[{data:o,error:s},{data:c,error:l}]=await Promise.all([e.from(`conversation_participants`).select(`conversation_id, profiles(id, full_name, avatar_url, role)`).in(`conversation_id`,a).neq(`user_id`,n),e.from(`messages`).select(`*`).in(`conversation_id`,a).order(`created_at`,{ascending:!1})]);if(s)throw s;if(l)throw l;let u=new Map((r??[]).map(e=>[e.conversation_id,e.last_read_at])),d=new Map;for(let e of o??[])e.profiles&&d.set(e.conversation_id,e.profiles);let f=new Map;for(let e of c??[])f.has(e.conversation_id)||f.set(e.conversation_id,e);return a.map(e=>{let t=f.get(e)??null,r=u.get(e),i=!!t&&t.sender_id!==n&&(!r||new Date(t.created_at)>new Date(r));return{conversationId:e,otherUser:d.get(e)??null,lastMessage:t,unread:i}}).sort((e,t)=>{let n=e.lastMessage?.created_at??``;return(t.lastMessage?.created_at??``).localeCompare(n)})}async function a(t){let{data:n,error:r}=await e.from(`messages`).select(`*`).eq(`conversation_id`,t).order(`created_at`,{ascending:!0}).limit(200);if(r)throw r;return n??[]}async function o(n,r){let i=await t(),a=r.trim();if(!a)throw Error(`Το μήνυμα είναι κενό.`);let{data:o,error:s}=await e.from(`messages`).insert({conversation_id:n,sender_id:i,content:a}).select(`*`).single();if(s)throw s;return o}async function s(n){let r=await t(),{error:i}=await e.from(`conversation_participants`).update({last_read_at:new Date().toISOString()}).eq(`conversation_id`,n).eq(`user_id`,r);if(i)throw i}export{s as a,n as i,i as n,o,r,a as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/useAuth-CfZB9gr3.js ===
+import{r as e}from"./jsx-runtime-BkSabwWG.js";import{r as t}from"./useRouter-C8taXhX3.js";import{t as n}from"./supabase-DXn9ZPwL.js";var r=e(t(),1);function i(){let[e,t]=(0,r.useState)(null),[i,a]=(0,r.useState)(null),[o,s]=(0,r.useState)(!0);return(0,r.useEffect)(()=>{let e=!0;n.auth.getSession().then(({data:n})=>{e&&(t(n.session),a(n.session?.user??null),s(!1))}).catch(()=>{e&&s(!1)});let{data:r}=n.auth.onAuthStateChange((n,r)=>{e&&(t(r),a(r?.user??null),s(!1))});return()=>{e=!1,r.subscription.unsubscribe()}},[]),{session:e,user:i,loading:o,signIn:(0,r.useCallback)(async(e,t)=>{let{error:r}=await n.auth.signInWithPassword({email:e,password:t});if(r)throw r},[]),signUp:(0,r.useCallback)(async(e,t)=>{let{data:r,error:i}=await n.auth.signUp({email:e,password:t});if(i)throw i;return{needsConfirmation:!r.session}},[]),signInWithGoogle:(0,r.useCallback)(async e=>{let t=typeof window<`u`?window.location.origin:{BASE_URL:`/`,DEV:!1,MODE:`production`,PROD:!0,SSR:!1,TSS_DEV_SERVER:`false`,TSS_DEV_SSR_STYLES_BASEPATH:`/`,TSS_DEV_SSR_STYLES_ENABLED:`true`,TSS_DISABLE_CSRF_MIDDLEWARE_WARNING:`false`,TSS_INLINE_CSS_ENABLED:`false`,TSS_ROUTER_BASEPATH:``,TSS_SERVER_FN_BASE:`/_serverFn/`,VITE_SITE_URL:`https://theauramethod.site`,VITE_STRIPE_PUBLISHABLE_KEY:`pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd`,VITE_SUPABASE_ANON_KEY:`[REDACTED_JWT]`,VITE_SUPABASE_PUBLISHABLE_KEY:`sb_publishable_L9Swjao34Gznj1IT7lLPuA_cCWSetH5`,VITE_SUPABASE_URL:`https://kvnpixezrebxuvgbznqr.supabase.co`,VITE_TURNSTILE_SITE_KEY:`0x4AAAAAAFuQC8D2OUlnvZo3`}.VITE_SITE_URL??`http://localhost:3000`,r=new URL(`/auth/callback`,t);e&&r.searchParams.set(`plan`,e);let{error:i}=await n.auth.signInWithOAuth({provider:`google`,options:{redirectTo:r.toString(),queryParams:{prompt:`select_account`}}});if(i)throw i},[]),signOut:(0,r.useCallback)(async()=>{let{error:e}=await n.auth.signOut();if(e)throw e},[])}}export{i as t};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/messagingQueries-RnKcgYgf.mjs ===
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { p as getCurrentUserId } from "./queries-DCA4yifx.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/messagingQueries-RnKcgYgf.js
+async function getProfileById(userId) {
+	const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
+	if (error) throw error;
+	return data;
+}
+async function getOrCreateDirectConversation(otherUserId) {
+	const { data, error } = await supabase.rpc("get_or_create_direct_conversation", { other_user_id: otherUserId });
+	if (error) throw error;
+	return data;
+}
+async function getMyConversations() {
+	const uid = await getCurrentUserId();
+	const { data: myRows, error: myErr } = await supabase.from("conversation_participants").select("conversation_id, last_read_at").eq("user_id", uid);
+	if (myErr) throw myErr;
+	const convIds = (myRows ?? []).map((r) => r.conversation_id);
+	if (convIds.length === 0) return [];
+	const [{ data: others, error: othErr }, { data: msgs, error: msgErr }] = await Promise.all([supabase.from("conversation_participants").select("conversation_id, profiles(id, full_name, avatar_url, role)").in("conversation_id", convIds).neq("user_id", uid), supabase.from("messages").select("*").in("conversation_id", convIds).order("created_at", { ascending: false })]);
+	if (othErr) throw othErr;
+	if (msgErr) throw msgErr;
+	const lastReadByConv = new Map((myRows ?? []).map((r) => [r.conversation_id, r.last_read_at]));
+	const otherByConv = /* @__PURE__ */ new Map();
+	for (const row of others ?? []) if (row.profiles) otherByConv.set(row.conversation_id, row.profiles);
+	const lastMsgByConv = /* @__PURE__ */ new Map();
+	for (const m of msgs ?? []) if (!lastMsgByConv.has(m.conversation_id)) lastMsgByConv.set(m.conversation_id, m);
+	return convIds.map((id) => {
+		const lastMessage = lastMsgByConv.get(id) ?? null;
+		const lastRead = lastReadByConv.get(id);
+		const unread = !!lastMessage && lastMessage.sender_id !== uid && (!lastRead || new Date(lastMessage.created_at) > new Date(lastRead));
+		return {
+			conversationId: id,
+			otherUser: otherByConv.get(id) ?? null,
+			lastMessage,
+			unread
+		};
+	}).sort((a, b) => {
+		const at = a.lastMessage?.created_at ?? "";
+		return (b.lastMessage?.created_at ?? "").localeCompare(at);
+	});
+}
+async function getConversationMessages(conversationId) {
+	const { data, error } = await supabase.from("messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(200);
+	if (error) throw error;
+	return data ?? [];
+}
+async function sendMessage(conversationId, content) {
+	const uid = await getCurrentUserId();
+	const trimmed = content.trim();
+	if (!trimmed) throw new Error("Το μήνυμα είναι κενό.");
+	const { data, error } = await supabase.from("messages").insert({
+		conversation_id: conversationId,
+		sender_id: uid,
+		content: trimmed
+	}).select("*").single();
+	if (error) throw error;
+	return data;
+}
+async function markConversationRead(conversationId) {
+	const uid = await getCurrentUserId();
+	const { error } = await supabase.from("conversation_participants").update({ last_read_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("conversation_id", conversationId).eq("user_id", uid);
+	if (error) throw error;
+}
+//#endregion
+export { markConversationRead as a, getProfileById as i, getMyConversations as n, sendMessage as o, getOrCreateDirectConversation as r, getConversationMessages as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/ssr.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/index.js
+var lastCapturedError;
+var TTL_MS = 5e3;
+function record(error) {
+	lastCapturedError = {
+		error,
+		at: Date.now()
+	};
+}
+var CAUSE_DEPTH_LIMIT = 5;
+var DESCRIPTION_LENGTH_LIMIT = 8e3;
+function describeError(error) {
+	const parts = [];
+	let current = error;
+	for (let depth = 0; depth < CAUSE_DEPTH_LIMIT && current != null; depth++) {
+		if (!(current instanceof Error)) {
+			parts.push(typeof current === "string" ? current : safeStringify(current));
+			break;
+		}
+		const label = depth === 0 ? "" : "caused by: ";
+		const status = describeStatus(current);
+		parts.push(`${label}${current.stack ?? `${current.name}: ${current.message}`}${status}`);
+		current = current.cause;
+	}
+	return parts.join("\n").slice(0, DESCRIPTION_LENGTH_LIMIT);
+}
+function describeStatus(error) {
+	const { status, statusCode } = error;
+	const value = status ?? statusCode;
+	return typeof value === "number" ? ` (status ${value})` : "";
+}
+function safeStringify(value) {
+	try {
+		return JSON.stringify(value) ?? String(value);
+	} catch {
+		return String(value);
+	}
+}
+function isErrorLike(value) {
+	return value instanceof Error;
+}
+var originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+	originalConsoleError(...args.map((arg) => {
+		if (!isErrorLike(arg)) return arg;
+		record(arg);
+		return describeError(arg);
+	}));
+};
+if (typeof globalThis.addEventListener === "function") {
+	globalThis.addEventListener("error", (event) => record(event.error ?? event));
+	globalThis.addEventListener("unhandledrejection", (event) => record(event.reason));
+}
+function consumeLastCapturedError() {
+	if (!lastCapturedError) return void 0;
+	if (Date.now() - lastCapturedError.at > TTL_MS) {
+		lastCapturedError = void 0;
+		return;
+	}
+	const { error } = lastCapturedError;
+	lastCapturedError = void 0;
+	return error;
+}
+function renderErrorPage() {
+	return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>This page didn't load</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font: 15px/1.5 system-ui, -apple-system, sans-serif; background: #fafafa; color: #111; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 1.5rem; }
+      .card { max-width: 28rem; width: 100%; text-align: center; padding: 2rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { color: #4b5563; margin: 0 0 1.5rem; }
+      .actions { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+      a, button { padding: 0.5rem 1rem; border-radius: 0.375rem; font: inherit; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
+      .primary { background: #111; color: #fff; }
+      .secondary { background: #fff; color: #111; border-color: #d1d5db; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>This page didn't load</h1>
+      <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      <div class="actions">
+        <button class="primary" onclick="location.reload()">Try again</button>
+        <a class="secondary" href="/">Go home</a>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+var serverEntryPromise;
+async function getServerEntry() {
+	if (!serverEntryPromise) serverEntryPromise = import("./server-CbXVDlKq.mjs").then((m) => m.default ?? m);
+	return serverEntryPromise;
+}
+async function normalizeCatastrophicSsrResponse(response) {
+	if (response.status < 500) return response;
+	if (!(response.headers.get("content-type") ?? "").includes("application/json")) return response;
+	const body = await response.clone().text();
+	if (!isH3SwallowedErrorBody(body)) return response;
+	console.error(consumeLastCapturedError() ?? /* @__PURE__ */ new Error(`h3 swallowed SSR error: ${body}`));
+	return new Response(renderErrorPage(), {
+		status: 500,
+		headers: { "content-type": "text/html; charset=utf-8" }
+	});
+}
+function isH3SwallowedErrorBody(body) {
+	try {
+		const payload = JSON.parse(body);
+		return payload.unhandled === true && payload.message === "HTTPError";
+	} catch {
+		return false;
+	}
+}
+var server_default = { async fetch(request, env, ctx) {
+	try {
+		return await normalizeCatastrophicSsrResponse(await (await getServerEntry()).fetch(request, env, ctx));
+	} catch (error) {
+		console.error(error);
+		return new Response(renderErrorPage(), {
+			status: 500,
+			headers: { "content-type": "text/html; charset=utf-8" }
+		});
+	}
+} };
+//#endregion
+export { server_default as default, renderErrorPage as t };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/Method.tsx ===
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+
+const STEPS = [
+  { n: "01", title: "Observe", body: "I gather visual and technical information." },
+  { n: "02", title: "Analyze", body: "I understand the face, head, hair and goal." },
+  { n: "03", title: "Design", body: "I choose shapes, lengths and transitions." },
+  { n: "04", title: "Execute", body: "I apply the technique with control." },
+  { n: "05", title: "Evaluate", body: "I compare the result with the goal." },
+  { n: "06", title: "Evolve", body: "I spot mistakes and refine the process." },
+];
+
+const CHROME =
+  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+function nodePos(i: number) {
+  const a = ((-90 + i * 60) * Math.PI) / 180;
+  return { x: 50 + 40 * Math.cos(a), y: 50 + 40 * Math.sin(a) };
+}
+
+export default function Method() {
+  const reduce = useReducedMotion();
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused || reduce) return;
+    const t = setInterval(() => setActive((a) => (a + 1) % STEPS.length), 3200);
+    return () => clearInterval(t);
+  }, [paused, reduce]);
+
+  const step = STEPS[active];
+
+  return (
+    <section id="method" className="relative mx-auto max-w-6xl overflow-hidden px-6 py-32">
+      {/* ambient chrome glow */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[720px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(255,255,255,0.10) 0%, rgba(180,190,200,0.05) 35%, transparent 70%)",
+        }}
+        animate={reduce ? undefined : { opacity: [0.5, 1, 0.5], scale: [0.95, 1.05, 0.95] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* heading */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 0.9, ease: EASE }}
+        className="relative mb-20 text-center"
+      >
+        <p className="font-aura mb-4 text-xs font-semibold tracking-[0.4em] text-white/50">
+          AURA CYCLE
+        </p>
+        <h2 className="font-aura text-4xl font-extrabold tracking-tight md:text-6xl">
+          <motion.span
+            initial={{ backgroundPosition: "0% 50%" }}
+            animate={{ backgroundPosition: "100% 50%" }}
+            transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+            style={{
+              backgroundImage: CHROME,
+              backgroundSize: "300% auto",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+            className="inline-block drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_60px_rgba(255,255,255,0.7)]"
+          >
+            THE AURA METHOD
+          </motion.span>
+        </h2>
+        <p className="font-aura mx-auto mt-6 max-w-md text-sm leading-relaxed text-white/55">
+          The core thinking cycle of the professional.
+        </p>
+      </motion.div>
+
+      <div className="relative grid items-center gap-16 lg:grid-cols-2">
+        {/* ORBIT */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.92 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 1.1, ease: EASE }}
+          className="relative mx-auto aspect-square w-full max-w-[460px]"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full overflow-visible">
+            <defs>
+              <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+                <stop offset="50%" stopColor="#8a8f96" stopOpacity="0.18" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="0.5" />
+              </linearGradient>
+              <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
+                <stop offset="100%" stopColor="#ffffff" stopOpacity="1" />
+              </linearGradient>
+              <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="1.4" result="b" />
+                <feMerge>
+                  <feMergeNode in="b" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* outer hairline + base ring */}
+            <circle cx="50" cy="50" r="47" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.2" strokeDasharray="0.6 1.6" />
+            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#ring)" strokeWidth="0.35" />
+            <circle cx="50" cy="50" r="31" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="0.2" />
+
+            {/* travelling light */}
+            {!reduce && (
+              <motion.circle
+                cx="50"
+                cy="50"
+                r="40"
+                fill="none"
+                stroke="url(#beam)"
+                strokeWidth="0.9"
+                strokeLinecap="round"
+                strokeDasharray="38 213.3"
+                filter="url(#glow)"
+                style={{ transformOrigin: "50px 50px" }}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+              />
+            )}
+          </svg>
+
+          {/* center readout */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={step.n}
+                initial={{ opacity: 0, y: 10, filter: "blur(6px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -10, filter: "blur(6px)" }}
+                transition={{ duration: 0.5, ease: EASE }}
+                className="text-center"
+              >
+                <span
+                  className="font-aura block text-6xl font-extrabold md:text-7xl"
+                  style={{
+                    backgroundImage: CHROME,
+                    backgroundSize: "200% auto",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    filter: "drop-shadow(0 0 24px rgba(255,255,255,0.45))",
+                  }}
+                >
+                  {step.n}
+                </span>
+                <span className="font-aura mt-2 block text-sm font-semibold tracking-[0.3em] text-white/70">
+                  {step.title.toUpperCase()}
+                </span>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          {/* nodes */}
+          {STEPS.map((s, i) => {
+            const { x, y } = nodePos(i);
+            const on = i === active;
+            return (
+              <button
+                key={s.n}
+                type="button"
+                aria-label={`${s.n} ${s.title}`}
+                aria-current={on}
+                onClick={() => setActive(i)}
+                onFocus={() => setActive(i)}
+                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white/80"
+                style={{ left: `${x}%`, top: `${y}%` }}
+              >
+                <motion.span
+                  animate={{
+                    scale: on ? 1.25 : 1,
+                    boxShadow: on
+                      ? "0 0 0 1px rgba(255,255,255,0.9), 0 0 28px rgba(255,255,255,0.65), inset 0 1px 0 rgba(255,255,255,0.9)"
+                      : "0 0 0 1px rgba(255,255,255,0.16), 0 0 0 rgba(255,255,255,0), inset 0 1px 0 rgba(255,255,255,0.25)",
+                  }}
+                  transition={{ duration: 0.5, ease: EASE }}
+                  className="font-aura flex h-11 w-11 items-center justify-center rounded-full text-[11px] font-bold md:h-12 md:w-12"
+                  style={{
+                    background: on
+                      ? "linear-gradient(145deg, #ffffff 0%, #c9ced4 45%, #7d838b 100%)"
+                      : "linear-gradient(145deg, #1b1d20 0%, #0d0e10 100%)",
+                    color: on ? "#0a0a0a" : "rgba(255,255,255,0.65)",
+                  }}
+                >
+                  {s.n}
+                </motion.span>
+              </button>
+            );
+          })}
+        </motion.div>
+
+        {/* STEP LIST */}
+        <div
+          className="relative flex flex-col gap-3"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+        >
+          {STEPS.map((s, i) => {
+            const on = i === active;
+            return (
+              <motion.button
+                key={s.n}
+                type="button"
+                onClick={() => setActive(i)}
+                initial={{ opacity: 0, x: 24 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.7, ease: EASE, delay: i * 0.08 }}
+                className="group relative overflow-hidden rounded-xl border p-5 text-left outline-none transition-colors duration-500 focus-visible:ring-2 focus-visible:ring-white/70"
+                style={{
+                  borderColor: on ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.07)",
+                  background: on
+                    ? "linear-gradient(120deg, rgba(255,255,255,0.10), rgba(255,255,255,0.02) 60%)"
+                    : "rgba(255,255,255,0.02)",
+                  boxShadow: on ? "0 0 40px rgba(255,255,255,0.08), inset 0 1px 0 rgba(255,255,255,0.25)" : "none",
+                }}
+              >
+                {/* chrome sweep on active */}
+                {on && !reduce && (
+                  <motion.span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-y-0 w-1/3"
+                    style={{
+                      background:
+                        "linear-gradient(100deg, transparent, rgba(255,255,255,0.18), transparent)",
+                    }}
+                    initial={{ left: "-35%" }}
+                    animate={{ left: "110%" }}
+                    transition={{ duration: 1.6, ease: "easeInOut" }}
+                  />
+                )}
+                <div className="relative flex items-center gap-5">
+                  <span
+                    className="font-aura text-sm font-semibold tracking-widest transition-colors duration-500"
+                    style={{ color: on ? "#ffffff" : "rgba(255,255,255,0.35)" }}
+                  >
+                    {s.n}
+                  </span>
+                  <div>
+                    <h3
+                      className="font-aura text-xl font-bold transition-colors duration-500"
+                      style={{ color: on ? "#ffffff" : "rgba(255,255,255,0.75)" }}
+                    >
+                      {s.title}
+                    </h3>
+                    <p className="font-aura mt-1 text-sm leading-relaxed text-white/55">{s.body}</p>
+                  </div>
+                </div>
+              </motion.button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* loop banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.9, ease: EASE }}
+        className="relative mt-20 text-center"
+      >
+        <div
+          aria-hidden
+          className="mx-auto mb-8 h-px w-full max-w-md"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)",
+            boxShadow: "0 0 20px rgba(255,255,255,0.5)",
+          }}
+        />
+        <p
+          className="font-aura text-2xl font-extrabold tracking-[0.25em] md:text-3xl"
+          style={{
+            backgroundImage: CHROME,
+            backgroundSize: "300% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            filter: "drop-shadow(0 0 18px rgba(255,255,255,0.35))",
+          }}
+        >
+          REPEAT → IMPROVE
+        </p>
+        <p className="font-aura mx-auto mt-4 max-w-lg text-sm leading-relaxed text-white/55">
+          Evaluation returns to observation, and the cycle continues.
+        </p>
+      </motion.div>
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/promo/PopupShell.tsx ===
+// src/components/aura/promo/PopupShell.tsx
+// Backdrop, focus, Esc, scroll-lock and the close button. The card itself is
+// drawn by each pop-up, so every page gets its own look.
+import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { X } from "lucide-react";
+import { EASE } from "@/components/aura/chrome";
+
+export default function PopupShell({
+  open,
+  onClose,
+  titleId,
+  descId,
+  closeLabel = "Close",
+  className = "max-w-lg",
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  titleId: string;
+  descId: string;
+  closeLabel?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    ref.current?.focus();
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose]);
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="guest-promo-backdrop"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-md"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: reduce ? 0 : 0.5 }}
+          onClick={onClose}
+        >
+          <motion.div
+            ref={ref}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={descId}
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            initial={reduce ? { opacity: 0 } : { opacity: 0, y: 32, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: 14, scale: 0.97 }}
+            transition={{ duration: reduce ? 0 : 0.75, ease: EASE }}
+            className={`relative my-auto w-full outline-none ${className}`}
+          >
+            {children}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={closeLabel}
+              className="absolute right-4 top-4 z-30 flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white/70 outline-none backdrop-blur transition-all hover:border-white/60 hover:text-white hover:shadow-[0_0_22px_rgba(255,255,255,0.3)] focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <X className="size-4" />
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+=== END FILE ===
+
+=== FILE: src/components/aura/SkillTree.tsx ===
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+
+interface Step {
+  n: string;
+  label: string;
+  desc: string;
+  x: number;
+  y: number;
+}
+
+const CX = 320;
+const CY = 280;
+const R = 185;
+
+const RAW = [
+  { n: "01", label: "Observe", desc: "I gather visual and technical information." },
+  { n: "02", label: "Analyze", desc: "I understand the face, head, hair and goal." },
+  { n: "03", label: "Design", desc: "I choose shapes, lengths and transitions." },
+  { n: "04", label: "Execute", desc: "I apply the technique with control." },
+  { n: "05", label: "Evaluate", desc: "I compare the result with the goal." },
+  { n: "06", label: "Evolve", desc: "I spot mistakes and refine the process." },
+];
+
+const STEPS: Step[] = RAW.map((s, i) => {
+  const a = ((-90 + i * 60) * Math.PI) / 180;
+  return { ...s, x: CX + R * Math.cos(a), y: CY + R * Math.sin(a) };
+});
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const CHROME_TEXT =
+  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+
+/** where the label sits relative to each node (hexagon: top, right x2, bottom, left x2) */
+function labelProps(i: number, s: Step) {
+  if (i === 0) return { x: s.x, y: s.y - 40, anchor: "middle" as const };
+  if (i === 3) return { x: s.x, y: s.y + 54, anchor: "middle" as const };
+  if (i === 1 || i === 2) return { x: s.x + 40, y: s.y + 7, anchor: "start" as const };
+  return { x: s.x - 40, y: s.y + 7, anchor: "end" as const };
+}
+
+export default function SkillTree() {
+  const reduce = useReducedMotion();
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (paused || reduce) return;
+    const t = setInterval(() => setActive((a) => (a + 1) % STEPS.length), 3200);
+    return () => clearInterval(t);
+  }, [paused, reduce]);
+
+  const sel = STEPS[active];
+
+  return (
+    <section id="skilltree" className="relative mx-auto max-w-5xl overflow-hidden px-4 py-20 sm:px-6 sm:py-32">
+      {/* ambient glow */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 aspect-square w-[min(760px,100%)] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      {/* header */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        transition={{ duration: 0.9, ease: EASE }}
+        className="relative mb-10 text-center sm:mb-14"
+      >
+        <span className="font-aura text-xs uppercase tracking-[0.4em] text-white/50 sm:tracking-[0.5em]">
+          Aura Cycle
+        </span>
+        <h2 className="font-aura mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl md:text-6xl">
+          <motion.span
+            initial={{ backgroundPosition: "0% 50%" }}
+            animate={{ backgroundPosition: "100% 50%" }}
+            transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+            style={{
+              backgroundImage: CHROME_TEXT,
+              backgroundSize: "300% auto",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+            className="inline-block drop-shadow-[0_2px_4px_rgba(255,255,255,0.9)] drop-shadow-[0_10px_30px_rgba(0,0,0,0.95)] drop-shadow-[0_0_60px_rgba(255,255,255,0.7)]"
+          >
+            THE AURA METHOD
+          </motion.span>
+        </h2>
+        <p className="font-aura mx-auto mt-5 max-w-xs text-sm leading-relaxed text-white/55 sm:max-w-md">
+          The core thinking cycle of the professional.
+        </p>
+      </motion.div>
+
+      {/* chrome graph panel — same layout on every screen size */}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 1, ease: EASE }}
+        onPointerEnter={() => setPaused(true)}
+        onPointerLeave={() => setPaused(false)}
+        className="relative mx-auto w-full max-w-3xl rounded-3xl p-px"
+        style={{
+          background: "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.05) 35%, rgba(255,255,255,0.05) 65%, rgba(255,255,255,0.4))",
+          boxShadow: "0 0 80px rgba(0,0,0,0.9), 0 0 60px rgba(255,255,255,0.05)",
+        }}
+      >
+        <div className="relative overflow-hidden rounded-[23px] bg-[#070707] p-2 sm:p-4">
+          {/* top sheen */}
+          <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-32" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.06), transparent)" }} />
+          {/* dotted grid */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.35]"
+            style={{
+              backgroundImage: "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+              maskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+              WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 75%)",
+            }}
+          />
+
+          <div className="relative w-full">
+            <svg viewBox="0 0 640 560" className="block h-auto w-full select-none" role="group" aria-label="AURA Cycle">
+              <defs>
+                <linearGradient id="edgeChrome" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="640" y2="560">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+                  <stop offset="50%" stopColor="#9aa0a8" stopOpacity="0.55" />
+                  <stop offset="100%" stopColor="#ffffff" stopOpacity="0.9" />
+                </linearGradient>
+                <radialGradient id="discChrome" cx="35%" cy="30%" r="80%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="45%" stopColor="#c9ced4" />
+                  <stop offset="100%" stopColor="#6c7279" />
+                </radialGradient>
+                <radialGradient id="discDark" cx="35%" cy="30%" r="90%">
+                  <stop offset="0%" stopColor="#2a2d31" />
+                  <stop offset="100%" stopColor="#0c0d0e" />
+                </radialGradient>
+                <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+                  <feGaussianBlur stdDeviation="5" result="b" />
+                  <feMerge>
+                    <feMergeNode in="b" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {/* inner & outer guide rings */}
+              <circle cx={CX} cy={CY} r={R + 52} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="1" strokeDasharray="2 8" />
+              <circle cx={CX} cy={CY} r={R - 52} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+
+              {/* edges (closed loop) */}
+              {STEPS.map((from, i) => {
+                const to = STEPS[(i + 1) % STEPS.length];
+                return (
+                  <g key={`edge-${i}`}>
+                    <motion.line
+                      x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                      stroke="url(#edgeChrome)"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      filter="url(#softGlow)"
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      animate={{ pathLength: 1, opacity: 1 }}
+                      transition={{ duration: 1.2, ease: "easeInOut", delay: i * 0.12 }}
+                    />
+                    {!reduce && (
+                      <motion.line
+                        x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                        stroke="#ffffff"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeDasharray="6 44"
+                        animate={{ strokeDashoffset: [0, -50] }}
+                        transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+                        style={{ filter: "drop-shadow(0 0 6px #fff)" }}
+                      />
+                    )}
+                  </g>
+                );
+              })}
+
+              {/* nodes */}
+              {STEPS.map((s, i) => {
+                const on = i === active;
+                const lp = labelProps(i, s);
+                return (
+                  <motion.g
+                    key={s.n}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`${s.n} ${s.label}`}
+                    aria-current={on}
+                    onClick={() => setActive(i)}
+                    onFocus={() => setActive(i)}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setActive(i)}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.7, ease: EASE, delay: 0.3 + i * 0.09 }}
+                    style={{ cursor: "pointer", outline: "none" }}
+                  >
+                    {/* larger tap target */}
+                    <circle cx={s.x} cy={s.y} r="44" fill="rgba(0,0,0,0.001)" />
+
+                    {/* selection ring */}
+                    {on && <circle cx={s.x} cy={s.y} r="40" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="1.2" strokeDasharray="2 6" />}
+
+                    {/* pulse */}
+                    {on && !reduce && (
+                      <motion.circle
+                        cx={s.x} cy={s.y} r="28" fill="none" stroke="#ffffff" strokeWidth="1.8"
+                        style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                        animate={{ scale: [1, 1.9], opacity: [0.7, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                      />
+                    )}
+
+                    {/* orbiting ring */}
+                    {on && !reduce && (
+                      <motion.circle
+                        cx={s.x} cy={s.y} r="35" fill="none" stroke="#d4d8dd" strokeWidth="2" strokeLinecap="round" strokeDasharray="36 184"
+                        style={{ transformBox: "fill-box", transformOrigin: "center", filter: "drop-shadow(0 0 5px #fff)" }}
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 3.5, repeat: Infinity, ease: "linear" }}
+                      />
+                    )}
+
+                    {/* dark disc */}
+                    <circle cx={s.x} cy={s.y} r="28" fill="url(#discDark)" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+                    {/* chrome disc fades in when active */}
+                    <motion.circle
+                      cx={s.x} cy={s.y} r="28" fill="url(#discChrome)" stroke="#ffffff" strokeWidth="2"
+                      animate={{ opacity: on ? 1 : 0 }}
+                      transition={{ duration: 0.5, ease: EASE }}
+                      style={{ filter: "drop-shadow(0 0 14px rgba(255,255,255,0.65))" }}
+                    />
+                    <text
+                      x={s.x} y={s.y + 6} textAnchor="middle" className="font-aura"
+                      fontSize="17" fontWeight="800" fill={on ? "#0a0a0a" : "#d9dce0"}
+                    >
+                      {s.n}
+                    </text>
+
+                    <text
+                      x={lp.x} y={lp.y} textAnchor={lp.anchor} className="font-aura"
+                      fontSize="21" fontWeight={on ? 700 : 500}
+                      fill={on ? "#ffffff" : "#B8BBBF"}
+                      style={on ? { filter: "drop-shadow(0 0 8px rgba(255,255,255,0.6))" } : undefined}
+                    >
+                      {s.label}
+                    </text>
+                  </motion.g>
+                );
+              })}
+            </svg>
+
+            {/* center readout (sized as % of the graph so it scales with it) */}
+            <div className="pointer-events-none absolute left-1/2 top-1/2 flex w-[34%] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-center">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={sel.n}
+                  initial={{ opacity: 0, y: 8, filter: "blur(6px)" }}
+                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                  exit={{ opacity: 0, y: -8, filter: "blur(6px)" }}
+                  transition={{ duration: 0.45, ease: EASE }}
+                >
+                  <span
+                    className="font-aura block text-5xl font-extrabold leading-none sm:text-7xl"
+                    style={{
+                      backgroundImage: CHROME_TEXT,
+                      backgroundSize: "200% auto",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      filter: "drop-shadow(0 0 20px rgba(255,255,255,0.45))",
+                    }}
+                  >
+                    {sel.n}
+                  </span>
+                  <span className="font-aura mt-2 block text-[10px] tracking-[0.3em] text-white/50 sm:text-xs">
+                    AURA CYCLE
+                  </span>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* detail bar */}
+          <div className="relative mt-2 flex min-h-[72px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-4 sm:px-6">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={sel.n}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.35, ease: EASE }}
+                className="min-w-0"
+              >
+                <h4 className="font-aura text-base font-bold text-white">
+                  {sel.n} {sel.label}
+                </h4>
+                <p className="font-aura mt-1 text-sm leading-relaxed text-white/60">{sel.desc}</p>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* loop banner */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-60px" }}
+        transition={{ duration: 0.9, ease: EASE }}
+        className="relative mt-14 text-center sm:mt-20"
+      >
+        <div
+          aria-hidden
+          className="mx-auto mb-8 h-px w-full max-w-xs sm:max-w-md"
+          style={{
+            background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.7), transparent)",
+            boxShadow: "0 0 20px rgba(255,255,255,0.5)",
+          }}
+        />
+        <p
+          className="font-aura text-xl font-extrabold tracking-[0.18em] sm:text-3xl sm:tracking-[0.25em]"
+          style={{
+            backgroundImage: CHROME_TEXT,
+            backgroundSize: "300% auto",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            filter: "drop-shadow(0 0 18px rgba(255,255,255,0.35))",
+          }}
+        >
+          REPEAT → IMPROVE
+        </p>
+        <p className="font-aura mx-auto mt-4 max-w-xs text-sm leading-relaxed text-white/55 sm:max-w-lg">
+          Evaluation returns to observation, and the cycle continues.
+        </p>
+      </motion.div>
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/ui/alert.tsx ===
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const alertVariants = cva(
+  "relative w-full rounded-lg border px-4 py-3 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7",
+  {
+    variants: {
+      variant: {
+        default: "bg-background text-foreground",
+        destructive:
+          "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  },
+);
+
+const Alert = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
+>(({ className, variant, ...props }, ref) => (
+  <div ref={ref} role="alert" className={cn(alertVariants({ variant }), className)} {...props} />
+));
+Alert.displayName = "Alert";
+
+const AlertTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
+  ({ className, ...props }, ref) => (
+    <h5
+      ref={ref}
+      className={cn("mb-1 font-medium leading-none tracking-tight", className)}
+      {...props}
+    />
+  ),
+);
+AlertTitle.displayName = "AlertTitle";
+
+const AlertDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("text-sm [&_p]:leading-relaxed", className)} {...props} />
+));
+AlertDescription.displayName = "AlertDescription";
+
+export { Alert, AlertTitle, AlertDescription };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/context-menu.tsx ===
+import * as React from "react";
+import * as ContextMenuPrimitive from "@radix-ui/react-context-menu";
+import { Check, ChevronRight, Circle } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const ContextMenu = ContextMenuPrimitive.Root;
+
+const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
+
+const ContextMenuGroup = ContextMenuPrimitive.Group;
+
+const ContextMenuPortal = ContextMenuPrimitive.Portal;
+
+const ContextMenuSub = ContextMenuPrimitive.Sub;
+
+const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
+
+const ContextMenuSubTrigger = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & {
+    inset?: boolean;
+  }
+>(({ className, inset, children, ...props }, ref) => (
+  <ContextMenuPrimitive.SubTrigger
+    ref={ref}
+    className={cn(
+      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+      inset && "pl-8",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+    <ChevronRight className="ml-auto h-4 w-4" />
+  </ContextMenuPrimitive.SubTrigger>
+));
+ContextMenuSubTrigger.displayName = ContextMenuPrimitive.SubTrigger.displayName;
+
+const ContextMenuSubContent = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.SubContent>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubContent>
+>(({ className, ...props }, ref) => (
+  <ContextMenuPrimitive.SubContent
+    ref={ref}
+    className={cn(
+      "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-context-menu-content-transform-origin)",
+      className,
+    )}
+    {...props}
+  />
+));
+ContextMenuSubContent.displayName = ContextMenuPrimitive.SubContent.displayName;
+
+const ContextMenuContent = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
+>(({ className, ...props }, ref) => (
+  <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Content
+      ref={ref}
+      className={cn(
+        "z-50 max-h-(--radix-context-menu-content-available-height) min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-context-menu-content-transform-origin)",
+        className,
+      )}
+      {...props}
+    />
+  </ContextMenuPrimitive.Portal>
+));
+ContextMenuContent.displayName = ContextMenuPrimitive.Content.displayName;
+
+const ContextMenuItem = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & {
+    inset?: boolean;
+  }
+>(({ className, inset, ...props }, ref) => (
+  <ContextMenuPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      inset && "pl-8",
+      className,
+    )}
+    {...props}
+  />
+));
+ContextMenuItem.displayName = ContextMenuPrimitive.Item.displayName;
+
+const ContextMenuCheckboxItem = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.CheckboxItem>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.CheckboxItem>
+>(({ className, children, ...props }, ref) => (
+  <ContextMenuPrimitive.CheckboxItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <ContextMenuPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </ContextMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </ContextMenuPrimitive.CheckboxItem>
+));
+ContextMenuCheckboxItem.displayName = ContextMenuPrimitive.CheckboxItem.displayName;
+
+const ContextMenuRadioItem = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.RadioItem>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.RadioItem>
+>(({ className, children, ...props }, ref) => (
+  <ContextMenuPrimitive.RadioItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <ContextMenuPrimitive.ItemIndicator>
+        <Circle className="h-4 w-4 fill-current" />
+      </ContextMenuPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </ContextMenuPrimitive.RadioItem>
+));
+ContextMenuRadioItem.displayName = ContextMenuPrimitive.RadioItem.displayName;
+
+const ContextMenuLabel = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Label> & {
+    inset?: boolean;
+  }
+>(({ className, inset, ...props }, ref) => (
+  <ContextMenuPrimitive.Label
+    ref={ref}
+    className={cn("px-2 py-1.5 text-sm font-semibold text-foreground", inset && "pl-8", className)}
+    {...props}
+  />
+));
+ContextMenuLabel.displayName = ContextMenuPrimitive.Label.displayName;
+
+const ContextMenuSeparator = React.forwardRef<
+  React.ElementRef<typeof ContextMenuPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <ContextMenuPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 my-1 h-px bg-border", className)}
+    {...props}
+  />
+));
+ContextMenuSeparator.displayName = ContextMenuPrimitive.Separator.displayName;
+
+const ContextMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
+  return (
+    <span
+      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
+      {...props}
+    />
+  );
+};
+ContextMenuShortcut.displayName = "ContextMenuShortcut";
+
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuCheckboxItem,
+  ContextMenuRadioItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuGroup,
+  ContextMenuPortal,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuRadioGroup,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/input.tsx ===
+import * as React from "react";
+
+import { cn } from "@/lib/utils";
+
+const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          className,
+        )}
+        ref={ref}
+        {...props}
+      />
+    );
+  },
+);
+Input.displayName = "Input";
+
+export { Input };
+
+=== END FILE ===
+

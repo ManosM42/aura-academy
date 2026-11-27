@@ -1,0 +1,1690 @@
+=== FILE: src/components/aura/AuraIntro.tsx ===
+// src/components/aura/AuraIntro.tsx
+//
+// First-visit intro for the AURA platform.
+// Plays once per browser, the first time someone enters the site on any page.
+// Clear AURA_INTRO_KEY to replay.
+
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { motion } from "motion/react";
+import welcomeVideo from "@/assets/welcome.mp4";
+
+export const AURA_INTRO_KEY = "aura:intro-seen";
+
+type Phase = "playing" | "outro" | "reveal" | "done";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+const LOAD_TIMEOUT_MS = 8000;
+
+function hasSeenIntro(): boolean {
+  try {
+    return localStorage.getItem(AURA_INTRO_KEY) !== null;
+  } catch {
+    return false; // storage blocked: treat as first visit
+  }
+}
+
+function markIntroSeen() {
+  try {
+    localStorage.setItem(AURA_INTRO_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
+interface AuraIntroProps {
+  onComplete?: () => void;
+}
+
+export default function AuraIntro({ onComplete }: AuraIntroProps) {
+  const [phase, setPhase] = useState<Phase>("playing");
+  const [ready, setReady] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const finishing = useRef(false);
+
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  // Returning visitor: skip before the first paint.
+  useIsoLayoutEffect(() => {
+    if (hasSeenIntro()) {
+      setPhase("done");
+      onCompleteRef.current?.();
+    }
+  }, []);
+
+  // Lock page scroll while the intro is up.
+  useEffect(() => {
+    if (phase === "done") return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [phase === "done"]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const finish = useCallback(() => {
+    if (finishing.current) return;
+    finishing.current = true;
+    markIntroSeen(); // also mark here, so a finished intro never replays
+    setPhase("outro");
+    window.setTimeout(() => setPhase("reveal"), 900);
+    window.setTimeout(() => {
+      setPhase("done");
+      onCompleteRef.current?.();
+    }, 2100);
+  }, []);
+
+  // Start playing on mount, but never for returning visitors.
+  useEffect(() => {
+    if (phase !== "playing" || hasSeenIntro()) return;
+    const v = videoRef.current;
+    if (!v) return;
+
+    v.muted = true; // autoplay is only allowed when muted
+    v.play().catch(finish);
+
+    const timeout = window.setTimeout(() => {
+      if (!v || v.readyState < 3 || v.paused) finish();
+    }, LOAD_TIMEOUT_MS);
+    return () => window.clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (phase === "done") return null;
+
+  return (
+    <motion.div
+      role="dialog"
+      aria-label="Welcome to AURA"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: phase === "reveal" ? 0 : 1 }}
+      transition={{ duration: 1.2, ease: EASE }}
+      style={{ pointerEvents: phase === "reveal" ? "none" : "auto" }}
+      className="fixed inset-0 z-[100] overflow-hidden bg-black"
+    >
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: phase === "playing" && ready ? 1 : 0 }}
+        transition={{
+          duration: phase === "outro" ? 0.9 : 0.8,
+          ease: "easeInOut",
+        }}
+        className="pointer-events-none absolute inset-0 bg-black"
+      >
+        <video
+          ref={videoRef}
+          src={welcomeVideo}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          disablePictureInPicture
+          className="h-full w-full bg-black object-contain"
+          onPlaying={() => {
+            setReady(true);
+            markIntroSeen();
+          }}
+          onLoadedMetadata={(e) => {
+            if (e.currentTarget.videoWidth === 0) finish();
+          }}
+          onEnded={finish}
+          onError={finish}
+        />
+      </motion.div>
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/AuraLoader.tsx ===
+// src/components/aura/AuraLoader.tsx
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import auraLogo from "@/assets/aura.jpg";
+
+interface AuraLoaderProps {
+  onComplete?: () => void;
+}
+
+export default function AuraLoader({ onComplete }: AuraLoaderProps) {
+  // Step sequence:
+  // 1: "Welcome" (1 sec)
+  // 2: "To" (1 sec)
+  // 3: aura.jpg (2 sec)
+  // 4: Solid black screen fades out to reveal the landing page
+  // "done": Unmounts component completely
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | "done">(1);
+
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  useEffect(() => {
+    let timer: number;
+
+    if (step === 1) {
+      // Step 1 ("Welcome"): 1 second
+      timer = window.setTimeout(() => setStep(2), 1000);
+    } else if (step === 2) {
+      // Step 2 ("To"): 1 second
+      timer = window.setTimeout(() => setStep(3), 1000);
+    } else if (step === 3) {
+      // Step 3 (aura.jpg): 2 seconds
+      timer = window.setTimeout(() => setStep(4), 2000);
+    } else if (step === 4) {
+      // Step 4 (Black screen fade out to main site): 1.2 seconds
+      timer = window.setTimeout(() => {
+        setStep("done");
+        onCompleteRef.current?.();
+      }, 1200);
+    }
+
+    return () => window.clearTimeout(timer);
+  }, [step]);
+
+  if (step === "done") return null;
+
+  const chromeTextStyle: React.CSSProperties = {
+    backgroundImage:
+      "linear-gradient(to bottom, #ffffff 0%, #e0e0e0 30%, #7a7a7a 49%, #292929 51%, #a3a3a3 60%, #ffffff 100%)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    filter:
+      "drop-shadow(0px 4px 12px rgba(255,255,255,0.15)) drop-shadow(0px 1px 2px rgba(255,255,255,0.3))",
+  };
+
+  return (
+    <motion.div
+      key="aura-loader-black-screen"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: step === 4 ? 0 : 1 }}
+      transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden pointer-events-none"
+    >
+      <AnimatePresence mode="wait">
+        {step === 1 && (
+          <motion.h1
+            key="text-welcome"
+            style={chromeTextStyle}
+            initial={{ opacity: 0, scale: 0.92, filter: "blur(16px)" }}
+            animate={{ opacity: 1, scale: 1.02, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(16px)" }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="notranslate text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
+          >
+            Welcome
+          </motion.h1>
+        )}
+
+        {step === 2 && (
+          <motion.h1
+            key="text-to"
+            style={chromeTextStyle}
+            initial={{ opacity: 0, scale: 0.92, filter: "blur(16px)" }}
+            animate={{ opacity: 1, scale: 1.02, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.08, filter: "blur(16px)" }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="notranslate text-5xl sm:text-7xl md:text-8xl font-extrabold uppercase tracking-[0.35em] select-none"
+          >
+            To
+          </motion.h1>
+        )}
+
+        {step === 3 && (
+          <motion.img
+            key="image-aura"
+            src={auraLogo}
+            alt="AURA"
+            initial={{ opacity: 0, scale: 0.88, filter: "blur(24px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0, scale: 1.06, filter: "blur(24px)" }}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            className="w-[310px] sm:w-[440px] md:w-[580px] h-auto object-contain select-none"
+            draggable={false}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/AuraMark.tsx ===
+// src/components/aura/AuraMark.tsx
+import auraLogo from "@/assets/aura.jpg";
+
+interface AuraMarkProps {
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}
+
+const SIZE_CLASS: Record<NonNullable<AuraMarkProps["size"]>, string> = {
+  sm: "aura-mark-sm",
+  md: "",
+  lg: "aura-mark-lg",
+};
+
+/**
+ * The AURA emblem: the brand image (aura.JPG) framed in a chrome disc with a
+ * slow metallic light sweep. Used everywhere the mark appears EXCEPT the
+ * navbars, which use logo.jpg directly.
+ */
+export default function AuraMark({ size = "md", className = "" }: AuraMarkProps) {
+  return (
+    <span
+      className={`aura-mark ${SIZE_CLASS[size]} ${className}`}
+      role="img"
+      aria-label="AURA"
+    >
+      <img src={auraLogo} alt="" className="aura-mark-img" draggable={false} />
+      <span className="aura-mark-sweep" aria-hidden />
+    </span>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/ChristmasSnow.tsx ===
+// src/components/aura/ChristmasSnow.tsx
+//
+// Gentle, small snowflakes for the Christmas vibe. Uses the `falling-snow` package
+// (npm i falling-snow). The snow never blocks clicks and respects "reduce motion".
+import { useEffect, useState } from "react";
+import { Snowfall } from "falling-snow/react";
+import { isWinter } from "falling-snow";
+
+interface ChristmasSnowProps {
+  /** Number of flakes on desktop (phones get ~60% of this). */
+  count?: number;
+  /**
+   * Layer of the snow. 40 keeps it above the page but under the intro video and dialogs.
+   * Use 9999 if you also want snow over the navbar.
+   */
+  zIndex?: number;
+  /** Only snow in December, January and February (hides itself the rest of the year). */
+  onlyInWinter?: boolean;
+}
+
+export default function ChristmasSnow({ count = 110, zIndex = 40, onlyInWinter = false }: ChristmasSnowProps) {
+  const [flakes, setFlakes] = useState<number | null>(null);
+
+  // Client only: decide the amount after mount (no server/client mismatch).
+  useEffect(() => {
+    const phone = window.matchMedia("(max-width: 640px)");
+    const apply = () => setFlakes(phone.matches ? Math.round(count * 0.6) : count);
+    apply();
+    phone.addEventListener("change", apply);
+    return () => phone.removeEventListener("change", apply);
+  }, [count]);
+
+  if (flakes === null) return null;
+  if (onlyInWinter && !isWinter()) return null;
+
+  return (
+    <Snowfall
+      fullScreen
+      flake="mixed" // real crystal shapes, from tiny soft dots to detailed stars
+      count={flakes}
+      size={[3, 9]} // a bit bigger than before, still delicate
+      speed={0.9}
+      wind={0.35} // a light breeze
+      sway={1.5} // natural side-to-side flutter
+      spin={0.8}
+      depth={1} // full depth of field: far flakes small, slow and blurry; near ones sharp
+      opacity={[0.25, 0.95]}
+      colors={["#ffffff", "#f4f8ff", "#e3eeff", "#d6e6ff"]}
+      zIndex={zIndex}
+    />
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/ChromeCursor.tsx ===
+import { useEffect, useRef } from "react";
+
+/**
+ * A barely-visible grayscale radial light that follows the pointer,
+ * evoking reflected light on polished metal. Not an RGB gaming glow.
+ * Disabled on touch devices and when reduced motion is preferred.
+ */
+export default function ChromeCursor() {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    if (reduced || coarse) return;
+
+    let raf = 0;
+    let x = window.innerWidth / 2;
+    let y = window.innerHeight / 2;
+
+    const render = () => {
+      el.style.transform = `translate3d(${x - 300}px, ${y - 300}px, 0)`;
+      raf = requestAnimationFrame(render);
+    };
+
+    const onMove = (e: PointerEvent) => {
+      x = e.clientX;
+      y = e.clientY;
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    raf = requestAnimationFrame(render);
+
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      aria-hidden="true"
+      className="pointer-events-none fixed left-0 top-0 z-[2] h-[600px] w-[600px] rounded-full"
+      style={{
+        background:
+          "radial-gradient(circle, rgba(255,255,255,0.045) 0%, rgba(191,192,194,0.02) 35%, transparent 62%)",
+      }}
+    />
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/faceSpec.ts ===
+// faceSpec.ts
+// Όλη η βαθμονόμηση για τη συγκεκριμένη εικόνα (aura-chrome.jpg, 1120×1260) σε ένα σημείο.
+// Αν αλλάξεις εικόνα, αλλάζεις μόνο αυτό το αρχείο. Με debug={true} βλέπεις τις γραμμές πάνω στο πρόσωπο.
+import type { EyeSpec, Pt } from "./eyeBlink";
+import type { MouthSpec } from "./mouthWarp";
+
+export const FACE_SRC = "/aura-chrome.jpg";
+export const FACE_W = 1120;
+export const FACE_H = 1260;
+export const FACE_ASPECT = FACE_W / FACE_H;
+
+/** Σημείο εστίασης όταν η εικόνα κόβεται (object-fit: cover), π.χ. στο κινητό. */
+export const FACE_FOCUS = { x: 0.5, y: 0.27 };
+
+const n = (pts: [number, number][]): Pt[] => pts.map(([x, y]) => [x / FACE_W, y / FACE_H] as const);
+
+/** Στόμα: κέντρο στη γραμμή ανάμεσα στα χείλη (x=560.5, y=484), γωνίες στο ±70px. */
+export const MOUTH: MouthSpec = {
+  x: 560.5 / FACE_W,
+  y: 484 / FACE_H,
+  halfW: 70 / FACE_W,
+  jaw: 120 / FACE_H,
+  lip: 29 / FACE_H,
+  maxOpen: 29 / FACE_H,
+};
+
+/** Μάτια: `up` = άκρη πάνω βλεφάρου, `lo` = άκρη κάτω βλεφάρου. Πρώτο = αριστερό της εικόνας. */
+export const EYES: EyeSpec[] = [
+  {
+    up: n([[436, 309], [444, 301.5], [454, 297.5], [469, 295.5], [484, 296], [499, 300], [511, 307], [523, 317]]),
+    lo: n([[436, 309], [441, 314.5], [449, 320], [459, 323], [474, 324.5], [489, 323.5], [504, 322.5], [517, 323], [523, 317]]),
+  },
+  {
+    up: n([[604, 318], [614, 306], [624, 300], [634, 297], [649, 295.5], [664, 296], [674, 299], [681, 304], [687, 311]]),
+    lo: n([[604, 318], [611, 322], [619, 321], [629, 322.5], [639, 324], [654, 324.8], [666, 323.5], [674, 320.5], [681, 316.5], [687, 311]]),
+  },
+];
+=== END FILE ===
+
+=== FILE: src/components/aura/HamburgerButton.tsx ===
+// src/components/aura/HamburgerButton.tsx
+interface HamburgerButtonProps {
+  open: boolean;
+  onClick: () => void;
+  className?: string;
+}
+
+/**
+ * Chrome hamburger toggle. The three lines animate into an X when `open`.
+ * Purely presentational — parent owns the open state.
+ */
+export default function HamburgerButton({
+  open,
+  onClick,
+  className = "",
+}: HamburgerButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={open ? "Close menu" : "Open menu"}
+      aria-expanded={open}
+      className={`hamburger ${open ? "is-open" : ""} ${className}`}
+    >
+      <span className="hamburger-line" />
+      <span className="hamburger-line" />
+      <span className="hamburger-line" />
+    </button>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/jobs/JobsLocked.tsx ===
+// src/components/aura/jobs/JobsLocked.tsx
+import { Link } from "@tanstack/react-router";
+import { Briefcase, Lock } from "lucide-react";
+import { getPlan } from "@/lib/plans";
+import { jobsCss } from "./jobsTheme";
+
+// Change these paths if your routes are named differently.
+const UPGRADE_PATH = "/pricing";
+const LOGIN_PATH = "/login";
+
+export default function JobsLocked({ signedOut = false }: { signedOut?: boolean }) {
+  const basic = getPlan("low");
+
+  return (
+    <div className="fj-root">
+      <style>{jobsCss}</style>
+      <div className="fj-wrap">
+        <div className="fj-lock">
+          <span className="fj-lock-icon">
+            <Briefcase className="size-8" aria-hidden />
+          </span>
+          <h1 className="fj-title fj-chrome" style={{ fontSize: "clamp(1.8rem,6vw,2.4rem)" }}>
+            {signedOut ? "Sign in to continue" : "Unlock Find Job"}
+          </h1>
+          <span className="fj-rule" aria-hidden />
+          <p className="fj-sub" style={{ fontSize: ".98rem" }}>
+            {signedOut
+              ? "Sign in with your AURA account to see the barbershops that are hiring."
+              : "Find Job is available with any AURA plan. Choose a plan to see open positions from our partner barbershops."}
+          </p>
+          {!signedOut && basic && (
+            <p style={{ marginTop: 14, fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.5)" }}>
+              Plans from {basic.priceLabel} / month
+            </p>
+          )}
+
+          <Link to={signedOut ? LOGIN_PATH : UPGRADE_PATH} className="fj-btn fj-btn-chrome" style={{ marginTop: 26, height: 52, padding: "0 30px" }}>
+            <Lock className="size-4" aria-hidden />
+            {signedOut ? "Sign in" : "View plans"}
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/mouthWarp.ts ===
+// mouthWarp.ts
+// Κίνηση στόματος ανά pixel (όχι λωρίδες): το πάνω χείλος ανεβαίνει, το κάτω χείλος και το σαγόνι
+// κατεβαίνουν, και στο άνοιγμα ζωγραφίζεται ρεαλιστικό εσωτερικό (κοιλότητα, δόντια, γλώσσα).
+// Δεν εξαρτάται από DOM/React, άρα δοκιμάζεται σε node.
+
+export type MouthSpec = {
+  /** Κέντρο στόματος και γραμμή ανάμεσα στα χείλη, κλίμακα 0..1 της εικόνας */
+  readonly x: number;
+  readonly y: number;
+  /** μισό πλάτος χειλιών (γωνία–κέντρο) ως ποσοστό του πλάτους */
+  readonly halfW: number;
+  /** πόσο κάτω από τη γραμμή των χειλιών φτάνει το σαγόνι (ποσοστό ύψους) */
+  readonly jaw: number;
+  /** ύψος πάνω χείλους (ποσοστό ύψους) */
+  readonly lip: number;
+  /** μέγιστο άνοιγμα στόματος (ποσοστό ύψους) */
+  readonly maxOpen: number;
+};
+
+export type MouthRuntime = {
+  rx: number;
+  ry: number;
+  w: number;
+  h: number;
+  orig: Uint8ClampedArray;
+  /** Όλα σε τοπικές συντεταγμένες της περιοχής (pixels) */
+  mx: number;
+  my: number;
+  hw0: number;
+  jaw: number;
+  lip: number;
+  maxOpen: number;
+  margin: number;
+  s: number;
+};
+
+const REF_HALF_W = 79; // μισό πλάτος χειλιών στη φωτογραφία όπου ρυθμίστηκαν τα μεγέθη των δοντιών
+
+const clamp = (v: number, a: number, b: number) => (v < a ? a : v > b ? b : v);
+const clamp01 = (v: number) => clamp(v, 0, 1);
+const sstep = (t: number) => {
+  const x = clamp01(t);
+  return x * x * (3 - 2 * x);
+};
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+export function buildMouth(
+  spec: MouthSpec,
+  W: number,
+  H: number,
+  getRegion: (x: number, y: number, w: number, h: number) => Uint8ClampedArray,
+): MouthRuntime {
+  const mxA = spec.x * W;
+  const myA = Math.round(spec.y * H);
+  const hw0 = spec.halfW * W;
+  const jaw = spec.jaw * H;
+  const lip = spec.lip * H;
+  const margin = hw0 * 1.5;
+
+  const rx = Math.max(0, Math.floor(mxA - margin) - 2);
+  const ry = Math.max(0, Math.floor(myA - lip) - 8);
+  const w = Math.min(W, Math.ceil(mxA + margin) + 2) - rx;
+  const h = Math.min(H, Math.ceil(myA + jaw) + 6) - ry;
+
+  return {
+    rx,
+    ry,
+    w,
+    h,
+    orig: new Uint8ClampedArray(getRegion(rx, ry, w, h)),
+    mx: mxA - rx,
+    my: myA - ry,
+    hw0,
+    jaw,
+    lip,
+    maxOpen: spec.maxOpen * H,
+    margin,
+    s: hw0 / REF_HALF_W,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Δόντια                                                               */
+/* ------------------------------------------------------------------ */
+
+const REL = [0.8, 0.9, 1, 1, 0.9, 0.8];
+const REL_SUM = REL.reduce((a, b) => a + b, 0);
+const BOUND: number[] = [0];
+for (const r of REL) BOUND.push(BOUND[BOUND.length - 1] + r / REL_SUM);
+
+type Tooth = { i: number; u: number; wpx: number; arch: number };
+
+function toothAt(tx: number, totalW: number): Tooth | null {
+  if (tx < 0 || tx >= 1) return null;
+  let i = 0;
+  while (i < REL.length - 1 && tx >= BOUND[i + 1]) i++;
+  const span = BOUND[i + 1] - BOUND[i];
+  return { i, u: (tx - BOUND[i]) / span, wpx: totalW * span, arch: Math.abs(i - 2.5) / 2.5 };
+}
+
+/** Κάλυψη (0..1) δοντιού στη θέση: ο μυς επάνω-κάτω «κρεμιέται» από τη βάση προς την άκρη */
+function toothCoverage(t: Tooth, hh: number, dist: number): number {
+  // dist = απόσταση από τη βάση του δοντιού προς την άκρη (pixels), hh = ύψος δοντιού
+  const r = Math.min(t.wpx * 0.3, hh * 0.5);
+  const a = Math.max(1e-3, r / t.wpx);
+  const v = Math.abs(t.u - 0.5);
+  const v0 = 0.5 - a;
+  const dy = v > v0 ? r * (1 - Math.sqrt(Math.max(0, 1 - ((v - v0) / a) ** 2))) : 0;
+  return clamp01(hh - dy - dist + 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/* Render                                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ζωγραφίζει το στόμα στο `out` (RGBA περιοχής). Γυρίζει false αν το άνοιγμα είναι αμελητέο
+ * (τότε ο καλών πρέπει να επαναφέρει την αρχική εικόνα).
+ */
+export function renderMouth(m: MouthRuntime, open: number, width: number, out: Uint8ClampedArray): boolean {
+  const D = open * m.maxOpen;
+  if (D < 0.4) return false;
+
+  const { w, h, orig, mx, my, hw0, jaw, lip, margin, s } = m;
+  const Ul = D * 0.28; // πόσο ανεβαίνει το πάνω χείλος
+  const Dl = D - Ul; // πόσο κατεβαίνει το κάτω χείλος + σαγόνι
+  const geoW = Math.min(width, 1.08); // πιο πλατύ από τα χείλη δεν ανοίγει φυσικά
+  const hw = hw0 * geoW;
+  const c = clamp((1 - geoW) * 0.3, -0.04, 0.16); // «σούφρωμα» για Ο/ΟΥ
+
+  const gX = (x: number) => {
+    const t = Math.abs(x - mx) / margin;
+    return t >= 1 ? 0 : Math.cos((t * Math.PI) / 2) ** 2;
+  };
+  // το οριζόντιο σούφρωμα σβήνει κατακόρυφα προς τα όρια της περιοχής (χωρίς ραφή)
+  const vTop = Math.max(1, my - lip * 0.8);
+  const vBot0 = my + jaw * 0.4;
+  const vBot1 = Math.max(vBot0 + 1, h - 1);
+  const vw = (y: number) => sstep(y / vTop) * (1 - sstep((y - vBot0) / (vBot1 - vBot0)));
+  const shiftAt = (x: number, y: number) => -(x - mx) * c * gX(x) * vw(y);
+  const wX = (x: number) => {
+    const t = Math.abs(x - mx) / hw;
+    return t >= 1 ? 0 : Math.cos((t * Math.PI) / 2) ** 0.8;
+  };
+  const upW = (ys: number) => (1 - clamp01((my - ys) / lip)) ** 2;
+  const dnW = (ys: number) => (1 - clamp01((ys - my) / jaw)) ** 2;
+
+  const maxX = w - 1.001;
+  const maxY = h - 1.001;
+  // bilinear δείγμα από την αρχική περιοχή
+  const sample = (sx: number, sy: number, dst: number[]) => {
+    const x = clamp(sx - 0.5, 0, maxX);
+    const y = clamp(sy - 0.5, 0, maxY);
+    const x0 = Math.floor(x);
+    const y0 = Math.floor(y);
+    const fx = x - x0;
+    const fy = y - y0;
+    const i00 = (y0 * w + x0) * 4;
+    const i10 = i00 + 4;
+    const i01 = i00 + w * 4;
+    const i11 = i01 + 4;
+    for (let k = 0; k < 3; k++) {
+      dst[k] =
+        (orig[i00 + k] * (1 - fx) + orig[i10 + k] * fx) * (1 - fy) +
+        (orig[i01 + k] * (1 - fx) + orig[i11 + k] * fx) * fy;
+    }
+  };
+
+  // Εσωτερικό: παράμετροι
+  const teethVis = clamp((width - 0.72) / 0.25, 0, 1); // κρύβονται στα Ο/ΟΥ
+  const showUpper = open > 0.18 && teethVis > 0;
+  const showLower = open > 0.55 && teethVis > 0;
+  const lowerVis = teethVis * clamp((open - 0.55) / 0.25, 0, 1);
+  const totalW = hw * 1.5;
+  const upperCap = 18 * s;
+  const lowerCap = 11 * s;
+  const showTongue = open > 0.4;
+
+  const interior = (dst: number[], xd: number, yd: number, yTop: number, yBot: number, oh: number, q: number) => {
+    const pv = clamp01((yd - yTop) / oh); // 0 πάνω, 1 κάτω
+    // κοιλότητα: σκούρο, ζεστό, πιο βαθύ στο κέντρο
+    let cr = mix(14, 40, pv);
+    let cg = mix(7, 19, pv);
+    let cb = mix(9, 23, pv);
+    const throat = Math.exp(-(q * q) / 0.32);
+    const deep = 1 - 0.6 * throat * (1 - 0.35 * pv);
+    cr *= deep;
+    cg *= deep;
+    cb *= deep;
+
+    // γλώσσα
+    if (showTongue) {
+      const rxT = hw * 0.46;
+      const ryT = Math.max(0.8, Dl * 0.34);
+      const cyT = yBot - ryT * 0.55;
+      const dx = (xd - mx) / rxT;
+      const dy = (yd - cyT) / ryT;
+      const nd = Math.sqrt(dx * dx + dy * dy) - 1;
+      const cov = clamp01(0.5 - nd * Math.min(rxT, ryT));
+      if (cov > 0) {
+        const v = clamp01((yd - (cyT - ryT)) / (2 * ryT));
+        let tr = mix(118, 78, sstep(v / 0.6));
+        let tg = mix(70, 44, sstep(v / 0.6));
+        let tb = mix(74, 49, sstep(v / 0.6));
+        tr = mix(tr, 44, sstep((v - 0.6) / 0.4));
+        tg = mix(tg, 22, sstep((v - 0.6) / 0.4));
+        tb = mix(tb, 26, sstep((v - 0.6) / 0.4));
+        const groove = 1 - 0.3 * Math.exp(-((xd - mx) * (xd - mx)) / (2 * 1.4 * 1.4)) * (1 - v);
+        tr *= groove;
+        tg *= groove;
+        tb *= groove;
+        const hl =
+          0.3 * Math.exp(-(((xd - (mx - rxT * 0.2)) / (rxT * 0.3)) ** 2 + ((yd - (cyT - ryT * 0.4)) / (ryT * 0.22)) ** 2));
+        tr += (255 - tr) * hl;
+        tg += (255 - tg) * hl;
+        tb += (255 - tb) * hl;
+        cr = mix(cr, tr, cov);
+        cg = mix(cg, tg, cov);
+        cb = mix(cb, tb, cov);
+      }
+    }
+
+    // δόντια (κάτω πρώτα, ώστε τα πάνω να είναι μπροστά)
+    if (showLower) {
+      const tw = totalW * 0.9;
+      const tooth = toothAt((xd - mx) / tw + 0.5, tw);
+      if (tooth) {
+        const hh = Math.max(0.6, Math.min(Dl * 0.4, lowerCap) * (1 - 0.3 * tooth.arch * tooth.arch));
+        const cov = toothCoverage(tooth, hh, yBot - yd) * lowerVis;
+        if (cov > 0 && yBot - yd >= -0.5) {
+          const t = clamp01((yBot - yd) / hh);
+          const base = t < 0.3 ? mix(120, 176, t / 0.3) : mix(176, 160, (t - 0.3) / 0.7);
+          const edge = 1 - 0.34 * sstep((Math.abs(tooth.u - 0.5) * 2 - 0.45) / 0.55);
+          const gap = 1 - 0.5 * (1 - sstep((Math.min(tooth.u, 1 - tooth.u) * tooth.wpx) / 0.9));
+          const k2 = (edge * gap * (1 - 0.4 * tooth.arch * tooth.arch)) * 0.88;
+          cr = mix(cr, base * k2, cov);
+          cg = mix(cg, (base - 4) * k2, cov);
+          cb = mix(cb, (base - 14) * k2, cov);
+        }
+      }
+    }
+    if (showUpper) {
+      const tooth = toothAt((xd - mx) / totalW + 0.5, totalW);
+      if (tooth) {
+        const hh = Math.max(0.6, Math.min(oh * 0.55, upperCap) * (1 - 0.3 * tooth.arch * tooth.arch));
+        const cov = toothCoverage(tooth, hh, yd - yTop) * teethVis;
+        if (cov > 0) {
+          const t = clamp01((yd - yTop) / hh);
+          // βάση σκιασμένη (ούλα), φως στη μέση, ζεστή/ημιδιαφανής άκρη
+          let tr = t < 0.35 ? mix(150, 238, t / 0.35) : mix(238, 214, (t - 0.35) / 0.65);
+          let tg = t < 0.35 ? mix(142, 234, t / 0.35) : mix(234, 208, (t - 0.35) / 0.65);
+          let tb = t < 0.35 ? mix(130, 224, t / 0.35) : mix(224, 192, (t - 0.35) / 0.65);
+          const edge = 1 - 0.34 * sstep((Math.abs(tooth.u - 0.5) * 2 - 0.45) / 0.55);
+          const gap = 1 - 0.5 * (1 - sstep((Math.min(tooth.u, 1 - tooth.u) * tooth.wpx) / 0.9));
+          const dark = edge * gap * (1 - 0.4 * tooth.arch * tooth.arch);
+          tr *= dark;
+          tg *= dark;
+          tb *= dark;
+          // γυαλάδα
+          const spec = 0.3 * Math.exp(-(((tooth.u - 0.34) / 0.14) ** 2 + ((t - 0.38) / 0.2) ** 2));
+          tr += (255 - tr) * spec;
+          tg += (255 - tg) * spec;
+          tb += (255 - tb) * spec;
+          // διαφάνεια του σμάλτου κοντά στην άκρη
+          const tl = sstep((t - 0.72) / 0.28) * 0.28;
+          tr = mix(tr, cr, tl);
+          tg = mix(tg, cg, tl);
+          tb = mix(tb, cb, tl);
+          cr = mix(cr, tr, cov);
+          cg = mix(cg, tg, cov);
+          cb = mix(cb, tb, cov);
+        }
+      }
+    }
+
+    // σκιές: από το πάνω χείλος, κάτω χείλος και γωνίες του στόματος
+    const ts = Math.exp(-(yd - yTop) / Math.max(2, 0.45 * oh)) * 0.55;
+    const bs = Math.exp(-(yBot - yd) / Math.max(1.5, 0.2 * oh)) * 0.3;
+    const cs = sstep((Math.abs(q) - 0.6) / 0.4) * 0.75;
+    const shade = (1 - ts) * (1 - bs) * (1 - cs);
+    dst[0] = cr * shade;
+    dst[1] = cg * shade;
+    dst[2] = cb * shade;
+  };
+
+  const lip3 = [0, 0, 0];
+  const col = [0, 0, 0];
+  out.set(orig);
+
+  for (let X = 0; X < w; X++) {
+    const xd = X + 0.5;
+    // αντίστροφη οριζόντια μετατόπιση (σούφρωμα)
+    let xs = xd;
+    for (let it = 0; it < 3; it++) xs = xd - shiftAt(xs, my);
+    const k = wX(xs);
+    const moved = Math.abs(shiftAt(xs, my));
+    if (k < 0.02 && moved < 0.3) continue; // αμετάβλητη στήλη
+
+    const yTop = my - Ul * k;
+    const yBot = my + Dl * k;
+    const hasOpen = k >= 0.02 && D * k >= 0.3;
+    const oh = Math.max(1e-3, yBot - yTop);
+    const q = (xd - mx) / Math.max(1, hw);
+
+    for (let y = 0; y < h; y++) {
+      const yd = y + 0.5;
+
+      // κάλυψη ανοίγματος (με anti-alias στα όρια)
+      let cin = 0;
+      if (hasOpen) cin = clamp01(yd - yTop + 0.5) * clamp01(yBot - yd + 0.5);
+
+      // χείλη: αντίστροφη κατακόρυφη μετατόπιση
+      if (cin < 1) {
+        let ys: number;
+        if (!hasOpen) {
+          ys = yd;
+        } else if (yd < (yTop + yBot) / 2) {
+          const t = Math.min(yd, yTop);
+          ys = t;
+          for (let it = 0; it < 8; it++) ys = t + Ul * k * upW(ys);
+        } else {
+          const t = Math.max(yd, yBot);
+          ys = t;
+          for (let it = 0; it < 8; it++) ys = t - Dl * k * dnW(ys);
+        }
+        let xsy = xd;
+        for (let it = 0; it < 2; it++) xsy = xd - shiftAt(xsy, yd);
+        sample(xsy, ys, lip3);
+        if (hasOpen) {
+          // μικρή σκιά επαφής στα χείλη δίπλα στο άνοιγμα
+          const d = yd < (yTop + yBot) / 2 ? yTop - yd : yd - yBot;
+          const f = 1 - 0.22 * Math.exp(-Math.max(0, d) / (2.2 * s)) * k;
+          lip3[0] *= f;
+          lip3[1] *= f;
+          lip3[2] *= f;
+        }
+      }
+
+      let r: number;
+      let g: number;
+      let b: number;
+
+      if (cin > 0) {
+        interior(col, xd, yd, yTop, yBot, oh, q);
+        r = lip3[0] * (1 - cin) + col[0] * cin;
+        g = lip3[1] * (1 - cin) + col[1] * cin;
+        b = lip3[2] * (1 - cin) + col[2] * cin;
+        if (cin >= 1) {
+          r = col[0];
+          g = col[1];
+          b = col[2];
+        }
+      } else {
+        r = lip3[0];
+        g = lip3[1];
+        b = lip3[2];
+      }
+
+      const o = (y * w + X) * 4;
+      out[o] = r;
+      out[o + 1] = g;
+      out[o + 2] = b;
+      out[o + 3] = 255;
+
+    }
+  }
+  return true;
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/portfolio/CreatePortfolioButton.tsx ===
+// src/components/aura/portfolio/CreatePortfolioButton.tsx
+// Drop this at the START of the Profile page: <CreatePortfolioButton userId={user.id} />
+// Shows only for active AURA ELITE members.
+import { Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { Images, Sparkles } from "lucide-react";
+import { useIsElite, useMyPortfolio } from "@/lib/portfolio";
+import { pfCss } from "./pfStyles";
+
+export default function CreatePortfolioButton({ userId }: { userId: string | undefined }) {
+  const { isElite, loading: eliteLoading } = useIsElite(userId);
+  const { portfolio, loading: pfLoading } = useMyPortfolio(userId);
+
+  if (!userId || eliteLoading || pfLoading || !isElite) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="pf-root mb-8 flex justify-center"
+    >
+      <style>{pfCss}</style>
+      {portfolio ? (
+        <Link to="/portfolios/$slug" params={{ slug: portfolio.slug }} className="pf-btn pf-btn-solid px-7 py-3.5 tracking-[0.16em]">
+          <Images className="size-4" /> ΤΟ PORTFOLIO ΜΟΥ
+        </Link>
+      ) : (
+        <Link to="/portfolios/create" className="pf-btn pf-btn-solid px-7 py-3.5 tracking-[0.16em]">
+          <Sparkles className="size-4" /> ΔΗΜΙΟΥΡΓΗΣΕ ΤΟ PORTFOLIO ΣΟΥ
+        </Link>
+      )}
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/portfolio/PortfolioCreatePage.tsx ===
+// src/components/aura/portfolio/PortfolioCreatePage.tsx
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { ArrowLeft, Camera, Gem, Loader2, Lock, UserRound, Share2 } from "lucide-react";
+import { createPortfolio, updatePortfolio, useIsElite, useMyPortfolio, type PortfolioForm } from "@/lib/portfolio";
+import { useAuthUser } from "@/lib/useAuthUser";
+import { pfCss } from "./pfStyles";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+const STEPS = [
+  {
+    icon: UserRound,
+    title: "Φτιάξε το προφίλ σου",
+    text: "Γράψε έναν σύντομο τίτλο, λίγα λόγια για σένα, την πόλη σου και το Instagram σου.",
+  },
+  {
+    icon: Camera,
+    title: "Ανέβασε τις δουλειές σου",
+    text: "Πρόσθεσε φωτογραφίες από κουρέματα και fades, με περιγραφή για την τεχνική που χρησιμοποίησες.",
+  },
+  {
+    icon: Share2,
+    title: "Δείξε τες σε όλους",
+    text: "Το portfolio εμφανίζεται στη δημόσια λίστα και όλοι μπορούν να το δουν και να κάνουν like.",
+  },
+];
+
+export default function PortfolioCreatePage() {
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuthUser();
+  const { isElite, loading: eliteLoading } = useIsElite(user?.id);
+  const { portfolio, loading: pfLoading } = useMyPortfolio(user?.id);
+
+  const [form, setForm] = useState<PortfolioForm>({ headline: "", bio: "", city: "", instagram: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const editing = Boolean(portfolio);
+
+  useEffect(() => {
+    if (portfolio) {
+      setForm({
+        headline: portfolio.headline,
+        bio: portfolio.bio,
+        city: portfolio.city,
+        instagram: portfolio.instagram,
+      });
+    }
+  }, [portfolio]);
+
+  function set<K extends keyof PortfolioForm>(key: K, value: PortfolioForm[K]) {
+    setForm((f) => ({ ...f, [key]: value }));
+  }
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!user || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      let slug: string;
+      if (editing && portfolio) {
+        await updatePortfolio(user.id, form);
+        slug = portfolio.slug;
+      } else {
+        slug = await createPortfolio(form);
+      }
+      await navigate({ to: "/portfolios/$slug", params: { slug } });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Κάτι πήγε στραβά.");
+      setBusy(false);
+    }
+  }
+
+  const shell = (children: React.ReactNode) => (
+    <main className="pf-root relative min-h-screen overflow-hidden bg-[#050506] px-4 pb-28 pt-28 text-white sm:px-6">
+      <style>{pfCss}</style>
+      <div className="pf-grid-bg absolute inset-x-0 top-0 h-[560px]" />
+      <div className="pf-orb -left-24 top-24 h-80 w-80" />
+      <div className="pf-orb -right-16 top-72 h-96 w-96" />
+      <div className="relative mx-auto max-w-3xl">{children}</div>
+    </main>
+  );
+
+  if (authLoading || (user && (eliteLoading || pfLoading))) {
+    return shell(
+      <div className="space-y-5">
+        <div className="pf-skel mx-auto h-10 w-2/3 rounded" />
+        <div className="pf-skel h-40 w-full rounded-2xl" />
+      </div>,
+    );
+  }
+
+  if (!user) {
+    return shell(
+      <div className="pf-panel mx-auto max-w-md p-10 text-center">
+        <Lock className="mx-auto size-9 text-white/40" />
+        <h1 className="pf-title mt-4 text-2xl font-bold">Συνδέσου για να συνεχίσεις</h1>
+        <Link to="/login" className="pf-btn pf-btn-solid mt-6 px-8">
+          Σύνδεση
+        </Link>
+      </div>,
+    );
+  }
+
+  if (!isElite) {
+    return shell(
+      <div className="pf-panel mx-auto max-w-md p-10 text-center">
+        <Gem className="mx-auto size-9 text-white/60" />
+        <h1 className="pf-title mt-4 text-2xl font-bold">Μόνο για μέλη AURA ELITE</h1>
+        <p className="mt-3 text-sm text-white/55">Κάνε upgrade για να δημιουργήσεις το δικό σου portfolio.</p>
+        <Link to="/pricing" className="pf-btn pf-btn-solid mt-6 px-8 tracking-[0.16em]">
+          UPGRADE TO ELITE
+        </Link>
+      </div>,
+    );
+  }
+
+  return shell(
+    <>
+      <Link
+        to={editing && portfolio ? "/portfolios/$slug" : "/portfolios"}
+        params={editing && portfolio ? { slug: portfolio.slug } : undefined}
+        className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/45 transition hover:text-white"
+      >
+        <ArrowLeft className="size-3.5" /> Πίσω
+      </Link>
+
+      <motion.header
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: EASE }}
+        className="mt-8 text-center"
+      >
+        <span className="pf-kicker">Aura Elite</span>
+        <h1 className="pf-title mt-4 text-3xl font-bold tracking-tight sm:text-5xl">
+          {editing ? "Επεξεργασία portfolio" : "Δημιούργησε το portfolio σου"}
+        </h1>
+      </motion.header>
+
+      {!editing && (
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          {STEPS.map((s, i) => (
+            <motion.div
+              key={s.title}
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 + i * 0.1, ease: EASE }}
+              className="pf-step"
+            >
+              <span className="pf-step-n">{i + 1}</span>
+              <s.icon className="mt-4 size-5 text-white/70" />
+              <h3 className="mt-3 text-sm font-semibold text-white">{s.title}</h3>
+              <p className="mt-1.5 text-xs leading-relaxed text-white/55">{s.text}</p>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
+      <motion.form
+        onSubmit={(e) => void submit(e)}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.7, delay: 0.35, ease: EASE }}
+        className="pf-panel mt-8 space-y-5 p-6 sm:p-8"
+      >
+        <label className="block">
+          <span className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.22em] text-white/45">
+            Τίτλος <span className="normal-case tracking-normal">{form.headline.length}/80</span>
+          </span>
+          <input
+            className="pf-input"
+            placeholder="π.χ. Fade specialist · Barber στην Αθήνα"
+            maxLength={80}
+            value={form.headline}
+            onChange={(e) => set("headline", e.target.value)}
+            disabled={busy}
+          />
+        </label>
+
+        <label className="block">
+          <span className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.22em] text-white/45">
+            Bio <span className="normal-case tracking-normal">{form.bio.length}/500</span>
+          </span>
+          <textarea
+            className="pf-input min-h-[110px] resize-y"
+            placeholder="Πες λίγα λόγια για σένα και το στυλ σου…"
+            maxLength={500}
+            value={form.bio}
+            onChange={(e) => set("bio", e.target.value)}
+            disabled={busy}
+          />
+        </label>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] uppercase tracking-[0.22em] text-white/45">Πόλη</span>
+            <input className="pf-input" placeholder="Αθήνα" maxLength={60} value={form.city} onChange={(e) => set("city", e.target.value)} disabled={busy} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] uppercase tracking-[0.22em] text-white/45">Instagram</span>
+            <input
+              className="pf-input"
+              placeholder="username (χωρίς @)"
+              maxLength={40}
+              value={form.instagram}
+              onChange={(e) => set("instagram", e.target.value.replace(/[^A-Za-z0-9._]/g, ""))}
+              disabled={busy}
+            />
+          </label>
+        </div>
+
+        {error && (
+          <p className="pf-toast" role="alert">
+            <span>
+              {error}
+              {/username/i.test(error) && (
+                <>
+                  {" "}
+                  <Link to="/profile" className="font-semibold underline underline-offset-4">
+                    Πήγαινε στο προφίλ
+                  </Link>
+                </>
+              )}
+            </span>
+          </p>
+        )}
+
+        <button type="submit" className="pf-btn pf-btn-solid w-full py-3.5 tracking-[0.18em]" disabled={busy}>
+          {busy && <Loader2 className="size-4 animate-spin" />}
+          {busy ? "Αποθήκευση…" : editing ? "ΑΠΟΘΗΚΕΥΣΗ" : "ΔΗΜΙΟΥΡΓΙΑ PORTFOLIO"}
+        </button>
+        {!editing && (
+          <p className="text-center text-[11px] text-white/35">
+            Η διεύθυνση του portfolio σου προκύπτει από το username σου και δεν αλλάζει.
+          </p>
+        )}
+      </motion.form>
+    </>,
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/portfolio/UpgradePopup.tsx ===
+// src/components/aura/portfolio/UpgradePopup.tsx
+import { useEffect, useRef } from "react";
+import { Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { Crown, X } from "lucide-react";
+
+/** Shown to everyone who is not Elite when they open someone's portfolio. */
+export default function UpgradePopup({ onClose }: { onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="pf-modal-layer" onPointerDown={onClose}>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pf-upgrade-title"
+        initial={{ opacity: 0, y: 24, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className="pf-modal"
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <button
+          ref={closeRef}
+          type="button"
+          onClick={onClose}
+          aria-label="Κλείσιμο"
+          className="pf-iconbtn absolute right-4 top-4"
+          style={{ width: 34, height: 34 }}
+        >
+          <X className="size-4" />
+        </button>
+
+        <span className="pf-crown">
+          <Crown className="size-7" />
+        </span>
+
+        <p className="pf-kicker mt-6" style={{ letterSpacing: "0.4em" }}>
+          Aura Elite
+        </p>
+        <h2 id="pf-upgrade-title" className="pf-title mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
+          Upgrade to Elite to create your own portfolio
+        </h2>
+        <p className="mx-auto mt-4 max-w-sm text-sm leading-relaxed text-white/55">
+          Τα portfolios είναι αποκλειστικό προνόμιο των μελών AURA ELITE. Δημιούργησε το δικό σου, ανέβασε τις
+          δουλειές σου και δείξε τες σε όλη την κοινότητα.
+        </p>
+
+        <div className="mt-8 flex flex-col gap-3">
+          <Link to="/pricing" className="pf-btn pf-btn-solid w-full py-3.5 text-[13px] tracking-[0.18em]">
+            UPGRADE TO ELITE
+          </Link>
+          <button type="button" onClick={onClose} className="pf-btn w-full">
+            Ίσως αργότερα
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/ProgressChrome.tsx ===
+// src/components/aura/ProgressChrome.tsx
+import { motion, useReducedMotion } from "motion/react";
+
+interface ProgressChromeProps {
+  value: number; // 0 - 100
+  label?: string;
+  verified?: boolean;
+}
+
+/**
+ * Progress rail per the AURA brief:
+ * gunmetal (0%) -> silver (50%) -> bright chrome/white (100%).
+ * Verified state adds a refined silver-white glow (never green).
+ */
+export default function ProgressChrome({
+  value,
+  label,
+  verified = false,
+}: ProgressChromeProps) {
+  const reduced = useReducedMotion();
+  const clamped = Math.max(0, Math.min(100, value));
+
+  return (
+    <div className="w-full">
+      {(label || true) && (
+        <div className="mb-3 flex items-baseline justify-between">
+          <span className="font-aura text-[0.7rem] uppercase tracking-[0.24em] text-aura-text-muted">
+            {label ?? "Mastery"}
+          </span>
+          <span
+            className={`font-aura text-sm tabular-nums ${
+              verified ? "chrome-text font-semibold" : "text-aura-text-secondary"
+            }`}
+          >
+            {verified ? "Verified" : `${Math.round(clamped)}%`}
+          </span>
+        </div>
+      )}
+
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-aura-gunmetal/60">
+        <motion.div
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            background:
+              "linear-gradient(90deg, #6e7073 0%, #bfc0c2 55%, #ffffff 100%)",
+            boxShadow: verified
+              ? "0 0 16px 1px rgba(255,255,255,0.45)"
+              : "0 0 10px -2px rgba(255,255,255,0.25)",
+          }}
+          initial={{ width: 0 }}
+          animate={{ width: `${clamped}%` }}
+          transition={{ duration: reduced ? 0 : 1, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/useAuraChat.ts ===
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client"; // ← προσαρμόσε στο δικό σου path
+import { speakable, type AuraCard } from "@/components/aura/AuraChatCards";
+import { useAuraSpeech } from "@/hooks/useAuraSpeech";
+
+export type Msg = { role: "user" | "assistant"; content: string; cards?: AuraCard[] };
+
+export const DEFAULT_LIMIT = 10; // μέχρι να απαντήσει ο server με το πραγματικό όριο
+const STORE_KEY = "aura_chat_v2";
+
+type Saved = { messages: Msg[]; remaining: number | null; limit: number; limitReached: boolean };
+
+function loadSaved(): Saved | null {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw) as Saved;
+    if (!Array.isArray(s.messages)) return null;
+    return {
+      messages: s.messages.slice(-20),
+      remaining: typeof s.remaining === "number" ? s.remaining : null,
+      limit: typeof s.limit === "number" ? s.limit : DEFAULT_LIMIT,
+      limitReached: !!s.limitReached,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem("aura_device");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("aura_device", id);
+    }
+    return id;
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Όλη η λογική του AURA AI σε ένα σημείο: η σελίδα /ai και το floating widget μοιράζονται
+ * την ίδια συζήτηση, το ίδιο όριο μηνυμάτων, τις ίδιες κάρτες και την ίδια φωνή.
+ *
+ * `canSpeak`: το widget μιλά μόνο όταν είναι ανοιχτό.
+ */
+export function useAuraChat(opts: { canSpeak?: () => boolean } = {}) {
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [limit, setLimit] = useState(DEFAULT_LIMIT);
+  const [limitReached, setLimitReached] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [ready, setReady] = useState(false);
+
+  const canSpeakRef = useRef(opts.canSpeak);
+  canSpeakRef.current = opts.canSpeak;
+
+  const { speak, stop, speaking, voiceIssue, getViseme } = useAuraSpeech();
+
+  // φόρτωση της αποθηκευμένης συζήτησης (μόνο στον browser, ώστε να μην χαλάει το SSR)
+  useEffect(() => {
+    const s = loadSaved();
+    if (s) {
+      setMessages(s.messages);
+      setRemaining(s.remaining);
+      setLimit(s.limit);
+      setLimitReached(s.limitReached);
+    }
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      sessionStorage.setItem(
+        STORE_KEY,
+        JSON.stringify({ messages: messages.slice(-20), remaining, limit, limitReached } satisfies Saved),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [ready, messages, remaining, limit, limitReached]);
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim();
+    if (!text || loading || limitReached) return;
+
+    stop();
+    const next: Msg[] = [...messages, { role: "user", content: text }];
+    setMessages(next);
+    setInput("");
+    setLoading(true);
+
+    try {
+      let reply: string | null = null;
+      let cards: AuraCard[] | undefined;
+      const payload = next.map(({ role, content }) => ({ role, content })); // στον server μόνο κείμενο
+
+      for (let attempt = 0; attempt < 2 && !reply; attempt++) {
+        try {
+          const { data, error: invokeErr } = await supabase.functions.invoke("ai-chat", {
+            body: { messages: payload, deviceId: getDeviceId() },
+          });
+          if (invokeErr) throw invokeErr;
+
+          if (data?.error === "limit_reached") {
+            setLimitReached(true);
+            setRemaining(0);
+            return;
+          }
+          if (typeof data?.reply === "string" && data.reply.trim()) {
+            reply = data.reply;
+            cards = Array.isArray(data.cards) && data.cards.length ? (data.cards as AuraCard[]) : undefined;
+            if (typeof data.remaining === "number") setRemaining(data.remaining);
+            if (typeof data.limit === "number") setLimit(data.limit);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const finalReply = reply ?? "Συγγνώμη, είχα ένα μικρό πρόβλημα σύνδεσης. Στείλε μου ξανά το μήνυμά σου.";
+      setMessages([...next, { role: "assistant", content: finalReply, cards }]);
+      // η φωνή διαβάζει μόνο τις πρώτες προτάσεις (λιγότερη κατανάλωση TTS)
+      if (voiceOn && (canSpeakRef.current ? canSpeakRef.current() : true)) void speak(speakable(finalReply));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function newChat() {
+    stop();
+    setMessages([]);
+  }
+
+  function toggleVoice() {
+    if (voiceOn) stop();
+    setVoiceOn(!voiceOn);
+  }
+
+  function replay(text: string) {
+    void speak(speakable(text));
+  }
+
+  return {
+    ready,
+    messages,
+    input,
+    setInput,
+    loading,
+    remaining,
+    limit,
+    limitReached,
+    left: remaining ?? limit,
+    voiceOn,
+    toggleVoice,
+    speaking,
+    voiceIssue,
+    getViseme,
+    stopVoice: stop,
+    send,
+    newChat,
+    replay,
+  };
+}
+
+export type AuraChat = ReturnType<typeof useAuraChat>;
+=== END FILE ===
+
+=== FILE: src/components/aura/useLockedViewport.ts ===
+import { useEffect, useState } from "react";
+
+export function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const update = () => setMatch(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [query]);
+  return match;
+}
+
+/**
+ * Στο κινητό η σελίδα «κλειδώνει» στο ορατό τμήμα της οθόνης (visualViewport). Όταν ανοίγει το
+ * πληκτρολόγιο, όλο το UI μικραίνει ώστε να χωράει πάνω από αυτό, και ο χαρακτήρας μένει ορατός.
+ * Η σελίδα πίσω δεν κινείται. Όταν enabled γίνει false, όλα επανέρχονται όπως ήταν.
+ */
+export function useLockedViewport(enabled: boolean) {
+  const [vp, setVp] = useState({ height: 0, top: 0, keyboard: false });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const vv = window.visualViewport;
+    let maxH = 0;
+    let lastW = window.innerWidth;
+
+    const update = () => {
+      if (window.innerWidth !== lastW) {
+        lastW = window.innerWidth; // περιστροφή οθόνης
+        maxH = 0;
+      }
+      const height = Math.round(vv ? vv.height : window.innerHeight);
+      const top = Math.round(vv ? vv.offsetTop : 0);
+      maxH = Math.max(maxH, height); // το μεγαλύτερο ύψος που είδαμε = πληκτρολόγιο κλειστό
+      const keyboard = maxH - height > 120;
+      setVp((p) => (p.height === height && p.top === top && p.keyboard === keyboard ? p : { height, top, keyboard }));
+      if (window.scrollY !== 0) window.scrollTo(0, 0); // το iOS σκρολάρει τη σελίδα όταν εστιάζεις input
+    };
+    update();
+
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+
+    // κλείδωσε τη σελίδα πίσω από το chat
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prev = {
+      hOverflow: html.style.overflow,
+      hOverscroll: html.style.overscrollBehavior,
+      bOverflow: body.style.overflow,
+      bPosition: body.style.position,
+      bTop: body.style.top,
+      bWidth: body.style.width,
+    };
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+
+    return () => {
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      html.style.overflow = prev.hOverflow;
+      html.style.overscrollBehavior = prev.hOverscroll;
+      body.style.overflow = prev.bOverflow;
+      body.style.position = prev.bPosition;
+      body.style.top = prev.bTop;
+      body.style.width = prev.bWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [enabled]);
+
+  return vp;
+}
+=== END FILE ===
+
+=== FILE: src/components/ui/aspect-ratio.tsx ===
+import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio";
+
+const AspectRatio = AspectRatioPrimitive.Root;
+
+export { AspectRatio };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/breadcrumb.tsx ===
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const Breadcrumb = React.forwardRef<
+  HTMLElement,
+  React.ComponentPropsWithoutRef<"nav"> & {
+    separator?: React.ReactNode;
+  }
+>(({ ...props }, ref) => <nav ref={ref} aria-label="breadcrumb" {...props} />);
+Breadcrumb.displayName = "Breadcrumb";
+
+const BreadcrumbList = React.forwardRef<HTMLOListElement, React.ComponentPropsWithoutRef<"ol">>(
+  ({ className, ...props }, ref) => (
+    <ol
+      ref={ref}
+      className={cn(
+        "flex flex-wrap items-center gap-1.5 break-words text-sm text-muted-foreground sm:gap-2.5",
+        className,
+      )}
+      {...props}
+    />
+  ),
+);
+BreadcrumbList.displayName = "BreadcrumbList";
+
+const BreadcrumbItem = React.forwardRef<HTMLLIElement, React.ComponentPropsWithoutRef<"li">>(
+  ({ className, ...props }, ref) => (
+    <li ref={ref} className={cn("inline-flex items-center gap-1.5", className)} {...props} />
+  ),
+);
+BreadcrumbItem.displayName = "BreadcrumbItem";
+
+const BreadcrumbLink = React.forwardRef<
+  HTMLAnchorElement,
+  React.ComponentPropsWithoutRef<"a"> & {
+    asChild?: boolean;
+  }
+>(({ asChild, className, ...props }, ref) => {
+  const Comp = asChild ? Slot : "a";
+
+  return (
+    <Comp
+      ref={ref}
+      className={cn("transition-colors hover:text-foreground", className)}
+      {...props}
+    />
+  );
+});
+BreadcrumbLink.displayName = "BreadcrumbLink";
+
+const BreadcrumbPage = React.forwardRef<HTMLSpanElement, React.ComponentPropsWithoutRef<"span">>(
+  ({ className, ...props }, ref) => (
+    <span
+      ref={ref}
+      role="link"
+      aria-disabled="true"
+      aria-current="page"
+      className={cn("font-normal text-foreground", className)}
+      {...props}
+    />
+  ),
+);
+BreadcrumbPage.displayName = "BreadcrumbPage";
+
+const BreadcrumbSeparator = ({ children, className, ...props }: React.ComponentProps<"li">) => (
+  <li
+    role="presentation"
+    aria-hidden="true"
+    className={cn("[&>svg]:w-3.5 [&>svg]:h-3.5", className)}
+    {...props}
+  >
+    {children ?? <ChevronRight />}
+  </li>
+);
+BreadcrumbSeparator.displayName = "BreadcrumbSeparator";
+
+const BreadcrumbEllipsis = ({ className, ...props }: React.ComponentProps<"span">) => (
+  <span
+    role="presentation"
+    aria-hidden="true"
+    className={cn("flex h-9 w-9 items-center justify-center", className)}
+    {...props}
+  >
+    <MoreHorizontal className="h-4 w-4" />
+    <span className="sr-only">More</span>
+  </span>
+);
+BreadcrumbEllipsis.displayName = "BreadcrumbElipssis";
+
+export {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  BreadcrumbEllipsis,
+};
+
+=== END FILE ===
+

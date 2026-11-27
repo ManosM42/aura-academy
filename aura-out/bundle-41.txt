@@ -1,0 +1,841 @@
+=== FILE: src/routes/online-seminars.tsx ===
+import { useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar as CalendarIcon,
+  Check,
+  Clock,
+  Globe,
+  Loader2,
+  Mail,
+  Phone,
+  ShieldCheck,
+  User,
+  Users,
+  Video,
+  X,
+} from "lucide-react";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import { DiscountedPrice, MemberBadge, SavingsLine } from "@/components/aura/DiscountPrice";
+import SeminarMemberPopup from "@/components/aura/promo/SeminarMemberPopup";
+import { applyPercent, usePlanDiscountTable, useMyDiscounts } from "@/lib/discounts";
+import { useGuestPromo } from "@/lib/useGuestPromo";
+import type { PlanId } from "@/lib/plans";
+import {
+  formatPrice,
+  getPublicOnlineSeminars,
+  startOnlineCheckout,
+  type PublicOnlineSeminar,
+} from "@/lib/onlineSeminars";
+
+export const Route = createFileRoute("/online-seminars")({ component: OnlineSeminarsRoute });
+
+
+const chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+const shimmerBtn =
+  "group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-7 py-3.5 text-sm font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 enabled:hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] enabled:hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40";
+
+function OnlineSeminarsRoute() {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const glowY = useTransform(scrollYProgress, [0, 1], [-60, 140]);
+  const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 80]);
+
+  const [reload, setReload] = useState(0);
+  const { data, error, loading } = useAsync(getPublicOnlineSeminars, [reload]);
+  const [selected, setSelected] = useState<PublicOnlineSeminar | null>(null);
+  // Member discount (only plans that have one in public.plan_discounts, i.e. ELITE).
+  const { plan: planId, seminarPercent } = useMyDiscounts();
+  // Visitors who are not signed in get a "members save" pop-up (timer, or when they press Book).
+  const discountTable = usePlanDiscountTable();
+  const promo = useGuestPromo({
+    storageKey: "aura-seminar-member-promo",
+    delayMs: 9000,
+    enabled: discountTable.high.online_seminar > 0 || discountTable.mid.online_seminar > 0,
+    paused: selected !== null,
+  });
+
+  return (
+    <main ref={ref} className="relative min-h-screen overflow-hidden bg-black pb-24 pt-28 text-white selection:bg-white selection:text-black">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
+      />
+      <motion.div aria-hidden style={{ y: glowY }} className="pointer-events-none absolute -right-40 top-20 -z-10 h-[520px] w-[520px] rounded-full bg-white/[0.06] blur-[140px]" />
+      <motion.div aria-hidden style={{ rotate: ringRotate }} className="pointer-events-none absolute -left-44 top-64 -z-10 h-[480px] w-[480px] rounded-full border border-dashed border-white/10" />
+      <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 md:px-10">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}>
+          <Link to="/seminars" className="mb-6 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white">
+            <ArrowLeft className="size-3.5" /> Σεμινάρια επί τόπου
+          </Link>
+          <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50">
+            <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
+            Online σεμινάρια
+          </div>
+          <h1 className={`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText}`}>
+            Μάθε από οπουδήποτε.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+            Live online σεμινάρια με τον Theopistos. Κλείσε τη θέση σου, πλήρωσε με ασφάλεια και θα
+            επικοινωνήσουμε μαζί σου με όλες τις λεπτομέρειες.
+          </p>
+        </motion.div>
+
+        <div className="mt-12">
+          {loading && <LoadingSkeleton rows={3} />}
+          {error && <ErrorState message={error} />}
+
+          {data && data.length === 0 && (
+            <div className="rounded-3xl border border-white/10 bg-zinc-950/70 p-12 text-center">
+              <Globe className="mx-auto size-8 text-zinc-500" />
+              <p className="mt-4 text-zinc-400">Δεν υπάρχουν προγραμματισμένα online σεμινάρια αυτή τη στιγμή.</p>
+              <p className="mt-1 text-sm text-zinc-600">Ξανάλεγξε σύντομα.</p>
+            </div>
+          )}
+
+          {data && data.length > 0 && (
+            <div className="grid gap-6 md:grid-cols-2">
+              {data.map((s, i) => (
+                <SeminarCard
+                  key={s.id}
+                  s={s}
+                  index={i}
+                  reduce={!!reduce}
+                  percent={seminarPercent}
+                  planId={planId}
+                  onBook={() => promo.guard(() => setSelected(s))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <SeminarMemberPopup open={promo.open} onClose={promo.close} canContinue={promo.canContinue} />
+
+      <AnimatePresence>
+        {selected && (
+          <BookingModal
+            seminar={selected}
+            percent={seminarPercent}
+            planId={planId}
+            onClose={() => {
+              setSelected(null);
+              setReload((n) => n + 1);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </main>
+  );
+}
+
+function SeminarCard({
+  s,
+  index,
+  reduce,
+  percent,
+  planId,
+  onBook,
+}: {
+  s: PublicOnlineSeminar;
+  index: number;
+  reduce: boolean;
+  percent: number;
+  planId: PlanId | null;
+  onBook: () => void;
+}) {
+  const memberPrice = applyPercent(s.price_cents, percent);
+  const discounted = percent > 0 && memberPrice < s.price_cents;
+  const left = s.capacity ? s.capacity - s.taken : null;
+  const soldOut = left !== null && left <= 0;
+  const date = new Date(s.starts_at);
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 28 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.6, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={reduce ? undefined : { y: -6 }}
+      className="group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-7 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/35"
+    >
+      <div aria-hidden className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-white/[0.07] blur-[70px] transition-opacity duration-500 group-hover:opacity-100" />
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+      <div className="relative flex items-start justify-between gap-4">
+        <div className="flex size-12 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+          <Video className="size-6" />
+        </div>
+        {discounted ? (
+          <div className="flex flex-col items-end gap-2.5">
+            <MemberBadge planId={planId} percent={percent} />
+            <DiscountedPrice
+              listCents={s.price_cents}
+              finalCents={memberPrice}
+              format={(c) => formatPrice(c, s.currency)}
+              size="md"
+            />
+          </div>
+        ) : (
+          <span className={`bg-clip-text text-2xl font-extrabold text-transparent bg-gradient-to-b from-white to-zinc-400`}>
+            {formatPrice(s.price_cents, s.currency)}
+          </span>
+        )}
+      </div>
+
+      <h2 className={`relative mt-5 text-2xl font-bold ${chromeText}`}>{s.title}</h2>
+      {s.description && <p className="relative mt-3 line-clamp-4 text-sm leading-relaxed text-zinc-400">{s.description}</p>}
+
+      <ul className="relative mt-5 space-y-2 text-sm text-zinc-300">
+        <li className="flex items-center gap-2"><CalendarIcon className="size-4 text-zinc-500" />
+          {date.toLocaleDateString("el-GR", { weekday: "long", day: "numeric", month: "long" })}
+        </li>
+        <li className="flex items-center gap-2"><Clock className="size-4 text-zinc-500" />
+          {date.toLocaleTimeString("el-GR", { hour: "2-digit", minute: "2-digit" })} · {s.duration_minutes} λεπτά
+        </li>
+        {left !== null && (
+          <li className={`flex items-center gap-2 ${left <= 3 && !soldOut ? "text-amber-400" : ""}`}>
+            <Users className="size-4 text-zinc-500" />
+            {soldOut ? "Sold out" : `${left} θέσεις διαθέσιμες`}
+          </li>
+        )}
+      </ul>
+
+      <div className="relative mt-7">
+        <button type="button" disabled={soldOut} onClick={onBook} className={shimmerBtn}>
+          <span className="relative">{soldOut ? "Γεμάτο" : "Κλείσε θέση"}</span>
+          <ArrowRight className="relative size-4 transition-transform duration-300 group-enabled:group-hover:translate-x-1" />
+        </button>
+      </div>
+    </motion.article>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Booking modal: details -> Viva payment page (confirmed on return)  */
+/* ------------------------------------------------------------------ */
+
+function BookingModal({
+  seminar,
+  percent,
+  planId,
+  onClose,
+}: {
+  seminar: PublicOnlineSeminar;
+  percent: number;
+  planId: PlanId | null;
+  onClose: () => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // What the SERVER will charge (returned by the checkout function). Until we
+  // have it, show the price calculated from the member discount.
+  const [quote, setQuote] = useState<{ list: number; final: number; percent: number } | null>(null);
+
+  const shownPercent = quote ? quote.percent : percent;
+  const shownList = quote ? quote.list : seminar.price_cents;
+  const shownFinal = quote ? quote.final : applyPercent(seminar.price_cents, percent);
+  const hasDiscount = shownPercent > 0 && shownFinal < shownList;
+  const fmt = (c: number) => formatPrice(c, seminar.currency);
+
+  const valid =
+    fullName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && phone.trim().length >= 6;
+
+  async function toPayment() {
+    if (!valid || busy) return;
+    setBusy(true);
+    setError(null);
+    let redirecting = false;
+    try {
+      const res = await startOnlineCheckout({ seminarId: seminar.id, fullName, email, phone });
+      setQuote({ list: res.listPriceCents, final: res.amountCents, percent: res.discountPercent });
+      // Viva's payment page cannot be embedded: the customer goes there and comes back to
+      // /checkout/return, which confirms the payment with Viva before showing anything.
+      redirecting = true;
+      window.location.assign(res.redirectUrl);
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message === "sold_out"
+          ? "Δυστυχώς οι θέσεις εξαντλήθηκαν."
+          : "Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.",
+      );
+    } finally {
+      // Keep the button disabled while the browser is leaving for Viva.
+      if (!redirecting) setBusy(false);
+    }
+  }
+
+  const inputWrap =
+    "flex items-center gap-2 rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 transition-colors focus-within:border-white/40 focus-within:ring-2 focus-within:ring-white/10";
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md"
+      onClick={busy ? undefined : onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 30, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 30, scale: 0.97 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-black to-zinc-950 p-6 shadow-[0_0_100px_-30px_rgba(255,255,255,0.3)] sm:p-8"
+      >
+        <div aria-hidden className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-white/[0.07] blur-[80px]" />
+        {!busy && (
+          <button type="button" onClick={onClose} aria-label="Κλείσιμο" className="absolute right-4 top-4 z-10 text-zinc-500 transition hover:text-white">
+            <X className="size-5" />
+          </button>
+        )}
+
+        <div className="relative">
+          <AnimatePresence mode="wait">
+            {(
+              <motion.div key="d" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+                <p className="text-xs uppercase tracking-[0.25em] text-zinc-500">Κράτηση θέσης</p>
+                <h3 className={`mt-2 text-2xl font-bold ${chromeText}`}>{seminar.title}</h3>
+                <p className="mt-1 text-sm text-zinc-400">
+                  {new Date(seminar.starts_at).toLocaleString("el-GR", { dateStyle: "long", timeStyle: "short" })}
+                  {!hasDiscount && ` · ${fmt(seminar.price_cents)}`}
+                </p>
+
+                {hasDiscount && (
+                  <div className="mt-5 rounded-2xl border border-white/20 bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-4 shadow-[0_0_40px_-18px_rgba(255,255,255,0.5)]">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <MemberBadge planId={planId} percent={shownPercent} />
+                      <DiscountedPrice listCents={shownList} finalCents={shownFinal} format={fmt} layout="inline" size="md" />
+                    </div>
+                    <SavingsLine className="mt-3" label="Κερδίζεις" amount={fmt(shownList - shownFinal)} />
+                  </div>
+                )}
+
+                <div className="mt-6 space-y-4">
+                  {[
+                    { icon: User, label: "Ονοματεπώνυμο", v: fullName, set: setFullName, type: "text", ac: "name" },
+                    { icon: Mail, label: "Email", v: email, set: setEmail, type: "email", ac: "email" },
+                    { icon: Phone, label: "Τηλέφωνο", v: phone, set: setPhone, type: "tel", ac: "tel" },
+                  ].map((f) => (
+                    <label key={f.label} className="block">
+                      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">{f.label}</span>
+                      <div className={inputWrap}>
+                        <f.icon className="size-4 shrink-0 text-zinc-500" />
+                        <input
+                          type={f.type}
+                          value={f.v}
+                          autoComplete={f.ac}
+                          onChange={(e) => f.set(e.target.value)}
+                          className="w-full bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+                        />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {error && <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">{error}</p>}
+
+                <button type="button" disabled={!valid || busy} onClick={toPayment} className={`${shimmerBtn} mt-6 w-full`}>
+                  {busy ? <Loader2 className="relative size-5 animate-spin" /> : (
+                    <>
+                      <span className="relative">Συνέχεια στην πληρωμή</span>
+                      <ArrowRight className="relative size-4" />
+                    </>
+                  )}
+                </button>
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600">
+                  <ShieldCheck className="size-3.5" /> Ασφαλής πληρωμή μέσω Viva.com
+                </p>
+              </motion.div>
+            )}
+
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/checkout.index.tsx ===
+// src/routes/checkout.index.tsx
+import { useEffect, useRef, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import CheckoutModal from "@/components/aura/CheckoutModal";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { useAuth } from "@/lib/useAuth";
+import { useSubscription } from "@/lib/useSubscription";
+import { usePlans } from "@/lib/usePlans";
+import { clearCheckoutIntent, setCheckoutIntent } from "@/lib/checkout-intent";
+import { isPlanId, type PlanId } from "@/lib/plans";
+
+interface CheckoutSearch {
+  plan?: PlanId;
+}
+
+export const Route = createFileRoute("/checkout/")({
+  validateSearch: (search: Record<string, unknown>): CheckoutSearch => ({
+    plan: isPlanId(search["plan"]) ? search["plan"] : undefined,
+  }),
+  head: () => ({
+    meta: [
+      { title: "AURA — Checkout" },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
+  component: CheckoutPage,
+});
+
+function CheckoutPage() {
+  const { plan: planId } = Route.useSearch();
+  const navigate = useNavigate();
+  const { session, loading: authLoading } = useAuth();
+  const userId = session?.user.id;
+  const { hasAccess, loading: subLoading } = useSubscription(userId);
+  // Τα πλάνα (και οι τιμές τους) έρχονται πλέον από τη βάση: ρυθμίζονται από το admin panel.
+  const { plans, loading: plansLoading } = usePlans();
+
+  // Ξεκινά ΚΛΕΙΣΤΟ. Ανοίγει μόνο όταν ξέρουμε ότι ο χρήστης είναι
+  // συνδεδεμένος και δεν έχει ήδη ενεργή συνδρομή.
+  const [modalOpen, setModalOpen] = useState(false);
+  // Φρουρός ώστε το modal να ανοίξει αυτόματα μία φορά και να μην
+  // ξανανοίγει μόνο του αφού ο χρήστης το κλείσει.
+  const autoOpenedRef = useRef(false);
+
+  const plan = plans.find((p) => p.id === planId);
+  const signedIn = Boolean(session);
+  // Το useSubscription δεν έχει τι να φορτώσει χωρίς userId, οπότε το
+  // subLoading μετράει μόνο όταν υπάρχει session.
+  const waiting = authLoading || plansLoading || (signedIn && subLoading);
+
+  // Χωρίς έγκυρο (ή ενεργό) πακέτο δεν υπάρχει checkout.
+  useEffect(() => {
+    if (plansLoading) return;
+    if (!plan) navigate({ to: "/pricing", replace: true });
+  }, [plan, plansLoading, navigate]);
+
+  // Ενεργή συνδρομή → καμία νέα χρέωση.
+  useEffect(() => {
+    if (waiting || !signedIn) return;
+    if (hasAccess) {
+      clearCheckoutIntent();
+      navigate({ to: "/academy", replace: true });
+    }
+  }, [waiting, signedIn, hasAccess, navigate]);
+
+  // Μη συνδεδεμένος επισκέπτης: fallback αν χαθεί το plan από το URL.
+  // Σε effect, ΟΧΙ στο render body.
+  useEffect(() => {
+    if (!plan || authLoading || signedIn) return;
+    setCheckoutIntent(plan.id);
+  }, [plan, authLoading, signedIn]);
+
+  // Έφτασε συνδεδεμένος: το intent έκανε τη δουλειά του.
+  useEffect(() => {
+    if (waiting || !signedIn || hasAccess) return;
+    clearCheckoutIntent();
+  }, [waiting, signedIn, hasAccess]);
+
+  // Αυτόματο άνοιγμα του modal, μία και μόνη φορά.
+  useEffect(() => {
+    if (autoOpenedRef.current) return;
+    if (!plan || waiting || !signedIn || hasAccess) return;
+    autoOpenedRef.current = true;
+    setModalOpen(true);
+  }, [plan, waiting, signedIn, hasAccess]);
+
+  if (waiting) {
+    return (
+      <div className="mx-auto max-w-md px-5 pt-40" aria-busy="true">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 w-1/3 rounded bg-white/5" />
+          <div className="h-32 rounded-2xl bg-white/5" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!plan) return null;
+
+  if (!session) {
+    return (
+      <div className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40">
+        <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">
+          ΑΠΑΙΤΕΙΤΑΙ ΣΥΝΔΕΣΗ
+        </p>
+        <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+          Συνδέσου για να ολοκληρώσεις
+        </h1>
+        <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+          Διάλεξες <span className="text-neutral-200">{plan.name}</span> ({plan.priceLabel}/μήνα).
+          Μετά τη σύνδεση επιστρέφεις αυτόματα εδώ για την πληρωμή.
+        </p>
+        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link to="/login" search={{ plan: plan.id }}>
+            <ChromeButton type="button">ΣΥΝΔΕΣΗ / ΕΓΓΡΑΦΗ</ChromeButton>
+          </Link>
+          <Link to="/pricing">
+            <ChromeButton type="button" variant="secondary">
+              ΑΛΛΑΓΗ ΠΑΚΕΤΟΥ
+            </ChromeButton>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-3xl px-5 pb-24 pt-32 sm:pt-40">
+      <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">CHECKOUT</p>
+      <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">{plan.name}</h1>
+      <p className="mt-3 text-sm text-neutral-400">
+        {plan.priceLabel} / μήνα — ακύρωση ανά πάσα στιγμή.
+      </p>
+
+      {!modalOpen && (
+        <div className="mt-8 flex flex-wrap gap-3">
+          <ChromeButton type="button" onClick={() => setModalOpen(true)}>
+            ΣΥΝΕΧΕΙΑ ΣΤΗΝ ΠΛΗΡΩΜΗ
+          </ChromeButton>
+          <Link to="/pricing">
+            <ChromeButton type="button" variant="secondary">
+              ΑΛΛΑΓΗ ΠΑΚΕΤΟΥ
+            </ChromeButton>
+          </Link>
+        </div>
+      )}
+
+      <CheckoutModal plan={plan} open={modalOpen} onClose={() => setModalOpen(false)} />
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/admin.book-BFzT9Y31.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./AnimatePresence-ClHpx5iG.js";import{t as a}from"./use-reduced-motion-CNAPwhZE.js";import{t as o}from"./react-D9fOyxUn.js";import{y as s}from"./queries-B7Arqryn.js";import{t as c}from"./createLucideIcon-Dz5w4CtK.js";import{t as l}from"./arrow-left-Brxe6F5I.js";import{t as u}from"./book-open-l6w5YLVR.js";import{t as d}from"./check-l8y3aT-v.js";import{t as f}from"./chevron-down-CMzGfsmT.js";import{t as p}from"./circle-alert-Bs1x-kqg.js";import{t as m}from"./copy-CMIpwlCB.js";import{t as h}from"./loader-circle-DdNdnF6-.js";import{t as g}from"./mail-B0XmtP5t.js";import{t as _}from"./map-pin-BnQggz49.js";import{t as v}from"./phone-CFEnp_vY.js";import{t as y}from"./refresh-cw-DyxcL6uw.js";import{a as b,c as x,i as S,o as C,r as w,s as T}from"./book-DN8DL8gW.js";import{i as E,n as D,r as O}from"./States-BulpY35p.js";import{a as k,c as A,i as j,n as M,s as N}from"./chrome-DYZby3h2.js";var P=c(`euro`,[[`path`,{d:`M4 10h12`,key:`1y6xl8`}],[`path`,{d:`M4 14h9`,key:`1loblj`}],[`path`,{d:`M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2`,key:`1j6lzo`}]]),F=c(`package-check`,[[`path`,{d:`m16 16 2 2 4-4`,key:`gfu2re`}],[`path`,{d:`M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14`,key:`e7tb2h`}],[`path`,{d:`m7.5 4.27 9 5.15`,key:`1c824w`}],[`polyline`,{points:`3.29 7 12 12 20.71 7`,key:`ousv84`}],[`line`,{x1:`12`,x2:`12`,y1:`22`,y2:`12`,key:`a4e8g8`}]]),I=e(n()),L=t(),R=[`admin`,`super_admin`,`operations`],z={pending:`Αναμονή πληρωμής`,paid:`Πληρώθηκε`,shipped:`Στάλθηκε`,delivered:`Παραδόθηκε`,cancelled:`Ακυρώθηκε`,refunded:`Επιστροφή χρημάτων`},B=Object.keys(z),V=[{key:`all`,label:`Όλες`},{key:`paid`,label:`Προς αποστολή`},{key:`shipped`,label:`Στάλθηκαν`},{key:`delivered`,label:`Παραδόθηκαν`},{key:`pending`,label:`Αναμονή`},{key:`cancelled`,label:`Ακυρωμένες`}],H=new Intl.DateTimeFormat(`el-GR`,{day:`2-digit`,month:`short`,year:`numeric`,hour:`2-digit`,minute:`2-digit`});function U(){let[e,t]=(0,I.useState)(void 0),[n,r]=(0,I.useState)(null);(0,I.useEffect)(()=>{let e=!0;return s().then(n=>e&&t(n?.role??null)).catch(t=>e&&r(t.message)),()=>{e=!1}},[]);let i=!!e&&R.includes(e);return(0,L.jsxs)(`main`,{className:`relative min-h-screen overflow-x-hidden px-4 pb-24 pt-28 text-white sm:px-6 sm:pt-36 md:px-10`,children:[(0,L.jsx)(W,{}),(0,L.jsxs)(`div`,{className:`relative mx-auto max-w-6xl`,children:[e===void 0&&!n&&(0,L.jsx)(O,{rows:3}),n&&(0,L.jsx)(D,{message:n}),e!==void 0&&!i&&(0,L.jsx)(N,{inner:`p-8 text-center`,children:(0,L.jsx)(E,{reason:`Μόνο διαχειριστές έχουν πρόσβαση στη διαχείριση του βιβλίου.`})}),i&&(0,L.jsx)(G,{})]})]})}function W(){let e=a();return(0,L.jsx)(o.div,{"aria-hidden":!0,className:`pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full`,style:{background:`radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)`},animate:e?void 0:{opacity:[.4,1,.4]},transition:{duration:8,repeat:1/0,ease:`easeInOut`}})}function G(){let[e,t]=(0,I.useState)(null),[n,a]=(0,I.useState)(null),[s,c]=(0,I.useState)(null),[d,f]=(0,I.useState)(!1),[p,m]=(0,I.useState)(`all`),h=(0,I.useCallback)(async()=>{f(!0),c(null);try{let[e,n]=await Promise.all([b(),S()]);t(e),a(n)}catch(e){c(e.message)}finally{f(!1)}},[]);(0,I.useEffect)(()=>{h()},[h]);let g=(0,I.useMemo)(()=>{let t=n??[],r=t.filter(e=>[`paid`,`shipped`,`delivered`].includes(e.status));return{toShip:t.filter(e=>e.status===`paid`).length,sold:r.reduce((e,t)=>e+t.quantity,0),revenue:r.reduce((e,t)=>e+t.total_cents,0),currency:t[0]?.currency??e?.currency??`eur`}},[n,e]),_=(0,I.useMemo)(()=>(n??[]).filter(e=>p===`all`||e.status===p),[n,p]);return(0,L.jsxs)(o.div,{initial:`hidden`,animate:`show`,variants:{show:{transition:{staggerChildren:.1}}},className:`space-y-10`,children:[(0,L.jsxs)(o.header,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:k}}},className:`flex flex-col gap-5 border-b border-white/10 pb-8 sm:flex-row sm:items-end sm:justify-between`,children:[(0,L.jsxs)(`div`,{children:[(0,L.jsxs)(r,{to:`/admin`,className:`mb-5 inline-flex items-center gap-2 text-xs text-white/50 outline-none transition-colors hover:text-white focus-visible:text-white`,children:[(0,L.jsx)(l,{className:`size-3.5`}),` Πίσω στο Admin`]}),(0,L.jsxs)(`div`,{className:`mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50`,children:[(0,L.jsx)(`span`,{className:`h-px w-10 bg-gradient-to-r from-white/70 to-transparent`}),`Book Manager`]}),(0,L.jsx)(`h1`,{className:`text-3xl font-extrabold uppercase tracking-tight sm:text-5xl`,children:(0,L.jsx)(j,{children:`Βιβλίο & Παραγγελίες`})})]}),(0,L.jsxs)(M,{type:`button`,solid:!1,onClick:()=>void h(),disabled:d,children:[(0,L.jsx)(y,{className:`size-4 ${d?`animate-spin`:``}`}),` Ανανέωση`]})]}),s&&(0,L.jsx)(D,{message:s}),!e&&!n&&!s&&(0,L.jsx)(O,{rows:4}),(e||n)&&(0,L.jsxs)(L.Fragment,{children:[(0,L.jsxs)(o.div,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:k}}},className:`grid gap-5 sm:grid-cols-3`,children:[(0,L.jsx)(Y,{icon:(0,L.jsx)(x,{className:`size-5`}),label:`Προς αποστολή`,value:String(g.toShip),highlight:g.toShip>0}),(0,L.jsx)(Y,{icon:(0,L.jsx)(u,{className:`size-5`}),label:`Πωλημένα αντίτυπα`,value:String(g.sold)}),(0,L.jsx)(Y,{icon:(0,L.jsx)(P,{className:`size-5`}),label:`Έσοδα`,value:w(g.revenue,g.currency)})]}),(0,L.jsxs)(o.section,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:k}}},children:[(0,L.jsx)(X,{children:`Τιμή & διαθεσιμότητα`}),(0,L.jsx)(K,{settings:e,onSaved:t})]}),(0,L.jsxs)(o.section,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:k}}},className:`space-y-5`,children:[(0,L.jsxs)(X,{children:[`Παραγγελίες (`,n?.length??0,`)`]}),(0,L.jsx)(`div`,{className:`flex flex-wrap gap-2`,role:`tablist`,"aria-label":`Φίλτρο παραγγελιών`,children:V.map(e=>{let t=p===e.key,r=e.key===`all`?n?.length??0:(n??[]).filter(t=>t.status===e.key).length;return(0,L.jsxs)(`button`,{role:`tab`,"aria-selected":t,onClick:()=>m(e.key),className:`relative rounded-full px-4 py-2 text-xs font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/60`,style:{color:t?`#0a0a0a`:`rgba(255,255,255,0.6)`},children:[t?(0,L.jsx)(o.span,{layoutId:`order-filter`,className:`absolute inset-0 rounded-full`,style:{backgroundImage:`linear-gradient(180deg,#fff,#c9ced4 50%,#f4f4f6)`,boxShadow:`0 0 24px rgba(255,255,255,0.35)`},transition:{type:`spring`,stiffness:380,damping:32}}):(0,L.jsx)(`span`,{className:`absolute inset-0 rounded-full border border-white/10 bg-white/[0.03]`}),(0,L.jsxs)(`span`,{className:`relative`,children:[e.label,` · `,r]})]},e.key)})}),n&&_.length===0&&(0,L.jsx)(N,{inner:`p-10 text-center`,children:(0,L.jsx)(`p`,{className:`text-sm text-white/50`,children:`Δεν υπάρχουν παραγγελίες σε αυτή την κατηγορία.`})}),(0,L.jsx)(`div`,{className:`space-y-4`,children:(0,L.jsx)(i,{initial:!1,children:_.map(e=>(0,L.jsx)(q,{order:e,onSaved:e=>a(t=>(t??[]).map(t=>t.id===e.id?e:t))},e.id))})})]})]})]})}function K({settings:e,onSaved:t}){let[n,r]=(0,I.useState)(e?.title??`ΛURΛ — The Barbering Book`),[a,s]=(0,I.useState)(e?(e.price_cents/100).toFixed(2):``),[c,l]=(0,I.useState)(e?(e.shipping_cents/100).toFixed(2):`0.00`),[u,f]=(0,I.useState)(e?.stock==null?``:String(e.stock)),[m,g]=(0,I.useState)(e?.is_active??!0),[_,v]=(0,I.useState)(!1),[y,b]=(0,I.useState)(null),[x,S]=(0,I.useState)(!1),C=e=>Math.round(parseFloat(e.replace(`,`,`.`))*100);async function w(){b(null),S(!1);let e=C(a),r=C(c||`0`),i=u.trim()===``?null:Math.floor(Number(u));if(!n.trim())return b(`Βάλε τίτλο.`);if(!Number.isFinite(e)||e<0)return b(`Μη έγκυρη τιμή.`);if(e>0&&e<50)return b(`Η ελάχιστη τιμή για πληρωμή με κάρτα είναι 0,50.`);if(!Number.isFinite(r)||r<0)return b(`Μη έγκυρα μεταφορικά.`);if(i!==null&&(!Number.isFinite(i)||i<0))return b(`Μη έγκυρο απόθεμα.`);v(!0);try{t(await T({title:n.trim(),price_cents:e,shipping_cents:r,stock:i,is_active:m})),S(!0),setTimeout(()=>S(!1),2500)}catch(e){b(e.message)}finally{v(!1)}}return(0,L.jsxs)(N,{inner:`p-6 sm:p-8`,children:[(0,L.jsxs)(`div`,{className:`grid gap-5 sm:grid-cols-2`,children:[(0,L.jsx)(Z,{label:`Τίτλος βιβλίου`,className:`sm:col-span-2`,children:(0,L.jsx)(`input`,{className:A,value:n,onChange:e=>r(e.target.value)})}),(0,L.jsx)(Z,{label:`Τιμή (€)`,children:(0,L.jsx)(`input`,{className:A,inputMode:`decimal`,value:a,onChange:e=>s(e.target.value),placeholder:`30.00`})}),(0,L.jsx)(Z,{label:`Μεταφορικά (€)`,children:(0,L.jsx)(`input`,{className:A,inputMode:`decimal`,value:c,onChange:e=>l(e.target.value),placeholder:`0.00`})}),(0,L.jsx)(Z,{label:`Απόθεμα (κενό = απεριόριστο)`,children:(0,L.jsx)(`input`,{className:A,inputMode:`numeric`,value:u,onChange:e=>f(e.target.value),placeholder:`π.χ. 100`})}),(0,L.jsxs)(`div`,{children:[(0,L.jsx)(`span`,{className:`mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45`,children:`Παραγγελίες`}),(0,L.jsxs)(`button`,{type:`button`,role:`switch`,"aria-checked":m,onClick:()=>g(e=>!e),className:`flex w-full items-center justify-between rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/85 outline-none transition-all hover:border-white/30 focus-visible:ring-2 focus-visible:ring-white/50`,children:[(0,L.jsx)(`span`,{children:m?`Ανοιχτές`:`Κλειστές`}),(0,L.jsx)(`span`,{className:`relative h-6 w-11 rounded-full transition-colors duration-300`,style:{background:m?`linear-gradient(180deg,#fff,#a9afb7)`:`rgba(255,255,255,0.12)`,boxShadow:m?`0 0 20px rgba(255,255,255,0.45)`:`none`},children:(0,L.jsx)(o.span,{className:`absolute top-0.5 size-5 rounded-full bg-neutral-950`,animate:{left:m?22:2},transition:{type:`spring`,stiffness:500,damping:30}})})]})]})]}),y&&(0,L.jsxs)(`p`,{role:`alert`,className:`mt-5 flex items-start gap-2 rounded-xl border border-white/20 bg-white/[0.05] p-3 text-sm text-white/85`,children:[(0,L.jsx)(p,{className:`mt-0.5 size-4 shrink-0`}),` `,y]}),(0,L.jsxs)(`div`,{className:`mt-6 flex flex-wrap items-center gap-4`,children:[(0,L.jsxs)(M,{type:`button`,onClick:()=>void w(),disabled:_,children:[_?(0,L.jsx)(h,{className:`size-4 animate-spin`}):(0,L.jsx)(d,{className:`size-4`}),`Αποθήκευση`]}),(0,L.jsx)(i,{children:x&&(0,L.jsx)(o.span,{initial:{opacity:0,x:-8},animate:{opacity:1,x:0},exit:{opacity:0},className:`text-sm font-semibold text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.6)]`,children:`Αποθηκεύτηκε ✓`})})]})]})}function q({order:e,onSaved:t}){let[n,r]=(0,I.useState)(e.status===`paid`),[a,s]=(0,I.useState)(e.status),[c,l]=(0,I.useState)(e.tracking_number??``),[y,b]=(0,I.useState)(e.admin_note??``),[S,T]=(0,I.useState)(!1),[E,D]=(0,I.useState)(null),[O,A]=(0,I.useState)(!1),j=a!==e.status||c!==(e.tracking_number??``)||y!==(e.admin_note??``),P=e.status===`paid`,R=[e.full_name,e.address_line1,e.address_line2,`${e.postal_code} ${e.city}${e.region?`, ${e.region}`:``}`,e.country,`Τηλ: ${e.phone}`].filter(Boolean).join(`
+`);async function V(){try{await navigator.clipboard.writeText(R),A(!0),setTimeout(()=>A(!1),1800)}catch{}}async function U(){T(!0),D(null);try{t(await C(e.id,{status:a,tracking_number:c.trim()||null,admin_note:y.trim()||null,...a===`shipped`&&e.status!==`shipped`?{shipped_at:new Date().toISOString()}:{}}))}catch(e){D(e.message)}finally{T(!1)}}return(0,L.jsx)(o.article,{layout:!0,initial:{opacity:0,y:18},animate:{opacity:1,y:0},exit:{opacity:0,scale:.97},transition:{duration:.5,ease:k},children:(0,L.jsxs)(N,{inner:`p-0`,children:[P&&(0,L.jsx)(`span`,{"aria-hidden":!0,className:`absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent shadow-[0_0_14px_rgba(255,255,255,0.9)]`}),(0,L.jsxs)(`button`,{type:`button`,"aria-expanded":n,onClick:()=>r(e=>!e),className:`flex w-full items-center justify-between gap-4 p-5 text-left outline-none transition-colors hover:bg-white/[0.03] focus-visible:bg-white/[0.05] sm:p-6`,children:[(0,L.jsxs)(`div`,{className:`flex min-w-0 items-center gap-4`,children:[(0,L.jsx)(`span`,{className:`flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/[0.05] text-white`,style:P?{boxShadow:`0 0 22px rgba(255,255,255,0.35)`}:void 0,children:e.status===`delivered`?(0,L.jsx)(F,{className:`size-5`}):e.status===`shipped`?(0,L.jsx)(x,{className:`size-5`}):(0,L.jsx)(u,{className:`size-5`})}),(0,L.jsxs)(`div`,{className:`min-w-0`,children:[(0,L.jsx)(`p`,{className:`truncate text-sm font-bold text-white`,children:e.full_name}),(0,L.jsxs)(`p`,{className:`mt-0.5 truncate text-xs text-white/45`,children:[H.format(new Date(e.created_at)),` · `,e.quantity,` αντίτυπο`,e.quantity>1?`α`:``,` · `,e.city]})]})]}),(0,L.jsxs)(`div`,{className:`flex shrink-0 items-center gap-3`,children:[(0,L.jsx)(`span`,{className:`hidden text-sm font-extrabold text-white sm:block`,children:w(e.total_cents,e.currency)}),(0,L.jsx)(J,{status:e.status}),(0,L.jsx)(f,{className:`size-4 text-white/50 transition-transform duration-300 ${n?`rotate-180`:``}`})]})]}),(0,L.jsx)(i,{initial:!1,children:n&&(0,L.jsx)(o.div,{initial:{height:0,opacity:0},animate:{height:`auto`,opacity:1},exit:{height:0,opacity:0},transition:{duration:.4,ease:k},className:`overflow-hidden`,children:(0,L.jsxs)(`div`,{className:`grid gap-6 border-t border-white/10 p-5 sm:p-6 lg:grid-cols-2`,children:[(0,L.jsxs)(`div`,{children:[(0,L.jsxs)(`div`,{className:`mb-3 flex items-center justify-between`,children:[(0,L.jsx)(`h3`,{className:`text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50`,children:`Στοιχεία αποστολής`}),(0,L.jsxs)(`button`,{type:`button`,onClick:()=>void V(),className:`inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-white/80 outline-none transition-all hover:border-white/60 hover:text-white hover:shadow-[0_0_20px_rgba(255,255,255,0.2)] focus-visible:ring-2 focus-visible:ring-white/60`,children:[O?(0,L.jsx)(d,{className:`size-3.5`}):(0,L.jsx)(m,{className:`size-3.5`}),O?`Αντιγράφηκε`:`Αντιγραφή`]})]}),(0,L.jsxs)(`div`,{className:`space-y-3 rounded-2xl border border-white/[0.08] bg-black/40 p-4 text-sm`,children:[(0,L.jsxs)(`p`,{className:`flex items-start gap-3 text-white/90`,children:[(0,L.jsx)(_,{className:`mt-0.5 size-4 shrink-0 text-white/50`}),(0,L.jsxs)(`span`,{className:`leading-relaxed`,children:[e.address_line1,e.address_line2&&(0,L.jsxs)(L.Fragment,{children:[`, `,e.address_line2]}),(0,L.jsx)(`br`,{}),e.postal_code,` `,e.city,e.region&&(0,L.jsxs)(L.Fragment,{children:[`, `,e.region]}),(0,L.jsx)(`br`,{}),e.country]})]}),(0,L.jsxs)(`p`,{className:`flex items-center gap-3 text-white/85`,children:[(0,L.jsx)(v,{className:`size-4 shrink-0 text-white/50`}),(0,L.jsx)(`a`,{href:`tel:${e.phone}`,className:`underline-offset-4 hover:underline`,children:e.phone})]}),(0,L.jsxs)(`p`,{className:`flex items-center gap-3 text-white/85`,children:[(0,L.jsx)(g,{className:`size-4 shrink-0 text-white/50`}),(0,L.jsx)(`a`,{href:`mailto:${e.email}`,className:`break-all underline-offset-4 hover:underline`,children:e.email})]}),e.notes&&(0,L.jsxs)(`p`,{className:`border-t border-white/10 pt-3 text-xs leading-relaxed text-white/60`,children:[(0,L.jsx)(`span`,{className:`text-white/40`,children:`Σημείωση πελάτη: `}),e.notes]})]}),(0,L.jsxs)(`dl`,{className:`mt-4 space-y-2 text-sm`,children:[(0,L.jsx)(Q,{label:`Βιβλίο × ${e.quantity}`,value:w(e.unit_price_cents*e.quantity,e.currency)}),(0,L.jsx)(Q,{label:`Μεταφορικά`,value:w(e.shipping_cents,e.currency)}),(0,L.jsx)(Q,{label:`Σύνολο`,value:w(e.total_cents,e.currency),strong:!0})]})]}),(0,L.jsxs)(`div`,{className:`space-y-4`,children:[(0,L.jsx)(`h3`,{className:`text-[11px] font-semibold uppercase tracking-[0.3em] text-white/50`,children:`Διεκπεραίωση`}),(0,L.jsx)(Z,{label:`Κατάσταση`,children:(0,L.jsx)(`select`,{className:`w-full rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/90 outline-none transition-all duration-300 placeholder:text-white/25 focus:border-white/50 focus:bg-black/80 focus:shadow-[0_0_26px_rgba(255,255,255,0.1)] focus:ring-2 focus:ring-white/15 disabled:opacity-50`,value:a,onChange:e=>s(e.target.value),children:B.map(e=>(0,L.jsx)(`option`,{value:e,className:`bg-zinc-900`,children:z[e]},e))})}),(0,L.jsx)(Z,{label:`Αριθμός αποστολής (tracking)`,children:(0,L.jsx)(`input`,{className:`w-full rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/90 outline-none transition-all duration-300 placeholder:text-white/25 focus:border-white/50 focus:bg-black/80 focus:shadow-[0_0_26px_rgba(255,255,255,0.1)] focus:ring-2 focus:ring-white/15 disabled:opacity-50`,value:c,onChange:e=>l(e.target.value),placeholder:`Προαιρετικό`})}),(0,L.jsx)(Z,{label:`Εσωτερική σημείωση`,children:(0,L.jsx)(`textarea`,{rows:2,className:`w-full rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/90 outline-none transition-all duration-300 placeholder:text-white/25 focus:border-white/50 focus:bg-black/80 focus:shadow-[0_0_26px_rgba(255,255,255,0.1)] focus:ring-2 focus:ring-white/15 disabled:opacity-50`,value:y,onChange:e=>b(e.target.value),placeholder:`Ορατή μόνο σε διαχειριστές`})}),e.paid_at&&(0,L.jsxs)(`p`,{className:`text-xs text-white/40`,children:[`Πληρώθηκε: `,H.format(new Date(e.paid_at))]}),e.shipped_at&&(0,L.jsxs)(`p`,{className:`text-xs text-white/40`,children:[`Στάλθηκε: `,H.format(new Date(e.shipped_at))]}),E&&(0,L.jsxs)(`p`,{role:`alert`,className:`flex items-start gap-2 rounded-xl border border-white/20 bg-white/[0.05] p-3 text-sm text-white/85`,children:[(0,L.jsx)(p,{className:`mt-0.5 size-4 shrink-0`}),` `,E]}),(0,L.jsxs)(M,{type:`button`,onClick:()=>void U(),disabled:S||!j,children:[S?(0,L.jsx)(h,{className:`size-4 animate-spin`}):(0,L.jsx)(d,{className:`size-4`}),`Αποθήκευση αλλαγών`]})]})]})})})]})})}function J({status:e}){let t=e===`paid`||e===`shipped`||e===`delivered`;return(0,L.jsx)(`span`,{className:`rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wider`,style:{borderColor:t?`rgba(255,255,255,0.6)`:`rgba(255,255,255,0.15)`,color:e===`paid`?`#0a0a0a`:t?`#fff`:`rgba(255,255,255,0.45)`,background:e===`paid`?`#fff`:`transparent`,boxShadow:e===`paid`?`0 0 20px rgba(255,255,255,0.5)`:`none`},children:z[e]})}function Y({icon:e,label:t,value:n,highlight:r}){return(0,L.jsx)(o.div,{whileHover:{y:-5},transition:{duration:.25},className:`group`,children:(0,L.jsxs)(N,{inner:`p-6`,children:[(0,L.jsx)(`div`,{className:`absolute right-0 top-0 text-white/35 transition-all duration-300 group-hover:text-white group-hover:drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]`,children:e}),(0,L.jsx)(`p`,{className:`text-xs uppercase tracking-[0.25em] text-white/50`,children:t}),(0,L.jsx)(`p`,{className:`mt-4 text-3xl font-extrabold tracking-tight text-white`,style:r?{textShadow:`0 0 24px rgba(255,255,255,0.7)`}:void 0,children:n})]})})}function X({children:e}){return(0,L.jsxs)(`h2`,{className:`mb-4 flex items-center gap-3 px-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/65`,children:[(0,L.jsx)(`span`,{className:`size-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]`}),e]})}function Z({label:e,children:t,className:n=``}){return(0,L.jsxs)(`label`,{className:`block ${n}`,children:[(0,L.jsx)(`span`,{className:`mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45`,children:e}),t]})}function Q({label:e,value:t,strong:n}){return(0,L.jsxs)(`div`,{className:`flex items-center justify-between ${n?`border-t border-white/10 pt-2`:``}`,children:[(0,L.jsx)(`dt`,{className:`text-white/50`,children:e}),(0,L.jsx)(`dd`,{className:n?`font-extrabold text-white`:`text-white/85`,children:t})]})}export{U as component};
+=== END FILE ===
+
+=== FILE: src/components/aura/ContactForm.tsx ===
+import { useState, type FormEvent } from "react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { db } from "@/lib/db";
+import { useAuth } from "@/lib/useAuth";
+
+type Kind = "message" | "appointment";
+
+interface FieldErrors {
+  full_name?: string;
+  email?: string;
+  phone?: string;
+  message?: string;
+  preferred_at?: string;
+  consent?: string;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+const inputClass =
+  "w-full rounded-lg border border-white/10 bg-[#111111] px-4 py-3 text-sm text-neutral-100 placeholder:text-neutral-600 transition-colors focus:border-white/35 focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40";
+const labelClass = "mb-2 block text-[11px] uppercase tracking-[0.25em] text-neutral-500";
+
+export default function ContactForm() {
+  const { session } = useAuth();
+
+  const [kind, setKind] = useState<Kind>("message");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState(session?.user?.email ?? "");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState("");
+  const [preferredAt, setPreferredAt] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [honeypot, setHoneypot] = useState("");
+
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  function validate(): FieldErrors {
+    const next: FieldErrors = {};
+    if (fullName.trim().length < 2) next.full_name = "Συμπλήρωσε το ονοματεπώνυμό σου.";
+    if (!EMAIL_RE.test(email.trim())) next.email = "Δώσε ένα έγκυρο email.";
+    if (kind === "appointment") {
+      if (phone.trim().length < 8) next.phone = "Για ραντεβού χρειαζόμαστε τηλέφωνο.";
+      if (!preferredAt) next.preferred_at = "Διάλεξε ημερομηνία και ώρα.";
+      else if (new Date(preferredAt).getTime() < Date.now())
+        next.preferred_at = "Η ημερομηνία πρέπει να είναι στο μέλλον.";
+    }
+    if (message.trim().length < 10) next.message = "Γράψε τουλάχιστον 10 χαρακτήρες.";
+    if (!consent) next.consent = "Χρειαζόμαστε τη συγκατάθεσή σου για να σου απαντήσουμε.";
+    return next;
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setServerError(null);
+
+    // Honeypot: τα bots γεμίζουν κρυφά πεδία — σιωπηλή "επιτυχία".
+    if (honeypot.trim() !== "") {
+      setStatus("sent");
+      return;
+    }
+
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    setStatus("sending");
+
+    const { error } = await db.from("contact_messages").insert({
+      kind,
+      full_name: fullName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim() || null,
+      message: message.trim(),
+      preferred_at: kind === "appointment" ? new Date(preferredAt).toISOString() : null,
+      user_id: session?.user?.id ?? null,
+    });
+
+    if (error) {
+      setStatus("error");
+      setServerError(error.message);
+      return;
+    }
+
+    setStatus("sent");
+    setFullName("");
+    setPhone("");
+    setMessage("");
+    setPreferredAt("");
+    setConsent(false);
+  }
+
+  if (status === "sent") {
+    return (
+      <div className="rounded-2xl border border-white/15 bg-[#0A0A0A] p-8 text-center">
+        <p className="text-xs uppercase tracking-[0.4em] text-neutral-500">ΕΛΗΦΘΗ</p>
+        <h3 className="mt-4 text-2xl font-semibold tracking-tight text-neutral-100">
+          {kind === "appointment" ? "Το αίτημα ραντεβού στάλθηκε." : "Το μήνυμά σου στάλθηκε."}
+        </h3>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-neutral-400">
+          Η ομάδα της AURA απαντά συνήθως μέσα σε 1–2 εργάσιμες ημέρες στο email που έδωσες.
+        </p>
+        <button
+          type="button"
+          onClick={() => setStatus("idle")}
+          className="mt-6 rounded-full border border-white/20 px-6 py-2.5 text-xs uppercase tracking-[0.2em] text-neutral-200 transition-colors hover:border-white/50 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        >
+          Νέο μήνυμα
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 sm:p-8"
+    >
+      <fieldset className="mb-7">
+        <legend className={labelClass}>Τι θέλεις να κάνεις</legend>
+        <div className="inline-flex rounded-full border border-white/10 p-1">
+          {(
+            [
+              { value: "message", label: "ΜΗΝΥΜΑ" },
+              { value: "appointment", label: "ΡΑΝΤΕΒΟΥ" },
+            ] as const
+          ).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={kind === option.value}
+              onClick={() => setKind(option.value)}
+              className={[
+                "rounded-full px-5 py-2 text-[11px] uppercase tracking-[0.2em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50",
+                kind === option.value
+                  ? "bg-white/10 text-white"
+                  : "text-neutral-500 hover:text-neutral-200",
+              ].join(" ")}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label className={labelClass} htmlFor="contact-name">
+            Ονοματεπώνυμο
+          </label>
+          <input
+            id="contact-name"
+            name="full_name"
+            autoComplete="name"
+            className={inputClass}
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            aria-invalid={Boolean(errors.full_name)}
+            aria-describedby={errors.full_name ? "err-name" : undefined}
+            placeholder="Γιάννης Παπαδόπουλος"
+          />
+          {errors.full_name && (
+            <p id="err-name" className="mt-2 text-xs text-neutral-400">
+              {errors.full_name}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className={labelClass} htmlFor="contact-email">
+            Email
+          </label>
+          <input
+            id="contact-email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            className={inputClass}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? "err-email" : undefined}
+            placeholder="you@example.com"
+          />
+          {errors.email && (
+            <p id="err-email" className="mt-2 text-xs text-neutral-400">
+              {errors.email}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className={labelClass} htmlFor="contact-phone">
+            Τηλέφωνο {kind === "message" && <span className="text-neutral-700">(προαιρετικό)</span>}
+          </label>
+          <input
+            id="contact-phone"
+            name="phone"
+            type="tel"
+            autoComplete="tel"
+            className={inputClass}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            aria-invalid={Boolean(errors.phone)}
+            aria-describedby={errors.phone ? "err-phone" : undefined}
+            placeholder="+30 69XXXXXXXX"
+          />
+          {errors.phone && (
+            <p id="err-phone" className="mt-2 text-xs text-neutral-400">
+              {errors.phone}
+            </p>
+          )}
+        </div>
+
+        {kind === "appointment" && (
+          <div>
+            <label className={labelClass} htmlFor="contact-when">
+              Προτιμώμενη ημερομηνία & ώρα
+            </label>
+            <input
+              id="contact-when"
+              name="preferred_at"
+              type="datetime-local"
+              className={inputClass}
+              value={preferredAt}
+              onChange={(e) => setPreferredAt(e.target.value)}
+              aria-invalid={Boolean(errors.preferred_at)}
+              aria-describedby={errors.preferred_at ? "err-when" : undefined}
+            />
+            {errors.preferred_at && (
+              <p id="err-when" className="mt-2 text-xs text-neutral-400">
+                {errors.preferred_at}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="sm:col-span-2">
+          <label className={labelClass} htmlFor="contact-message">
+            {kind === "appointment" ? "Τι θέλεις να δουλέψουμε" : "Μήνυμα"}
+          </label>
+          <textarea
+            id="contact-message"
+            name="message"
+            rows={5}
+            className={`${inputClass} resize-y`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            aria-invalid={Boolean(errors.message)}
+            aria-describedby={errors.message ? "err-message" : undefined}
+            placeholder="Πες μας λίγα λόγια για το επίπεδό σου και τον στόχο σου."
+          />
+          {errors.message && (
+            <p id="err-message" className="mt-2 text-xs text-neutral-400">
+              {errors.message}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Honeypot — κρυφό από χρήστες και screen readers, ορατό στα bots. */}
+      <div className="hidden" aria-hidden="true">
+        <label htmlFor="contact-company">Company</label>
+        <input
+          id="contact-company"
+          name="company"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(e) => setHoneypot(e.target.value)}
+        />
+      </div>
+
+      <div className="mt-6 flex items-start gap-3">
+        <input
+          id="contact-consent"
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          aria-invalid={Boolean(errors.consent)}
+          className="mt-1 h-4 w-4 shrink-0 rounded border-white/20 bg-[#111111] accent-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        />
+        <label htmlFor="contact-consent" className="text-xs leading-relaxed text-neutral-400">
+          Συμφωνώ να αποθηκεύσει η AURA τα στοιχεία μου για να απαντήσει στο αίτημά μου.
+        </label>
+      </div>
+      {errors.consent && <p className="mt-2 text-xs text-neutral-400">{errors.consent}</p>}
+
+      {status === "error" && serverError && (
+        <p role="alert" className="mt-5 rounded-lg border border-white/15 bg-[#111111] px-4 py-3 text-xs text-neutral-300">
+          Κάτι πήγε λάθος: {serverError}
+        </p>
+      )}
+
+      <div className="mt-8">
+        <ChromeButton type="submit" disabled={status === "sending"} className="w-full sm:w-auto">
+          {status === "sending"
+            ? "ΑΠΟΣΤΟΛΗ…"
+            : kind === "appointment"
+              ? "ΚΛΕΙΣΕ ΡΑΝΤΕΒΟΥ"
+              : "ΣΤΕΙΛΕ ΜΗΝΥΜΑ"}
+        </ChromeButton>
+      </div>
+    </form>
+  );
+}
+=== END FILE ===
+

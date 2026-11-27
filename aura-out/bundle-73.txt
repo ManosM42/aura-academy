@@ -1,0 +1,1576 @@
+=== FILE: src/components/aura/CallProvider.tsx ===
+// src/components/aura/CallProvider.tsx
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/useAuth";
+import { formatDuration, type CallLog } from "@/lib/call-logs";
+
+type Kind = "audio" | "video";
+type Phase = "idle" | "ringing" | "connecting" | "connected";
+
+export interface CallPeer {
+  id: string;
+  name: string;
+  avatar: string | null;
+}
+interface CallInfo {
+  id: string;
+  conversationId: string;
+  kind: Kind;
+  peer: CallPeer;
+  direction: "out" | "in";
+}
+interface CallCtx {
+  busy: boolean;
+  startCall: (peer: CallPeer, conversationId: string, kind: Kind) => Promise<void>;
+}
+
+const Ctx = createContext<CallCtx>({ busy: false, startCall: async () => {} });
+export const useCall = () => useContext(Ctx);
+
+const RING_TIMEOUT_MS = 45_000;
+const FALLBACK_ICE: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
+
+function makeId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+async function getIceServers(): Promise<RTCIceServer[]> {
+  try {
+    const { data, error } = await supabase.functions.invoke("get-ice-servers");
+    if (!error && data?.iceServers) return data.iceServers as RTCIceServer[];
+  } catch {
+    /* fall through */
+  }
+  return FALLBACK_ICE;
+}
+
+function subscribe(ch: RealtimeChannel, timeoutMs = 8000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("subscribe timeout")), timeoutMs);
+    ch.subscribe((status) => {
+      if (status === "SUBSCRIBED") {
+        clearTimeout(t);
+        resolve();
+      }
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        clearTimeout(t);
+        reject(new Error(status));
+      }
+    });
+  });
+}
+
+/** Tries a private channel first, then falls back to a public one. */
+async function openChannel(
+  name: string,
+  setup: (ch: RealtimeChannel) => void,
+): Promise<RealtimeChannel> {
+  let lastErr: unknown;
+  for (const priv of [true, false]) {
+    const ch = supabase.channel(name, { config: { private: priv } });
+    setup(ch);
+    try {
+      await subscribe(ch);
+      return ch;
+    } catch (e) {
+      lastErr = e;
+      supabase.removeChannel(ch);
+    }
+  }
+  throw lastErr;
+}
+
+export function CallProvider({ children }: { children: ReactNode }) {
+  const { profile } = useAuth();
+  const myId = profile?.id;
+
+  const [call, setCall] = useState<CallInfo | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [muted, setMuted] = useState(false);
+  const [camOff, setCamOff] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [seconds, setSeconds] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const callRef = useRef<CallInfo | null>(null);
+  const phaseRef = useRef<Phase>("idle");
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const roomRef = useRef<RealtimeChannel | null>(null);
+  const localRef = useRef<MediaStream | null>(null);
+  const pendingIce = useRef<RTCIceCandidateInit[]>([]);
+  const ringTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readyTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offeringRef = useRef(false);
+
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+  const setPhaseBoth = (p: Phase) => {
+    phaseRef.current = p;
+    setPhase(p);
+  };
+
+  const showNotice = useCallback((msg: string) => {
+    setNotice(msg);
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    noticeTimer.current = setTimeout(() => setNotice(null), 6000);
+  }, []);
+
+  const cleanup = useCallback(() => {
+    if (ringTimer.current) clearTimeout(ringTimer.current);
+    ringTimer.current = null;
+    if (readyTimer.current) clearInterval(readyTimer.current);
+    readyTimer.current = null;
+    if (connTimer.current) clearTimeout(connTimer.current);
+    connTimer.current = null;
+    offeringRef.current = false;
+    localRef.current?.getTracks().forEach((t) => t.stop());
+    localRef.current = null;
+    pcRef.current?.close();
+    pcRef.current = null;
+    if (roomRef.current) supabase.removeChannel(roomRef.current);
+    roomRef.current = null;
+    pendingIce.current = [];
+    callRef.current = null;
+    setCall(null);
+    setLocalStream(null);
+    setRemoteStream(null);
+    setMuted(false);
+    setCamOff(false);
+    setSeconds(0);
+    setPhaseBoth("idle");
+  }, []);
+
+  useEffect(() => {
+    if (localVideoRef.current) localVideoRef.current.srcObject = localStream;
+  }, [localStream, phase]);
+  useEffect(() => {
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remoteStream;
+  }, [remoteStream, phase]);
+
+  useEffect(() => {
+    if (phase !== "connected") return;
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [phase]);
+
+  // simple ringtone (incoming = higher beep, outgoing = lower beep)
+  const ringing = !!call && phase === "ringing";
+  const incomingDir = call?.direction === "in";
+  useEffect(() => {
+    if (!ringing) return;
+    let ctx: AudioContext | null = null;
+    try {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      ctx = new AC();
+    } catch {
+      return;
+    }
+    const beep = () => {
+      if (!ctx) return;
+      try {
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.frequency.value = incomingDir ? 880 : 440;
+        g.gain.value = 0.05;
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start();
+        o.stop(ctx.currentTime + 0.4);
+      } catch {
+        /* ignore */
+      }
+    };
+    beep();
+    const t = setInterval(() => {
+      beep();
+      if (incomingDir && navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    }, 1500);
+    return () => {
+      clearInterval(t);
+      ctx?.close().catch(() => {});
+    };
+  }, [ringing, incomingDir]);
+
+  // ---------- end / hang up ----------
+  const endCall = useCallback(
+    async (finalStatus: "ended" | "missed" = "ended") => {
+      const info = callRef.current;
+      if (!info) return;
+      const answered = phaseRef.current === "connected" || phaseRef.current === "connecting";
+      const status = answered
+        ? "ended"
+        : info.direction === "out"
+          ? finalStatus === "missed"
+            ? "missed"
+            : "cancelled"
+          : "ended";
+      await supabase
+        .from("call_logs")
+        .update({ status, ended_at: new Date().toISOString() })
+        .eq("id", info.id)
+        .is("ended_at", null);
+      roomRef.current?.send({ type: "broadcast", event: "hangup", payload: {} });
+      setTimeout(cleanup, 80);
+    },
+    [cleanup],
+  );
+
+  // ---------- peer connection + signaling room ----------
+  const joinRoom = useCallback(
+    async (info: CallInfo, isCaller: boolean) => {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: info.kind === "video" ? { facingMode: "user" } : false,
+      });
+      localRef.current = stream;
+      setLocalStream(stream);
+
+      const pc = new RTCPeerConnection({ iceServers: await getIceServers() });
+      pcRef.current = pc;
+      stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+
+      const remote = new MediaStream();
+      pc.ontrack = (e) => {
+        e.streams[0]?.getTracks().forEach((t) => {
+          if (!remote.getTracks().includes(t)) remote.addTrack(t);
+        });
+        setRemoteStream(new MediaStream(remote.getTracks()));
+      };
+      const markConnected = () => {
+        if (connTimer.current) clearTimeout(connTimer.current);
+        connTimer.current = null;
+        setPhaseBoth("connected");
+      };
+      const startConnTimer = () => {
+        if (connTimer.current) return;
+        connTimer.current = setTimeout(() => {
+          if (phaseRef.current !== "connected") {
+            showNotice("Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.");
+            void endCall("ended");
+          }
+        }, 25_000);
+      };
+      pc.oniceconnectionstatechange = () => {
+        console.log("[call] ice:", pc.iceConnectionState);
+        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+          markConnected();
+        }
+      };
+      pc.onconnectionstatechange = () => {
+        console.log("[call] pc:", pc.connectionState);
+        if (pc.connectionState === "connected") markConnected();
+        if (pc.connectionState === "failed") {
+          showNotice("Η σύνδεση απέτυχε.");
+          void endCall("ended");
+        }
+      };
+
+      const send = (event: string, payload: unknown = {}) =>
+        roomRef.current?.send({ type: "broadcast", event, payload });
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) void send("ice", { c: e.candidate.toJSON() });
+      };
+
+      const flushIce = async () => {
+        for (const c of pendingIce.current) await pc.addIceCandidate(c).catch(() => {});
+        pendingIce.current = [];
+      };
+
+      roomRef.current = await openChannel(`call:${info.id}`, (room) => {
+        room
+          .on("broadcast", { event: "ready" }, async () => {
+            if (!isCaller) return;
+            console.log("[call] got ready");
+            if (ringTimer.current) clearTimeout(ringTimer.current);
+            ringTimer.current = null;
+            if (phaseRef.current === "ringing") setPhaseBoth("connecting");
+            startConnTimer();
+            if (pc.remoteDescription) return; // already answered
+            if (pc.localDescription) {
+              void send("offer", { sdp: pc.localDescription }); // callee asked again
+              return;
+            }
+            if (offeringRef.current) return;
+            offeringRef.current = true;
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            void send("offer", { sdp: offer });
+          })
+          .on("broadcast", { event: "offer" }, async ({ payload }) => {
+            if (pc.remoteDescription) return; // duplicate offer
+            console.log("[call] got offer");
+            if (readyTimer.current) clearInterval(readyTimer.current);
+            readyTimer.current = null;
+            await pc.setRemoteDescription(payload.sdp);
+            await flushIce();
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            void send("answer", { sdp: answer });
+          })
+          .on("broadcast", { event: "answer" }, async ({ payload }) => {
+            if (pc.remoteDescription) return;
+            console.log("[call] got answer");
+            await pc.setRemoteDescription(payload.sdp);
+            await flushIce();
+          })
+          .on("broadcast", { event: "ice" }, async ({ payload }) => {
+            if (pc.remoteDescription) await pc.addIceCandidate(payload.c).catch(() => {});
+            else pendingIce.current.push(payload.c);
+          })
+          .on("broadcast", { event: "hangup" }, () => cleanup())
+          .on("broadcast", { event: "decline" }, () => cleanup());
+      });
+
+      return send;
+    },
+    [cleanup, endCall, showNotice],
+  );
+
+  const mediaErrorText = (e: unknown) => {
+    const name = (e as Error)?.name;
+    if (name === "NotAllowedError") return "Επίτρεψε μικρόφωνο/κάμερα στον browser.";
+    if (name === "NotFoundError") return "Δεν βρέθηκε μικρόφωνο/κάμερα.";
+    if (!window.isSecureContext) return "Οι κλήσεις θέλουν HTTPS.";
+    return "Η κλήση απέτυχε. Δοκίμασε ξανά.";
+  };
+
+  // ---------- outgoing ----------
+  const startCall = useCallback(
+    async (peer: CallPeer, conversationId: string, kind: Kind) => {
+      if (!profile || callRef.current) return;
+      const id = makeId();
+      const info: CallInfo = { id, conversationId, kind, peer, direction: "out" };
+      callRef.current = info;
+      setCall(info);
+      setPhaseBoth("ringing");
+
+      try {
+        // 1) the INSERT makes the other phone ring (and lets us join the private room)
+        const { error } = await supabase.from("call_logs").insert({
+          id,
+          conversation_id: conversationId,
+          caller_id: profile.id,
+          callee_id: peer.id,
+          kind,
+        });
+        if (error) throw error;
+
+        // 2) camera/mic + signaling room (callee keeps asking "ready" until we answer)
+        await joinRoom(info, true);
+
+        ringTimer.current = setTimeout(() => {
+          if (phaseRef.current === "ringing") void endCall("missed");
+        }, RING_TIMEOUT_MS);
+      } catch (e) {
+        console.error("startCall failed", e);
+        showNotice(mediaErrorText(e));
+        await supabase
+          .from("call_logs")
+          .update({ status: "cancelled", ended_at: new Date().toISOString() })
+          .eq("id", id);
+        cleanup();
+      }
+    },
+    [profile, joinRoom, endCall, cleanup, showNotice],
+  );
+
+  // ---------- incoming: listen for new call_logs rows addressed to me ----------
+  useEffect(() => {
+    if (!myId) return;
+
+    const showIncoming = async (row: CallLog) => {
+      if (callRef.current) return; // already busy or already showing this one
+      if (row.status !== "ringing" || row.ended_at) return;
+      if (Date.now() - new Date(row.created_at).getTime() > 60_000) return;
+
+      let name = "Χρήστης";
+      let avatar: string | null = null;
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", row.caller_id)
+          .maybeSingle();
+        if (data) {
+          name = (data as any).full_name ?? name;
+          avatar = (data as any).avatar_url ?? null;
+        }
+      } catch {
+        /* keep defaults */
+      }
+      if (callRef.current) return;
+
+      const info: CallInfo = {
+        id: row.id,
+        conversationId: row.conversation_id,
+        kind: row.kind,
+        peer: { id: row.caller_id, name, avatar },
+        direction: "in",
+      };
+      callRef.current = info;
+      setCall(info);
+      setPhaseBoth("ringing");
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    };
+
+    const ch = supabase
+      .channel(`incoming-calls:${myId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "call_logs", filter: `callee_id=eq.${myId}` },
+        (payload) => void showIncoming(payload.new as CallLog),
+      )
+      .subscribe();
+
+    // catch a call that started while this page was loading
+    (async () => {
+      const since = new Date(Date.now() - 45_000).toISOString();
+      const { data } = await supabase
+        .from("call_logs")
+        .select("*")
+        .eq("callee_id", myId)
+        .eq("status", "ringing")
+        .is("ended_at", null)
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (data?.[0]) void showIncoming(data[0] as CallLog);
+    })();
+
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [myId]);
+
+  // ---------- watch the current call's row: ended / declined / cancelled ----------
+  const callId = call?.id;
+  useEffect(() => {
+    if (!callId) return;
+    const ch = supabase
+      .channel(`call-status:${callId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "call_logs", filter: `id=eq.${callId}` },
+        (payload) => {
+          const row = payload.new as CallLog;
+          if (row.ended_at && callRef.current?.id === callId) cleanup();
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(ch);
+    };
+  }, [callId, cleanup]);
+
+  const accept = async () => {
+    const info = callRef.current;
+    if (!info) return;
+    setPhaseBoth("connecting");
+    try {
+      const send = await joinRoom(info, false);
+      await supabase
+        .from("call_logs")
+        .update({ status: "answered", answered_at: new Date().toISOString() })
+        .eq("id", info.id);
+      let tries = 0;
+      const sendReady = () => {
+        console.log("[call] send ready");
+        void send("ready");
+      };
+      sendReady();
+      readyTimer.current = setInterval(() => {
+        if (pcRef.current?.remoteDescription || ++tries > 25) {
+          if (readyTimer.current) clearInterval(readyTimer.current);
+          readyTimer.current = null;
+          return;
+        }
+        sendReady();
+      }, 1000);
+      connTimer.current = setTimeout(() => {
+        if (phaseRef.current !== "connected") {
+          showNotice("Δεν έγινε σύνδεση (δίκτυο/TURN). Δοκίμασε ξανά.");
+          void endCall("ended");
+        }
+      }, 25_000);
+    } catch (e) {
+      console.error("accept failed", e);
+      showNotice(mediaErrorText(e));
+      await endCall("ended");
+    }
+  };
+
+  const decline = async () => {
+    const info = callRef.current;
+    if (!info) return;
+    await supabase
+      .from("call_logs")
+      .update({ status: "declined", ended_at: new Date().toISOString() })
+      .eq("id", info.id);
+    cleanup();
+  };
+
+  const toggleMute = () => {
+    const next = !muted;
+    localRef.current?.getAudioTracks().forEach((t) => (t.enabled = !next));
+    setMuted(next);
+  };
+  const toggleCam = () => {
+    const next = !camOff;
+    localRef.current?.getVideoTracks().forEach((t) => (t.enabled = !next));
+    setCamOff(next);
+  };
+
+  const value = useMemo(() => ({ busy: !!call, startCall }), [call, startCall]);
+  const incomingRinging = call?.direction === "in" && phase === "ringing";
+  const isVideo = call?.kind === "video";
+
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+
+      {notice && (
+        <div className="fixed left-1/2 top-4 z-[120] -translate-x-1/2 rounded-full bg-red-500/90 px-4 py-2 text-sm text-white shadow-lg">
+          {notice}
+        </div>
+      )}
+
+      {call && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-[#070707] text-white">
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={`absolute inset-0 h-full w-full object-cover ${
+              isVideo && phase === "connected" ? "" : "invisible"
+            }`}
+          />
+
+          {(!isVideo || phase !== "connected") && (
+            <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-4 px-6">
+              {call.peer.avatar ? (
+                <img src={call.peer.avatar} alt="" className="h-28 w-28 rounded-full object-cover ring-1 ring-white/20" />
+              ) : (
+                <div className="flex h-28 w-28 items-center justify-center rounded-full bg-white/10 text-3xl font-semibold">
+                  {call.peer.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <p className="text-xl font-medium">{call.peer.name}</p>
+              <p className="text-sm text-white/50">
+                {phase === "connected"
+                  ? formatDuration(seconds)
+                  : phase === "connecting"
+                    ? "Σύνδεση…"
+                    : incomingRinging
+                      ? isVideo ? "Εισερχόμενη βιντεοκλήση" : "Εισερχόμενη κλήση"
+                      : "Καλεί…"}
+              </p>
+            </div>
+          )}
+
+          {isVideo && phase === "connected" && (
+            <p className="absolute left-0 right-0 top-6 z-10 text-center text-sm text-white/80 [text-shadow:0_1px_4px_rgba(0,0,0,.6)]">
+              {call.peer.name} · {formatDuration(seconds)}
+            </p>
+          )}
+
+          {isVideo && localStream && (
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute right-4 top-4 z-20 h-36 w-24 -scale-x-100 rounded-xl bg-black object-cover ring-1 ring-white/20"
+            />
+          )}
+
+          <div className="relative z-10 flex items-center justify-center gap-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6">
+            {incomingRinging ? (
+              <>
+                <button onClick={decline} aria-label="Απόρριψη" className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500">
+                  <PhoneOff size={26} />
+                </button>
+                <button onClick={accept} aria-label="Απάντηση" className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500">
+                  {isVideo ? <Video size={26} /> : <Phone size={26} />}
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={toggleMute} aria-label="Σίγαση" className={`flex h-14 w-14 items-center justify-center rounded-full ${muted ? "bg-white text-black" : "bg-white/15"}`}>
+                  {muted ? <MicOff size={22} /> : <Mic size={22} />}
+                </button>
+                {isVideo && (
+                  <button onClick={toggleCam} aria-label="Κάμερα" className={`flex h-14 w-14 items-center justify-center rounded-full ${camOff ? "bg-white text-black" : "bg-white/15"}`}>
+                    {camOff ? <VideoOff size={22} /> : <Video size={22} />}
+                  </button>
+                )}
+                <button onClick={() => endCall("ended")} aria-label="Τερματισμός" className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500">
+                  <PhoneOff size={26} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </Ctx.Provider>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/CourseCard.tsx ===
+// src/components/aura/CourseCard.tsx
+import { Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { getPlan } from "@/lib/plans";
+import type { CourseListItem } from "@/lib/courses.types";
+
+interface CourseCardProps {
+  item: CourseListItem;
+  index: number;
+}
+
+function formatDuration(seconds: number | null): string | null {
+  if (!seconds) return null;
+  const mins = Math.round(seconds / 60);
+  return `${mins}′`;
+}
+
+export default function CourseCard({ item, index }: CourseCardProps) {
+  const { course, locked } = item;
+  const plan = getPlan(course.required_plan);
+  const duration = formatDuration(course.video_duration_seconds);
+  const hasVideo = course.video_status === "ready" || course.video_status === "uploaded";
+
+  const cta = locked ? "ΚΛΕΙΔΩΜΕΝΟ" : "ΔΕΣ ΤΟ VIDEO";
+
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.5, delay: Math.min(index * 0.07, 0.35) }}
+      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.07] via-white/[0.02] to-transparent p-6 transition-colors duration-500 hover:border-white/25"
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 -top-1/2 h-full translate-y-[-30%] bg-[radial-gradient(60%_80%_at_50%_100%,rgba(255,255,255,0.16),transparent_70%)] opacity-0 transition-opacity duration-700 group-hover:opacity-100"
+      />
+
+      <div className="relative flex items-center justify-between gap-3">
+        <span className="text-[10px] uppercase tracking-[0.4em] text-neutral-500">
+          {duration ?? "—"}
+        </span>
+        <span
+          className={[
+            "rounded-full border px-3 py-1 text-[9px] uppercase tracking-[0.3em]",
+            locked ? "border-white/10 text-neutral-500" : "border-white/25 text-neutral-200",
+          ].join(" ")}
+        >
+          {plan?.name ?? course.required_plan}
+        </span>
+      </div>
+
+      <h3 className="relative mt-5 text-xl font-semibold tracking-tight text-neutral-100">
+        {course.title}
+      </h3>
+
+      {course.summary ? (
+        <p className="relative mt-3 line-clamp-3 text-sm leading-relaxed text-neutral-400">
+          {course.summary}
+        </p>
+      ) : null}
+
+      {!hasVideo && !locked ? (
+        <p className="relative mt-4 text-[10px] uppercase tracking-[0.3em] text-neutral-600">
+          Έρχεται σύντομα
+        </p>
+      ) : null}
+
+      <div className="relative mt-7">
+        {locked ? (
+          <Link
+            to="/pricing"
+            className="inline-flex items-center gap-2 border-b border-white/20 pb-1 text-[11px] uppercase tracking-[0.35em] text-neutral-400 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+          >
+            {cta} — ΔΕΣ ΠΛΑΝΑ →
+          </Link>
+        ) : (
+          <Link
+            to="/courses/$slug"
+            params={{ slug: course.slug }}
+            className="inline-flex items-center gap-2 border-b border-white/30 pb-1 text-[11px] uppercase tracking-[0.35em] text-neutral-100 transition hover:border-white hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white/60"
+          >
+            {cta} →
+          </Link>
+        )}
+      </div>
+    </motion.article>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/ui/chart.tsx ===
+import * as React from "react";
+import * as RechartsPrimitive from "recharts";
+
+import { cn } from "@/lib/utils";
+
+// Format: { THEME_NAME: CSS_SELECTOR }
+const THEMES = { light: "", dark: ".dark" } as const;
+
+export type ChartConfig = {
+  [k in string]: {
+    label?: React.ReactNode;
+    icon?: React.ComponentType;
+  } & (
+    | { color?: string; theme?: never }
+    | { color?: never; theme: Record<keyof typeof THEMES, string> }
+  );
+};
+
+type ChartContextProps = {
+  config: ChartConfig;
+};
+
+const ChartContext = React.createContext<ChartContextProps | null>(null);
+
+function useChart() {
+  const context = React.useContext(ChartContext);
+
+  if (!context) {
+    throw new Error("useChart must be used within a <ChartContainer />");
+  }
+
+  return context;
+}
+
+const ChartContainer = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & {
+    config: ChartConfig;
+    children: React.ComponentProps<typeof RechartsPrimitive.ResponsiveContainer>["children"];
+  }
+>(({ id, className, children, config, ...props }, ref) => {
+  const uniqueId = React.useId();
+  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`;
+
+  return (
+    <ChartContext.Provider value={{ config }}>
+      <div
+        data-chart={chartId}
+        ref={ref}
+        className={cn(
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          className,
+        )}
+        {...props}
+      >
+        <ChartStyle id={chartId} config={config} />
+        <RechartsPrimitive.ResponsiveContainer>{children}</RechartsPrimitive.ResponsiveContainer>
+      </div>
+    </ChartContext.Provider>
+  );
+});
+ChartContainer.displayName = "Chart";
+
+const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
+  const colorConfig = Object.entries(config).filter(([, config]) => config.theme || config.color);
+
+  if (!colorConfig.length) {
+    return null;
+  }
+
+  return (
+    <style
+      dangerouslySetInnerHTML={{
+        __html: Object.entries(THEMES)
+          .map(
+            ([theme, prefix]) => `
+${prefix} [data-chart=${id}] {
+${colorConfig
+  .map(([key, itemConfig]) => {
+    const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
+    return color ? `  --color-${key}: ${color};` : null;
+  })
+  .join("\n")}
+}
+`,
+          )
+          .join("\n"),
+      }}
+    />
+  );
+};
+
+const ChartTooltip = RechartsPrimitive.Tooltip;
+
+const ChartTooltipContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+    React.ComponentProps<"div"> & {
+      hideLabel?: boolean;
+      hideIndicator?: boolean;
+      indicator?: "line" | "dot" | "dashed";
+      nameKey?: string;
+      labelKey?: string;
+    }
+>(
+  (
+    {
+      active,
+      payload,
+      className,
+      indicator = "dot",
+      hideLabel = false,
+      hideIndicator = false,
+      label,
+      labelFormatter,
+      labelClassName,
+      formatter,
+      color,
+      nameKey,
+      labelKey,
+    },
+    ref,
+  ) => {
+    const { config } = useChart();
+
+    const tooltipLabel = React.useMemo(() => {
+      if (hideLabel || !payload?.length) {
+        return null;
+      }
+
+      const [item] = payload;
+      const key = `${labelKey || item?.dataKey || item?.name || "value"}`;
+      const itemConfig = getPayloadConfigFromPayload(config, item, key);
+      const value =
+        !labelKey && typeof label === "string"
+          ? config[label as keyof typeof config]?.label || label
+          : itemConfig?.label;
+
+      if (labelFormatter) {
+        return (
+          <div className={cn("font-medium", labelClassName)}>{labelFormatter(value, payload)}</div>
+        );
+      }
+
+      if (!value) {
+        return null;
+      }
+
+      return <div className={cn("font-medium", labelClassName)}>{value}</div>;
+    }, [label, labelFormatter, payload, hideLabel, labelClassName, config, labelKey]);
+
+    if (!active || !payload?.length) {
+      return null;
+    }
+
+    const nestLabel = payload.length === 1 && indicator !== "dot";
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          className,
+        )}
+      >
+        {!nestLabel ? tooltipLabel : null}
+        <div className="grid gap-1.5">
+          {payload
+            .filter((item) => item.type !== "none")
+            .map((item, index) => {
+              const key = `${nameKey || item.name || item.dataKey || "value"}`;
+              const itemConfig = getPayloadConfigFromPayload(config, item, key);
+              const indicatorColor = color || item.payload.fill || item.color;
+
+              return (
+                <div
+                  key={item.dataKey}
+                  className={cn(
+                    "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
+                    indicator === "dot" && "items-center",
+                  )}
+                >
+                  {formatter && item?.value !== undefined && item.name ? (
+                    formatter(item.value, item.name, item, index, item.payload)
+                  ) : (
+                    <>
+                      {itemConfig?.icon ? (
+                        <itemConfig.icon />
+                      ) : (
+                        !hideIndicator && (
+                          <div
+                            className={cn(
+                              "shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)",
+                              {
+                                "h-2.5 w-2.5": indicator === "dot",
+                                "w-1": indicator === "line",
+                                "w-0 border-[1.5px] border-dashed bg-transparent":
+                                  indicator === "dashed",
+                                "my-0.5": nestLabel && indicator === "dashed",
+                              },
+                            )}
+                            style={
+                              {
+                                "--color-bg": indicatorColor,
+                                "--color-border": indicatorColor,
+                              } as React.CSSProperties
+                            }
+                          />
+                        )
+                      )}
+                      <div
+                        className={cn(
+                          "flex flex-1 justify-between leading-none",
+                          nestLabel ? "items-end" : "items-center",
+                        )}
+                      >
+                        <div className="grid gap-1.5">
+                          {nestLabel ? tooltipLabel : null}
+                          <span className="text-muted-foreground">
+                            {itemConfig?.label || item.name}
+                          </span>
+                        </div>
+                        {item.value && (
+                          <span className="font-mono font-medium tabular-nums text-foreground">
+                            {item.value.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    );
+  },
+);
+ChartTooltipContent.displayName = "ChartTooltip";
+
+const ChartLegend = RechartsPrimitive.Legend;
+
+const ChartLegendContent = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> &
+    Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+      hideIcon?: boolean;
+      nameKey?: string;
+    }
+>(({ className, hideIcon = false, payload, verticalAlign = "bottom", nameKey }, ref) => {
+  const { config } = useChart();
+
+  if (!payload?.length) {
+    return null;
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "flex items-center justify-center gap-4",
+        verticalAlign === "top" ? "pb-3" : "pt-3",
+        className,
+      )}
+    >
+      {payload
+        .filter((item) => item.type !== "none")
+        .map((item) => {
+          const key = `${nameKey || item.dataKey || "value"}`;
+          const itemConfig = getPayloadConfigFromPayload(config, item, key);
+
+          return (
+            <div
+              key={item.value}
+              className={cn(
+                "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
+              )}
+            >
+              {itemConfig?.icon && !hideIcon ? (
+                <itemConfig.icon />
+              ) : (
+                <div
+                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  style={{
+                    backgroundColor: item.color,
+                  }}
+                />
+              )}
+              {itemConfig?.label}
+            </div>
+          );
+        })}
+    </div>
+  );
+});
+ChartLegendContent.displayName = "ChartLegend";
+
+// Helper to extract item config from a payload.
+function getPayloadConfigFromPayload(config: ChartConfig, payload: unknown, key: string) {
+  if (typeof payload !== "object" || payload === null) {
+    return undefined;
+  }
+
+  const payloadPayload =
+    "payload" in payload && typeof payload.payload === "object" && payload.payload !== null
+      ? payload.payload
+      : undefined;
+
+  let configLabelKey: string = key;
+
+  if (key in payload && typeof payload[key as keyof typeof payload] === "string") {
+    configLabelKey = payload[key as keyof typeof payload] as string;
+  } else if (
+    payloadPayload &&
+    key in payloadPayload &&
+    typeof payloadPayload[key as keyof typeof payloadPayload] === "string"
+  ) {
+    configLabelKey = payloadPayload[key as keyof typeof payloadPayload] as string;
+  }
+
+  return configLabelKey in config ? config[configLabelKey] : config[key as keyof typeof config];
+}
+
+export {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  ChartStyle,
+};
+
+=== END FILE ===
+
+=== FILE: src/routes/academy.$slug.tsx ===
+// src/routes/academy/$slug.tsx
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowLeft, ArrowRight, Clock, Layers, Users } from "lucide-react";
+import { getCourseBySlug } from "@/lib/queries";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import { CHROME_FILL, ChromeText, EASE, Frame } from "@/components/aura/chrome";
+
+export const Route = createFileRoute("/academy/$slug")({
+  component: CoursePage,
+});
+
+function CoursePage() {
+  const reduce = useReducedMotion();
+  const { slug } = Route.useParams();
+  const { data, error, loading } = useAsync(() => getCourseBySlug(slug), [slug]);
+
+  return (
+    <main className="relative min-h-screen overflow-x-hidden bg-[#070707] px-4 pb-24 pt-28 text-white sm:px-6 sm:pt-36">
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(900px,130%)] -translate-x-1/2 -translate-y-1/3 rounded-full md:block"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(170,180,190,0.035) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.45, 1, 0.45] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+      />
+
+      <div className="relative mx-auto max-w-4xl">
+        <motion.div whileHover={{ x: -3 }} className="inline-block">
+          <Link
+            to="/academy"
+            className="group inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-white/75 outline-none transition-all hover:border-white/60 hover:bg-white/[0.09] hover:text-white hover:shadow-[0_0_22px_rgba(255,255,255,0.14)] focus-visible:ring-2 focus-visible:ring-white/60"
+          >
+            <ArrowLeft className="size-3.5 transition-transform group-hover:-translate-x-1" />
+            Πίσω στην Academy
+          </Link>
+        </motion.div>
+
+        {loading && (
+          <div className="mt-8">
+            <LoadingSkeleton rows={4} />
+          </div>
+        )}
+        {error && (
+          <div className="mt-8">
+            <ErrorState message={error} />
+          </div>
+        )}
+
+        {data && (
+          <>
+            <motion.header
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: EASE }}
+              className="mt-8"
+            >
+              <Frame inner="p-6 sm:p-10">
+                <span
+                  className="inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-950"
+                  style={{ backgroundImage: CHROME_FILL, boxShadow: "0 0 18px rgba(255,255,255,0.3)" }}
+                >
+                  {data.level}
+                </span>
+                <h1 className="mt-5 text-3xl font-extrabold tracking-tight sm:text-5xl">
+                  <ChromeText>{data.title}</ChromeText>
+                </h1>
+                {data.outcome && (
+                  <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/65 sm:text-base">{data.outcome}</p>
+                )}
+
+                <dl className="mt-8 grid gap-4 sm:grid-cols-3">
+                  {data.audience && (
+                    <Meta icon={<Users className="size-4" />} label="Για ποιον" value={data.audience} />
+                  )}
+                  {data.estimated_hours != null && (
+                    <Meta icon={<Clock className="size-4" />} label="Διάρκεια" value={`${data.estimated_hours} ώρες`} />
+                  )}
+                  <Meta icon={<Layers className="size-4" />} label="Modules" value={String(data.modules.length)} />
+                </dl>
+              </Frame>
+            </motion.header>
+
+            <section className="mt-10 space-y-5">
+              {data.modules.length === 0 && (
+                <p className="text-sm text-white/50">Δεν έχουν προστεθεί modules ακόμη.</p>
+              )}
+
+              {data.modules.map((m, i) => (
+                <motion.div
+                  key={m.id}
+                  initial={i < 3 && !reduce ? { opacity: 0, y: 20 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease: EASE, delay: 0.15 + i * 0.07 }}
+                  style={{ contentVisibility: "auto", containIntrinsicSize: "auto 260px" }}
+                >
+                  <Frame inner="p-5 sm:p-7">
+                    <div className="flex items-start gap-4">
+                      <span
+                        className="font-extrabold leading-none text-white/25 sm:text-3xl text-2xl"
+                        style={{ fontVariantNumeric: "tabular-nums" }}
+                      >
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="text-lg font-bold text-white sm:text-xl">{m.title}</h2>
+                        {m.objective && <p className="mt-1 text-sm leading-relaxed text-white/55">{m.objective}</p>}
+                      </div>
+                    </div>
+
+                    <ul className="mt-5 space-y-1.5">
+                      {m.lessons.map((lesson) => (
+                        <li key={lesson.id}>
+                          <Link
+                            to="/lesson/$lessonId"
+                            params={{ lessonId: lesson.id }}
+                            className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-sm text-white/80 outline-none transition-all duration-300 hover:border-white/25 hover:bg-white/[0.05] hover:text-white hover:shadow-[0_0_24px_rgba(255,255,255,0.06)] focus-visible:border-white/50 focus-visible:ring-2 focus-visible:ring-white/40"
+                          >
+                            <span className="shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/45 transition-colors group-hover:border-white/40 group-hover:text-white/80">
+                              {lesson.type}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">{lesson.title}</span>
+                            <span
+                              className="flex size-7 shrink-0 items-center justify-center rounded-full text-neutral-950 opacity-60 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 group-hover:shadow-[0_0_18px_rgba(255,255,255,0.5)]"
+                              style={{ backgroundImage: CHROME_FILL }}
+                            >
+                              <ArrowRight className="size-3.5" />
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                      {m.lessons.length === 0 && (
+                        <li className="px-3 py-3 text-sm text-white/40">Χωρίς μαθήματα ακόμη.</li>
+                      )}
+                    </ul>
+                  </Frame>
+                </motion.div>
+              ))}
+            </section>
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+
+function Meta({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+      <dt className="flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-white/40">
+        <span className="text-white/70">{icon}</span>
+        {label}
+      </dt>
+      <dd className="mt-2 text-sm font-semibold text-white/90">{value}</dd>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/admin.notifications.tsx ===
+// src/routes/admin.notifications.tsx  ->  /admin/notifications
+import { useCallback, useEffect, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Bell,
+  BellOff,
+  BellRing,
+  BookOpen,
+  CalendarCheck,
+  ClipboardCheck,
+  Loader2,
+  Send,
+  UserPlus,
+  Users,
+} from "lucide-react";
+import { getMyProfile } from "@/lib/queries";
+import { supabase } from "@/lib/supabase";
+import { ErrorState, LoadingSkeleton, LockedState } from "@/components/aura/States";
+import { ChromeCTA, ChromeText, EASE, Frame, CHROME_FILL } from "@/components/aura/chrome";
+import {
+  disablePush,
+  enablePush,
+  getPushState,
+  getRecentNotifications,
+  sendTestNotification,
+  type AdminNotification,
+  type PushState,
+} from "@/lib/push";
+
+export const Route = createFileRoute("/admin/notifications")({
+  head: () => ({ meta: [{ title: "AURA Admin — Ειδοποιήσεις" }] }),
+  component: NotificationsPage,
+});
+
+const ADMIN_ROLES = ["admin", "super_admin", "operations"];
+
+const EVENTS = [
+  { type: "new_member", icon: UserPlus, label: "Νέο μέλος", text: "Κάποιος πληρώνει και ξεκινά συνδρομή." },
+  { type: "seminar_booking", icon: CalendarCheck, label: "Κράτηση σεμιναρίου", text: "Κλείνεται μία θέση σε σεμινάριο." },
+  { type: "seminar_full", icon: Users, label: "Σεμινάριο γεμάτο", text: "Ένα σεμινάριο φτάνει τη μέγιστη χωρητικότητα." },
+  { type: "book_order", icon: BookOpen, label: "Παραγγελία βιβλίου", text: "Αγοράζεται ένα βιβλίο." },
+  { type: "review_submission", icon: ClipboardCheck, label: "Νέο review", text: "Ένας μαθητής στέλνει εργασία στο review queue." },
+];
+
+const iconFor = (type: string) => EVENTS.find((e) => e.type === type)?.icon ?? Bell;
+
+const dateFmt = new Intl.DateTimeFormat("el-GR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+
+function NotificationsPage() {
+  const reduce = useReducedMotion();
+  const [role, setRole] = useState<string | null | undefined>(undefined);
+  const [roleError, setRoleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getMyProfile()
+      .then((p) => alive && setRole(p?.role ?? null))
+      .catch((e: Error) => alive && setRoleError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const allowed = !!role && ADMIN_ROLES.includes(role);
+
+  return (
+    <main className="relative min-h-screen overflow-x-hidden px-4 pb-24 pt-28 text-white sm:px-6 sm:pt-36 md:px-10">
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full md:block"
+        style={{ background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" }}
+        animate={reduce ? undefined : { opacity: [0.4, 1, 0.4] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="relative mx-auto max-w-4xl">
+        {role === undefined && !roleError && <LoadingSkeleton rows={3} />}
+        {roleError && <ErrorState message={roleError} />}
+        {role !== undefined && !allowed && (
+          <Frame inner="p-8 text-center">
+            <LockedState reason="Μόνο διαχειριστές έχουν πρόσβαση στις ειδοποιήσεις." />
+          </Frame>
+        )}
+        {allowed && <Content />}
+      </div>
+    </main>
+  );
+}
+
+function Content() {
+  const reduce = useReducedMotion();
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [testSent, setTestSent] = useState(false);
+  const [items, setItems] = useState<AdminNotification[] | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+
+  const refreshState = useCallback(async () => setState(await getPushState()), []);
+
+  useEffect(() => {
+    void refreshState();
+  }, [refreshState]);
+
+  // history + live updates
+  useEffect(() => {
+    let alive = true;
+    getRecentNotifications()
+      .then((rows) => alive && setItems(rows))
+      .catch((e: Error) => alive && setListError(e.message));
+
+    const channel = supabase
+      .channel("admin-notifications-feed")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "admin_notifications" }, (payload) => {
+        setItems((list) => [payload.new as AdminNotification, ...(list ?? [])].slice(0, 30));
+      })
+      .subscribe();
+
+    return () => {
+      alive = false;
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  async function toggle() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (state === "enabled") await disablePush();
+      else await enablePush();
+      await refreshState();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function test() {
+    setBusy(true);
+    setError(null);
+    setTestSent(false);
+    try {
+      await sendTestNotification();
+      setTestSent(true);
+      setTimeout(() => setTestSent(false), 4000);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const enabled = state === "enabled";
+  const blocked = state === "unsupported" || state === "insecure" || state === "denied";
+
+  return (
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={{ show: { transition: { staggerChildren: 0.1 } } }}
+      className="space-y-10"
+    >
+      {/* header */}
+      <motion.header
+        variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}
+        className="border-b border-white/10 pb-8"
+      >
+        <Link
+          to={"/admin" as never}
+          className="mb-5 inline-flex items-center gap-2 text-xs text-white/50 outline-none transition-colors hover:text-white focus-visible:text-white"
+        >
+          <ArrowLeft className="size-3.5" /> Πίσω στο Admin
+        </Link>
+        <div className="mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50">
+          <span className="h-px w-10 bg-gradient-to-r from-white/70 to-transparent" />
+          Alerts
+        </div>
+        <h1 className="text-3xl font-extrabold uppercase tracking-tight sm:text-5xl">
+          <ChromeText>Ειδοποιήσεις</ChromeText>
+        </h1>
+      </motion.header>
+
+      {/* enable card */}
+      <motion.section variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+        <Frame inner="p-6 sm:p-8">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-5">
+              <div className="relative shrink-0">
+                {enabled && !reduce && (
+                  <motion.span
+                    aria-hidden
+                    className="absolute inset-0 rounded-2xl border border-white/60"
+                    animate={{ scale: [1, 1.5], opacity: [0.6, 0] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeOut" }}
+                  />
+                )}
+                <span
+                  className="relative flex size-14 items-center justify-center rounded-2xl text-neutral-950"
+                  style={
+                    enabled
+                      ? { backgroundImage: CHROME_FILL, boxShadow: "0 0 34px rgba(255,255,255,0.5), inset 0 1px 0 rgba(255,255,255,0.95)" }
+                      : { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.15)" }
+                  }
+                >
+                  {enabled ? <BellRing className="size-6" /> : blocked ? <BellOff className="size-6" /> : <Bell className="size-6" />}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  {state === null ? "Έλεγχος…" : enabled ? "Οι ειδοποιήσεις είναι ενεργές" : "Οι ειδοποιήσεις είναι ανενεργές"}
+                </h2>
+                <p className="mt-1 max-w-md text-sm leading-relaxed text-white/55">
+                  {state === "insecure" &&
+                    "Το site τρέχει σε http. Οι ειδοποιήσεις του Chrome λειτουργούν μόνο σε https (ή localhost)."}
+                  {state === "unsupported" && "Αυτός ο browser δεν υποστηρίζει push ειδοποιήσεις."}
+                  {state === "denied" &&
+                    "Έχεις μπλοκάρει τις ειδοποιήσεις. Επίτρεψέ τες από το εικονίδιο δίπλα στη διεύθυνση του site και ανανέωσε τη σελίδα."}
+                  {(state === "enabled" || state === "disabled") &&
+                    "Ενεργοποίησέ τες σε κάθε browser ή συσκευή όπου θέλεις να λαμβάνεις ειδοποιήσεις. Ο Chrome πρέπει να είναι ανοιχτός."}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 flex-col gap-3 sm:items-end">
+              <ChromeCTA type="button" solid={!enabled} onClick={() => void toggle()} disabled={busy || blocked || state === null}>
+                {busy ? <Loader2 className="size-4 animate-spin" /> : enabled ? <BellOff className="size-4" /> : <BellRing className="size-4" />}
+                {enabled ? "Απενεργοποίηση" : "Ενεργοποίηση"}
+              </ChromeCTA>
+              {enabled && (
+                <ChromeCTA type="button" solid={false} onClick={() => void test()} disabled={busy}>
+                  <Send className="size-4" /> Δοκιμαστική
+                </ChromeCTA>
+              )}
+            </div>
+          </div>
+
+          <AnimatePresence>
+            {testSent && (
+              <motion.p
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="mt-5 text-sm font-semibold text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.6)]"
+              >
+                Στάλθηκε. Η ειδοποίηση πρέπει να εμφανιστεί σε λίγα δευτερόλεπτα.
+              </motion.p>
+            )}
+          </AnimatePresence>
+          {error && (
+            <p role="alert" className="mt-5 flex items-start gap-2 rounded-xl border border-white/20 bg-white/[0.05] p-3 text-sm text-white/85">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" /> {error}
+            </p>
+          )}
+        </Frame>
+      </motion.section>
+
+      {/* what notifies */}
+      <motion.section variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+        <SectionTitle>Πότε ειδοποιείσαι</SectionTitle>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {EVENTS.map((e, i) => (
+            <motion.div
+              key={e.type}
+              whileHover={{ y: -4 }}
+              className={`group ${i === EVENTS.length - 1 && EVENTS.length % 2 === 1 ? "sm:col-span-2" : ""}`}
+            >
+              <Frame inner="p-5">
+                <div className="flex items-start gap-4">
+                  <span className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+                    <e.icon className="size-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">{e.label}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-white/50">{e.text}</p>
+                  </div>
+                </div>
+              </Frame>
+            </motion.div>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* history */}
+      <motion.section variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: EASE } } }}>
+        <SectionTitle>Πρόσφατες ειδοποιήσεις</SectionTitle>
+        {listError && <ErrorState message={listError} />}
+        {!items && !listError && <LoadingSkeleton rows={3} />}
+        {items && items.length === 0 && (
+          <Frame inner="p-8 text-center">
+            <p className="text-sm text-white/45">Δεν υπάρχουν ειδοποιήσεις ακόμη.</p>
+          </Frame>
+        )}
+        {items && items.length > 0 && (
+          <Frame inner="p-2 sm:p-3">
+            <ul className="divide-y divide-white/[0.06]">
+              <AnimatePresence initial={false}>
+                {items.map((n) => {
+                  const Icon = iconFor(n.type);
+                  const row = (
+                    <div className="flex items-start gap-4 rounded-xl px-3 py-3.5 transition-colors hover:bg-white/[0.04]">
+                      <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.05] text-white/80">
+                        <Icon className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-white">{n.title}</p>
+                        {n.body && <p className="mt-0.5 break-words text-sm text-white/55">{n.body}</p>}
+                      </div>
+                      <span className="shrink-0 text-xs text-white/35">{dateFmt.format(new Date(n.created_at))}</span>
+                    </div>
+                  );
+                  return (
+                    <motion.li
+                      key={n.id}
+                      layout
+                      initial={{ opacity: 0, y: -12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.4, ease: EASE }}
+                    >
+                      {n.url && n.type !== "test" ? <Link to={n.url as never}>{row}</Link> : row}
+                    </motion.li>
+                  );
+                })}
+              </AnimatePresence>
+            </ul>
+          </Frame>
+        )}
+      </motion.section>
+    </motion.div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-4 flex items-center gap-3 px-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/65">
+      <span className="size-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+      {children}
+    </h2>
+  );
+}
+=== END FILE ===
+

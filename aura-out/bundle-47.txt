@@ -1,0 +1,840 @@
+=== FILE: .output/public/assets/pricing-CZ1XLkT8.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./useNavigate-BR9bgUfC.js";import{i,t as a}from"./use-transform-Csj7YyAF.js";import{t as o}from"./use-reduced-motion-CNAPwhZE.js";import{t as s}from"./react-D9fOyxUn.js";import{t as c}from"./useAuth-B1WX5JkE.js";import{t as l}from"./createLucideIcon-Dz5w4CtK.js";import{t as u}from"./check-l8y3aT-v.js";import{t as d}from"./chevron-down-CMzGfsmT.js";import{t as f}from"./shield-check-Djau1VnD.js";import{t as p}from"./x-DCxPHqh1.js";import{t as m}from"./plans-BkcWWgXs.js";import{t as h}from"./ChromeButton-CdfVnEPs.js";import{i as g}from"./checkout-intent-CYMuNmEZ.js";import{r as _}from"./useSubscription-CI-f8eKe.js";import{t as v}from"./ChromeCursor-Bd--RrJo.js";var y=l(`undo-2`,[[`path`,{d:`M9 14 4 9l5-5`,key:`102s5s`}],[`path`,{d:`M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11`,key:`f3b9sd`}]]),b=l(`zap`,[[`path`,{d:`M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z`,key:`1xq2db`}]]),x=e(n(),1),S=t(),C=[.22,1,.36,1],w=7;function T({plan:e,index:t,hasAccess:n,loading:r,onSelect:i}){let[a,o]=(0,x.useState)(!1),c=(0,x.useRef)(null),l=a?e.features:e.features.slice(0,w),f=e.features.length-w,p=e.name.replace(`AURA `,``);function m(e){let t=c.current;if(!t)return;let n=t.getBoundingClientRect();t.style.setProperty(`--mx`,`${e.clientX-n.left}px`),t.style.setProperty(`--my`,`${e.clientY-n.top}px`)}return(0,S.jsx)(s.div,{initial:{opacity:0,y:56,filter:`blur(8px)`},whileInView:{opacity:1,y:0,filter:`blur(0px)`},viewport:{once:!0,margin:`0px 0px -12% 0px`},transition:{duration:.95,ease:C,delay:t*.12},className:e.highlight?`lg:-my-5`:``,children:(0,S.jsxs)(`article`,{ref:c,onMouseMove:m,className:`pr-wrap ${e.highlight?`pr-wrap-hi`:``}`,"aria-labelledby":`plan-${e.id}`,children:[e.highlight&&(0,S.jsx)(`span`,{className:`pr-border`,"aria-hidden":!0}),(0,S.jsxs)(`div`,{className:`pr-card`,children:[(0,S.jsx)(`div`,{className:`pr-spot`,"aria-hidden":!0}),(0,S.jsxs)(`div`,{className:`relative flex flex-1 flex-col`,children:[(0,S.jsx)(`div`,{className:`flex min-h-7 items-center`,children:e.badge?(0,S.jsx)(`span`,{className:`pr-badge`,children:e.badge}):null}),(0,S.jsx)(`h3`,{id:`plan-${e.id}`,className:`pr-name mt-3 text-2xl font-bold tracking-[0.12em]`,children:e.name}),(0,S.jsx)(`p`,{className:`mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/70`,children:e.slogan}),(0,S.jsx)(`p`,{className:`mt-4 text-sm leading-relaxed text-white/55`,children:e.tagline}),(0,S.jsxs)(`div`,{className:`mt-7 border-y border-white/[0.07] py-6`,children:[(0,S.jsx)(`span`,{className:`text-[10px] uppercase tracking-[0.35em] text-white/35`,children:`Monthly subscription`}),(0,S.jsxs)(`p`,{className:`mt-2 flex items-baseline gap-2`,children:[(0,S.jsx)(`span`,{className:`pr-price`,children:e.priceLabel}),(0,S.jsx)(`span`,{className:`text-xs uppercase tracking-[0.25em] text-white/45`,children:`/ Μήνα`})]})]}),(0,S.jsx)(`p`,{className:`mt-6 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/40`,children:`Περιλαμβάνει`}),(0,S.jsx)(`ul`,{className:`mt-4 space-y-3`,children:l.map(e=>(0,S.jsxs)(`li`,{className:`flex items-start gap-3 text-sm leading-snug text-white/75`,children:[(0,S.jsx)(`span`,{className:`pr-check`,"aria-hidden":!0,children:(0,S.jsx)(u,{className:`size-3`,strokeWidth:3})}),(0,S.jsx)(`span`,{children:e})]},e))}),f>0&&(0,S.jsxs)(`button`,{type:`button`,onClick:()=>o(e=>!e),"aria-expanded":a,className:`pr-more mt-4`,children:[a?`Λιγότερα`:`+ ${f} ακόμη προνόμια`,(0,S.jsx)(d,{className:`size-3.5 transition-transform ${a?`rotate-180`:``}`})]}),(0,S.jsx)(`div`,{className:`mt-auto pt-8`,children:(0,S.jsx)(h,{type:`button`,variant:e.highlight?`primary`:`secondary`,className:`w-full`,disabled:r,onClick:()=>i(e.id),children:n?`ΕΧΕΙΣ ΠΡΟΣΒΑΣΗ`:`ΞΕΚΙΝΑ ΜΕ ${p}`})})]})]})]})})}function E(){let e=r(),{session:t}=c(),{hasAccess:n,loading:i}=_(t?.user.id);function a(r){if(!t){g(r),e({to:`/login`,search:{plan:r}});return}if(n){e({to:`/academy`});return}e({to:`/checkout`,search:{plan:r}})}return(0,S.jsxs)(S.Fragment,{children:[(0,S.jsx)(`style`,{children:D}),(0,S.jsx)(`div`,{className:`grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6`,children:m.map((e,t)=>(0,S.jsx)(T,{plan:e,index:t,hasAccess:n,loading:i,onSelect:a},e.id))})]})}var D=`
+@keyframes pr-spin { to { transform: rotate(360deg); } }
+@keyframes pr-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.pr-wrap {
+  position: relative; height: 100%; padding: 1px; border-radius: 1.4rem; overflow: hidden; isolation: isolate;
+  background: rgba(255,255,255,.09);
+  transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s, background .5s;
+}
+.pr-wrap:hover { transform: translateY(-6px); background: rgba(255,255,255,.22); box-shadow: 0 34px 90px -34px rgba(220,228,240,.3); }
+.pr-wrap-hi { background: rgba(255,255,255,.1); box-shadow: 0 0 90px -30px rgba(232,236,242,.5); }
+.pr-wrap-hi:hover { background: rgba(255,255,255,.1); }
+.pr-border {
+  position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.98) 74%, rgba(255,255,255,0) 90%, transparent 100%);
+  animation: pr-spin 7s linear infinite;
+}
+.pr-card {
+  position: relative; display: flex; flex-direction: column; height: 100%; padding: 2rem; overflow: hidden;
+  border-radius: calc(1.4rem - 1px);
+  background: linear-gradient(180deg, rgba(22,23,29,.96), rgba(8,9,12,.98));
+}
+.pr-wrap-hi .pr-card { background: linear-gradient(180deg, rgba(28,29,36,.97), rgba(9,10,13,.99)); }
+.pr-spot {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,.08), transparent 60%);
+}
+.pr-name, .pr-price {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 25%, #9ca3af 45%, #ffffff 60%, #8b93a1 80%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pr-shimmer 7s linear infinite;
+}
+.pr-price { font-size: 3.2rem; line-height: 1; font-weight: 700; letter-spacing: -.02em; }
+.pr-badge {
+  border-radius: 9999px; padding: .3rem .8rem; font-size: 10px; letter-spacing: .3em; color: #f1f5f9;
+  border: 1px solid rgba(232,236,242,.45); background: rgba(255,255,255,.07); box-shadow: 0 0 20px -4px rgba(232,236,242,.55);
+}
+.pr-check {
+  display: grid; place-items: center; flex-shrink: 0; width: 1.15rem; height: 1.15rem; margin-top: .15rem; border-radius: 9999px;
+  color: #f1f5f9; border: 1px solid rgba(232,236,242,.4); background: rgba(255,255,255,.06); box-shadow: 0 0 12px -2px rgba(232,236,242,.5);
+}
+.pr-more {
+  display: inline-flex; width: fit-content; align-items: center; gap: .4rem; font-size: 11px; letter-spacing: .2em;
+  text-transform: uppercase; color: rgba(255,255,255,.6); transition: color .2s, text-shadow .2s;
+}
+.pr-more:hover { color: #fff; text-shadow: 0 0 14px rgba(232,236,242,.7); }
+@media (prefers-reduced-motion: reduce) { .pr-border, .pr-name, .pr-price { animation: none !important; } }
+`,O=[.22,1,.36,1];function k({children:e,delay:t=0}){return(0,S.jsx)(s.div,{initial:{opacity:0,y:44,filter:`blur(8px)`},whileInView:{opacity:1,y:0,filter:`blur(0px)`},viewport:{once:!0,margin:`0px 0px -10% 0px`},transition:{duration:.95,ease:O,delay:t},children:e})}var A=[{title:`Εκπαίδευση`,rows:[{label:`Μηνιαία εκπαιδευτικά videos`,values:[!0,!0,!0]},{label:`Προχωρημένα videos κουρεμάτων`,values:[!1,!0,!0]},{label:`Αποκλειστικά ELITE μαθήματα`,values:[!1,!1,!0]},{label:`AURA Certification`,values:[!1,!0,!0]},{label:`AURA Elite Challenges`,values:[!1,!1,!0]},{label:`Early Access σε νέα videos`,values:[!1,!1,!0]}]},{title:`Αξιολόγηση & εξέλιξη`,rows:[{label:`Review System`,values:[!0,!0,!0]},{label:`Προσωπικό AURA Portfolio`,values:[!1,!1,!0]},{label:`Προσωπική αξιολόγηση από εκπαιδευτή`,values:[!1,!1,`Έως 4 / μήνα`]},{label:`Αναλυτικό feedback & προτάσεις`,values:[!1,!1,!0]},{label:`Personal Progress Tracking`,values:[!1,!1,!0]}]},{title:`Κοινότητα & καριέρα`,rows:[{label:`AURA Social Access`,values:[!0,!0,!0]},{label:`AURA Find Job`,values:[!0,!0,!0]},{label:`Ιδιωτική κοινότητα ELITE`,values:[!1,!1,!0]},{label:`VIP Community Status`,values:[!1,!1,!0]},{label:`Δημοσίευση εργασιών στην Ακαδημία`,values:[!1,!1,!0]},{label:`Προτεραιότητα στο Support`,values:[!1,!1,!0]}]},{title:`Εκπτώσεις`,rows:[{label:`E-book AURA Professional Hair Method`,values:[!1,`50%`,`50%`]},{label:`Φυσικό AURA Hair Method Book`,values:[!1,`25%`,`50%`]},{label:`AURA Online Seminars`,values:[!1,!1,`25%`]},{label:`Προϊόντα FORZA BRAVA`,values:[!1,`10%`,`10%`]}]},{title:`Ευελιξία`,rows:[{label:`Ακύρωση ανά πάσα στιγμή`,values:[!0,!0,!0]}]}];function j({v:e}){return e===!0?(0,S.jsx)(`span`,{className:`pp-tick`,role:`img`,"aria-label":`Περιλαμβάνεται`,children:(0,S.jsx)(u,{className:`size-3.5`,strokeWidth:3})}):e===!1?(0,S.jsx)(`span`,{className:`pp-cross`,role:`img`,"aria-label":`Δεν περιλαμβάνεται`,children:(0,S.jsx)(p,{className:`size-3.5`})}):(0,S.jsx)(`span`,{className:`pp-val`,children:e})}var M=[{q:`Μπορώ να ακυρώσω τη συνδρομή μου;`,a:`Ναι. Όλα τα πλάνα έχουν δυνατότητα ακύρωσης ανά πάσα στιγμή, χωρίς δέσμευση.`},{q:`Πώς γίνεται η χρέωση;`,a:`Η συνδρομή είναι μηνιαία και η πληρωμή γίνεται με ασφάλεια μέσω Stripe. Ξεκινάς από τη σελίδα checkout αφού συνδεθείς.`},{q:`Σε ποιες εκπτώσεις έχω πρόσβαση;`,a:`Το PRO δίνει 50% στο E-book, 25% στο φυσικό βιβλίο και 10% στα FORZA BRAVA. Το ELITE προσθέτει 50% στο φυσικό βιβλίο και 25% στα Online Seminars.`}];function N(){let e=(0,x.useRef)(null),t=o(),{scrollYProgress:n}=i({target:e,offset:[`start start`,`end start`]}),r=a(n,[0,1],[0,t?0:140]),c=a(n,[0,.9],[1,0]);return(0,S.jsxs)(`section`,{ref:e,className:`relative px-5 pb-20 pt-10 text-center sm:pb-28`,children:[(0,S.jsx)(`div`,{className:`pp-ring`,"aria-hidden":!0}),(0,S.jsxs)(s.div,{style:{y:r,opacity:c},className:`relative mx-auto max-w-3xl`,children:[(0,S.jsx)(s.span,{initial:{opacity:0,y:16},animate:{opacity:1,y:0},transition:{duration:.8,ease:O},className:`chrome-text text-[11px] font-semibold uppercase tracking-[0.5em]`,children:`Aura Academy · Πλάνα`}),(0,S.jsx)(s.h1,{initial:{opacity:0,y:28,filter:`blur(10px)`},animate:{opacity:1,y:0,filter:`blur(0px)`},transition:{duration:1.1,ease:O,delay:.15},className:`pp-title mt-6 text-4xl font-bold tracking-tight sm:text-6xl`,children:`Διάλεξε το επίπεδό σου`}),(0,S.jsx)(s.p,{initial:{opacity:0,y:20},animate:{opacity:1,y:0},transition:{duration:1,ease:O,delay:.35},className:`mx-auto mt-6 max-w-xl text-sm leading-relaxed text-white/55 sm:text-base`,children:`Τρία επίπεδα εκπαίδευσης για barbers που θέλουν να εξελιχθούν. Ξεκίνα από εκεί που σου ταιριάζει και ακύρωσε ανά πάσα στιγμή.`})]})]})}function P(){let e=o();return(0,S.jsxs)(`div`,{className:`pp-root relative min-h-screen w-full overflow-x-clip bg-aura-bg pt-28 text-white sm:pt-32`,children:[(0,S.jsx)(`style`,{children:I}),(0,S.jsx)(`div`,{className:`aura-grain`,"aria-hidden":!0}),(0,S.jsx)(v,{}),(0,S.jsx)(`div`,{className:`hero-atmosphere absolute inset-0`,"aria-hidden":!0}),(0,S.jsx)(`div`,{className:`pp-grid absolute inset-0`,"aria-hidden":!0}),!e&&(0,S.jsxs)(S.Fragment,{children:[(0,S.jsx)(s.div,{className:`pp-orb left-[4%] top-[8%] h-80 w-80`,animate:{y:[0,-34,0],x:[0,18,0]},transition:{duration:15,repeat:1/0,ease:`easeInOut`},"aria-hidden":!0}),(0,S.jsx)(s.div,{className:`pp-orb right-[3%] top-[48%] h-[26rem] w-[26rem]`,animate:{y:[0,30,0],x:[0,-22,0]},transition:{duration:19,repeat:1/0,ease:`easeInOut`},"aria-hidden":!0})]}),(0,S.jsxs)(`div`,{className:`relative z-10`,children:[(0,S.jsx)(N,{}),(0,S.jsx)(`section`,{id:`plans`,className:`mx-auto max-w-6xl scroll-mt-28 px-5 pb-24 sm:px-8`,children:(0,S.jsx)(E,{})}),(0,S.jsx)(`section`,{className:`mx-auto max-w-5xl px-5 pb-28 sm:px-8`,children:(0,S.jsx)(k,{children:(0,S.jsx)(`div`,{className:`pp-trust grid gap-px overflow-hidden rounded-2xl sm:grid-cols-3`,children:[{icon:y,t:`Ακύρωση ανά πάσα στιγμή`,d:`Χωρίς δέσμευση και χωρίς κρυφές χρεώσεις.`},{icon:f,t:`Ασφαλής πληρωμή`,d:`Οι πληρωμές γίνονται μέσω Stripe.`},{icon:b,t:`Γρήγορη έναρξη`,d:`Πρόσβαση μόλις ολοκληρωθεί η πληρωμή.`}].map(({icon:e,t,d:n})=>(0,S.jsxs)(`div`,{className:`pp-trust-item flex flex-col items-center gap-3 px-6 py-8 text-center`,children:[(0,S.jsx)(`span`,{className:`pp-icon`,children:(0,S.jsx)(e,{className:`size-5 text-white/85`})}),(0,S.jsx)(`h3`,{className:`text-sm font-semibold tracking-wide`,children:t}),(0,S.jsx)(`p`,{className:`text-xs leading-relaxed text-white/50`,children:n})]},t))})})}),(0,S.jsxs)(`section`,{className:`mx-auto max-w-5xl px-5 pb-28 sm:px-8`,"aria-labelledby":`compare-title`,children:[(0,S.jsx)(k,{children:(0,S.jsxs)(`div`,{className:`mb-10 text-center`,children:[(0,S.jsx)(`span`,{className:`chrome-text text-[11px] font-semibold uppercase tracking-[0.5em]`,children:`Σύγκριση`}),(0,S.jsx)(`h2`,{id:`compare-title`,className:`pp-title mt-4 text-3xl font-bold tracking-tight sm:text-5xl`,children:`Τι περιλαμβάνει το κάθε πλάνο`}),(0,S.jsx)(`p`,{className:`mx-auto mt-4 max-w-xl text-sm text-white/50`,children:`Δες με μια ματιά τι κερδίζεις σε κάθε επίπεδο.`})]})}),(0,S.jsx)(k,{delay:.1,children:(0,S.jsx)(`div`,{className:`pp-table-wrap`,children:(0,S.jsxs)(`table`,{className:`pp-table w-full min-w-[680px] border-collapse text-left`,children:[(0,S.jsx)(`caption`,{className:`sr-only`,children:`Σύγκριση των πλάνων AURA Basic, Pro και Elite`}),(0,S.jsx)(`thead`,{children:(0,S.jsxs)(`tr`,{children:[(0,S.jsx)(`th`,{scope:`col`,className:`pp-th-label`,children:`Προνόμιο`}),m.map(e=>(0,S.jsxs)(`th`,{scope:`col`,className:`pp-th ${e.highlight?`pp-col-hi`:``}`,children:[(0,S.jsx)(`span`,{className:`block text-xs font-bold tracking-[0.2em]`,children:e.name}),(0,S.jsxs)(`span`,{className:`mt-1 block text-[11px] font-normal text-white/50`,children:[e.priceLabel,` / μήνα`]})]},e.id))]})}),(0,S.jsx)(`tbody`,{children:A.map(e=>(0,S.jsx)(F,{title:e.title,rows:e.rows},e.title))})]})})})]}),(0,S.jsxs)(`section`,{className:`mx-auto max-w-3xl px-5 pb-28 sm:px-8`,"aria-labelledby":`faq-title`,children:[(0,S.jsx)(k,{children:(0,S.jsx)(`h2`,{id:`faq-title`,className:`pp-title mb-8 text-center text-3xl font-bold tracking-tight sm:text-4xl`,children:`Συχνές ερωτήσεις`})}),(0,S.jsx)(`div`,{className:`space-y-3`,children:M.map((e,t)=>(0,S.jsx)(k,{delay:t*.08,children:(0,S.jsxs)(`details`,{className:`pp-faq group`,children:[(0,S.jsxs)(`summary`,{children:[(0,S.jsx)(`span`,{children:e.q}),(0,S.jsx)(`span`,{className:`pp-plus`,"aria-hidden":!0})]}),(0,S.jsx)(`p`,{className:`px-6 pb-6 text-sm leading-relaxed text-white/60`,children:e.a})]})},e.q))})]}),(0,S.jsx)(`section`,{className:`mx-auto max-w-3xl px-5 pb-32 text-center sm:px-8`,children:(0,S.jsx)(k,{children:(0,S.jsxs)(`div`,{className:`pp-cta px-6 py-14 sm:px-12`,children:[(0,S.jsx)(`h2`,{className:`pp-title text-3xl font-bold tracking-tight sm:text-5xl`,children:`Ξεκίνα την εξέλιξή σου`}),(0,S.jsx)(`p`,{className:`mx-auto mt-5 max-w-md text-sm leading-relaxed text-white/55`,children:`Διάλεξε το πλάνο σου και μπες στο AURA system.`}),(0,S.jsx)(`div`,{className:`mt-8 flex justify-center`,children:(0,S.jsx)(h,{type:`button`,onClick:()=>document.getElementById(`plans`)?.scrollIntoView({behavior:`smooth`}),children:`ΔΕΣ ΤΑ ΠΛΑΝΑ`})})]})})})]})]})}function F({title:e,rows:t}){return(0,S.jsxs)(S.Fragment,{children:[(0,S.jsx)(`tr`,{children:(0,S.jsx)(`th`,{colSpan:4,scope:`colgroup`,className:`pp-group`,children:e})}),t.map(e=>(0,S.jsxs)(`tr`,{className:`pp-row`,children:[(0,S.jsx)(`th`,{scope:`row`,className:`pp-label`,children:e.label}),e.values.map((e,t)=>(0,S.jsx)(`td`,{className:`pp-cell ${m[t]?.highlight?`pp-col-hi`:``}`,children:(0,S.jsx)(j,{v:e})},t))]},e.label))]})}var I=`
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+@keyframes pp-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes pp-pulse { 0%,100% { opacity: .5; } 50% { opacity: .95; } }
+
+.pp-grid {
+  background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 50% at 50% 18%, #000 15%, transparent 75%);
+          mask-image: radial-gradient(ellipse 75% 50% at 50% 18%, #000 15%, transparent 75%);
+  pointer-events: none;
+}
+.pp-orb { position: absolute; border-radius: 9999px; pointer-events: none; filter: blur(46px);
+  background: radial-gradient(circle at 35% 30%, rgba(232,236,242,.15), rgba(160,168,180,.05) 45%, transparent 70%); }
+.pp-ring {
+  position: absolute; left: 50%; top: 50%; width: min(640px, 90vw); aspect-ratio: 1; transform: translate(-50%, -52%);
+  border-radius: 9999px; pointer-events: none; opacity: .55;
+  background: conic-gradient(from 0deg, transparent 0 60%, rgba(232,236,242,.35) 80%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  animation: pp-spin 20s linear infinite;
+}
+.pp-title {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 22%, #9ca3af 42%, #ffffff 58%, #8b93a1 78%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pp-shimmer 7s linear infinite;
+}
+
+.pp-trust { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08); }
+.pp-trust-item { background: linear-gradient(180deg, rgba(20,21,27,.95), rgba(9,10,13,.97)); }
+.pp-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.16); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.14), rgba(255,255,255,.02));
+  box-shadow: 0 0 28px -8px rgba(232,236,242,.5); }
+
+.pp-table-wrap { overflow-x: auto; border-radius: 1.2rem; border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(180deg, rgba(20,21,27,.94), rgba(9,10,13,.97)); box-shadow: 0 30px 80px -40px rgba(0,0,0,.9); }
+.pp-th-label, .pp-th { padding: 1.4rem 1rem; font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.45); border-bottom: 1px solid rgba(255,255,255,.1); }
+.pp-th { text-align: center; color: #f1f5f9; }
+.pp-th-label { position: sticky; left: 0; z-index: 2; background: rgba(14,15,19,.98); }
+.pp-col-hi { background: linear-gradient(180deg, rgba(232,236,242,.08), rgba(232,236,242,.03)); }
+.pp-group { padding: 1.1rem 1rem .6rem; text-align: left; font-size: 10px; letter-spacing: .4em; text-transform: uppercase; color: rgba(255,255,255,.4);
+  background: rgba(255,255,255,.025); }
+.pp-label { position: sticky; left: 0; z-index: 1; padding: .95rem 1rem; text-align: left; font-size: 13px; font-weight: 400; color: rgba(255,255,255,.8);
+  background: rgba(12,13,17,.98); border-top: 1px solid rgba(255,255,255,.05); }
+.pp-cell { padding: .85rem 1rem; text-align: center; border-top: 1px solid rgba(255,255,255,.05); }
+.pp-row { transition: background .25s; }
+.pp-row:hover .pp-cell, .pp-row:hover .pp-label { background-color: rgba(255,255,255,.035); }
+.pp-tick { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; color: #f8fafc;
+  border: 1px solid rgba(232,236,242,.5); background: rgba(255,255,255,.08); box-shadow: 0 0 16px -2px rgba(232,236,242,.6); }
+.pp-cross { display: inline-grid; place-items: center; width: 24px; height: 24px; color: rgba(255,255,255,.25); }
+.pp-val { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #f1f5f9; text-shadow: 0 0 14px rgba(232,236,242,.5); }
+
+.pp-faq { border-radius: 1rem; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(180deg, rgba(20,21,27,.92), rgba(9,10,13,.95)); transition: border-color .3s; }
+.pp-faq:hover, .pp-faq[open] { border-color: rgba(232,236,242,.3); }
+.pp-faq summary { display: flex; cursor: pointer; list-style: none; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.5rem; font-size: 14px; font-weight: 500; }
+.pp-faq summary::-webkit-details-marker { display: none; }
+.pp-plus { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
+.pp-plus::before, .pp-plus::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; background: #e8ecf2; transition: transform .3s; }
+.pp-plus::after { transform: rotate(90deg); }
+.pp-faq[open] .pp-plus::after { transform: rotate(0deg); }
+
+.pp-cta { position: relative; overflow: hidden; border-radius: 1.6rem; border: 1px solid rgba(255,255,255,.12);
+  background: radial-gradient(70% 90% at 50% 0%, rgba(232,236,242,.12), transparent 70%), linear-gradient(180deg, rgba(22,23,29,.95), rgba(9,10,13,.97)); }
+
+@media (prefers-reduced-motion: reduce) { .pp-ring, .pp-title { animation: none !important; } }
+`;export{P as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/useSubscription-CNKMk-yc.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { t as db } from "./db-BETNILr1.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { r as isPlanId } from "./plans-sHsWJraA.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/useSubscription-CNKMk-yc.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var ACTIVE_STATUSES = ["active", "trialing"];
+var NON_CANCELLABLE_STATUSES = ["canceled", "incomplete_expired"];
+var COLUMNS = "id, user_id, plan_id, status, current_period_end, cancel_at_period_end, created_at";
+function isActiveStatus(status) {
+	return ACTIVE_STATUSES.includes(status);
+}
+function isCancellableStatus(status) {
+	return !NON_CANCELLABLE_STATUSES.includes(status);
+}
+function useSubscription(userId, options = {}) {
+	const includeInactive = options.includeInactive ?? false;
+	const [subscription, setSubscription] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(Boolean(userId));
+	const [error, setError] = (0, import_react.useState)(null);
+	const [tick, setTick] = (0, import_react.useState)(0);
+	const refresh = (0, import_react.useCallback)(() => setTick((n) => n + 1), []);
+	(0, import_react.useEffect)(() => {
+		let active = true;
+		if (!userId) {
+			setSubscription(null);
+			setLoading(false);
+			setError(null);
+			return;
+		}
+		setLoading(true);
+		setError(null);
+		let query = db.from("subscriptions").select(COLUMNS).eq("user_id", userId);
+		if (!includeInactive) query = query.in("status", ACTIVE_STATUSES);
+		query.order("created_at", { ascending: false }).limit(1).maybeSingle().then(({ data, error: queryError }) => {
+			if (!active) return;
+			if (queryError) {
+				setError(queryError.message);
+				setSubscription(null);
+			} else if (data && isPlanId(data.plan_id)) setSubscription(data);
+			else {
+				if (data) {
+					console.error("subscriptions row with unknown plan_id", data);
+					setError("Άγνωστο πακέτο στη συνδρομή.");
+				}
+				setSubscription(null);
+			}
+			setLoading(false);
+		});
+		return () => {
+			active = false;
+		};
+	}, [
+		userId,
+		includeInactive,
+		tick
+	]);
+	return {
+		subscription,
+		hasAccess: subscription !== null && isActiveStatus(subscription.status),
+		loading,
+		error,
+		refresh
+	};
+}
+//#endregion
+export { isCancellableStatus as n, useSubscription as r, isActiveStatus as t };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/AuraAvatar.tsx ===
+// src/components/aura/AuraAvatar.tsx
+interface AuraAvatarProps {
+  name?: string | null;
+  email?: string | null;
+  src?: string | null;
+  size?: number;
+  className?: string;
+}
+
+function initials(name?: string | null, email?: string | null) {
+  const source = (name && name.trim()) || (email ? email.split("@")[0] : "");
+  if (!source) return "A";
+  const parts = source.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase() || "A";
+}
+
+export default function AuraAvatar({
+  name,
+  email,
+  src,
+  size = 40,
+  className = "",
+}: AuraAvatarProps) {
+  return (
+    <span
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-aura-elevated ${className}`}
+      style={{
+        width: size,
+        height: size,
+        boxShadow: "0 0 18px -6px rgba(255,255,255,0.35)",
+      }}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={name ?? email ?? "Avatar"}
+          className="h-full w-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <span
+          className="chrome-text font-aura font-semibold leading-none"
+          style={{ fontSize: size * 0.36 }}
+        >
+          {initials(name, email)}
+        </span>
+      )}
+    </span>
+  );
+}
+=== END FILE ===
+
+=== FILE: supabase/functions/delete-account/index.ts ===
+// supabase/functions/delete-account/index.ts
+//
+// Permanently removes the CALLING user's account.
+// Order matters:
+//   1. validate (signed in, exact phrase, terms accepted, not a staff account)
+//   2. mark the profile as "deleted" (webhooks stop writing for this user)
+//   3. STOP BILLING in Stripe (cancel every subscription immediately, no more charges)
+//      -> if this fails we abort and restore the account, nothing is deleted
+//   4. delete uploaded files (storage)
+//   5. purge database rows (public.purge_user_data, all-or-nothing)
+//   6. hard-delete the auth user (the same e-mail / Google / Apple can sign up again)
+//
+// Payment records (amounts, dates, plan) are kept but ANONYMIZED (no user link),
+// because Greek tax law requires you to keep accounting records.
+import Stripe from "npm:stripe@^18";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@^2";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+const REQUIRED_PHRASE = "REMOVE MY ACCOUNT";
+
+/** Team accounts own content (courses, reviews...). They are removed by a super admin, not here. */
+const STAFF_ROLES = new Set([
+  "educator",
+  "senior_educator",
+  "content_manager",
+  "operations",
+  "admin",
+  "super_admin",
+]);
+
+const DEAD_STATUSES = new Set(["canceled", "incomplete_expired"]);
+
+function isMissing(err: unknown): boolean {
+  return (err as { code?: string } | null)?.code === "resource_missing";
+}
+
+/* ------------------------------------------------------------------ */
+/* Stripe                                                              */
+/* ------------------------------------------------------------------ */
+
+async function collectStripeIds(admin: SupabaseClient, stripe: Stripe, userId: string) {
+  const customerIds = new Set<string>();
+  const subscriptionIds = new Set<string>();
+
+  const { data: maps } = await admin
+    .from("stripe_customers")
+    .select("stripe_customer_id")
+    .eq("user_id", userId);
+  for (const m of maps ?? []) if (m.stripe_customer_id) customerIds.add(String(m.stripe_customer_id));
+
+  const { data: subs } = await admin
+    .from("subscriptions")
+    .select("stripe_customer_id, stripe_subscription_id")
+    .eq("user_id", userId);
+  for (const s of subs ?? []) {
+    if (s.stripe_customer_id) customerIds.add(String(s.stripe_customer_id));
+    if (s.stripe_subscription_id) subscriptionIds.add(String(s.stripe_subscription_id));
+  }
+
+  // Safety net: customers we created for this user but lost the mapping of.
+  try {
+    const found = await stripe.customers.search({
+      query: `metadata['supabase_user_id']:'${userId}'`,
+      limit: 20,
+    });
+    for (const c of found.data) customerIds.add(c.id);
+  } catch (err) {
+    console.error("customer search failed (continuing)", err);
+  }
+
+  return { customerIds, subscriptionIds };
+}
+
+/** Cancels every live subscription NOW (no proration, no final invoice). Throws if one cannot be stopped. */
+async function cancelAllSubscriptions(
+  stripe: Stripe,
+  subscriptionIds: Set<string>,
+  customerIds: Set<string>,
+): Promise<number> {
+  let canceled = 0;
+  const seen = new Set<string>();
+
+  const cancelOne = async (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    try {
+      const sub = await stripe.subscriptions.retrieve(id);
+      if (DEAD_STATUSES.has(sub.status)) return;
+      await stripe.subscriptions.cancel(id, { prorate: false, invoice_now: false });
+      canceled += 1;
+    } catch (err) {
+      if (isMissing(err)) return;
+      throw err;
+    }
+  };
+
+  for (const id of subscriptionIds) await cancelOne(id);
+
+  for (const customerId of customerIds) {
+    try {
+      for await (const sub of stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 })) {
+        await cancelOne(sub.id);
+      }
+    } catch (err) {
+      if (!isMissing(err)) throw err;
+    }
+  }
+  return canceled;
+}
+
+/* ------------------------------------------------------------------ */
+/* Storage                                                             */
+/* ------------------------------------------------------------------ */
+
+async function removeFolder(admin: SupabaseClient, bucket: string, prefix: string, depth = 0): Promise<number> {
+  if (depth > 3) return 0;
+  const { data, error } = await admin.storage.from(bucket).list(prefix, { limit: 1000 });
+  if (error || !data) return 0; // bucket missing or empty: nothing to do
+
+  let removed = 0;
+  const files: string[] = [];
+  for (const entry of data) {
+    const path = `${prefix}/${entry.name}`;
+    if (entry.id) files.push(path); // files have an id, folders don't
+    else removed += await removeFolder(admin, bucket, path, depth + 1);
+  }
+  for (let i = 0; i < files.length; i += 100) {
+    const chunk = files.slice(i, i + 100);
+    const { error: rmError } = await admin.storage.from(bucket).remove(chunk);
+    if (rmError) console.error(`storage remove failed in ${bucket}`, rmError.message);
+    else removed += chunk.length;
+  }
+  return removed;
+}
+
+async function removeStoredFiles(
+  admin: SupabaseClient,
+  supabaseUrl: string,
+  userId: string,
+  avatarUrl: string | null,
+): Promise<void> {
+  const buckets = (Deno.env.get("ACCOUNT_DELETE_BUCKETS") ?? "elite-chat,avatars")
+    .split(",")
+    .map((b) => b.trim())
+    .filter(Boolean);
+
+  for (const bucket of buckets) {
+    try {
+      await removeFolder(admin, bucket, userId);
+    } catch (err) {
+      console.error(`storage cleanup failed for ${bucket}`, err);
+    }
+  }
+
+  // The profile photo may live under a different path: delete it by its URL (our storage only).
+  if (avatarUrl && avatarUrl.startsWith(supabaseUrl)) {
+    const match = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/([^/]+)\/(.+?)(?:\?|$)/.exec(avatarUrl);
+    if (match?.[1] && match[2]) {
+      try {
+        await admin.storage.from(match[1]).remove([decodeURIComponent(match[2])]);
+      } catch (err) {
+        console.error("avatar removal failed", err);
+      }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Handler                                                             */
+/* ------------------------------------------------------------------ */
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing environment configuration");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  // ---- 1. validate -------------------------------------------------
+  let body: { confirmation?: unknown; acceptedTerms?: unknown };
+  try {
+    body = JSON.parse(await req.text());
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (body.confirmation !== REQUIRED_PHRASE) {
+    return json({ error: `Γράψε ακριβώς: ${REQUIRED_PHRASE}` }, 400);
+  }
+  if (body.acceptedTerms !== true) {
+    return json({ error: "Πρέπει να αποδεχτείς τους Όρους Χρήσης." }, 400);
+  }
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user) return json({ error: "Unauthorized" }, 401);
+
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const stripe = new Stripe(stripeKey);
+  const userId = user.id;
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role, status, avatar_url")
+    .eq("id", userId)
+    .maybeSingle();
+
+  const role = String(profile?.role ?? "student");
+  if (STAFF_ROLES.has(role)) {
+    return json(
+      { error: "Οι λογαριασμοί ομάδας (εκπαιδευτές/admin) αφαιρούνται από έναν super admin. Επικοινώνησε μαζί μας." },
+      403,
+    );
+  }
+
+  const previousStatus = String(profile?.status ?? "active");
+
+  try {
+    // ---- 2. lock the account so webhooks / sessions stop touching it ---
+    if (profile) {
+      const { error: lockError } = await admin.from("profiles").update({ status: "deleted" }).eq("id", userId);
+      if (lockError) throw new Error(`Could not lock the account: ${lockError.message}`);
+    }
+
+    // ---- 3. STOP BILLING ----------------------------------------------
+    let customerIds = new Set<string>();
+    try {
+      const ids = await collectStripeIds(admin, stripe, userId);
+      customerIds = ids.customerIds;
+      const canceled = await cancelAllSubscriptions(stripe, ids.subscriptionIds, ids.customerIds);
+      console.log(`delete-account ${userId}: canceled ${canceled} subscription(s)`);
+    } catch (err) {
+      console.error("Stripe cancellation failed, aborting deletion", err);
+      if (profile) await admin.from("profiles").update({ status: previousStatus }).eq("id", userId);
+      return json(
+        { error: "Δεν μπορέσαμε να ακυρώσουμε τη συνδρομή σου στο Stripe. Δεν διαγράφηκε τίποτα — δοκίμασε ξανά ή επικοινώνησε μαζί μας." },
+        502,
+      );
+    }
+
+    // ---- 4. files -------------------------------------------------------
+    await removeStoredFiles(admin, supabaseUrl, userId, (profile?.avatar_url as string | null) ?? null);
+
+    // ---- 5. database (atomic) --------------------------------------------
+    const { data: purge, error: purgeError } = await admin.rpc("purge_user_data", { p_user_id: userId });
+    if (purgeError) {
+      console.error("purge_user_data failed", purgeError.message);
+      return json(
+        {
+          error:
+            "Η συνδρομή σου ακυρώθηκε, αλλά η διαγραφή των δεδομένων δεν ολοκληρώθηκε. Μπορείς να ξαναπατήσεις διαγραφή ή να επικοινωνήσεις μαζί μας.",
+          detail: purgeError.message,
+        },
+        500,
+      );
+    }
+    console.log(`delete-account ${userId}: purge`, JSON.stringify(purge));
+
+    // ---- 6. the login itself ------------------------------------------------
+    const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
+    if (deleteError) {
+      console.error("auth deleteUser failed", deleteError.message);
+      return json(
+        {
+          error: "Τα δεδομένα σου διαγράφηκαν, αλλά το login δεν αφαιρέθηκε. Ξαναπάτησε διαγραφή ή επικοινώνησε μαζί μας.",
+          detail: deleteError.message,
+        },
+        500,
+      );
+    }
+
+    // Stripe customer objects: remove personal data there too (payment records stay for accounting).
+    for (const customerId of customerIds) {
+      try {
+        await stripe.customers.del(customerId);
+      } catch (err) {
+        if (!isMissing(err)) console.error(`could not delete Stripe customer ${customerId}`, err);
+      }
+    }
+
+    return json({ ok: true });
+  } catch (error) {
+    console.error("delete-account failed", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `Η διαγραφή απέτυχε: ${message}` }, 500);
+  }
+});
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/checkout-intent-Cw-r21JH.mjs ===
+import { r as isPlanId } from "./plans-sHsWJraA.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/checkout-intent-Cw-r21JH.js
+var KEY = "aura.checkout.intent";
+/** Λήγει σε 30′ — αρκεί για OAuth round trip, όχι για την επόμενη μέρα. */
+var TTL_MS = 18e5;
+function store() {
+	try {
+		if (typeof window === "undefined") return null;
+		return window.localStorage;
+	} catch {
+		return null;
+	}
+}
+function parse(raw) {
+	if (!raw) return null;
+	try {
+		const parsed = JSON.parse(raw);
+		if (!isPlanId(parsed.plan) || typeof parsed.savedAt !== "number") return null;
+		if (Date.now() - parsed.savedAt > TTL_MS) return null;
+		return parsed.plan;
+	} catch {
+		return null;
+	}
+}
+/** Αποθηκεύει το πακέτο που διάλεξε ο επισκέπτης πριν τον στείλουμε στο login. */
+function setCheckoutIntent(planId) {
+	const s = store();
+	if (!s) return;
+	try {
+		const payload = {
+			plan: planId,
+			savedAt: Date.now()
+		};
+		s.setItem(KEY, JSON.stringify(payload));
+	} catch {}
+}
+/** Διαβάζει χωρίς να σβήνει. */
+function peekCheckoutIntent() {
+	const s = store();
+	return s ? parse(s.getItem(KEY)) : null;
+}
+/** Διαβάζει ΚΑΙ σβήνει. Μόνο τη στιγμή του redirect προς checkout. */
+function consumeCheckoutIntent() {
+	const plan = peekCheckoutIntent();
+	clearCheckoutIntent();
+	return plan;
+}
+function clearCheckoutIntent() {
+	const s = store();
+	if (!s) return;
+	try {
+		s.removeItem(KEY);
+	} catch {}
+}
+//#endregion
+export { setCheckoutIntent as i, consumeCheckoutIntent as n, peekCheckoutIntent as r, clearCheckoutIntent as t };
+
+=== END FILE ===
+
+=== FILE: src/lib/checkout-provider.ts ===
+// src/lib/checkout-provider.ts
+//
+// Which payment provider does THIS visitor's checkout use?
+// The database decides (public.get_my_checkout_provider); the Edge Function
+// re-checks the same rule, so the browser can never force Viva.
+// If anything goes wrong we fall back to Stripe, i.e. today's behaviour.
+import { db } from "@/lib/db";
+
+export type CheckoutProvider = "stripe" | "viva";
+
+export async function getCheckoutProvider(): Promise<CheckoutProvider> {
+  try {
+    const { data, error } = await db.rpc("get_my_checkout_provider");
+    if (error) {
+      console.error("get_my_checkout_provider:", error.message);
+      return "stripe";
+    }
+    return data === "viva" ? "viva" : "stripe";
+  } catch {
+    return "stripe";
+  }
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/create-checkout-session/index.ts ===
+// supabase/functions/create-checkout-session/index.ts
+//
+// The price now comes from public.plans (edited in the admin panel).
+// There is no Stripe Price ID to maintain: we send the amount inline with
+// `price_data`, attached to ONE Stripe product per plan that we create and
+// remember automatically (plans.stripe_product_id).
+import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+type PlanId = "low" | "mid" | "high";
+
+function isPlanId(value: unknown): value is PlanId {
+  return value === "low" || value === "mid" || value === "high";
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing environment configuration", {
+      stripeKey: Boolean(stripeKey),
+      supabaseUrl: Boolean(supabaseUrl),
+      anonKey: Boolean(anonKey),
+      serviceKey: Boolean(serviceKey),
+    });
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  let planId: unknown;
+  try {
+    const parsed = JSON.parse(await req.text()) as { planId?: unknown };
+    planId = parsed?.planId;
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (!isPlanId(planId)) return json({ error: "Unknown plan" }, 400);
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user?.email) {
+    console.error("getUser failed", userError?.message ?? "no email on user");
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const stripe = new Stripe(stripeKey);
+
+  try {
+    // 1. The plan and its CURRENT price, straight from the database.
+    const { data: plan, error: planError } = await admin
+      .from("plans")
+      .select("id, name, price_cents, currency, active, stripe_product_id")
+      .eq("id", planId)
+      .maybeSingle();
+
+    if (planError) {
+      console.error("plans lookup failed", planError.message);
+      return json({ error: "Could not load the plan." }, 500);
+    }
+    if (!plan || !plan.active) return json({ error: "Το πλάνο δεν είναι διαθέσιμο." }, 404);
+
+    const unitAmount = Number(plan.price_cents);
+    if (!Number.isInteger(unitAmount) || unitAmount < 50) {
+      console.error("Invalid price on plan", plan.id, plan.price_cents);
+      return json({ error: "Το πλάνο δεν έχει έγκυρη τιμή." }, 500);
+    }
+
+    // 2. Already subscribed? No second charge.
+    const { data: existing } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", user.id)
+      .in("status", ["active", "trialing"])
+      .maybeSingle();
+    if (existing) return json({ error: "Υπάρχει ήδη ενεργή συνδρομή." }, 409);
+
+    // 3. Stripe customer
+    const { data: mapping } = await admin
+      .from("stripe_customers")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    let customerId = mapping?.stripe_customer_id as string | undefined;
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        metadata: { supabase_user_id: user.id },
+      });
+      customerId = customer.id;
+
+      const { error: insertError } = await admin
+        .from("stripe_customers")
+        .insert({ user_id: user.id, stripe_customer_id: customerId });
+      if (insertError) console.error("stripe_customers insert failed", insertError.message);
+    }
+
+    // 4. One Stripe product per plan: keep its name in sync, or create it.
+    let productId: string | null = (plan.stripe_product_id as string | null) ?? null;
+    if (productId) {
+      try {
+        await stripe.products.update(productId, { name: String(plan.name) });
+      } catch (err) {
+        // Deleted product, or the ID belongs to the other Stripe mode (test/live).
+        console.error("Stored product unusable, creating a new one", err);
+        productId = null;
+      }
+    }
+    if (!productId) {
+      const product = await stripe.products.create({
+        name: String(plan.name),
+        metadata: { plan_id: String(plan.id) },
+      });
+      productId = product.id;
+      const { error: saveError } = await admin
+        .from("plans")
+        .update({ stripe_product_id: productId })
+        .eq("id", plan.id);
+      if (saveError) console.error("Could not store stripe_product_id", saveError.message);
+    }
+
+    const origin =
+      Deno.env.get("PUBLIC_SITE_URL") ?? req.headers.get("origin") ?? "http://localhost:3000";
+
+    // 5. Embedded checkout with an inline monthly price.
+    const session = await stripe.checkout.sessions.create({
+      mode: "subscription",
+      ui_mode: "embedded",
+      customer: customerId,
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: String(plan.currency ?? "eur").toLowerCase(),
+            product: productId,
+            unit_amount: unitAmount,
+            recurring: { interval: "month" },
+          },
+        },
+      ],
+      allow_promotion_codes: true,
+      client_reference_id: user.id,
+      metadata: { supabase_user_id: user.id, plan_id: planId },
+      subscription_data: {
+        metadata: { supabase_user_id: user.id, plan_id: planId },
+      },
+      return_url: `${origin}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+    });
+
+    if (!session.client_secret) {
+      console.error("Stripe returned no client_secret", session.id);
+      return json({ error: "Stripe δεν επέστρεψε client secret." }, 502);
+    }
+
+    return json({ clientSecret: session.client_secret });
+  } catch (error) {
+    console.error("create-checkout-session failed", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `Η δημιουργία πληρωμής απέτυχε: ${message}` }, 500);
+  }
+});
+=== END FILE ===
+
+=== FILE: .output/public/assets/profile-5CgIYQAn.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./react-D9fOyxUn.js";import{B as a,L as o}from"./queries-B7Arqryn.js";import{t as s}from"./useAuth-B1WX5JkE.js";import{n as c}from"./plans-BkcWWgXs.js";import{t as l}from"./useAsync-CZJ1G06G.js";import{n as u,r as d}from"./States-BulpY35p.js";import{u as f}from"./courses-LEqLhg7m.js";import{n as p,r as m,t as h}from"./useSubscription-CI-f8eKe.js";var g=e(n()),_=t(),v={active:`ΕΝΕΡΓΗ`,trialing:`ΔΟΚΙΜΑΣΤΙΚΗ`,past_due:`ΕΚΚΡΕΜΗΣ ΠΛΗΡΩΜΗ`,unpaid:`ΑΠΛΗΡΩΤΗ`,canceled:`ΑΚΥΡΩΜΕΝΗ`,incomplete:`ΗΜΙΤΕΛΗΣ`,incomplete_expired:`ΕΛΗΞΕ`,paused:`ΣΕ ΠΑΥΣΗ`};function y(e){if(!e)return null;let t=new Date(e);return Number.isNaN(t.getTime())?null:new Intl.DateTimeFormat(`el-GR`,{day:`2-digit`,month:`long`,year:`numeric`}).format(t)}function b({userId:e}){let{subscription:t,loading:n,error:i}=m(e,{includeInactive:!0}),a=`mt-8 rounded-2xl border border-white/10 bg-black/40 p-5 sm:p-6`,o=`mt-4 inline-flex rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40`;if(n)return(0,_.jsx)(`section`,{className:a,"aria-busy":`true`,"aria-label":`Συνδρομή`,children:(0,_.jsxs)(`div`,{className:`animate-pulse space-y-3`,children:[(0,_.jsx)(`div`,{className:`h-3 w-24 rounded bg-white/10`}),(0,_.jsx)(`div`,{className:`h-6 w-48 rounded bg-white/10`}),(0,_.jsx)(`div`,{className:`h-3 w-32 rounded bg-white/5`})]})});if(i)return(0,_.jsxs)(`section`,{className:a,"aria-label":`Συνδρομή`,children:[(0,_.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.4em] text-white/40`,children:`ΣΥΝΔΡΟΜΗ`}),(0,_.jsxs)(`p`,{className:`mt-3 text-sm text-white/70`,role:`alert`,children:[`Δεν μπορέσαμε να φορτώσουμε τη συνδρομή σου. `,i]})]});if(!t)return(0,_.jsxs)(`section`,{className:a,"aria-label":`Συνδρομή`,children:[(0,_.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.4em] text-white/40`,children:`ΣΥΝΔΡΟΜΗ`}),(0,_.jsx)(`h2`,{className:`mt-3 text-lg font-medium text-white/90`,children:`Δεν έχεις ενεργό πακέτο`}),(0,_.jsx)(`p`,{className:`mt-2 text-sm text-white/60`,children:`Διάλεξε μέθοδο για να ξεκλειδώσεις την Academy.`}),(0,_.jsx)(r,{to:`/pricing`,className:o,children:`ΔΕΣ ΤΑ ΠΑΚΕΤΑ`})]});let s=c(t.plan_id),l=h(t.status),u=v[t.status]??t.status.toUpperCase(),d=y(t.current_period_end);return(0,_.jsxs)(`section`,{className:a,"aria-label":`Συνδρομή`,children:[(0,_.jsxs)(`div`,{className:`flex flex-wrap items-start justify-between gap-4`,children:[(0,_.jsxs)(`div`,{className:`min-w-0`,children:[(0,_.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.4em] text-white/40`,children:`ΤΟ ΠΑΚΕΤΟ ΜΟΥ`}),(0,_.jsx)(`h2`,{className:`mt-2 truncate text-xl font-semibold tracking-tight text-white`,children:s?.name??t.plan_id}),s&&(0,_.jsxs)(`p`,{className:`mt-1 text-sm text-white/60`,children:[s.priceLabel,` / μήνα · `,s.haircuts,` κουρέματα`]})]}),(0,_.jsx)(`span`,{className:l?`shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white`:`shrink-0 rounded-full border border-white/15 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/50`,children:u})]}),(0,_.jsxs)(`dl`,{className:`mt-5 grid gap-4 sm:grid-cols-2`,children:[d&&(0,_.jsxs)(`div`,{children:[(0,_.jsx)(`dt`,{className:`text-xs uppercase tracking-[0.2em] text-white/40`,children:t.cancel_at_period_end?`ΛΗΓΕΙ`:`ΑΝΑΝΕΩΝΕΤΑΙ`}),(0,_.jsx)(`dd`,{className:`mt-1 text-sm text-white/80`,children:d})]}),(0,_.jsxs)(`div`,{children:[(0,_.jsx)(`dt`,{className:`text-xs uppercase tracking-[0.2em] text-white/40`,children:`ΕΝΑΡΞΗ`}),(0,_.jsx)(`dd`,{className:`mt-1 text-sm text-white/80`,children:y(t.created_at)??`—`})]})]}),t.cancel_at_period_end&&(0,_.jsx)(`p`,{className:`mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70`,children:`Η συνδρομή έχει προγραμματιστεί για ακύρωση. Διατηρείς πρόσβαση μέχρι τη λήξη της τρέχουσας περιόδου.`}),s&&s.features.length>0&&(0,_.jsx)(`ul`,{className:`mt-5 flex flex-wrap gap-2`,children:s.features.map(e=>(0,_.jsx)(`li`,{className:`rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.15em] text-white/55`,children:e},e))}),!l&&(0,_.jsx)(r,{to:`/pricing`,className:o,children:`ΕΠΑΝΕΝΕΡΓΟΠΟΙΗΣΗ`}),p(t.status)&&!t.cancel_at_period_end&&(0,_.jsx)(r,{to:`/stop-plan`,className:`mt-4 inline-flex rounded-lg border border-red-500/25 px-4 py-2 text-sm text-red-300/80 transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40`,children:`Stop Plan`})]})}function x(e){let t=new Date(e);return Number.isNaN(t.getTime())?`—`:t.toLocaleDateString(`el-GR`,{day:`2-digit`,month:`long`,year:`numeric`})}function S(){let{data:e,error:t,loading:n}=l(f,[]);return(0,_.jsxs)(`section`,{className:`mt-16`,children:[(0,_.jsx)(`h2`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-500`,children:`ΟΛΟΚΛΗΡΩΜΕΝΑ COURSES`}),n?(0,_.jsx)(`div`,{className:`mt-6 space-y-3`,children:[0,1].map(e=>(0,_.jsx)(`div`,{className:`h-16 animate-pulse rounded-xl bg-white/[0.04]`},e))}):null,t?(0,_.jsx)(`p`,{className:`mt-6 text-sm text-red-400`,role:`alert`,children:t instanceof Error?t.message:String(t)}):null,e&&e.length===0?(0,_.jsxs)(`p`,{className:`mt-6 text-sm text-neutral-500`,children:[`Δεν έχεις ολοκληρώσει course ακόμη.`,` `,(0,_.jsx)(r,{to:`/courses`,className:`text-neutral-300 underline-offset-4 hover:underline`,children:`Δες τα courses`}),`.`]}):null,e&&e.length>0?(0,_.jsx)(`ul`,{className:`mt-6 space-y-3`,children:e.map((e,t)=>(0,_.jsxs)(i.li,{initial:{opacity:0,y:12},animate:{opacity:1,y:0},transition:{duration:.35,delay:Math.min(t*.05,.3)},className:`flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.06] to-transparent px-5 py-4`,children:[(0,_.jsxs)(`div`,{className:`min-w-0`,children:[(0,_.jsx)(`p`,{className:`truncate text-sm font-medium text-neutral-100`,children:e.course.title}),(0,_.jsxs)(`p`,{className:`mt-1 text-[10px] uppercase tracking-[0.3em] text-neutral-500`,children:[x(e.completedAt),` · `,e.course.step_count,` ΒΗΜΑΤΑ`,e.replays>0?` · ${e.replays} REPLAY`:``]})]}),(0,_.jsx)(r,{to:`/courses/$slug`,params:{slug:e.course.slug},className:`shrink-0 rounded-full border border-white/20 px-5 py-2 text-[10px] uppercase tracking-[0.3em] text-neutral-200 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60`,children:`REPLAY`})]},e.course.id))}):null]})}function C(){let{profile:e,loading:t,session:n,refresh:r}=s(),[i,c]=(0,g.useState)({full_name:``,headline:``,bio:``,city:``,instagram:``}),[l,f]=(0,g.useState)(null),[p,m]=(0,g.useState)(!1),[h,v]=(0,g.useState)(!1),[y,x]=(0,g.useState)(null),C=(0,g.useRef)(null);(0,g.useEffect)(()=>{e&&(c({full_name:e.full_name??``,headline:e.headline??``,bio:e.bio??``,city:e.city??``,instagram:e.instagram??``}),f(e.avatar_url??null))},[e]);async function T(e){if(e){v(!0),x(null);try{let t=await a(e);await o({avatar_url:t}),f(t),r(),x(`Η φωτογραφία ενημερώθηκε.`)}catch(e){x(`Αποτυχία: `+e.message)}finally{v(!1),C.current&&(C.current.value=``)}}}async function E(){m(!0),x(null);try{await o(i),r(),x(`Το προφίλ αποθηκεύτηκε.`)}catch(e){x(`Αποτυχία: `+e.message)}finally{m(!1)}}let D=`w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white/90 outline-none focus:border-white/30`;if(t)return(0,_.jsx)(`main`,{className:`mx-auto min-h-screen max-w-2xl px-6 py-12 text-white`,children:(0,_.jsx)(d,{rows:4})});if(!n||!e)return(0,_.jsx)(`main`,{className:`mx-auto min-h-screen max-w-2xl px-6 py-12 text-white`,children:(0,_.jsx)(u,{message:`Πρέπει να συνδεθείς για να δεις το προφίλ σου.`})});let O=(i.full_name||`?`).split(` `).map(e=>e[0]).filter(Boolean).slice(0,2).join(``).toUpperCase();return(0,_.jsxs)(`main`,{className:`mx-auto min-h-screen max-w-2xl px-6 py-12 text-white`,children:[(0,_.jsxs)(`header`,{className:`mb-8`,children:[(0,_.jsx)(`p`,{className:`text-xs uppercase tracking-[0.3em] text-white/40`,children:`Account`}),(0,_.jsx)(`h1`,{className:`mt-2 text-2xl font-semibold`,children:`Το προφίλ μου`})]}),(0,_.jsxs)(`section`,{className:`mb-8 flex items-center gap-5`,children:[l?(0,_.jsx)(`img`,{src:l,alt:`Avatar`,className:`h-20 w-20 rounded-full object-cover ring-1 ring-white/20`}):(0,_.jsx)(`span`,{className:`flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-lg font-medium text-white/70`,children:O||`?`}),(0,_.jsxs)(`div`,{children:[(0,_.jsx)(`input`,{ref:C,type:`file`,accept:`image/*`,className:`hidden`,onChange:e=>T(e.target.files?.[0])}),(0,_.jsx)(`button`,{onClick:()=>C.current?.click(),disabled:h,className:`rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-50`,children:h?`Ανέβασμα…`:`Αλλαγή φωτογραφίας`}),(0,_.jsx)(`p`,{className:`mt-1 text-xs text-white/40`,children:`JPG/PNG, έως 5MB.`})]})]}),(0,_.jsxs)(`section`,{className:`mb-8 grid grid-cols-3 gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-center text-sm`,children:[(0,_.jsxs)(`div`,{children:[(0,_.jsx)(`p`,{className:`text-xs uppercase tracking-wide text-white/40`,children:`Ρόλος`}),(0,_.jsx)(`p`,{className:`mt-1 text-white/80`,children:e.role})]}),(0,_.jsxs)(`div`,{children:[(0,_.jsx)(`p`,{className:`text-xs uppercase tracking-wide text-white/40`,children:`Level`}),(0,_.jsx)(`p`,{className:`mt-1 text-white/80`,children:e.level})]}),(0,_.jsxs)(`div`,{children:[(0,_.jsx)(`p`,{className:`text-xs uppercase tracking-wide text-white/40`,children:`Status`}),(0,_.jsx)(`p`,{className:`mt-1 text-white/80`,children:e.status})]})]}),(0,_.jsx)(b,{userId:n.user.id}),(0,_.jsx)(S,{}),(0,_.jsxs)(`section`,{className:`mt-8 space-y-4`,children:[(0,_.jsx)(w,{label:`Ονοματεπώνυμο`,children:(0,_.jsx)(`input`,{className:D,value:i.full_name,onChange:e=>c({...i,full_name:e.target.value})})}),(0,_.jsx)(w,{label:`Τίτλος (headline)`,children:(0,_.jsx)(`input`,{className:D,placeholder:`π.χ. Master Barber · Athens`,value:i.headline,onChange:e=>c({...i,headline:e.target.value})})}),(0,_.jsx)(w,{label:`Bio`,children:(0,_.jsx)(`textarea`,{rows:4,className:D,placeholder:`Πες λίγα λόγια για σένα, τη διαδρομή και το στυλ σου…`,value:i.bio,onChange:e=>c({...i,bio:e.target.value})})}),(0,_.jsxs)(`div`,{className:`grid gap-4 sm:grid-cols-2`,children:[(0,_.jsx)(w,{label:`Πόλη`,children:(0,_.jsx)(`input`,{className:D,value:i.city,onChange:e=>c({...i,city:e.target.value})})}),(0,_.jsx)(w,{label:`Instagram`,children:(0,_.jsx)(`input`,{className:D,placeholder:`@username`,value:i.instagram,onChange:e=>c({...i,instagram:e.target.value})})})]})]}),y&&(0,_.jsx)(`p`,{className:`mt-4 text-sm text-white/70`,role:`status`,children:y}),(0,_.jsx)(`button`,{onClick:E,disabled:p,className:`mt-6 rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40`,children:p?`Αποθήκευση…`:`Αποθήκευση προφίλ`})]})}function w({label:e,children:t}){return(0,_.jsxs)(`label`,{className:`block`,children:[(0,_.jsx)(`span`,{className:`mb-1 block text-sm text-white/70`,children:e}),t]})}export{C as component};
+=== END FILE ===
+

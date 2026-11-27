@@ -1,0 +1,1222 @@
+=== FILE: .output/server/_libs/supabase__realtime-js.mjs ===
+import { n as Socket, t as Presence } from "./supabase__phoenix.mjs";
+//#region node_modules/@supabase/realtime-js/dist/module/lib/websocket-factory.js
+/**
+* Utilities for creating WebSocket instances across runtimes.
+*/
+var WebSocketFactory = class {
+	/**
+	* Static-only utility – prevent instantiation.
+	*/
+	constructor() {}
+	static detectEnvironment() {
+		var _a;
+		if (typeof WebSocket !== "undefined") return {
+			type: "native",
+			wsConstructor: WebSocket
+		};
+		const gt = globalThis;
+		if (typeof globalThis !== "undefined" && typeof gt.WebSocket !== "undefined") return {
+			type: "native",
+			wsConstructor: gt.WebSocket
+		};
+		const gl = typeof global !== "undefined" ? global : void 0;
+		if (gl && typeof gl.WebSocket !== "undefined") return {
+			type: "native",
+			wsConstructor: gl.WebSocket
+		};
+		if (typeof globalThis !== "undefined" && typeof gt.WebSocketPair !== "undefined" && typeof globalThis.WebSocket === "undefined") return {
+			type: "cloudflare",
+			error: "Cloudflare Workers detected. WebSocket clients are not supported in Cloudflare Workers.",
+			workaround: "Use Cloudflare Workers WebSocket API for server-side WebSocket handling, or deploy to a different runtime."
+		};
+		if (typeof globalThis !== "undefined" && gt.EdgeRuntime || typeof navigator !== "undefined" && ((_a = navigator.userAgent) === null || _a === void 0 ? void 0 : _a.includes("Vercel-Edge"))) return {
+			type: "unsupported",
+			error: "Edge runtime detected (Vercel Edge/Netlify Edge). WebSockets are not supported in edge functions.",
+			workaround: "Use serverless functions or a different deployment target for WebSocket functionality."
+		};
+		const _process = globalThis["process"];
+		if (_process) {
+			const processVersions = _process["versions"];
+			if (processVersions && processVersions["node"]) return {
+				type: "unsupported",
+				error: "Node.js detected but native WebSocket not found.",
+				workaround: "Ensure you are running Node.js 22+ or provide a WebSocket implementation via the transport option."
+			};
+		}
+		return {
+			type: "unsupported",
+			error: "Unknown JavaScript runtime without WebSocket support.",
+			workaround: "Ensure you're running in a supported environment (browser, Node.js, Deno) or provide a custom WebSocket implementation."
+		};
+	}
+	/**
+	* Returns the best available WebSocket constructor for the current runtime.
+	*
+	* @category Realtime
+	*
+	* @example Example with error handling
+	* ```ts
+	* try {
+	*   const WS = WebSocketFactory.getWebSocketConstructor()
+	*   const socket = new WS('wss://example.com/socket')
+	* } catch (error) {
+	*   console.error('WebSocket not available in this environment.', error)
+	* }
+	* ```
+	*/
+	static getWebSocketConstructor() {
+		const env = this.detectEnvironment();
+		if (env.wsConstructor) return env.wsConstructor;
+		let errorMessage = env.error || "WebSocket not supported in this environment.";
+		if (env.workaround) errorMessage += `\n\nSuggested solution: ${env.workaround}`;
+		throw new Error(errorMessage);
+	}
+	/**
+	* Detects whether the runtime can establish WebSocket connections.
+	*
+	* @category Realtime
+	*
+	* @example Example in a Node.js script
+	* ```ts
+	* if (!WebSocketFactory.isWebSocketSupported()) {
+	*   console.error('WebSockets are required for this script.')
+	*   process.exitCode = 1
+	* }
+	* ```
+	*/
+	static isWebSocketSupported() {
+		try {
+			return this.detectEnvironment().type === "native";
+		} catch (_a) {
+			return false;
+		}
+	}
+};
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/lib/constants.js
+var DEFAULT_VERSION = `realtime-js/2.112.4`;
+var VSN_1_0_0 = "1.0.0";
+var VSN_2_0_0 = "2.0.0";
+var DEFAULT_VSN = VSN_2_0_0;
+var DEFAULT_TIMEOUT = 1e4;
+var CHANNEL_STATES = {
+	closed: "closed",
+	errored: "errored",
+	joined: "joined",
+	joining: "joining",
+	leaving: "leaving"
+};
+var CHANNEL_EVENTS = {
+	close: "phx_close",
+	error: "phx_error",
+	join: "phx_join",
+	reply: "phx_reply",
+	leave: "phx_leave",
+	access_token: "[REDACTED]"
+};
+var CONNECTION_STATE = {
+	connecting: "connecting",
+	open: "open",
+	closing: "closing",
+	closed: "closed"
+};
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/lib/serializer.js
+var Serializer = class {
+	constructor(allowedMetadataKeys) {
+		this.HEADER_LENGTH = 1;
+		this.USER_BROADCAST_PUSH_META_LENGTH = 6;
+		this.KINDS = {
+			userBroadcastPush: 3,
+			userBroadcast: 4
+		};
+		this.BINARY_ENCODING = 0;
+		this.JSON_ENCODING = 1;
+		this.BROADCAST_EVENT = "broadcast";
+		this.allowedMetadataKeys = [];
+		this.allowedMetadataKeys = allowedMetadataKeys !== null && allowedMetadataKeys !== void 0 ? allowedMetadataKeys : [];
+	}
+	encode(msg, callback) {
+		if (msg.event === this.BROADCAST_EVENT && !(msg.payload instanceof ArrayBuffer) && typeof msg.payload.event === "string") return callback(this._binaryEncodeUserBroadcastPush(msg));
+		let payload = [
+			msg.join_ref,
+			msg.ref,
+			msg.topic,
+			msg.event,
+			msg.payload
+		];
+		return callback(JSON.stringify(payload));
+	}
+	_binaryEncodeUserBroadcastPush(message) {
+		var _a;
+		if (this._isArrayBuffer((_a = message.payload) === null || _a === void 0 ? void 0 : _a.payload)) return this._encodeBinaryUserBroadcastPush(message);
+		else return this._encodeJsonUserBroadcastPush(message);
+	}
+	_encodeBinaryUserBroadcastPush(message) {
+		var _a, _b;
+		const userPayload = (_b = (_a = message.payload) === null || _a === void 0 ? void 0 : _a.payload) !== null && _b !== void 0 ? _b : /* @__PURE__ */ new ArrayBuffer(0);
+		return this._encodeUserBroadcastPush(message, this.BINARY_ENCODING, userPayload);
+	}
+	_encodeJsonUserBroadcastPush(message) {
+		var _a, _b;
+		const userPayload = (_b = (_a = message.payload) === null || _a === void 0 ? void 0 : _a.payload) !== null && _b !== void 0 ? _b : {};
+		const encodedUserPayload = new TextEncoder().encode(JSON.stringify(userPayload)).buffer;
+		return this._encodeUserBroadcastPush(message, this.JSON_ENCODING, encodedUserPayload);
+	}
+	_encodeUserBroadcastPush(message, encodingType, encodedPayload) {
+		var _a, _b;
+		const encoder = new TextEncoder();
+		const topic = encoder.encode(message.topic);
+		const ref = encoder.encode((_a = message.ref) !== null && _a !== void 0 ? _a : "");
+		const joinRef = encoder.encode((_b = message.join_ref) !== null && _b !== void 0 ? _b : "");
+		const userEvent = encoder.encode(message.payload.event);
+		const rest = this.allowedMetadataKeys ? this._pick(message.payload, this.allowedMetadataKeys) : {};
+		const metadata = encoder.encode(Object.keys(rest).length === 0 ? "" : JSON.stringify(rest));
+		if (joinRef.length > 255) throw new Error(`joinRef length ${joinRef.length} exceeds maximum of 255`);
+		if (ref.length > 255) throw new Error(`ref length ${ref.length} exceeds maximum of 255`);
+		if (topic.length > 255) throw new Error(`topic length ${topic.length} exceeds maximum of 255`);
+		if (userEvent.length > 255) throw new Error(`userEvent length ${userEvent.length} exceeds maximum of 255`);
+		if (metadata.length > 255) throw new Error(`metadata length ${metadata.length} exceeds maximum of 255`);
+		const metaLength = this.USER_BROADCAST_PUSH_META_LENGTH + joinRef.length + ref.length + topic.length + userEvent.length + metadata.length;
+		const header = new ArrayBuffer(this.HEADER_LENGTH + metaLength);
+		const view = new DataView(header);
+		const bytes = new Uint8Array(header);
+		let offset = 0;
+		view.setUint8(offset++, this.KINDS.userBroadcastPush);
+		view.setUint8(offset++, joinRef.length);
+		view.setUint8(offset++, ref.length);
+		view.setUint8(offset++, topic.length);
+		view.setUint8(offset++, userEvent.length);
+		view.setUint8(offset++, metadata.length);
+		view.setUint8(offset++, encodingType);
+		bytes.set(joinRef, offset);
+		offset += joinRef.length;
+		bytes.set(ref, offset);
+		offset += ref.length;
+		bytes.set(topic, offset);
+		offset += topic.length;
+		bytes.set(userEvent, offset);
+		offset += userEvent.length;
+		bytes.set(metadata, offset);
+		offset += metadata.length;
+		var combined = new Uint8Array(header.byteLength + encodedPayload.byteLength);
+		combined.set(new Uint8Array(header), 0);
+		combined.set(new Uint8Array(encodedPayload), header.byteLength);
+		return combined.buffer;
+	}
+	decode(rawPayload, callback) {
+		if (this._isArrayBuffer(rawPayload)) return callback(this._binaryDecode(rawPayload));
+		if (typeof rawPayload === "string") {
+			const [join_ref, ref, topic, event, payload] = JSON.parse(rawPayload);
+			return callback({
+				join_ref,
+				ref,
+				topic,
+				event,
+				payload
+			});
+		}
+		return callback({});
+	}
+	_binaryDecode(buffer) {
+		const view = new DataView(buffer);
+		const kind = view.getUint8(0);
+		const decoder = new TextDecoder();
+		switch (kind) {
+			case this.KINDS.userBroadcast: return this._decodeUserBroadcast(buffer, view, decoder);
+		}
+	}
+	_decodeUserBroadcast(buffer, view, decoder) {
+		const topicSize = view.getUint8(1);
+		const userEventSize = view.getUint8(2);
+		const metadataSize = view.getUint8(3);
+		const payloadEncoding = view.getUint8(4);
+		let offset = this.HEADER_LENGTH + 4;
+		const topic = decoder.decode(buffer.slice(offset, offset + topicSize));
+		offset = offset + topicSize;
+		const userEvent = decoder.decode(buffer.slice(offset, offset + userEventSize));
+		offset = offset + userEventSize;
+		const metadata = decoder.decode(buffer.slice(offset, offset + metadataSize));
+		offset = offset + metadataSize;
+		const payload = buffer.slice(offset, buffer.byteLength);
+		const parsedPayload = payloadEncoding === this.JSON_ENCODING ? JSON.parse(decoder.decode(payload)) : payload;
+		const data = {
+			type: this.BROADCAST_EVENT,
+			event: userEvent,
+			payload: parsedPayload
+		};
+		if (metadataSize > 0) data["meta"] = JSON.parse(metadata);
+		return {
+			join_ref: null,
+			ref: null,
+			topic,
+			event: this.BROADCAST_EVENT,
+			payload: data
+		};
+	}
+	_isArrayBuffer(buffer) {
+		var _a;
+		return buffer instanceof ArrayBuffer || ((_a = buffer === null || buffer === void 0 ? void 0 : buffer.constructor) === null || _a === void 0 ? void 0 : _a.name) === "ArrayBuffer";
+	}
+	_pick(obj, keys) {
+		if (!obj || typeof obj !== "object") return {};
+		return Object.fromEntries(Object.entries(obj).filter(([key]) => keys.includes(key)));
+	}
+};
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/lib/transformers.js
+/**
+* Helpers to convert the change Payload into native JS types.
+*/
+var PostgresTypes;
+(function(PostgresTypes) {
+	PostgresTypes["abstime"] = "abstime";
+	PostgresTypes["bool"] = "bool";
+	PostgresTypes["date"] = "date";
+	PostgresTypes["daterange"] = "daterange";
+	PostgresTypes["float4"] = "float4";
+	PostgresTypes["float8"] = "float8";
+	PostgresTypes["int2"] = "int2";
+	PostgresTypes["int4"] = "int4";
+	PostgresTypes["int4range"] = "int4range";
+	PostgresTypes["int8"] = "int8";
+	PostgresTypes["int8range"] = "int8range";
+	PostgresTypes["json"] = "json";
+	PostgresTypes["jsonb"] = "jsonb";
+	PostgresTypes["money"] = "money";
+	PostgresTypes["numeric"] = "numeric";
+	PostgresTypes["oid"] = "oid";
+	PostgresTypes["reltime"] = "reltime";
+	PostgresTypes["text"] = "text";
+	PostgresTypes["time"] = "time";
+	PostgresTypes["timestamp"] = "timestamp";
+	PostgresTypes["timestamptz"] = "timestamptz";
+	PostgresTypes["timetz"] = "timetz";
+	PostgresTypes["tsrange"] = "tsrange";
+	PostgresTypes["tstzrange"] = "tstzrange";
+})(PostgresTypes || (PostgresTypes = {}));
+/**
+* Takes an array of columns and an object of string values then converts each string value
+* to its mapped type.
+*
+* @param {{name: String, type: String}[]} columns
+* @param {Object} record
+* @param {Object} options The map of various options that can be applied to the mapper
+* @param {Array} options.skipTypes The array of types that should not be converted
+*
+* @example convertChangeData([{name: 'first_name', type: 'text'}, {name: 'age', type: 'int4'}], {first_name: 'Paul', age:'33'}, {})
+* //=>{ first_name: 'Paul', age: 33 }
+*/
+var convertChangeData = (columns, record, options = {}) => {
+	var _a;
+	const skipTypes = (_a = options.skipTypes) !== null && _a !== void 0 ? _a : [];
+	if (!record) return {};
+	return Object.keys(record).reduce((acc, rec_key) => {
+		acc[rec_key] = convertColumn(rec_key, columns, record, skipTypes);
+		return acc;
+	}, {});
+};
+/**
+* Converts the value of an individual column.
+*
+* @param {String} columnName The column that you want to convert
+* @param {{name: String, type: String}[]} columns All of the columns
+* @param {Object} record The map of string values
+* @param {Array} skipTypes An array of types that should not be converted
+* @return {object} Useless information
+*
+* @example convertColumn('age', [{name: 'first_name', type: 'text'}, {name: 'age', type: 'int4'}], {first_name: 'Paul', age: '33'}, [])
+* //=> 33
+* @example convertColumn('age', [{name: 'first_name', type: 'text'}, {name: 'age', type: 'int4'}], {first_name: 'Paul', age: '33'}, ['int4'])
+* //=> "33"
+*/
+var convertColumn = (columnName, columns, record, skipTypes) => {
+	const column = columns.find((x) => x.name === columnName);
+	const colType = column === null || column === void 0 ? void 0 : column.type;
+	const value = record[columnName];
+	if (colType && !skipTypes.includes(colType)) return convertCell(colType, value);
+	return noop(value);
+};
+/**
+* If the value of the cell is `null`, returns null.
+* Otherwise converts the string value to the correct type.
+* @param {String} type A postgres column type
+* @param {String} value The cell value
+*
+* @example convertCell('bool', 't')
+* //=> true
+* @example convertCell('int8', '10')
+* //=> 10
+* @example convertCell('_int4', '{1,2,3,4}')
+* //=> [1,2,3,4]
+*/
+var convertCell = (type, value) => {
+	if (type.charAt(0) === "_") return toArray(value, type.slice(1, type.length));
+	switch (type) {
+		case PostgresTypes.bool: return toBoolean(value);
+		case PostgresTypes.float4:
+		case PostgresTypes.float8:
+		case PostgresTypes.int2:
+		case PostgresTypes.int4:
+		case PostgresTypes.int8:
+		case PostgresTypes.numeric:
+		case PostgresTypes.oid: return toNumber(value);
+		case PostgresTypes.json:
+		case PostgresTypes.jsonb: return toJson(value);
+		case PostgresTypes.timestamp: return toTimestampString(value);
+		case PostgresTypes.abstime:
+		case PostgresTypes.date:
+		case PostgresTypes.daterange:
+		case PostgresTypes.int4range:
+		case PostgresTypes.int8range:
+		case PostgresTypes.money:
+		case PostgresTypes.reltime:
+		case PostgresTypes.text:
+		case PostgresTypes.time:
+		case PostgresTypes.timestamptz:
+		case PostgresTypes.timetz:
+		case PostgresTypes.tsrange:
+		case PostgresTypes.tstzrange: return noop(value);
+		default: return noop(value);
+	}
+};
+var noop = (value) => {
+	return value;
+};
+var toBoolean = (value) => {
+	switch (value) {
+		case "t": return true;
+		case "f": return false;
+		default: return value;
+	}
+};
+var toNumber = (value) => {
+	if (typeof value === "string") {
+		const parsedValue = parseFloat(value);
+		if (!Number.isNaN(parsedValue)) return parsedValue;
+	}
+	return value;
+};
+var toJson = (value) => {
+	if (typeof value === "string") try {
+		return JSON.parse(value);
+	} catch (_a) {
+		return value;
+	}
+	return value;
+};
+/**
+* Converts a Postgres Array into a native JS array
+*
+* @example toArray('{}', 'int4')
+* //=> []
+* @example toArray('{"[2021-01-01,2021-12-31)","(2021-01-01,2021-12-32]"}', 'daterange')
+* //=> ['[2021-01-01,2021-12-31)', '(2021-01-01,2021-12-32]']
+* @example toArray([1,2,3,4], 'int4')
+* //=> [1,2,3,4]
+*/
+var toArray = (value, type) => {
+	if (typeof value !== "string") return value;
+	const lastIdx = value.length - 1;
+	const closeBrace = value[lastIdx];
+	if (value[0] === "{" && closeBrace === "}") {
+		let arr;
+		const valTrim = value.slice(1, lastIdx);
+		try {
+			arr = JSON.parse("[" + valTrim + "]");
+		} catch (_) {
+			arr = valTrim ? valTrim.split(",") : [];
+		}
+		return arr.map((val) => convertCell(type, val));
+	}
+	return value;
+};
+/**
+* Fixes timestamp to be ISO-8601. Swaps the space between the date and time for a 'T'
+* See https://github.com/supabase/supabase/issues/18
+*
+* @example toTimestampString('2019-09-10 00:00:00')
+* //=> '2019-09-10T00:00:00'
+*/
+var toTimestampString = (value) => {
+	if (typeof value === "string") return value.replace(" ", "T");
+	return value;
+};
+var httpEndpointURL = (socketUrl) => {
+	const wsUrl = new URL(socketUrl);
+	wsUrl.protocol = wsUrl.protocol.replace(/^ws/i, "http");
+	wsUrl.pathname = wsUrl.pathname.replace(/\/+$/, "").replace(/\/socket\/websocket$/i, "").replace(/\/socket$/i, "").replace(/\/websocket$/i, "");
+	if (wsUrl.pathname === "" || wsUrl.pathname === "/") wsUrl.pathname = "/api/broadcast";
+	else wsUrl.pathname = wsUrl.pathname + "/api/broadcast";
+	return wsUrl.href;
+};
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/phoenix/presenceAdapter.js
+var PresenceAdapter = class PresenceAdapter {
+	constructor(channel, opts) {
+		const phoenixOptions = phoenixPresenceOptions(opts);
+		this.presence = new Presence(channel.getChannel(), phoenixOptions);
+		this.presence.onJoin((key, currentPresence, newPresence) => {
+			const onJoinPayload = PresenceAdapter.onJoinPayload(key, currentPresence, newPresence);
+			channel.getChannel().trigger("presence", onJoinPayload);
+		});
+		this.presence.onLeave((key, currentPresence, leftPresence) => {
+			const onLeavePayload = PresenceAdapter.onLeavePayload(key, currentPresence, leftPresence);
+			channel.getChannel().trigger("presence", onLeavePayload);
+		});
+		this.presence.onSync(() => {
+			channel.getChannel().trigger("presence", { event: "sync" });
+		});
+	}
+	get state() {
+		return PresenceAdapter.transformState(this.presence.state);
+	}
+	/**
+	* @private
+	* Remove 'metas' key
+	* Change 'phx_ref' to 'presence_ref'
+	* Remove 'phx_ref' and 'phx_ref_prev'
+	*
+	* @example Transform state
+	* // returns {
+	*  abc123: [
+	*    { presence_ref: '2', user_id: 1 },
+	*    { presence_ref: '3', user_id: 2 }
+	*  ]
+	* }
+	* RealtimePresence.transformState({
+	*  abc123: {
+	*    metas: [
+	*      { phx_ref: '2', phx_ref_prev: '1' user_id: 1 },
+	*      { phx_ref: '3', user_id: 2 }
+	*    ]
+	*  }
+	* })
+	*
+	*/
+	static transformState(state) {
+		state = cloneState(state);
+		return Object.getOwnPropertyNames(state).reduce((newState, key) => {
+			const presences = state[key];
+			newState[key] = transformState(presences);
+			return newState;
+		}, {});
+	}
+	static onJoinPayload(key, currentPresence, newPresence) {
+		return {
+			event: "join",
+			key,
+			currentPresences: parseCurrentPresences(currentPresence),
+			newPresences: transformState(newPresence)
+		};
+	}
+	static onLeavePayload(key, currentPresence, leftPresence) {
+		return {
+			event: "leave",
+			key,
+			currentPresences: parseCurrentPresences(currentPresence),
+			leftPresences: transformState(leftPresence)
+		};
+	}
+};
+function transformState(presences) {
+	return presences.metas.map((presence) => {
+		const descriptors = Object.getOwnPropertyDescriptors(presence);
+		const transformedPresence = Object.defineProperties({}, descriptors);
+		transformedPresence["presence_ref"] = transformedPresence["phx_ref"];
+		delete transformedPresence["phx_ref"];
+		delete transformedPresence["phx_ref_prev"];
+		return transformedPresence;
+	});
+}
+function cloneState(state) {
+	return JSON.parse(JSON.stringify(state));
+}
+function phoenixPresenceOptions(opts) {
+	return (opts === null || opts === void 0 ? void 0 : opts.events) && { events: opts.events };
+}
+function parseCurrentPresences(currentPresences) {
+	return (currentPresences === null || currentPresences === void 0 ? void 0 : currentPresences.metas) ? transformState(currentPresences) : [];
+}
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/RealtimePresence.js
+var REALTIME_PRESENCE_LISTEN_EVENTS;
+(function(REALTIME_PRESENCE_LISTEN_EVENTS) {
+	REALTIME_PRESENCE_LISTEN_EVENTS["SYNC"] = "sync";
+	REALTIME_PRESENCE_LISTEN_EVENTS["JOIN"] = "join";
+	REALTIME_PRESENCE_LISTEN_EVENTS["LEAVE"] = "leave";
+})(REALTIME_PRESENCE_LISTEN_EVENTS || (REALTIME_PRESENCE_LISTEN_EVENTS = {}));
+var RealtimePresence = class {
+	get state() {
+		return this.presenceAdapter.state;
+	}
+	/**
+	* Creates a Presence helper that keeps the local presence state in sync with the server.
+	*
+	* @param channel - The realtime channel to bind to.
+	* @param opts - Optional custom event names, e.g. `{ events: { state: 'state', diff: 'diff' } }`.
+	*
+	* @category Realtime
+	*
+	* @example Example for a presence channel
+	* ```ts
+	* const presence = new RealtimePresence(channel)
+	*
+	* channel.on('presence', ({ event, key }) => {
+	*   console.log(`Presence ${event} on ${key}`)
+	* })
+	* ```
+	*/
+	constructor(channel, opts) {
+		this.channel = channel;
+		this.presenceAdapter = new PresenceAdapter(this.channel.channelAdapter, opts);
+	}
+};
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/lib/normalizeChannelError.js
+/**
+* Normalize the various shapes a channel error reason can take into a real `Error`.
+*
+* Transport-level channel errors arrive as a `CloseEvent`, a transport `Event`, an `Error`,
+* a string, or `undefined` depending on which path in the underlying socket fired. Server-reply
+* errors arrive as a payload object. This helper produces a consistent `Error` for every case
+* and preserves the original via `cause` so callers can still inspect the raw event.
+*/
+function normalizeChannelError(reason) {
+	if (reason instanceof Error) return reason;
+	if (typeof reason === "string") return new Error(reason);
+	if (reason && typeof reason === "object") {
+		const obj = reason;
+		if (typeof obj.code === "number") {
+			const detail = typeof obj.reason === "string" && obj.reason ? ` (${obj.reason})` : "";
+			return new Error(`socket closed: ${obj.code}${detail}`, { cause: reason });
+		}
+		return new Error("channel error: transport failure", { cause: reason });
+	}
+	return /* @__PURE__ */ new Error("channel error: connection lost");
+}
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/phoenix/channelAdapter.js
+var ChannelAdapter = class {
+	constructor(socket, topic, params) {
+		const phoenixParams = phoenixChannelParams(params);
+		this.channel = socket.getSocket().channel(topic, phoenixParams);
+		this.socket = socket;
+	}
+	get state() {
+		return this.channel.state;
+	}
+	set state(state) {
+		this.channel.state = state;
+	}
+	get joinedOnce() {
+		return this.channel.joinedOnce;
+	}
+	get joinPush() {
+		return this.channel.joinPush;
+	}
+	get rejoinTimer() {
+		return this.channel.rejoinTimer;
+	}
+	on(event, callback) {
+		return this.channel.on(event, callback);
+	}
+	off(event, refNumber) {
+		this.channel.off(event, refNumber);
+	}
+	subscribe(timeout) {
+		return this.channel.join(timeout);
+	}
+	unsubscribe(timeout) {
+		return this.channel.leave(timeout);
+	}
+	teardown() {
+		this.channel.teardown();
+	}
+	onClose(callback) {
+		this.channel.onClose(callback);
+	}
+	onError(callback) {
+		return this.channel.onError(callback);
+	}
+	push(event, payload, timeout) {
+		let push;
+		try {
+			push = this.channel.push(event, payload, timeout);
+		} catch (error) {
+			throw new Error(`tried to push '${event}' to '${this.channel.topic}' before joining. Use channel.subscribe() before pushing events`);
+		}
+		if (this.channel.pushBuffer.length > 100) {
+			const removedPush = this.channel.pushBuffer.shift();
+			removedPush.cancelTimeout();
+			this.socket.log("channel", `discarded push due to buffer overflow: ${removedPush.event}`, removedPush.payload());
+		}
+		return push;
+	}
+	updateJoinPayload(payload) {
+		const oldPayload = this.channel.joinPush.payload();
+		this.channel.joinPush.payload = () => Object.assign(Object.assign({}, oldPayload), payload);
+	}
+	canPush() {
+		return this.socket.isConnected() && this.state === CHANNEL_STATES.joined;
+	}
+	isJoined() {
+		return this.state === CHANNEL_STATES.joined;
+	}
+	isJoining() {
+		return this.state === CHANNEL_STATES.joining;
+	}
+	isClosed() {
+		return this.state === CHANNEL_STATES.closed;
+	}
+	isLeaving() {
+		return this.state === CHANNEL_STATES.leaving;
+	}
+	updateFilterBindings(filterBindings) {
+		this.channel.filterBindings = filterBindings;
+	}
+	updatePayloadTransform(callback) {
+		this.channel.onMessage = callback;
+	}
+	/**
+	* @internal
+	*/
+	getChannel() {
+		return this.channel;
+	}
+};
+function phoenixChannelParams(options) {
+	return { config: Object.assign({
+		broadcast: {
+			ack: false,
+			self: false
+		},
+		presence: {
+			key: "",
+			enabled: false
+		},
+		private: false
+	}, options.config) };
+}
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/RealtimePostgresFilterBuilder.js
+var PostgrestReservedCharsRegexp = /[,()"\\]/;
+var needsQuoting = (value) => PostgrestReservedCharsRegexp.test(value) || value !== value.trim();
+var quote = (value) => `"${value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"")}"`;
+var serializeScalar = (value) => {
+	const serialized = value === null ? "null" : String(value);
+	return needsQuoting(serialized) ? quote(serialized) : serialized;
+};
+var serializeIsValue = (value) => value === null ? "null" : String(value);
+var serialize = (operator, value) => {
+	if (operator === "in") {
+		const values = Array.isArray(value) ? value : [value];
+		if (values.length === 0) throw new Error("Realtime `in` filter requires at least one value.");
+		return `in.(${Array.from(new Set(values)).map((v) => serializeScalar(v)).join(",")})`;
+	}
+	if (operator === "is") return `is.${serializeIsValue(value)}`;
+	return `${operator}.${serializeScalar(value)}`;
+};
+/**
+* Fluent builder for Postgres Changes `filter` strings.
+*
+* Each method appends a single `column=operator.value` condition. Multiple
+* conditions are combined with commas, which the Realtime server applies as an
+* `AND`. Pass an instance straight to `channel.on('postgres_changes', …)` — the
+* SDK serializes it to a string automatically — or call {@link build} to obtain
+* the string yourself.
+*
+* The builder mirrors the `postgrest-js` filter API (`eq`, `neq`, `in`, `like`,
+* `not`, …) for the operators that Realtime supports. Values containing reserved
+* characters (`,`, `(`, `)`, `"`, `\`) — or surrounding whitespace — are
+* automatically double-quoted and escaped the same way PostgREST does, so they
+* survive the server's filter parser; all other values are sent verbatim.
+*
+* The filter is snapshotted when passed to `channel.on(...)`; mutating the
+* builder afterwards does not affect an existing subscription. An empty builder
+* serializes to `''`, which the server treats as "no filter".
+*
+* @example
+* channel.on('postgres_changes', {
+*   event: '*',
+*   schema: 'public',
+*   table: 'users',
+*   filter: postgresChangesFilter().eq('id', 1).lt('age', 30), // → 'id=eq.1,age=lt.30'
+* }, (payload) => { ... })
+*/
+var RealtimePostgresFilterBuilder = class {
+	constructor() {
+		this.filters = [];
+	}
+	add(column, operator, value, negate = false) {
+		const prefix = negate ? "not." : "";
+		this.filters.push(`${column}=${prefix}${serialize(operator, value)}`);
+		return this;
+	}
+	/** Match rows where `column` equals `value` (`column=eq.value`). */
+	eq(column, value) {
+		return this.add(column, "eq", value);
+	}
+	/** Match rows where `column` does not equal `value` (`column=neq.value`). */
+	neq(column, value) {
+		return this.add(column, "neq", value);
+	}
+	/** Match rows where `column` is greater than `value` (`column=gt.value`). */
+	gt(column, value) {
+		return this.add(column, "gt", value);
+	}
+	/** Match rows where `column` is greater than or equal to `value` (`column=gte.value`). */
+	gte(column, value) {
+		return this.add(column, "gte", value);
+	}
+	/** Match rows where `column` is less than `value` (`column=lt.value`). */
+	lt(column, value) {
+		return this.add(column, "lt", value);
+	}
+	/** Match rows where `column` is less than or equal to `value` (`column=lte.value`). */
+	lte(column, value) {
+		return this.add(column, "lte", value);
+	}
+	/**
+	* Match rows where `column` is one of `values` (`column=in.(a,b,c)`).
+	* Requires at least one value; duplicates are removed. An element containing a
+	* reserved character is double-quoted (`in.("a,b",c)`), so commas inside an
+	* element are preserved. `null` is intentionally not accepted (`IN (null)`
+	* never matches in SQL) — use `is`/`not('col','is',null)` for null checks.
+	*/
+	in(column, values) {
+		return this.add(column, "in", values);
+	}
+	/** Match rows where `column` matches the case-sensitive `pattern` (`column=like.pattern`). */
+	like(column, pattern) {
+		return this.add(column, "like", pattern);
+	}
+	/** Match rows where `column` matches the case-insensitive `pattern` (`column=ilike.pattern`). */
+	ilike(column, pattern) {
+		return this.add(column, "ilike", pattern);
+	}
+	/** Match rows where `column` matches the POSIX regex `pattern` (`column=match.pattern`). */
+	match(column, pattern) {
+		return this.add(column, "match", pattern);
+	}
+	/** Match rows where `column` matches the case-insensitive POSIX regex `pattern` (`column=imatch.pattern`). */
+	imatch(column, pattern) {
+		return this.add(column, "imatch", pattern);
+	}
+	/**
+	* Match rows where `column` `IS` the given value (`column=is.null`).
+	* Accepts `null`, a boolean, or the keywords `'null' | 'true' | 'false' | 'unknown'`.
+	*/
+	is(column, value) {
+		return this.add(column, "is", value);
+	}
+	/** Match rows where `column` is distinct from `value` (`column=isdistinct.value`). NULL-safe inequality. */
+	isDistinct(column, value) {
+		return this.add(column, "isdistinct", value);
+	}
+	not(column, operator, value) {
+		return this.add(column, operator, value, true);
+	}
+	/**
+	* Serialize all conditions into the comma-separated (AND) filter string.
+	*
+	* Conditions are joined by commas, which the server applies as `AND`. A scalar
+	* value (or single `in` element) that contains a reserved character — `,`,
+	* `(`, `)`, `"`, `\` — or surrounding whitespace is double-quoted and escaped
+	* the way PostgREST does, so commas inside a value are preserved rather than
+	* read as a condition boundary.
+	*/
+	build() {
+		return this.filters.join(",");
+	}
+	/** Alias for {@link build}; lets the builder be used wherever a string is expected. */
+	toString() {
+		return this.build();
+	}
+};
+//#endregion
+//#region node_modules/@supabase/realtime-js/dist/module/RealtimeChannel.js
+var REALTIME_POSTGRES_CHANGES_LISTEN_EVENT;
+(function(REALTIME_POSTGRES_CHANGES_LISTEN_EVENT) {
+	REALTIME_POSTGRES_CHANGES_LISTEN_EVENT["ALL"] = "*";
+	REALTIME_POSTGRES_CHANGES_LISTEN_EVENT["INSERT"] = "INSERT";
+	REALTIME_POSTGRES_CHANGES_LISTEN_EVENT["UPDATE"] = "UPDATE";
+	REALTIME_POSTGRES_CHANGES_LISTEN_EVENT["DELETE"] = "DELETE";
+})(REALTIME_POSTGRES_CHANGES_LISTEN_EVENT || (REALTIME_POSTGRES_CHANGES_LISTEN_EVENT = {}));
+var REALTIME_LISTEN_TYPES;
+(function(REALTIME_LISTEN_TYPES) {
+	REALTIME_LISTEN_TYPES["BROADCAST"] = "broadcast";
+	REALTIME_LISTEN_TYPES["PRESENCE"] = "presence";
+	REALTIME_LISTEN_TYPES["POSTGRES_CHANGES"] = "postgres_changes";
+	REALTIME_LISTEN_TYPES["SYSTEM"] = "system";
+})(REALTIME_LISTEN_TYPES || (REALTIME_LISTEN_TYPES = {}));
+var REALTIME_SUBSCRIBE_STATES;
+(function(REALTIME_SUBSCRIBE_STATES) {
+	REALTIME_SUBSCRIBE_STATES["SUBSCRIBED"] = "SUBSCRIBED";
+	REALTIME_SUBSCRIBE_STATES["TIMED_OUT"] = "TIMED_OUT";
+	REALTIME_SUBSCRIBE_STATES["CLOSED"] = "CLOSED";
+	REALTIME_SUBSCRIBE_STATES["CHANNEL_ERROR"] = "CHANNEL_ERROR";
+})(REALTIME_SUBSCRIBE_STATES || (REALTIME_SUBSCRIBE_STATES = {}));
+/** A channel is the basic building block of Realtime
+* and narrows the scope of data flow to subscribed clients.
+* You can think of a channel as a chatroom where participants are able to see who's online
+* and send and receive messages.
+*/
+var RealtimeChannel = class RealtimeChannel {
+	get state() {
+		return this.channelAdapter.state;
+	}
+	set state(state) {
+		this.channelAdapter.state = state;
+	}
+	get joinedOnce() {
+		return this.channelAdapter.joinedOnce;
+	}
+	get timeout() {
+		return this.socket.timeout;
+	}
+	get joinPush() {
+		return this.channelAdapter.joinPush;
+	}
+	get rejoinTimer() {
+		return this.channelAdapter.rejoinTimer;
+	}
+	/**
+	* Creates a channel that can broadcast messages, sync presence, and listen to Postgres changes.
+	*
+	* The topic determines which realtime stream you are subscribing to. Config options let you
+	* enable acknowledgement for broadcasts, presence tracking, or private channels.
+	*
+	* @category Realtime
+	*
+	* @example Using supabase-js (recommended)
+	* ```ts
+	* import { createClient } from '@supabase/supabase-js'
+	*
+	* const supabase = createClient('https://xyzcompany.supabase.co', 'your-publishable-key')
+	* const channel = supabase.channel('room1')
+	* channel
+	*   .on('broadcast', { event: 'cursor-pos' }, (payload) => console.log(payload))
+	*   .subscribe()
+	* ```
+	*
+	* @example Standalone import for bundle-sensitive environments
+	* ```ts
+	* import RealtimeClient from '@supabase/realtime-js'
+	*
+	* const client = new RealtimeClient('https://xyzcompany.supabase.co/realtime/v1', {
+	*   params: { apikey: '[REDACTED]' },
+	* })
+	* const channel = new RealtimeChannel('realtime:public:messages', { config: {} }, client)
+	* ```
+	*/
+	constructor(topic, params = { config: {} }, socket) {
+		var _a, _b;
+		this.topic = topic;
+		this.params = params;
+		this.socket = socket;
+		this.bindings = {};
+		this.subTopic = topic.replace(/^realtime:/i, "");
+		this.params.config = Object.assign({
+			broadcast: {
+				ack: false,
+				self: false
+			},
+			presence: {
+				key: "",
+				enabled: false
+			},
+			private: false
+		}, params.config);
+		this.channelAdapter = new ChannelAdapter(this.socket.socketAdapter, topic, this.params);
+		this.presence = new RealtimePresence(this);
+		this._onClose(() => {
+			this.socket._remove(this);
+		});
+		this._updateFilterTransform();
+		this.broadcastEndpointURL = httpEndpointURL(this.socket.socketAdapter.endPointURL());
+		this.private = this.params.config.private || false;
+		if (!this.private && ((_b = (_a = this.params.config) === null || _a === void 0 ? void 0 : _a.broadcast) === null || _b === void 0 ? void 0 : _b.replay)) throw new Error(`tried to use replay on public channel '${this.topic}'. It must be a private channel.`);
+	}
+	/**
+	* Subscribe registers your client with the server.
+	*
+	* The optional `callback` receives a `status` and, on failure, an `err` argument.
+	* Log the full `err` so its `cause`, `name`, and any structured fields aren't hidden
+	* behind `err.message`.
+	*
+	* @category Realtime
+	*
+	* @example Handling errors
+	* ```js
+	* supabase.channel('room1').subscribe((status, err) => {
+	*   if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+	*     // Log the full error: its `cause` often holds the underlying reason.
+	*     console.error(status, err)
+	*   }
+	* })
+	* ```
+	*/
+	subscribe(callback, timeout = this.timeout) {
+		var _a, _b, _c;
+		if (!this.socket.isConnected()) this.socket.connect();
+		if (this.channelAdapter.isClosed()) {
+			const { config: { broadcast, presence, private: isPrivate } } = this.params;
+			const postgres_changes = (_b = (_a = this.bindings.postgres_changes) === null || _a === void 0 ? void 0 : _a.map((r) => r.filter)) !== null && _b !== void 0 ? _b : [];
+			const presence_enabled = !!this.bindings[REALTIME_LISTEN_TYPES.PRESENCE] && this.bindings[REALTIME_LISTEN_TYPES.PRESENCE].length > 0 || ((_c = this.params.config.presence) === null || _c === void 0 ? void 0 : _c.enabled) === true;
+			const accessTokenPayload = {};
+			const config = {
+				broadcast,
+				presence: Object.assign(Object.assign({}, presence), { enabled: presence_enabled }),
+				postgres_changes,
+				private: isPrivate
+			};
+			if (this.socket.accessTokenValue) accessTokenPayload.access_token = this.socket.accessTokenValue;
+			this._onError((reason) => {
+				callback === null || callback === void 0 || callback(REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR, normalizeChannelError(reason));
+			});
+			this._onClose(() => callback === null || callback === void 0 ? void 0 : callback(REALTIME_SUBSCRIBE_STATES.CLOSED));
+			this.updateJoinPayload(Object.assign({ config }, accessTokenPayload));
+			this._updateFilterMessage();
+			this.channelAdapter.subscribe(timeout).receive("ok", async ({ postgres_changes }) => {
+				if (!this.socket._isManualToken()) this.socket.setAuth();
+				if (postgres_changes === void 0) {
+					callback === null || callback === void 0 || callback(REALTIME_SUBSCRIBE_STATES.SUBSCRIBED);
+					return;
+				}
+				this._updatePostgresBindings(postgres_changes, callback);
+			}).receive("error", (error) => {
+				this.state = CHANNEL_STATES.errored;
+				const message = Object.values(error).join(", ") || "error";
+				callback === null || callback === void 0 || callback(REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR, new Error(message, { cause: error }));
+			}).receive("timeout", () => {
+				callback === null || callback === void 0 || callback(REALTIME_SUBSCRIBE_STATES.TIMED_OUT);
+			});
+		}
+		return this;
+	}
+	_updatePostgresBindings(postgres_changes, callback) {
+		var _a;
+		const clientPostgresBindings = this.bindings.postgres_changes;
+		const bindingsLen = (_a = clientPostgresBindings === null || clientPostgresBindings === void 0 ? void 0 : clientPostgresBindings.length) !== null && _a !== void 0 ? _a : 0;
+		const newPostgresBindings = [];
+		for (let i = 0; i < bindingsLen; i++) {
+			const clientPostgresBinding = clientPostgresBindings[i];
+			const { filter: { event, schema, table, filter } } = clientPostgresBinding;
+			const serverPostgresFilter = postgres_changes && postgres_changes[i];
+			if (serverPostgresFilter && serverPostgresFilter.event === event && RealtimeChannel.isFilterValueEqual(serverPostgresFilter.schema, schema) && RealtimeChannel.isFilterValueEqual(serverPostgresFilter.table, table) && RealtimeChannel.isFilterValueEqual(serverPostgresFilter.filter, filter)) newPostgresBindings.push(Object.assign(Object.assign({}, clientPostgresBinding), { id: serverPostgresFilter.id }));
+			else {
+				this.unsubscribe();
+				this.state = CHANNEL_STATES.errored;
+				callback === null || callback === void 0 || callback(REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR, /* @__PURE__ */ new Error("mismatch between server and client bindings for postgres changes"));
+				return;
+			}
+		}
+		this.bindings.postgres_changes = newPostgresBindings;
+		if (this.state != CHANNEL_STATES.errored && callback) callback(REALTIME_SUBSCRIBE_STATES.SUBSCRIBED);
+	}
+	/**
+	* Returns the current presence state for this channel.
+	*
+	* The shape is a map keyed by presence key (for example a user id) where each entry contains the
+	* tracked metadata for that user.
+	*
+	* @category Realtime
+	*/
+	presenceState() {
+		return this.presence.state;
+	}
+	/**
+	* Sends the supplied payload to the presence tracker so other subscribers can see that this
+	* client is online. Use `untrack` to stop broadcasting presence for the same key.
+	*
+	* Tracking makes this client visible to other subscribers immediately, regardless of this
+	* channel's `config.presence.enabled` setting or whether it has a `presence` listener — that
+	* flag only affects whether *this* client receives presence updates from others (and, on
+	* RLS-protected channels, whether it's authorized to do so).
+	*
+	* @category Realtime
+	*/
+	async track(payload, opts = {}) {
+		return await this.send({
+			type: "presence",
+			event: "track",
+			payload
+		}, opts);
+	}
+	/**
+	* Removes the current presence state for this client.
+	*
+	* @category Realtime
+	*/
+	async untrack(opts = {}) {
+		return await this.send({
+			type: "presence",
+			event: "untrack"
+		}, opts);
+	}
+	/**
+	* Listen to realtime events on this channel.
+	* @category Realtime
+	*
+	* @remarks
+	* - By default, Broadcast and Presence are enabled for all projects.
+	* - By default, listening to database changes is disabled for new projects due to database performance and security concerns. You can turn it on by managing Realtime's [replication](/docs/guides/api#realtime-api-overview).
+	* - You can receive the "previous" data for updates and deletes by setting the table's `REPLICA IDENTITY` to `FULL` (e.g., `ALTER TABLE your_table REPLICA IDENTITY FULL;`).
+	* - Row level security is not applied to delete statements. When RLS is enabled and replica identity is set to full, only the primary key is sent to clients.
+	*
+	* @example Listen to broadcast messages
+	* ```js
+	* const channel = supabase.channel("room1")
+	*
+	* channel.on("broadcast", { event: "cursor-pos" }, (payload) => {
+	*   console.log("Cursor position received!", payload);
+	* }).subscribe((status) => {
+	*   if (status === "SUBSCRIBED") {
+	*     channel.send({
+	*       type: "broadcast",
+	*       event: "cursor-pos",
+	*       payload: { x: Math.random(), y: Math.random() },
+	*     });
+	*   }
+	* });
+	* ```
+	*
+	* @example Listen to presence sync
+	* ```js
+	* const channel = supabase.channel('room1')
+	* channel
+	*   .on('presence', { event: 'sync' }, () => {
+	*     console.log('Synced presence state: ', channel.presenceState())
+	*   })
+	*   .subscribe(async (status) => {
+	*     if (status === 'SUBSCRIBED') {
+	*       await channel.track({ online_at: new Date().toISOString() })
+	*     }
+	*   })
+	* ```
+	*
+	* @example Listen to presence join
+	* ```js
+	* const channel = supabase.channel('room1')
+	* channel
+	*   .on('presence', { event: 'join' }, ({ newPresences }) => {
+	*     console.log('Newly joined presences: ', newPresences)
+	*   }
+[TRUNCATED: file is 80714 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/haircuts-CtVeKlLv.mjs ===
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { E as Scissors, Tt as ChevronRight, c as User, w as ShieldAlert, yt as Clock } from "../_libs/lucide-react.mjs";
+import { g as getHaircutReviewQueue, y as getMyProfile } from "./queries-DCA4yifx.mjs";
+import { n as isAdminRole } from "./roles-DmnR1ATT.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { i as LockedState, n as ErrorState, r as LoadingSkeleton, t as EmptyState } from "./States-CTtcXN7r.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/haircuts-CtVeKlLv.js
+var import_jsx_runtime = require_jsx_runtime();
+function HaircutReviewQueue() {
+	const profile = useAsync(getMyProfile, []);
+	const admin = profile.data ? isAdminRole(profile.data.role) : false;
+	const queue = useAsync(async () => admin ? getHaircutReviewQueue() : [], [admin]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto min-h-screen max-w-5xl px-4 sm:px-6 py-16 text-white relative",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute top-10 left-1/2 -translate-x-1/2 w-[500px] h-[250px] bg-orange-600/10 blur-[120px] pointer-events-none rounded-full" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "mb-12 relative z-10 border-b border-white/10 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Scissors, { className: "w-3.5 h-3.5" }), "Admin Hub"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+					className: "text-3xl sm:text-4xl font-extrabold tracking-tight text-white",
+					children: "Ουρά Αξιολόγησης Κουρεμάτων"
+				})] }), queue.data && queue.data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "px-4 py-2 rounded-2xl bg-zinc-900/80 border border-white/10 text-xs text-zinc-400 backdrop-blur-md flex items-center gap-2",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "w-2 h-2 rounded-full bg-orange-500 animate-ping" }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+							className: "text-white font-bold",
+							children: queue.data.length
+						}),
+						" εκκρεμείς αξιολογήσεις"
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative z-10",
+				children: [
+					profile.loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 3 }),
+					profile.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: profile.error }),
+					profile.data && !admin && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldAlert, { className: "w-6 h-6" })
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LockedState, { reason: "Μόνο admins έχουν πρόσβαση στην ουρά αξιολόγησης κουρεμάτων." })]
+					}),
+					admin && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+						queue.loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 4 }),
+						queue.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: queue.error }),
+						queue.data && queue.data.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "p-12 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmptyState, {
+								title: "Καμία εκκρεμής υποβολή",
+								hint: "Όταν ένας student υποβάλει review κουρέματος, θα εμφανιστεί εδώ."
+							})
+						}),
+						queue.data && queue.data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl overflow-hidden",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+								className: "divide-y divide-white/5",
+								children: queue.data.map((row) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", {
+									className: "group",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+										to: "/review/haircuts/$haircutId",
+										params: { haircutId: row.id },
+										className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 transition-all duration-300 hover:bg-gradient-to-r hover:from-white/[0.04] hover:to-white/[0.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "flex items-start gap-4 min-w-0",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+												className: "p-3 rounded-2xl bg-black/60 border border-white/10 text-orange-400 group-hover:border-orange-500/40 group-hover:scale-105 transition-all duration-300 shrink-0",
+												children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Clock, { className: "w-5 h-5" })
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												className: "min-w-0",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+													className: "truncate text-base font-bold text-white group-hover:text-orange-400 transition-colors",
+													children: [row.method_description.slice(0, 60), row.method_description.length > 60 ? "…" : ""]
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+													className: "flex items-center gap-2 truncate text-xs text-zinc-400 mt-1",
+													children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+														className: "flex items-center gap-1 text-zinc-300",
+														children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(User, { className: "w-3.5 h-3.5 text-zinc-500" }), row.student?.full_name ?? "Άγνωστος μαθητής"]
+													})
+												})]
+											})]
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "flex items-center gap-4 self-end sm:self-center shrink-0",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: "rounded-full bg-orange-500/10 border border-orange-500/20 px-3.5 py-1 text-xs font-semibold tracking-wide text-orange-400 uppercase",
+												children: row.status
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+												className: "w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500 transition-all duration-300",
+												children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChevronRight, { className: "w-4 h-4" })
+											})]
+										})]
+									})
+								}, row.id))
+							})
+						})
+					] })
+				]
+			})
+		]
+	});
+}
+//#endregion
+export { HaircutReviewQueue as component };
+
+=== END FILE ===
+

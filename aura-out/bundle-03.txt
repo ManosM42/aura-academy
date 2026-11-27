@@ -1,0 +1,1145 @@
+=== FILE: src/routes/checkout.return.tsx ===
+// src/routes/checkout.return.tsx
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { useAuth } from "@/lib/useAuth";
+import { useSubscription } from "@/lib/useSubscription";
+import { clearCheckoutIntent } from "@/lib/checkout-intent";
+import { verifyCheckoutSession } from "@/lib/verify-checkout";
+import { getPlan } from "@/lib/plans";
+import {
+  failureMessage,
+  readVivaReturnParams,
+  verifyVivaPayment,
+  type VivaReturnParams,
+  type VivaVerifyResult,
+} from "@/lib/viva-return";
+
+const MAX_ATTEMPTS = 12; // ~18 δευτ. με 1.5s βήμα στον άμεσο έλεγχο
+const VERIFY_DELAY_MS = 1500;
+const POLL_DELAY_MS = 2000; // fallback χωρίς session_id
+
+interface CheckoutReturnSearch {
+  session_id?: string;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+export const Route = createFileRoute("/checkout/return")({
+  validateSearch: (search: Record<string, unknown>): CheckoutReturnSearch => ({
+    session_id:
+      typeof search["session_id"] === "string" && search["session_id"].length > 0
+        ? search["session_id"]
+        : undefined,
+  }),
+  head: () => ({ meta: [{ title: "AURA — Επιβεβαίωση πληρωμής" }] }),
+  component: CheckoutReturnPage,
+});
+
+/**
+ * One return address for every payment. Viva sends customers back with its own
+ * parameters (t / s / eventId): those are confirmed with Viva by the server.
+ * Anything else is the original Stripe flow.
+ */
+function CheckoutReturnPage() {
+  // The URL is only readable in the browser. Render the same neutral page on the server and on
+  // the first browser render (no hydration mismatch), then pick the right view.
+  const [mode, setMode] = useState<{ viva: VivaReturnParams | null } | null>(null);
+  useEffect(() => {
+    setMode({ viva: readVivaReturnParams(window.location.search) });
+  }, []);
+
+  if (mode === null) {
+    return (
+      <main className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40" aria-busy="true">
+        <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΕΠΙΒΕΒΑΙΩΣΗ</p>
+      </main>
+    );
+  }
+  return mode.viva ? <VivaReturnView params={mode.viva} /> : <StripeReturnView />;
+}
+
+function StripeReturnView() {
+  const navigate = useNavigate();
+  const { session_id: sessionId } = Route.useSearch();
+  const { session, loading: authLoading } = useAuth();
+  const { subscription, hasAccess, loading, refresh } = useSubscription(session?.user.id);
+
+  const [attempts, setAttempts] = useState(0);
+  const [verified, setVerified] = useState(false);
+  const [verifiedPlan, setVerifiedPlan] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [exhausted, setExhausted] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
+
+  // Το refresh μπορεί να μην είναι memoized στο useSubscription. Το κρατάμε
+  // σε ref ώστε μια νέα ταυτότητα συνάρτησης να μην ξεκινά ξανά τον βρόχο.
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  // Εγγύηση ότι ο άμεσος έλεγχος τρέχει μία φορά ανά session_id + retry.
+  const startedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    clearCheckoutIntent();
+  }, []);
+
+  // ── 1. Άμεση επιβεβαίωση από το Stripe (η κύρια διαδρομή) ────────────
+  useEffect(() => {
+    if (authLoading || !session?.user.id || !sessionId || verified) return;
+
+    const runKey = `${sessionId}:${retryToken}`;
+    if (startedRef.current === runKey) return;
+    startedRef.current = runKey;
+
+    let cancelled = false;
+
+    const run = async (): Promise<void> => {
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+        if (cancelled) return;
+        setAttempts(attempt);
+
+        try {
+          const result = await verifyCheckoutSession(sessionId);
+          if (cancelled) return;
+
+          if (result.hasAccess) {
+            setVerifiedPlan(result.subscription?.planId ?? null);
+            setVerifyError(null);
+            setVerified(true);
+            // Συγχρονίζουμε και το hook, ώστε dashboard/profile
+            // να δουν αμέσως την ενεργή συνδρομή.
+            void refreshRef.current();
+            return;
+          }
+
+          // state === "pending": η πληρωμή δεν έχει κλείσει ακόμη
+          // στο Stripe. Δεν είναι σφάλμα, ξαναδοκιμάζουμε.
+          setVerifyError(null);
+        } catch (err) {
+          if (cancelled) return;
+          setVerifyError(
+            err instanceof Error && err.message
+              ? err.message
+              : "Η επιβεβαίωση της πληρωμής απέτυχε.",
+          );
+        }
+
+        if (attempt < MAX_ATTEMPTS) await wait(VERIFY_DELAY_MS);
+      }
+
+      if (!cancelled) setExhausted(true);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, session?.user.id, sessionId, verified, retryToken]);
+
+  // ── 2. Fallback polling όταν λείπει το session_id από το URL ──────────
+  useEffect(() => {
+    if (sessionId) return;
+    if (authLoading || loading || hasAccess || attempts >= MAX_ATTEMPTS) return;
+
+    const timer = window.setTimeout(() => {
+      setAttempts((n) => n + 1);
+      void refreshRef.current();
+    }, POLL_DELAY_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [sessionId, authLoading, loading, hasAccess, attempts]);
+
+  const activated = hasAccess || verified;
+
+  // ── 3. Επιτυχία → dashboard ───────────────────────────────────────────
+  useEffect(() => {
+    if (!activated) return;
+    const timer = window.setTimeout(
+      () => navigate({ to: "/dashboard", replace: true }),
+      1600,
+    );
+    return () => window.clearTimeout(timer);
+  }, [activated, navigate]);
+
+  const handleRetry = useCallback(() => {
+    setAttempts(0);
+    setExhausted(false);
+    setVerifyError(null);
+    setRetryToken((t) => t + 1); // ξεκινά νέο κύκλο επιβεβαίωσης
+    void refreshRef.current();
+  }, []);
+
+  const planLabel = getPlan(subscription?.plan_id ?? verifiedPlan)?.name ?? null;
+  const noSession = !authLoading && !session?.user.id;
+  const timedOut =
+    !activated &&
+    (noSession || exhausted || (!sessionId && attempts >= MAX_ATTEMPTS));
+
+  return (
+    <main className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40">
+      {activated ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-500">ΕΝΕΡΓΟΠΟΙΗΘΗΚΕ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+            Καλώς όρισες στην AURA.
+          </h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+            Η συνδρομή σου είναι ενεργή
+            {planLabel ? ` (${planLabel})` : ""}. Σε μεταφέρουμε στο dashboard…
+          </p>
+        </>
+      ) : timedOut ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΣΕ ΕΚΚΡΕΜΟΤΗΤΑ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+            {noSession ? "Χρειάζεται σύνδεση" : "Η επιβεβαίωση καθυστερεί"}
+          </h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+            {noSession
+              ? "Για να ενεργοποιηθεί η συνδρομή πρέπει να είσαι συνδεδεμένος με τον λογαριασμό που έκανε την πληρωμή."
+              : "Η πληρωμή μπορεί να ολοκληρώθηκε αλλά η ενεργοποίηση δεν έχει καταγραφεί ακόμη. Δοκίμασε ανανέωση σε λίγο — αν συνεχίσει, στείλε μας μήνυμα και το ελέγχουμε άμεσα."}
+          </p>
+          {verifyError ? (
+            <p className="mt-4 text-sm leading-relaxed text-red-400" role="alert">
+              {verifyError}
+            </p>
+          ) : null}
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            {noSession ? (
+              <Link to="/login">
+                <ChromeButton type="button">ΣΥΝΔΕΣΗ</ChromeButton>
+              </Link>
+            ) : (
+              <ChromeButton type="button" onClick={handleRetry}>
+                ΕΛΕΓΞΕ ΞΑΝΑ
+              </ChromeButton>
+            )}
+            <Link to="/contact">
+              <ChromeButton type="button" variant="secondary">
+                ΕΠΙΚΟΙΝΩΝΙΑ
+              </ChromeButton>
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΕΠΙΒΕΒΑΙΩΣΗ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+            Ενεργοποιούμε την πρόσβασή σου… Κάνε refresh για είσοδο στην ακαδημία.
+          </h1>
+          <div
+            className="mx-auto mt-10 h-px w-56 overflow-hidden bg-white/10"
+            role="progressbar"
+            aria-label="Επιβεβαίωση πληρωμής"
+            aria-valuemin={0}
+            aria-valuemax={MAX_ATTEMPTS}
+            aria-valuenow={attempts}
+          >
+            <span
+              className="block h-full bg-white/70 transition-all duration-500"
+              style={{ width: `${Math.min(100, (attempts / MAX_ATTEMPTS) * 100)}%` }}
+            />
+          </div>
+        </>
+      )}
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Return from Viva                                                    */
+/* ------------------------------------------------------------------ */
+
+const VIVA_MAX_ATTEMPTS = 30; // ~60 s while the payment is still being confirmed
+const VIVA_POLL_MS = 2000;
+
+type VivaView =
+  | { phase: "verifying" }
+  | { phase: "done"; result: VivaVerifyResult }
+  | { phase: "unknown" }
+  | { phase: "timeout"; error: string | null };
+
+function kindLabel(kind: string): "subscription" | "upgrade" | "seminar" | "book" | "other" {
+  if (kind === "subscription_initial" || kind === "subscription_renewal") return "subscription";
+  if (kind === "subscription_upgrade") return "upgrade";
+  if (kind === "seminar") return "seminar";
+  if (kind === "book") return "book";
+  return "other";
+}
+
+function VivaReturnView({ params }: { params: VivaReturnParams }) {
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const { refresh } = useSubscription(session?.user.id);
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  }, [refresh]);
+
+  const [view, setView] = useState<VivaView>({ phase: "verifying" });
+  const [attempt, setAttempt] = useState(0);
+  const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    clearCheckoutIntent();
+  }, []);
+
+  // Ask the server (which asks Viva) until the payment is paid, failed or unknown.
+  useEffect(() => {
+    let cancelled = false;
+    setView({ phase: "verifying" });
+    setAttempt(0);
+
+    const run = async (): Promise<void> => {
+      let lastError: string | null = null;
+      for (let i = 1; i <= VIVA_MAX_ATTEMPTS; i += 1) {
+        if (cancelled) return;
+        setAttempt(i);
+        try {
+          const result = await verifyVivaPayment(params);
+          if (cancelled) return;
+          lastError = null;
+          if (result.status === "paid" || result.status === "failed") {
+            if (result.status === "paid") void refreshRef.current();
+            setView({ phase: "done", result });
+            return;
+          }
+          if (result.status === "unknown") {
+            setView({ phase: "unknown" });
+            return;
+          }
+          // "pending": the payment is not final yet. Not an error: ask again.
+        } catch (err) {
+          if (cancelled) return;
+          lastError = err instanceof Error && err.message ? err.message : "Η επιβεβαίωση της πληρωμής απέτυχε.";
+        }
+        await wait(VIVA_POLL_MS);
+      }
+      if (!cancelled) setView({ phase: "timeout", error: lastError });
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [params, retryToken]);
+
+  const done = view.phase === "done" ? view.result : null;
+  const paid = done?.status === "paid";
+  const kind = done ? kindLabel(done.kind) : "other";
+
+  // A paid subscription or upgrade: on to the dashboard.
+  useEffect(() => {
+    if (!paid || (kind !== "subscription" && kind !== "upgrade") || !session?.user.id) return;
+    const timer = window.setTimeout(() => navigate({ to: "/dashboard", replace: true }), 2200);
+    return () => window.clearTimeout(timer);
+  }, [paid, kind, session?.user.id, navigate]);
+
+  const planName = done && (kind === "subscription" || kind === "upgrade") ? getPlan(done.label)?.name ?? null : null;
+
+  return (
+    <main className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40">
+      {paid && done ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-500">
+            {kind === "subscription" ? "ΕΝΕΡΓΟΠΟΙΗΘΗΚΕ" : kind === "upgrade" ? "ΑΝΑΒΑΘΜΙΣΗ" : "ΟΛΟΚΛΗΡΩΘΗΚΕ"}
+          </p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+            {kind === "subscription"
+              ? "Καλώς όρισες στην AURA."
+              : kind === "upgrade"
+                ? "Η αναβάθμιση ολοκληρώθηκε."
+                : kind === "seminar"
+                  ? "Η κράτησή σου ολοκληρώθηκε."
+                  : kind === "book"
+                    ? "Η παραγγελία σου ολοκληρώθηκε."
+                    : "Η πληρωμή ολοκληρώθηκε."}
+          </h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+            {kind === "subscription" || kind === "upgrade"
+              ? `Η συνδρομή σου είναι ενεργή${planName ? ` (${planName})` : ""}. ${session?.user.id ? "Σε μεταφέρουμε στο dashboard…" : "Συνδέσου για να μπεις στην ακαδημία."}`
+              : kind === "seminar"
+                ? `Η πληρωμή σου για «${done.label ?? "το σεμινάριο"}» επιβεβαιώθηκε. Ο διαχειριστής θα επικοινωνήσει σύντομα μαζί σου με όλες τις πληροφορίες.`
+                : kind === "book"
+                  ? "Η πληρωμή σου επιβεβαιώθηκε. Θα επικοινωνήσουμε μαζί σου για την αποστολή του βιβλίου."
+                  : "Η πληρωμή σου επιβεβαιώθηκε."}
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            {kind === "subscription" || kind === "upgrade" ? (
+              <Link to={session?.user.id ? "/dashboard" : "/login"}>
+                <ChromeButton type="button">{session?.user.id ? "ΣΤΟ DASHBOARD" : "ΣΥΝΔΕΣΗ"}</ChromeButton>
+              </Link>
+            ) : (
+              <Link to={kind === "book" ? "/book" : "/online-seminars"}>
+                <ChromeButton type="button">ΠΙΣΩ</ChromeButton>
+              </Link>
+            )}
+          </div>
+        </>
+      ) : done ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΔΕΝ ΟΛΟΚΛΗΡΩΘΗΚΕ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">Η πληρωμή δεν πέρασε</h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400" role="alert">
+            {failureMessage(done.eventId)}
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link to={kind === "book" ? "/book" : kind === "seminar" ? "/online-seminars" : "/pricing"}>
+              <ChromeButton type="button">ΔΟΚΙΜΑΣΕ ΞΑΝΑ</ChromeButton>
+            </Link>
+            <Link to="/contact">
+              <ChromeButton type="button" variant="secondary">
+                ΕΠΙΚΟΙΝΩΝΙΑ
+              </ChromeButton>
+            </Link>
+          </div>
+        </>
+      ) : view.phase === "unknown" ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΜΗ ΕΓΚΥΡΗ ΠΛΗΡΩΜΗ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">Δεν βρήκαμε αυτή την πληρωμή</h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+            Ο σύνδεσμος δεν αντιστοιχεί σε παραγγελία μας. Αν πλήρωσες, στείλε μας μήνυμα και θα το ελέγξουμε άμεσα.
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link to="/contact">
+              <ChromeButton type="button">ΕΠΙΚΟΙΝΩΝΙΑ</ChromeButton>
+            </Link>
+          </div>
+        </>
+      ) : view.phase === "timeout" ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΣΕ ΕΚΚΡΕΜΟΤΗΤΑ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">Η επιβεβαίωση καθυστερεί</h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400">
+            Η πληρωμή σου δεν έχει επιβεβαιωθεί ακόμη. Αν χρεώθηκες, θα ολοκληρωθεί αυτόματα σε λίγα λεπτά. Δοκίμασε ξανά ή στείλε μας μήνυμα.
+          </p>
+          {view.error ? (
+            <p className="mt-4 text-sm leading-relaxed text-red-400" role="alert">
+              {view.error}
+            </p>
+          ) : null}
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <ChromeButton type="button" onClick={() => setRetryToken((n) => n + 1)}>
+              ΕΛΕΓΞΕ ΞΑΝΑ
+            </ChromeButton>
+            <Link to="/contact">
+              <ChromeButton type="button" variant="secondary">
+                ΕΠΙΚΟΙΝΩΝΙΑ
+              </ChromeButton>
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">ΕΠΙΒΕΒΑΙΩΣΗ</p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">Επιβεβαιώνουμε την πληρωμή σου…</h1>
+          <div
+            className="mx-auto mt-10 h-px w-56 overflow-hidden bg-white/10"
+            role="progressbar"
+            aria-label="Επιβεβαίωση πληρωμής"
+            aria-valuemin={0}
+            aria-valuemax={VIVA_MAX_ATTEMPTS}
+            aria-valuenow={attempt}
+          >
+            <span
+              className="block h-full bg-white/70 transition-all duration-500"
+              style={{ width: `${Math.min(100, (attempt / VIVA_MAX_ATTEMPTS) * 100)}%` }}
+            />
+          </div>
+        </>
+      )}
+    </main>
+  );
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/billing.ts ===
+// supabase/functions/_shared/billing.ts
+// Shared by stripe-webhook, verify-checkout-session and admin-billing-sync.
+import type Stripe from "npm:stripe@^18";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@^2";
+
+export type PlanId = "low" | "mid" | "high";
+
+export const ACCESS_STATUSES = ["active", "trialing"];
+
+/** Old plan names that may still exist in Stripe metadata or old rows. */
+const LEGACY_PLAN: Record<string, PlanId> = {
+  starter: "low",
+  core: "mid",
+  full: "high",
+  limited: "high",
+};
+
+export function normalizePlanId(value: unknown): PlanId | null {
+  if (value === "low" || value === "mid" || value === "high") return value;
+  if (typeof value === "string" && Object.prototype.hasOwnProperty.call(LEGACY_PLAN, value)) {
+    return LEGACY_PLAN[value] ?? null;
+  }
+  return null;
+}
+
+/** Thrown when an event belongs to an account that was deleted (or is being deleted). */
+export class UserDeletedError extends Error {
+  constructor(userId: string) {
+    super(`User ${userId} no longer exists`);
+    this.name = "UserDeletedError";
+  }
+}
+
+/** False once the account is being deleted or is gone, so webhooks never recreate its data. */
+export async function userIsActive(admin: SupabaseClient, userId: string): Promise<boolean> {
+  const { data: profile } = await admin.from("profiles").select("status").eq("id", userId).maybeSingle();
+  if (profile && String(profile.status) === "deleted") return false;
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  return !error && Boolean(data?.user);
+}
+
+/** Stripe returns either an id string or an expanded object. */
+export function refId(ref: unknown): string | null {
+  if (!ref) return null;
+  if (typeof ref === "string") return ref;
+  if (typeof ref === "object" && "id" in ref && typeof (ref as { id: unknown }).id === "string") {
+    return (ref as { id: string }).id;
+  }
+  return null;
+}
+
+type PeriodBearing = { current_period_end?: number | null };
+
+export function periodEndIso(sub: Stripe.Subscription): string | null {
+  const item = sub.items?.data?.[0] as (Stripe.SubscriptionItem & PeriodBearing) | undefined;
+  const fromItem = item?.current_period_end;
+  const fromSub = (sub as unknown as PeriodBearing).current_period_end;
+  const seconds =
+    typeof fromItem === "number" ? fromItem : typeof fromSub === "number" ? fromSub : null;
+  return seconds ? new Date(seconds * 1000).toISOString() : null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Subscriptions                                                       */
+/* ------------------------------------------------------------------ */
+
+export async function resolveUserId(
+  admin: SupabaseClient,
+  sub: Stripe.Subscription,
+): Promise<string | null> {
+  const fromMeta = sub.metadata?.["supabase_user_id"];
+  if (typeof fromMeta === "string" && fromMeta.length > 0) return fromMeta;
+
+  const customerId = refId(sub.customer);
+  if (!customerId) return null;
+
+  const { data } = await admin
+    .from("stripe_customers")
+    .select("user_id")
+    .eq("stripe_customer_id", customerId)
+    .maybeSingle();
+
+  return (data?.user_id as string | undefined) ?? null;
+}
+
+/**
+ * Which AURA plan is this subscription?
+ * 1) metadata.plan_id  2) a hint (e.g. from the checkout session)
+ * 3) the Stripe product we created for a plan  4) what we already stored.
+ */
+export async function resolvePlanId(
+  admin: SupabaseClient,
+  sub: Stripe.Subscription,
+  hint?: unknown,
+): Promise<PlanId | null> {
+  const fromMeta = normalizePlanId(sub.metadata?.["plan_id"]);
+  if (fromMeta) return fromMeta;
+
+  const fromHint = normalizePlanId(hint);
+  if (fromHint) return fromHint;
+
+  const price = sub.items?.data?.[0]?.price;
+  const productId = refId(price?.product);
+  if (productId) {
+    const { data } = await admin
+      .from("plans")
+      .select("id")
+      .eq("stripe_product_id", productId)
+      .maybeSingle();
+    const fromProduct = normalizePlanId(data?.id);
+    if (fromProduct) return fromProduct;
+  }
+
+  const { data: existing } = await admin
+    .from("subscriptions")
+    .select("plan_id")
+    .eq("stripe_subscription_id", sub.id)
+    .maybeSingle();
+  return normalizePlanId(existing?.plan_id);
+}
+
+/** Upserts public.subscriptions from a Stripe subscription. Null = couldn't map it. */
+export async function syncSubscription(
+  admin: SupabaseClient,
+  sub: Stripe.Subscription,
+  hint?: { planId?: unknown; userId?: string | null },
+): Promise<{ userId: string; planId: PlanId } | null> {
+  const userId = hint?.userId ?? (await resolveUserId(admin, sub));
+  if (!userId) {
+    console.error(`No user mapping for subscription ${sub.id}`);
+    return null;
+  }
+
+  if (!(await userIsActive(admin, userId))) throw new UserDeletedError(userId);
+
+  const planId = await resolvePlanId(admin, sub, hint?.planId);
+  if (!planId) {
+    console.error(`Could not resolve plan for subscription ${sub.id}`);
+    return null;
+  }
+
+  const { error } = await admin.from("subscriptions").upsert(
+    {
+      user_id: userId,
+      plan_id: planId,
+      status: sub.status,
+      stripe_customer_id: refId(sub.customer),
+      stripe_subscription_id: sub.id,
+      current_period_end: periodEndIso(sub),
+      cancel_at_period_end: sub.cancel_at_period_end ?? false,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "stripe_subscription_id" },
+  );
+  if (error) throw new Error(`subscriptions upsert failed: ${error.message}`);
+
+  return { userId, planId };
+}
+
+/* ------------------------------------------------------------------ */
+/* Invoices -> payments ledger                                         */
+/* ------------------------------------------------------------------ */
+
+type InvoiceLike = {
+  subscription?: unknown;
+  payment_intent?: unknown;
+  parent?: { subscription_details?: { subscription?: unknown } | null } | null;
+  payments?: { data?: Array<{ payment?: { payment_intent?: unknown } | null }> } | null;
+};
+
+/** Works on both the old (invoice.subscription) and new (invoice.parent...) API shapes. */
+export function invoiceSubscriptionId(inv: Stripe.Invoice): string | null {
+  const x = inv as unknown as InvoiceLike;
+  return refId(x.subscription) ?? refId(x.parent?.subscription_details?.subscription);
+}
+
+export function invoicePaymentIntentId(inv: Stripe.Invoice): string | null {
+  const x = inv as unknown as InvoiceLike;
+  return refId(x.payment_intent) ?? refId(x.payments?.data?.[0]?.payment?.payment_intent);
+}
+
+function iso(seconds: number | null | undefined): string | null {
+  return typeof seconds === "number" && seconds > 0 ? new Date(seconds * 1000).toISOString() : null;
+}
+
+/**
+ * Stores one PAID invoice. Idempotent (unique on stripe_invoice_id).
+ * Returns true when a row was written.
+ */
+export async function recordInvoice(
+  admin: SupabaseClient,
+  inv: Stripe.Invoice,
+  known?: { userId?: string | null; planId?: string | null },
+): Promise<boolean> {
+  if (inv.status !== "paid") return false;
+  const amount = inv.amount_paid ?? 0;
+  if (amount <= 0) return false; // free / 100% coupon invoices are not income
+
+  const subId = invoiceSubscriptionId(inv);
+  const customerId = refId(inv.customer);
+
+  let userId = known?.userId ?? null;
+  let planId = known?.planId ?? null;
+
+  if (subId && (!userId || !planId)) {
+    const { data } = await admin
+      .from("subscriptions")
+      .select("user_id, plan_id")
+      .eq("stripe_subscription_id", subId)
+      .maybeSingle();
+    userId = userId ?? ((data?.user_id as string | undefined) ?? null);
+    planId = planId ?? ((data?.plan_id as string | undefined) ?? null);
+  }
+
+  if (!userId && customerId) {
+    const { data } = await admin
+      .from("stripe_customers")
+      .select("user_id")
+      .eq("stripe_customer_id", customerId)
+      .maybeSingle();
+    userId = (data?.user_id as string | undefined) ?? null;
+  }
+
+  const line = inv.lines?.data?.[0] as { period?: { start?: number; end?: number } } | undefined;
+  const paidAt =
+    iso(inv.status_transitions?.paid_at) ?? iso(inv.created) ?? new Date().toISOString();
+  const pi = invoicePaymentIntentId(inv);
+
+  const row = {
+    stripe_invoice_id: inv.id,
+    ...(subId ? { stripe_subscription_id: subId } : {}),
+    ...(customerId ? { stripe_customer_id: customerId } : {}),
+    ...(pi ? { stripe_payment_intent_id: pi } : {}),
+    ...(userId ? { user_id: userId } : {}),
+    ...(planId ? { plan_id: normalizePlanId(planId) ?? planId } : {}),
+    amount_cents: amount,
+    currency: (inv.currency ?? "eur").toLowerCase(),
+    billing_reason: inv.billing_reason ?? null,
+    period_start: iso(line?.period?.start ?? inv.period_start),
+    period_end: iso(line?.period?.end ?? inv.period_end),
+    paid_at: paidAt,
+  };
+
+  const { error } = await admin.from("payments").upsert(row, { onConflict: "stripe_invoice_id" });
+  if (error) throw new Error(`payments upsert failed: ${error.message}`);
+  return true;
+}
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/viva-process.ts ===
+// supabase/functions/_shared/viva-process.ts
+//
+// ONE place that turns a transaction CONFIRMED BY VIVA into database changes.
+// Used by the webhook, by the checkout-return verification and (for renewals and
+// upgrades) by the charge flows. Everything here is idempotent: processing the
+// same transaction twice, in any order, changes nothing the second time.
+//
+// A transaction reference (merchantTrns) always points at OUR order, so the same
+// code handles: first subscription payments, renewals, plan upgrades, online
+// seminar bookings and book orders.
+import type { VivaConfig, VivaTransaction } from "./viva.ts";
+
+export const EUR_ISO_NUMERIC = "978";
+
+/** Thrown for problems a retry could fix (Viva unreachable, database error, payment not final yet). */
+export class TransientError extends Error {}
+
+export interface RpcClient {
+  rpc(name: string, args?: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>;
+}
+
+export type Kind = "subscription" | "renewal" | "upgrade" | "seminar" | "book" | "unknown";
+export interface Outcome {
+  status: "processed" | "ignored";
+  result: string;
+  kind: Kind;
+}
+
+export async function rpc<T = Record<string, unknown>>(client: RpcClient, name: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await client.rpc(name, args);
+  if (error) throw new TransientError(`${name} failed: ${error.message}`);
+  return data as T;
+}
+
+/** Tells the admins (push + inbox) that something needs a human. Never throws. */
+export async function alertAdmins(client: RpcClient, title: string, body: string, data: Record<string, unknown>): Promise<void> {
+  try {
+    await client.rpc("notify_admins", { p_type: "billing_alert", p_title: title, p_body: body, p_url: "/admin", p_data: data });
+  } catch (err) {
+    console.error("alertAdmins failed:", err instanceof Error ? err.message : "unknown");
+  }
+}
+
+export async function kindOf(client: RpcClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Kind> {
+  if (!tx.merchantTrns) return "unknown";
+  const k = await rpc<string | null>(client, "viva_order_kind", { p_environment: cfg.env, p_merchant_trns: tx.merchantTrns });
+  switch (k) {
+    case "initial": return "subscription";
+    case "renewal": return "renewal";
+    case "upgrade": return "upgrade";
+    case "seminar": return "seminar";
+    case "book": return "book";
+    default: return "unknown";
+  }
+}
+
+/* ============================ PAID (status F) ============================ */
+
+export async function processPaid(client: RpcClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Outcome> {
+  // Not final yet: the caller decides whether to ask Viva to try again later.
+  if (tx.statusId !== "F") throw new TransientError(`transaction status is ${tx.statusId}, not F`);
+
+  const kind = await kindOf(client, cfg, tx);
+
+  if (tx.currencyCode !== null && tx.currencyCode !== EUR_ISO_NUMERIC) {
+    await alertAdmins(client, "Πρόβλημα πληρωμής Viva", "Η πληρωμή δεν είναι σε EUR. Δεν έγινε ενεργοποίηση.", {
+      transaction_id: tx.transactionId, kind: "currency_mismatch",
+    });
+    return { status: "ignored", result: "currency_mismatch", kind };
+  }
+
+  switch (kind) {
+    case "renewal": return paidSimple(client, cfg, tx, kind, "viva_apply_renewal", false, "renewed");
+    case "upgrade": return paidSimple(client, cfg, tx, kind, "viva_apply_upgrade", false, "upgraded");
+    case "seminar": return paidSimple(client, cfg, tx, kind, "viva_apply_seminar_payment", true, "paid");
+    case "book": return paidSimple(client, cfg, tx, kind, "viva_apply_book_payment", true, "paid");
+    default: return paidInitial(client, cfg, tx);
+  }
+}
+
+const FLAG_TEXT: Record<string, [string, string]> = {
+  duplicate_payment: ["Διπλή χρέωση Viva", "Ο πελάτης χρεώθηκε δύο φορές για την ίδια παραγγελία. Η δεύτερη πληρωμή δεν άλλαξε τίποτα. Χρειάζεται επιστροφή."],
+  paid_while_subscribed: ["Πληρωμή Viva ενώ υπάρχει συνδρομή", "Ο χρήστης πλήρωσε ενώ είχε ήδη ενεργή συνδρομή. Η πληρωμή καταγράφηκε, δεν άλλαξε η συνδρομή. Χρειάζεται επιστροφή ή έλεγχος."],
+  user_missing: ["Πληρωμή Viva χωρίς λογαριασμό", "Έγινε πληρωμή για λογαριασμό που έχει διαγραφεί. Η πληρωμή καταγράφηκε. Χρειάζεται επιστροφή."],
+  paid_but_not_active: ["Πληρωμή ανανέωσης για ανενεργή συνδρομή", "Έγινε χρέωση ανανέωσης αλλά η συνδρομή δεν ήταν ενεργή. Η πληρωμή καταγράφηκε, δεν άλλαξε η συνδρομή. Χρειάζεται επιστροφή ή έλεγχος."],
+  paid_but_not_applied: ["Πληρωμή αναβάθμισης που δεν εφαρμόστηκε", "Η πληρωμή αναβάθμισης έφτασε αλλά η αναβάθμιση δεν ήταν πια εφικτή. Η πληρωμή καταγράφηκε. Χρειάζεται επιστροφή ή έλεγχος."],
+};
+
+/** Renewals, upgrades, seminars and books: found by OUR reference, never by order code alone. */
+async function paidSimple(
+  client: RpcClient, cfg: VivaConfig, tx: VivaTransaction, kind: Kind,
+  fn: string, withOrderCode: boolean, okResult: string,
+): Promise<Outcome> {
+  const args: Record<string, unknown> = {
+    p_environment: cfg.env,
+    p_merchant_trns: tx.merchantTrns,
+    p_transaction_id: tx.transactionId,
+    p_amount_cents: tx.amountCents,
+    p_paid_at: tx.insDate,
+  };
+  if (withOrderCode) args.p_order_code = tx.orderCode;
+
+  const r = await rpc<{ result: string; order_id?: string; user_id?: string }>(client, fn, args);
+
+  if (r.result === okResult || r.result === "already_processed") return { status: "processed", result: r.result, kind };
+
+  const flag = FLAG_TEXT[r.result];
+  if (flag) {
+    await alertAdmins(client, flag[0], flag[1], {
+      order_id: r.order_id ?? null, user_id: r.user_id ?? null, transaction_id: tx.transactionId, kind: r.result,
+    });
+    return { status: "processed", result: r.result, kind };
+  }
+
+  // order_not_found, amount_mismatch, order_code_mismatch...: real money may have arrived that we did NOT record.
+  await alertAdmins(client, "Πρόβλημα πληρωμής Viva", `Η πληρωμή δεν ταιριάζει με καμία παραγγελία μας (${r.result}). Δεν έγινε ενεργοποίηση. Έλεγξε τη συναλλαγή στη Viva.`, {
+    transaction_id: tx.transactionId, order_code: tx.orderCode, kind: r.result,
+  });
+  return { status: "ignored", result: r.result, kind };
+}
+
+/** The first payment of a subscription: found by the order code Viva gave us. */
+async function paidInitial(client: RpcClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Outcome> {
+  const kind: Kind = "subscription";
+  if (tx.orderCode === null) {
+    await alertAdmins(client, "Πρόβλημα πληρωμής Viva", "Πληρωμή χωρίς κωδικό παραγγελίας που δεν αντιστοιχεί σε παραγγελία μας. Δεν έγινε ενεργοποίηση. Έλεγξε τη συναλλαγή στη Viva.", {
+      transaction_id: tx.transactionId, kind: "order_code_missing",
+    });
+    return { status: "ignored", result: "order_code_missing", kind: "unknown" };
+  }
+
+  const r = await rpc<{ result: string; order_id?: string; user_id?: string; expected_cents?: number; received_cents?: number }>(
+    client, "viva_apply_payment",
+    {
+      p_environment: cfg.env,
+      p_order_code: tx.orderCode,
+      p_merchant_trns: tx.merchantTrns,
+      p_transaction_id: tx.transactionId,
+      p_amount_cents: tx.amountCents,
+      p_paid_at: tx.insDate,
+      p_recurring: tx.recurringSupport,
+    },
+  );
+
+  if (r.result === "activated" || r.result === "already_processed") return { status: "processed", result: r.result, kind };
+
+  if (r.result === "activated_without_recurring") {
+    await alertAdmins(client, "Συνδρομή Viva χωρίς ανανέωση", "Η συνδρομή ενεργοποιήθηκε, αλλά η Viva δεν επέτρεψε επαναλαμβανόμενες χρεώσεις. Δεν θα ανανεωθεί αυτόματα.", {
+      order_id: r.order_id ?? null, kind: "no_recurring_support",
+    });
+    return { status: "processed", result: r.result, kind };
+  }
+
+  const flag = FLAG_TEXT[r.result];
+  if (flag) {
+    await alertAdmins(client, flag[0], flag[1], {
+      order_id: r.order_id ?? null, user_id: r.user_id ?? null, transaction_id: tx.transactionId, kind: r.result,
+    });
+    return { status: "processed", result: r.result, kind };
+  }
+
+  await alertAdmins(client, "Πρόβλημα πληρωμής Viva", `Η πληρωμή δεν ταιριάζει με καμία παραγγελία μας (${r.result}). Δεν έγινε ενεργοποίηση. Έλεγξε τη συναλλαγή στη Viva.`, {
+    transaction_id: tx.transactionId, order_code: tx.orderCode, kind: r.result,
+    expected_cents: r.expected_cents ?? null, received_cents: r.received_cents ?? null,
+  });
+  return { status: "ignored", result: r.result, kind };
+}
+
+/* ========================== FAILED (not F, e.g. E) ========================== */
+
+/**
+ * Viva says the customer may retry and still succeed, so a failure is never final:
+ * it only annotates a still-pending order. A later success is still accepted.
+ */
+export async function processFailed(client: RpcClient, cfg: VivaConfig, tx: VivaTransaction): Promise<Outcome> {
+  const kind = await kindOf(client, cfg, tx);
+  if (tx.statusId === "F") return { status: "ignored", result: "actually_succeeded", kind };
+
+  const reason = `viva_status_${tx.statusId}`;
+
+  if (kind === "renewal") {
+    if (!tx.merchantTrns) return { status: "ignored", result: "renewal_without_reference", kind };
+    const r = await rpc<{ result: string }>(client, "viva_fail_renewal", {
+      p_environment: cfg.env, p_order_id: tx.merchantTrns, p_reason: reason, p_counts: true,
+    });
+    return { status: r.result === "failure_recorded" ? "processed" : "ignored", result: r.result, kind };
+  }
+  if (kind === "upgrade") {
+    const r = await rpc<{ result: string }>(client, "viva_fail_upgrade", {
+      p_environment: cfg.env, p_order_id: tx.merchantTrns, p_reason: reason,
+    });
+    return { status: r.result === "failure_recorded" ? "processed" : "ignored", result: r.result, kind };
+  }
+  if (tx.orderCode === null) return { status: "ignored", result: "failure_without_order", kind };
+
+  if (kind === "subscription") {
+    const r = await rpc<{ result: string }>(client, "viva_record_failure", {
+      p_environment: cfg.env, p_order_code: tx.orderCode, p_merchant_trns: tx.merchantTrns, p_reason: reason,
+    });
+    return { status: r.result === "failure_recorded" ? "processed" : "ignored", result: r.result, kind };
+  }
+  if (kind === "seminar" || kind === "book") {
+    const r = await rpc<{ result: string }>(client, "viva_note_checkout_failure", {
+      p_environment: cfg.env, p_order_code: tx.orderCode, p_event_id: null,
+    });
+    return { status: r.result === "noted" ? "processed" : "ignored", result: r.result, kind };
+  }
+  return { status: "ignored", result: "unknown_order", kind };
+}
+
+/* ============================ REFUND (reversal) ============================ */
+
+export async function processReversal(client: RpcClient, cfg: VivaConfig, tx: VivaTransaction, parentId: string): Promise<Outcome> {
+  if (tx.statusId !== "F") throw new TransientError(`reversal status is ${tx.statusId}, not F`);
+
+  // Viva reports a reversal as a signed amount; only its size matters here.
+  const r = await rpc<{ result: string; user_id?: string; refunded_total_cents?: number }>(client, "viva_apply_refund", {
+    p_environment: cfg.env,
+    p_parent_transaction_id: parentId,
+    p_reversal_transaction_id: tx.transactionId,
+    p_refund_cents: Math.abs(tx.amountCents),
+  });
+
+  if (r.result === "refund_applied") {
+    await alertAdmins(client, "Επιστροφή χρημάτων Viva", "Καταγράφηκε επιστροφή χρημάτων. Η πρόσβαση του μέλους ΔΕΝ αφαιρέθηκε αυτόματα· έλεγξε αν χρειάζεται ακύρωση συνδρομής.", {
+      user_id: r.user_id ?? null, refunded_total_cents: r.refunded_total_cents ?? null, kind: "refund_applied",
+    });
+    return { status: "processed", result: r.result, kind: "unknown" };
+  }
+  if (r.result === "already_applied") return { status: "processed", result: r.result, kind: "unknown" };
+
+  await alertAdmins(client, "Πρόβλημα επιστροφής Viva", `Η επιστροφή δεν ταιριάζει με πληρωμή που έχουμε καταγράψει (${r.result}).`, {
+    transaction_id: tx.transactionId, kind: r.result,
+  });
+  return { status: "ignored", result: r.result, kind: "unknown" };
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/_shared/viva-upgrade.ts ===
+// supabase/functions/_shared/viva-upgrade.ts
+//
+// Plan upgrade for a member who pays with Viva. Same rules and numbers as the
+// Stripe path in change-plan: the member pays the NEW plan's price for the days
+// left in the current billing period (no credit for the old plan, upgrades
+// only), the plan switches at once and the next renewal is at the new price.
+//
+// The payment uses the card saved at the first payment (merchant-initiated, no
+// redirect). The plan changes only after Viva CONFIRMS the money, and a charge
+// whose outcome is unknown is never retried automatically.
+import { chargeRecurring, retrieveTransaction, type VivaConfig } from "./viva.ts";
+import { alertAdmins, EUR_ISO_NUMERIC, rpc, type RpcClient } from "./viva-process.ts";
+
+const DAY_MS = 86_400_000;
+const MIN_CHARGE_CENTS = 50;
+const CREDIT_UNUSED_OLD_PLAN = false; // keep identical to the Stripe path
+
+export interface VivaUpgradeInput {
+  client: RpcClient;
+  cfg: VivaConfig;
+  userId: string;
+  currentPlanId: string;
+  targetPlanId: string;
+  currentPlanName: string;
+  targetPlanName: string;
+  /** Today's list prices (plans table, edited in the admin panel). */
+  currentAmountCents: number;
+  newAmountCents: number;
+  /** End of the current billing period (ISO). */
+  periodEnd: string;
+  previewOnly: boolean;
+}
+
+export interface VivaUpgradeResponse {
+  status: number;
+  body: Record<string, unknown>;
+}
+
+/** The numbers shown in the upgrade window. */
+export function computeUpgradeQuote(currentAmount: number, newAmount: number, periodEndIso: string, nowMs: number = Date.now()) {
+  const endMs = new Date(periodEndIso).getTime();
+  if (!Number.isFinite(endMs) || endMs <= nowMs) return null;
+
+  // Our subscriptions are monthly: the period started one calendar month before it ends.
+  const start = new Date(endMs);
+  start.setUTCMonth(start.getUTCMonth() - 1);
+  const startMs = start.getTime();
+
+  const periodDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
+  // Part of a day counts as a full day, so the charge is never zero.
+  const remainingDays = Math.min(periodDays, Math.max(1, Math.ceil((endMs - nowMs) / DAY_MS)));
+  const proratedNew = Math.round((newAmount * remainingDays) / periodDays);
+  const creditCents = CREDIT_UNUSED_OLD_PLAN ? Math.round((currentAmount * remainingDays) / periodDays) : 0;
+  const dueToday = Math.max(proratedNew - creditCents, MIN_CHARGE_CENTS);
+  return { periodDays, remainingDays, creditCents, dueTodayCents: Math.min(dueToday, newAmount) };
+}
+
+const fail = (status: number, error: string): VivaUpgradeResponse => ({ status, body: { error } });
+
+export async function runVivaUpgrade(i: VivaUpgradeInput): Promise<VivaUpgradeResponse> {
+  const quote = computeUpgradeQuote(i.currentAmountCents, i.newAmountCents, i.periodEnd);
+  if (!quote) return fail(409, "Η συνδρομή σου ανανεώνεται αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.");
+
+  // ---- preview: numbers only, nothing changes ----
+  if (i.previewOnly) {
+    return {
+      status: 200,
+      body: {
+        currentPlanId: i.currentPlanId,
+        targetPlanId: i.targetPlanId,
+        currentPlanName: i.currentPlanName,
+        targetPlanName: i.targetPlanName,
+        currency: "eur",
+        currentAmountCents: i.currentAmountCents,
+        newAmountCents: i.newAmountCents,
+        periodDays: quote.periodDays,
+        remainingDays: quote.remainingDays,
+        creditCents: quote.creditCents,
+        dueTodayCents: quote.dueTodayCents,
+        renewalDate: new Date(i.periodEnd).toISOString(),
+        card: null, // Viva does not tell us the brand; the saved card is used
+      },
+    };
+  }
+
+  // ---- 1. reserve the upgrade in OUR database (one money movement at a time) ----
+  const begin = await rpc<{ result: string; order_id?: string; initial_transaction_id?: string }>(i.client, "viva_begin_upgrade", {
+    p_environment: i.cfg.env,
+    p_user: i.userId,
+    p_target_plan: i.targetPlanId,
+    p_amount_cents: quote.dueTodayCents,
+  });
+  switch (begin.result) {
+    case "ready": break;
+    case "already_in_progress": return fail(409, "Μια χρέωση είναι ήδη σε εξέλιξη. Δοκίμασε ξανά σε λίγα λεπτά.");
+    case "no_authorization": return fail(409, "Δεν υπάρχει αποθηκευμένη κάρτα για αυτή τη συνδρομή. Επικοινώνησε μαζί μας.");
+    case "not_an_upgrade": return fail(400, "Μπορείς να αναβαθμίσεις μόνο σε ανώτερο πλάνο.");
+    case "renewing": return fail(409, "Η συνδρομή σου ανανεώνεται αυτή τη στιγμή. Δοκίμασε ξανά σε λίγα λεπτά.");
+    case "no_subscription": return fail(404, "Δεν βρέθηκε ενεργή συνδρομή για αναβάθμιση.");
+    default:
+      console.error("viva_begin_upgrade refused:", begin.result);
+      return fail(500, "Δεν ήταν δυνατή η αναβάθμιση. Δοκίμασε ξανά.");
+  }
+  const orderId = begin.order_id as string;
+
+  // ---- 2. charge the saved card ----
+  const charge = await chargeRecurring(i.cfg, begin.initial_transaction_id as string, {
+    amountCents: quote.dueTodayCents,
+    customerTrns: `AURA ${i.targetPlanName} - αναβάθμιση`,
+    merchantTrns: orderId,
+  });
+
+  if (charge.kind === "unknown") {
+    // We cannot tell whether money moved: NOTHING is retried, nothing is changed.
+    await alertAdmins(i.client, "Αναβάθμιση Viva χωρίς απάντηση", "Η χρέωση αναβάθμισης δεν επιβεβαιώθηκε (πρόβλημα επικοινωνίας). Έλεγξε τη συναλλαγή στη Viva πριν επαναληφθεί.", {
+      order_id: orderId, kind: "upgrade_unknown", reason: charge.reason,
+    });
+    return fail(502, "Δεν πήραμε επιβεβαίωση της πληρωμής. Αν χρεωθείς, η αναβάθμιση θα ολοκληρωθεί αυτόματα· αλλιώς δοκίμασε ξανά αργότερα.");
+  }
+  if (charge.kind === "rejected") {
+    await rpc(i.client, "viva_fail_upgrade", { p_environment: i.cfg.env, p_order_id: orderId, p_reason: `viva_rejected_${charge.status}` });
+    await alertAdmins(i.client, "Η Viva απέρριψε αίτημα αναβάθμισης", `Η Viva απάντησε ${charge.status}. Έλεγξε τα διαπιστευτήρια και ότι είναι ενεργοποιημένες οι επαναλαμβανόμενες πληρωμές.`, {
+      order_id: orderId, kind: "upgrade_rejected", http_status: charge.status,
+    });
+    return fail(502, "Δεν ήταν δυνατή η χρέωση. Δεν χρεώθηκες. Δοκίμασε ξανά αργότερα.");
+  }
+  if (charge.kind === "declined") {
+    await rpc(i.client, "viva_fail_upgrade", { p_environment: i.cfg.env, p_order_id: orderId, p_reason: `declined_${charge.errorCode ?? "unknown"}` });
+    return fail(402, "Η κάρτα σου απορρίφθηκε. Δεν χρεώθηκες και το πλάνο σου δεν άλλαξε.");
+  }
+
+  // ---- 3. believe it only after Viva confirms it ----
+  let tx;
+  try {
+    tx = await retrieveTransaction(i.cfg, charge.transactionId);
+  } catch (err) {
+    await alertAdmins(i.client, "Αναβάθμιση Viva χωρίς επιβεβαίωση", "Η χρέωση έγινε αλλά δεν επιβεβαιώθηκε ακόμη από τη Viva. Η αναβάθμιση θα ολοκληρωθεί όταν έρθει η επιβεβαίωση.", {
+      order_id: orderId, kind: "upgrade_unverified",
+    });
+    console.error("upgrade: could not verify with Viva:", err instanceof Error ? err.message : "unknown");
+    return fail(502, "Η πληρωμή σου επεξεργάζεται. Η αναβάθμιση θα ολοκληρωθεί σε λίγα λεπτά.");
+  }
+
+  if (tx.statusId === "E") {
+    await rpc(i.client, "viva_fail_upgrade", { p_environment: i.cfg.env, p_order_id: orderId, p_reason: "viva_status_E" });
+    return fail(402, "Η πληρωμή δεν ολοκληρώθηκε. Δεν χρεώθηκες και το πλάνο σου δεν άλλαξε.");
+  }
+  if (tx.statusId !== "F") {
+    return fail(502, "Η πληρωμή σου επεξεργάζεται. Η αναβάθμιση θα ολοκληρωθεί σε λίγα λεπτά.");
+  }
+  if (tx.merchantTrns !== orderId || tx.amountCents !== quote.dueTodayCents || (tx.currencyCode !== null && tx.currencyCode !== EUR_ISO_NUMERIC)) {
+    await alertAdmins(i.client, "Αναβάθμιση Viva: ασυμφωνία στοιχείων", "Η Viva επιβεβαίωσε πληρωμή που δεν ταιριάζει με την παραγγελία μας. Δεν άλλαξε το πλάνο.", {
+      order_id: orderId, transaction_id: charge.transactionId, kind: "upgrade_mismatch", expected_cents: quote.dueTodayCents, received_cents: tx.amountCents,
+    });
+    return fail(502, "Η πληρωμή σου επεξεργάζεται. Αν δεν ολοκληρωθεί, θα επικοινωνήσουμε μαζί σου.");
+  }
+
+  // ---- 4. apply: the plan switches only now ----
+  const applied = await rpc<{ result: string; period_end?: string }>(i.client, "viva_apply_upgrade", {
+    p_environment: i.cfg.env,
+    p_merchant_trns: orderId,
+    p_transaction_id: tx.transactionId,
+    p_amount_cents: tx.amountCents,
+    p_paid_at: tx.insDate,
+  });
+  if (applied.result !== "upgraded" && applied.result !== "already_processed") {
+    await alertAdmins(i.client, "Πρόβλημα αναβάθμισης Viva", `Η πληρωμή επιβεβαιώθηκε αλλά η αναβάθμιση δεν εφαρμόστηκε (${applied.result}). Χρειάζεται έλεγχος.`, {
+      order_id: orderId, transaction_id: tx.transactionId, kind: applied.result,
+    });
+    return fail(500, "Πληρώθηκες, αλλά δεν μπορέσαμε να αλλάξουμε το πλάνο σου αυτόματα. Θα το διορθώσουμε άμεσα.");
+  }
+
+  return {
+    status: 200,
+    body: {
+      ok: true,
+      planId: i.targetPlanId,
+      chargedCents: quote.dueTodayCents,
+      nextRenewal: new Date(i.periodEnd).toISOString(),
+      card: null,
+      invoiceUrl: null,
+      invoiceNumber: null,
+    },
+  };
+}
+
+=== END FILE ===
+

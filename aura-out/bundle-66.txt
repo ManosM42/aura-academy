@@ -1,0 +1,1059 @@
+=== FILE: src/components/aura/PhysicalBook.tsx ===
+import { useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent, PointerEvent, ReactNode } from "react";
+import {
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from "motion/react";
+import {
+  BookOpen,
+  Compass,
+  Crown,
+  Layers,
+  MessageCircle,
+  Ruler,
+  Scissors,
+} from "lucide-react";
+
+// Front cover artwork (adjust the path/alias if your project differs)
+import bookCover from "@/assets/book.png";
+import { ChromeCTALink } from "@/components/aura/chrome";
+
+
+/* ------------------------------------------------------------------ */
+/* Content (edit freely)                                              */
+/* ------------------------------------------------------------------ */
+
+const CHAPTERS = [
+  "Foundations of the craft",
+  "Cutting geometry and shapes",
+  "Scissors, razor and clippers",
+  "Fades and blending",
+  "Face shapes and consultation",
+  "Styling and finishing",
+  "Clients, image and mindset",
+];
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII"];
+
+const TOPICS = [
+  {
+    icon: Ruler,
+    title: "Cutting geometry",
+    text: "The angles, sections and shapes behind every clean haircut.",
+  },
+  {
+    icon: Scissors,
+    title: "Every tool, mastered",
+    text: "Scissors, razor and clipper technique, explained step by step.",
+  },
+  {
+    icon: Layers,
+    title: "Fades and blending",
+    text: "From fast fades to photo-ready transitions.",
+  },
+  {
+    icon: Compass,
+    title: "Face shapes",
+    text: "Read the client and choose the cut that suits them.",
+  },
+  {
+    icon: MessageCircle,
+    title: "Client experience",
+    text: "Consultation and service that turn visitors into regulars.",
+  },
+  {
+    icon: Crown,
+    title: "Professional mindset",
+    text: "The standards, image and confidence behind the chair.",
+  },
+];
+
+/* ------------------------------------------------------------------ */
+/* Book geometry                                                      */
+/*                                                                    */
+/* Local coordinate system of the book (CSS 3D, y points down):       */
+/*   x: 0 (spine) .. W (fore-edge)                                    */
+/*   y: 0 (top)   .. H (bottom)                                       */
+/*   z: -T/2 (back) .. +T/2 (front)                                   */
+/*                                                                    */
+/* Every element is a flat plane whose transform-origin is its own    */
+/* centre, so each one is placed by: centre position (left/top),      */
+/* then rotated to face outwards, then pushed along z.                */
+/*                                                                    */
+/* The two hard covers are real boards of thickness B. The page block */
+/* sits between them, inset from the cover edges (the "squares").     */
+/* ------------------------------------------------------------------ */
+
+const W = 260; // width
+const H = 360; // height
+const T = 52; // total thickness
+const B = 3; // cover board thickness
+const PAGE_INSET_Y = 5; // cover overhang top/bottom
+const PAGE_INSET_R = 6; // cover overhang at the fore-edge
+const PAGE_DEPTH = T - B * 2; // page block thickness (46)
+const PAGE_W = W - PAGE_INSET_R;
+const PAGE_H = H - PAGE_INSET_Y * 2;
+
+const face: CSSProperties = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  backfaceVisibility: "hidden",
+  WebkitBackfaceVisibility: "hidden",
+};
+
+// Black paper with fine grey page lines
+const pagesV =
+  "repeating-linear-gradient(90deg, #0a0a0b 0px, #0a0a0b 1px, #2b2b2f 1px, #1c1c1f 2px, #0a0a0b 3px)";
+const pagesH =
+  "repeating-linear-gradient(0deg, #0a0a0b 0px, #0a0a0b 1px, #2b2b2f 1px, #1c1c1f 2px, #0a0a0b 3px)";
+
+// Cover board edges (black leather with a soft grey highlight)
+const boardEdgeTop =
+  "linear-gradient(180deg, #34343a 0%, #16161a 45%, #050506 100%)";
+const boardEdgeSide =
+  "linear-gradient(90deg, #34343a 0%, #16161a 45%, #050506 100%)";
+
+const chromeText =
+  "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+
+/* ------------------------------------------------------------------ */
+/* Small spotlight card used for the topic grid                        */
+/* ------------------------------------------------------------------ */
+
+function SpotlightCard({ children }: { children: ReactNode }) {
+  const x = useMotionValue(-300);
+  const y = useMotionValue(-300);
+  const spot = useMotionTemplate`radial-gradient(240px circle at ${x}px ${y}px, rgba(255,255,255,0.13), transparent 70%)`;
+
+  function onMove(e: PointerEvent<HTMLDivElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    x.set(e.clientX - r.left);
+    y.set(e.clientY - r.top);
+  }
+
+  return (
+    <motion.div
+      onPointerMove={onMove}
+      whileHover={{ y: -4 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-5 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/30"
+    >
+      <motion.div
+        aria-hidden
+        style={{ background: spot }}
+        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      />
+      <div className="relative">{children}</div>
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Section                                                            */
+/* ------------------------------------------------------------------ */
+
+export default function PhysicalBook() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+
+  const [hovered, setHovered] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hovered || pinned;
+
+  // Section scroll parallax
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
+  const watermarkY = useTransform(scrollYProgress, [0, 1], [140, -140]);
+  const glowY = useTransform(scrollYProgress, [0, 1], [-70, 70]);
+
+  // Pointer parallax for the book
+  const mx = useMotionValue(0);
+  const my = useMotionValue(0);
+  const sx = useSpring(mx, { stiffness: 90, damping: 16 });
+  const sy = useSpring(my, { stiffness: 90, damping: 16 });
+
+  const rotY = useTransform([sx, scrollYProgress], (latest) => {
+    if (reduce) return 0;
+    const [x, s] = latest as number[];
+    return x * 26 + (0.5 - s) * 30;
+  });
+  const rotX = useTransform(sy, (y) => (reduce ? 0 : -y * 18));
+
+  // Light glare that follows the pointer across the cover
+  const gx = useTransform(sx, (v) => 50 + v * 90);
+  const gy = useTransform(sy, (v) => 50 + v * 90);
+  const glare = useMotionTemplate`radial-gradient(circle at ${gx}% ${gy}%, rgba(255,255,255,0.22), rgba(255,255,255,0.04) 35%, transparent 62%)`;
+
+  function handleMove(e: PointerEvent<HTMLDivElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    mx.set((e.clientX - r.left) / r.width - 0.5);
+    my.set((e.clientY - r.top) / r.height - 0.5);
+  }
+
+  function handleLeave(e: PointerEvent<HTMLDivElement>) {
+    mx.set(0);
+    my.set(0);
+    if (e.pointerType === "mouse") setHovered(false);
+  }
+
+  function handleKey(e: KeyboardEvent<HTMLDivElement>) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setPinned((p) => !p);
+    }
+  }
+
+  return (
+    <section
+      ref={sectionRef}
+      id="book"
+      className="relative isolate overflow-hidden py-24 sm:py-32"
+    >
+      {/* Parallax background */}
+      <motion.div
+        aria-hidden
+        style={{ y: watermarkY }}
+        className="pointer-events-none absolute inset-x-0 top-8 -z-10 select-none text-center font-serif text-[24vw] font-bold leading-none tracking-[0.12em] text-white/[0.025]"
+      >
+        ΛURΛ
+      </motion.div>
+      <motion.div
+        aria-hidden
+        style={{ y: glowY }}
+        className="pointer-events-none absolute right-[-10%] top-1/3 -z-10 h-[520px] w-[520px] rounded-full bg-white/[0.05] blur-[130px]"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+      />
+
+      <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 md:px-10 lg:grid-cols-[1.05fr_1fr]">
+        {/* ------------------------- Copy ------------------------- */}
+        <div>
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50">
+              <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
+              The ΛURΛ book
+            </div>
+            <h2
+              className={`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText}`}
+            >
+              Years of chair time, bound in one book.
+            </h2>
+            <p className="mt-6 max-w-xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+              The AURA physical book is a barbering reference built to live at
+              your station. Clear technique breakdowns, cutting geometry, fades
+              from clean to photo-ready, and the client skills that keep your
+              chair full.
+            </p>
+          </motion.div>
+     <div className="mt-8">
+  <ChromeCTALink to="/book">Order the book</ChromeCTALink>
+</div>     
+
+          <div className="mt-10 grid gap-4 sm:grid-cols-2">
+            {TOPICS.map((t) => (
+              <SpotlightCard key={t.title}>
+                <div className="flex items-start gap-4">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+                    <t.icon className="size-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">
+                      {t.title}
+                    </h3>
+                    <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+                      {t.text}
+                    </p>
+                  </div>
+                </div>
+              </SpotlightCard>
+            ))}
+          </div>
+        </div>
+
+        {/* ------------------------- 3D book ------------------------- */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={open}
+          aria-label="Open or close the AURA book"
+          onPointerEnter={(e) => {
+            if (e.pointerType === "mouse") setHovered(true);
+          }}
+          onPointerLeave={handleLeave}
+          onPointerMove={handleMove}
+          onClick={() => setPinned((p) => !p)}
+          onKeyDown={handleKey}
+          className="relative flex h-[390px] cursor-pointer items-center justify-center rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-white/40 sm:h-[580px]"
+        >
+          {/* Glow and rings */}
+          <div
+            aria-hidden
+            className="absolute h-[420px] w-[420px] rounded-full bg-white/[0.08] blur-[90px]"
+          />
+          <motion.div
+            aria-hidden
+            animate={reduce ? undefined : { rotate: 360 }}
+            transition={{ duration: 90, repeat: Infinity, ease: "linear" }}
+            className="absolute h-[440px] w-[440px] rounded-full border border-dashed border-white/15"
+          />
+          <motion.div
+            aria-hidden
+            animate={reduce ? undefined : { rotate: -360 }}
+            transition={{ duration: 140, repeat: Infinity, ease: "linear" }}
+            className="absolute h-[540px] w-[540px] rounded-full border border-white/[0.07]"
+          />
+
+          {/* Floor glow */}
+          <motion.div
+            aria-hidden
+            animate={
+              reduce
+                ? undefined
+                : { scaleX: [1, 0.86, 1], opacity: [0.55, 0.32, 0.55] }
+            }
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute bottom-[70px] h-8 w-[240px] rounded-[100%] bg-white/25 blur-2xl sm:bottom-[92px]"
+          />
+
+          {/* Perspective wrapper (scaled down on small screens) */}
+          <div
+            className="origin-center scale-[0.58] min-[420px]:scale-[0.72] sm:scale-100"
+            style={{ perspective: 1800 }}
+          >
+            {/* Pose + float */}
+            <motion.div
+              style={{ transformStyle: "preserve-3d", width: W, height: H }}
+              animate={{
+                rotateY: open ? -8 : -28,
+                x: open ? 112 : 0,
+                y: reduce ? 0 : [0, -14, 0],
+              }}
+              transition={{
+                default: { type: "spring", stiffness: 55, damping: 16 },
+                y: reduce
+                  ? { duration: 0 }
+                  : { duration: 6, repeat: Infinity, ease: "easeInOut" },
+              }}
+            >
+              {/* Pointer / scroll parallax tilt */}
+              <motion.div
+                style={{
+                  transformStyle: "preserve-3d",
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                  rotateX: rotX,
+                  rotateY: rotY,
+                }}
+              >
+                {/* ============ BACK BOARD ============ */}
+                {/* Outer face */}
+                <div
+                  className="overflow-hidden rounded-sm bg-[linear-gradient(215deg,#1d1d21,#070708_55%,#0d0d0f)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]"
+                  style={{
+                    ...face,
+                    width: W,
+                    height: H,
+                    transform: `translateZ(${-T / 2}px) rotateY(180deg)`,
+                  }}
+                >
+                  <div className="absolute inset-5 rounded-sm border border-zinc-500/25" />
+                  <div className="absolute inset-[26px] rounded-sm border border-zinc-600/15" />
+                </div>
+                {/* Board edges: top, bottom, fore-edge */}
+                <div
+                  style={{
+                    ...face,
+                    width: W,
+                    height: B,
+                    top: -B / 2,
+                    background: boardEdgeTop,
+                    transform: `translateZ(${-T / 2 + B / 2}px) rotateX(90deg)`,
+                  }}
+                />
+                <div
+                  style={{
+                    ...face,
+                    width: W,
+                    height: B,
+                    top: H - B / 2,
+                    background: boardEdgeTop,
+                    transform: `translateZ(${-T / 2 + B / 2}px) rotateX(-90deg)`,
+                  }}
+                />
+                <div
+                  style={{
+                    ...face,
+                    width: B,
+                    height: H,
+                    left: W - B / 2,
+                    background: boardEdgeSide,
+                    transform: `translateZ(${-T / 2 + B / 2}px) rotateY(90deg)`,
+                  }}
+                />
+
+                {/* ============ SPINE ============ */}
+                <div
+                  className="flex items-center justify-center overflow-hidden border-y border-white/10 bg-gradient-to-r from-[#1b1b1f] via-[#0e0e10] to-[#050506]"
+                  style={{
+                    ...face,
+                    width: T,
+                    height: H,
+                    left: -T / 2,
+                    transform: "rotateY(-90deg)",
+                  }}
+                >
+                  {/* soft cylindrical highlight */}
+                  <div
+                    aria-hidden
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(255,255,255,0.10), transparent 30%, transparent 70%, rgba(255,255,255,0.05))",
+                    }}
+                  />
+                  <div className="absolute inset-x-0 top-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" />
+                  <div className="absolute inset-x-0 top-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" />
+                  <span
+                    className="bg-gradient-to-b from-zinc-100 to-zinc-500 bg-clip-text font-serif text-sm font-semibold tracking-[0.5em] text-transparent"
+                    style={{
+                      writingMode: "vertical-rl",
+                      transform: "rotate(180deg)",
+                    }}
+                  >
+                    ΛURΛ THE BARBERING BOOK
+                  </span>
+                  <div className="absolute inset-x-0 bottom-8 h-px bg-gradient-to-r from-transparent via-zinc-500/40 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-6 h-px bg-gradient-to-r from-transparent via-zinc-400/70 to-transparent" />
+                </div>
+
+                {/* ============ PAGE BLOCK ============ */}
+                {/* Fore-edge (right) */}
+                <div
+                  style={{
+                    ...face,
+                    width: PAGE_DEPTH,
+                    height: PAGE_H,
+                    top: PAGE_INSET_Y,
+                    left: PAGE_W - PAGE_DEPTH / 2,
+                    transform: "rotateY(90deg)",
+                    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,.55), transparent 16%, transparent 84%, rgba(0,0,0,.65)), ${pagesV}`,
+                  }}
+                />
+                {/* Top edge */}
+                <div
+                  style={{
+                    ...face,
+                    width: PAGE_W,
+                    height: PAGE_DEPTH,
+                    top: PAGE_INSET_Y - PAGE_DEPTH / 2,
+                    transform: "rotateX(90deg)",
+                    backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%), ${pagesH}`,
+                  }}
+                />
+                {/* Bottom edge */}
+                <div
+                  style={{
+                    ...face,
+                    width: PAGE_W,
+                    height: PAGE_DEPTH,
+                    top: H - PAGE_INSET_Y - PAGE_DEPTH / 2,
+                    transform: "rotateX(-90deg)",
+                    backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.5), transparent 20%), ${pagesH}`,
+                  }}
+                />
+
+                {/* First page, revealed when the cover opens */}
+                <div
+                  className="overflow-hidden rounded-r-sm bg-[linear-gradient(90deg,#0c0c0e,#1a1a1d_10%,#111113)] p-7 pl-9"
+                  style={{
+                    ...face,
+                    top: PAGE_INSET_Y,
+                    width: PAGE_W,
+                    height: PAGE_H,
+                    transform: `translateZ(${T / 2 - B - 0.5}px)`,
+                  }}
+                >
+                  <p className="font-serif text-lg text-zinc-100">Inside</p>
+                  <div className="mt-2 h-px bg-gradient-to-r from-zinc-400/60 to-transparent" />
+                  <ol className="mt-5 space-y-3">
+                    {CHAPTERS.map((c, i) => (
+                      <li
+                        key={c}
+                        className="flex items-baseline gap-3 font-serif text-[11px] leading-snug text-zinc-300"
+                      >
+                        <span className="w-6 shrink-0 text-zinc-500">
+                          {ROMAN[i]}
+                        </span>
+                        <span>{c}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <Scissors className="absolute bottom-6 right-6 size-4 text-zinc-600" />
+                </div>
+
+                {/* ============ FRONT BOARD (hinged on the spine) ============ */}
+                {/* Local z = 0 is the outer surface; the board extends to z = -B */}
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: W,
+                    height: H,
+                    transformStyle: "preserve-3d",
+                    transformOrigin: "left center",
+                    transform: `translateZ(${T / 2}px) rotateY(${open ? -150 : 0}deg)`,
+                    transition: reduce
+                      ? "none"
+                      : "transform 1.2s cubic-bezier(0.22, 0.8, 0.24, 1)",
+                  }}
+                >
+                  {/* Outside: the book.png cover */}
+                  <div
+                    className="overflow-hidden rounded-l-sm rounded-r-md bg-black shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                    style={{ ...face, width: W, height: H }}
+                  >
+                    <img
+                      src={bookCover}
+                      alt="AURA The Barbering Book cover"
+                      draggable={false}
+                      className="absolute inset-0 h-full w-full select-none object-cover"
+                    />
+                    {/* Edge vignette for depth */}
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        background:
+                          "radial-gradient(120% 100% at 50% 40%, transparent 60%, rgba(0,0,0,0.35) 100%)",
+                      }}
+                    />
+                    {/* Hinge groove */}
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-3 w-[3px]"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, rgba(0,0,0,0.75), rgba(0,0,0,0.25) 55%, rgba(255,255,255,0.14))",
+                      }}
+                    />
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-y-0 left-0 w-3"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, rgba(0,0,0,0.5), transparent)",
+                      }}
+                    />
+
+                    {/* Idle sheen */}
+                    {!reduce && (
+                      <motion.div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0"
+                        style={{
+                          background:
+                            "linear-gradient(105deg, transparent 42%, rgba(255,255,255,0.14) 50%, transparent 58%)",
+                        }}
+                        animate={{ x: ["-120%", "120%"] }}
+                        transition={{
+                          duration: 2.2,
+                          repeat: Infinity,
+                          repeatDelay: 4.5,
+                          ease: "easeInOut",
+                        }}
+                      />
+                    )}
+
+                    {/* Pointer glare */}
+                    <motion.div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-0"
+                      style={{ background: glare }}
+                    />
+                  </div>
+
+                  {/* Inside of the cover (board back face, at z = -B) */}
+                  <div
+                    className="flex flex-col items-center justify-center gap-4 overflow-hidden rounded-l-md bg-[linear-gradient(200deg,#1c1c1f,#08080a)] px-9 text-center"
+                    style={{
+                      ...face,
+                      width: W,
+                      height: H,
+                      transform: `translateZ(${-B}px) rotateY(180deg)`,
+                    }}
+                  >
+                    <Scissors className="size-6 text-zinc-300" />
+                    <p className="font-serif text-sm italic leading-relaxed text-zinc-300">
+                      For the barber who never stops learning.
+                    </p>
+                    <div className="h-px w-16 bg-gradient-to-r from-transparent via-zinc-400 to-transparent" />
+                    <p className="text-[9px] uppercase tracking-[0.35em] text-zinc-500">
+                      AURA
+                    </p>
+                  </div>
+
+                  {/* Board edges: top, bottom, fore-edge */}
+                  <div
+                    style={{
+                      ...face,
+                      width: W,
+                      height: B,
+                      top: -B / 2,
+                      background: boardEdgeTop,
+                      transform: `translateZ(${-B / 2}px) rotateX(90deg)`,
+                    }}
+                  />
+                  <div
+                    style={{
+                      ...face,
+                      width: W,
+                      height: B,
+                      top: H - B / 2,
+                      background: boardEdgeTop,
+                      transform: `translateZ(${-B / 2}px) rotateX(-90deg)`,
+                    }}
+                  />
+                  <div
+                    style={{
+                      ...face,
+                      width: B,
+                      height: H,
+                      left: W - B / 2,
+                      background: boardEdgeSide,
+                      transform: `translateZ(${-B / 2}px) rotateY(90deg)`,
+                    }}
+                  />
+                </div>
+              </motion.div>
+            </motion.div>
+          </div>
+
+          <p className="absolute bottom-1 flex items-center gap-2 text-xs text-zinc-500">
+            <BookOpen className="size-3.5" />
+            Hover to open the book. On touch screens, tap it.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/courses.$slug.tsx ===
+// src/routes/courses.$slug.tsx
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowLeft, Lock, Play, Sparkles } from "lucide-react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import ChromeCursor from "@/components/aura/ChromeCursor";
+import { getCourseForPlay, getStepVideoUrl } from "@/lib/courses";
+import { COURSE_CATEGORIES } from "@/lib/courses.types";
+import { getPlan } from "@/lib/plans";
+import { useAsync } from "@/lib/useAsync";
+
+export const Route = createFileRoute("/courses/$slug")({
+  head: () => ({ meta: [{ title: "AURA — Video" }] }),
+  component: CourseVideoPage,
+});
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } } };
+const rise = {
+  hidden: { opacity: 0, y: 22, filter: "blur(6px)" },
+  show: { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.9, ease: EASE } },
+};
+
+/* ------------------------------------------------------------------ */
+/* Shared background: grain, atmosphere, grid, floating chrome orbs    */
+/* ------------------------------------------------------------------ */
+
+function Backdrop() {
+  const reduce = useReducedMotion();
+  return (
+    <>
+      <div className="aura-grain" aria-hidden />
+      <div className="hero-atmosphere absolute inset-0" aria-hidden />
+      <div className="cv-grid absolute inset-0" aria-hidden />
+      {!reduce && (
+        <>
+          <motion.div
+            className="cv-orb left-[6%] top-[10%] h-80 w-80"
+            animate={{ y: [0, -34, 0], x: [0, 18, 0] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+          />
+          <motion.div
+            className="cv-orb bottom-[6%] right-[4%] h-[26rem] w-[26rem]"
+            animate={{ y: [0, 28, 0], x: [0, -22, 0] }}
+            transition={{ duration: 19, repeat: Infinity, ease: "easeInOut" }}
+            aria-hidden
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
+
+function CourseVideoPage() {
+  const { slug } = Route.useParams();
+  const { data, error, loading } = useAsync(() => getCourseForPlay(slug), [slug]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState<string | null>(null);
+  const infoRef = useRef<HTMLDivElement>(null);
+
+  const course = data?.course ?? null;
+  const locked = data?.locked ?? false;
+
+  useEffect(() => {
+    let cancelled = false;
+    setVideoError(null);
+    if (!course || locked || !course.video_path) {
+      setVideoUrl(null);
+      return;
+    }
+    void getStepVideoUrl(course.video_path, course.id)
+      .then((url) => {
+        if (!cancelled) setVideoUrl(url);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setVideoUrl(null);
+          setVideoError(err instanceof Error ? err.message : "Το preview απέτυχε.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [course, locked]);
+
+  function onInfoMove(e: MouseEvent<HTMLDivElement>) {
+    const el = infoRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }
+
+  /* ---------- loading ---------- */
+
+  if (loading) {
+    return (
+      <div className="cv-root relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-5">
+        <style>{css}</style>
+        <Backdrop />
+        <div className="relative z-10 flex w-full max-w-4xl flex-col gap-6">
+          <div className="cv-skeleton h-6 w-40 rounded-full" />
+          <div className="cv-skeleton aspect-video w-full rounded-2xl" />
+          <div className="cv-skeleton h-10 w-2/3 rounded-lg" />
+          <div className="cv-skeleton h-4 w-full rounded" />
+          <div className="cv-skeleton h-4 w-4/5 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- not found ---------- */
+
+  if (error || !course) {
+    return (
+      <div className="cv-root relative flex min-h-screen flex-col items-center justify-center gap-4 overflow-hidden bg-aura-bg px-5 text-center text-white">
+        <style>{css}</style>
+        <Backdrop />
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 flex flex-col items-center gap-4"
+        >
+          <motion.h1 variants={rise} className="cv-title text-3xl font-bold tracking-tight">
+            Δεν βρέθηκε
+          </motion.h1>
+          <motion.p variants={rise} className="text-sm text-white/50">
+            {error instanceof Error ? error.message : "Άγνωστο σφάλμα."}
+          </motion.p>
+          <motion.div variants={rise}>
+            <Link to="/courses" className="cv-back mt-4">
+              <ArrowLeft className="size-4" />
+              ΟΛΑ ΤΑ VIDEOS
+            </Link>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  const categoryLabel = COURSE_CATEGORIES.find((c) => c.key === course.category)?.label;
+  const plan = getPlan(course.required_plan);
+
+  return (
+    <div className="cv-root relative min-h-screen w-full overflow-x-clip bg-aura-bg pt-24 text-white sm:pt-28">
+      <style>{css}</style>
+      <ChromeCursor />
+      <Backdrop />
+
+      {/* ---------- top bar ---------- */}
+      <motion.header
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: EASE }}
+        className="cv-bar relative z-20"
+      >
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
+          <Link to="/courses" className="cv-back">
+            <ArrowLeft className="size-4" />
+            ΟΛΑ ΤΑ VIDEOS
+          </Link>
+          <div className="flex items-center gap-2">
+            {plan ? <span className="cv-chip cv-chip-plan">{plan.name}</span> : null}
+            {categoryLabel ? <span className="cv-chip">{categoryLabel}</span> : null}
+          </div>
+        </div>
+        <div className="chrome-line h-px w-full" aria-hidden />
+      </motion.header>
+
+      {locked ? (
+        /* ---------- locked ---------- */
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 mx-auto flex max-w-lg flex-col items-center gap-6 px-5 py-28 text-center sm:py-36"
+        >
+          <motion.div variants={rise} className="cv-lock">
+            <span className="cv-lock-ring" aria-hidden />
+            <Lock className="relative size-7 text-white/80" />
+          </motion.div>
+
+          <motion.h1 variants={rise} className="cv-title text-3xl font-bold tracking-tight sm:text-4xl">
+            {course.title}
+          </motion.h1>
+
+          <motion.p variants={rise} className="max-w-sm text-sm leading-relaxed text-white/55">
+            Αυτό το video χρειάζεται πλάνο{" "}
+            <span className="text-white">{plan?.name ?? course.required_plan}</span> ή ανώτερο.
+          </motion.p>
+
+          <motion.div variants={rise}>
+            <Link to="/pricing">
+              <ChromeButton type="button">ΔΕΣ ΤΑ ΠΛΑΝΑ</ChromeButton>
+            </Link>
+          </motion.div>
+        </motion.div>
+      ) : (
+        /* ---------- player ---------- */
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-0 pb-28 pt-0 sm:px-8 sm:pt-10"
+        >
+          <motion.div variants={rise} className="relative">
+            <div className="cv-glow" aria-hidden />
+
+            <div className="cv-frame sm:rounded-[1.4rem]">
+              <div className="cv-frame-border" aria-hidden />
+              <div className="relative aspect-video w-full overflow-hidden bg-black sm:rounded-[calc(1.4rem-1px)]">
+                {videoUrl ? (
+                  <video
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    className="h-full w-full object-contain"
+                  />
+                ) : videoError ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                    <span className="text-sm text-red-300/90">{videoError}</span>
+                  </div>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+                    {course.video_path ? (
+                      <>
+                        <span className="cv-spinner" aria-hidden />
+                        <span className="text-xs uppercase tracking-[0.3em] text-white/40">
+                          Φόρτωση βίντεο
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="cv-play" aria-hidden>
+                          <Play className="size-6 text-white/60" />
+                        </div>
+                        <span className="text-sm text-white/35">Δεν έχει ανέβει ακόμη βίντεο.</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* ---------- info ---------- */}
+          <motion.div variants={rise} className="px-5 sm:px-0">
+            <div ref={infoRef} onMouseMove={onInfoMove} className="cv-info p-7 sm:p-10">
+              <div className="cv-spot" aria-hidden />
+
+              <div className="relative">
+                <div className="mb-5 flex items-center gap-3">
+                  <Sparkles className="size-4 text-white/60" />
+                  <span className="chrome-text text-[11px] font-semibold uppercase tracking-[0.45em]">
+                    Aura
+                  </span>
+                  <span className="h-px flex-1 bg-gradient-to-r from-white/25 to-transparent" aria-hidden />
+                </div>
+
+                <h1 className="cv-title text-3xl font-bold tracking-tight sm:text-5xl">
+                  {course.title}
+                </h1>
+
+                {course.summary ? (
+                  <p className="mt-6 max-w-3xl whitespace-pre-line text-sm leading-[1.85] text-white/65 sm:text-base">
+                    {course.summary}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Styles                                                              */
+/* ------------------------------------------------------------------ */
+
+const css = `
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+@keyframes cv-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes cv-pulse { 0%,100% { opacity: .5; transform: scale(1); } 50% { opacity: .95; transform: scale(1.03); } }
+@keyframes cv-skel { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes cv-ring { 0% { transform: scale(.85); opacity: .7; } 100% { transform: scale(1.7); opacity: 0; } }
+
+.cv-grid {
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 15%, transparent 75%);
+          mask-image: radial-gradient(ellipse 75% 55% at 50% 30%, #000 15%, transparent 75%);
+  pointer-events: none;
+}
+.cv-orb {
+  position: absolute; border-radius: 9999px; pointer-events: none;
+  background: radial-gradient(circle at 35% 30%, rgba(232,236,242,.15), rgba(160,168,180,.05) 45%, transparent 70%);
+  filter: blur(44px);
+}
+
+/* top bar */
+.cv-bar {
+  background: linear-gradient(180deg, rgba(8,8,10,.82), rgba(8,8,10,.55));
+  -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+}
+.cv-back {
+  display: inline-flex; align-items: center; gap: .6rem;
+  font-size: 11px; letter-spacing: .3em; text-transform: uppercase; color: rgba(255,255,255,.6);
+  transition: color .25s, transform .25s, text-shadow .25s;
+}
+.cv-back:hover { color: #fff; transform: translateX(-3px); text-shadow: 0 0 18px rgba(232,236,242,.7); }
+.cv-chip {
+  border-radius: 9999px; padding: .35rem .85rem; font-size: 10px; letter-spacing: .3em; text-transform: uppercase;
+  color: rgba(255,255,255,.6); border: 1px solid rgba(255,255,255,.14);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.015));
+}
+.cv-chip-plan {
+  color: #f1f5f9; border-color: rgba(232,236,242,.4);
+  box-shadow: 0 0 18px -4px rgba(232,236,242,.5);
+}
+
+/* chrome title */
+.cv-title {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 22%, #9ca3af 42%, #ffffff 58%, #8b93a1 78%, #f1f5f9 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: cv-shimmer 7s linear infinite;
+}
+
+/* player frame */
+.cv-glow {
+  position: absolute; inset: -6% -4%; pointer-events: none; z-index: 0;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(214,222,235,.22), transparent 72%);
+  filter: blur(46px); animation: cv-pulse 6s ease-in-out infinite;
+}
+.cv-frame { position: relative; z-index: 1; overflow: hidden; isolation: isolate; padding: 1px; background: rgba(255,255,255,.07); }
+.cv-frame-border {
+  position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.95) 74%, rgba(255,255,255,0) 90%, transparent 100%);
+  animation: cv-spin 8s linear infinite;
+}
+
+/* info card */
+.cv-info {
+  position: relative; overflow: hidden; border-radius: 1.4rem;
+  border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(180deg, rgba(22,23,29,.92), rgba(9,10,13,.95));
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  box-shadow: 0 30px 80px -40px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+}
+.cv-spot {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(460px circle at var(--mx, 30%) var(--my, 0%), rgba(255,255,255,.08), transparent 60%);
+}
+
+/* locked */
+.cv-lock {
+  position: relative; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 1.2rem;
+  border: 1px solid rgba(255,255,255,.18);
+  background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.16), rgba(255,255,255,.02));
+  box-shadow: 0 0 46px -8px rgba(232,236,242,.5);
+}
+.cv-lock-ring {
+  position: absolute; inset: 0; border-radius: 1.2rem; border: 1px solid rgba(232,236,242,.5);
+  animation: cv-ring 2.8s ease-out infinite;
+}
+
+/* misc states */
+.cv-spinner {
+  width: 38px; height: 38px; border-radius: 9999px;
+  border: 2px solid rgba(255,255,255,.12); border-top-color: #fff;
+  animation: cv-spin .9s linear infinite; box-shadow: 0 0 22px rgba(255,255,255,.22);
+}
+.cv-play {
+  display: grid; place-items: center; width: 64px; height: 64px; border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.16); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.12), rgba(255,255,255,.02));
+  box-shadow: 0 0 36px -8px rgba(232,236,242,.45); animation: cv-pulse 4s ease-in-out infinite;
+}
+.cv-skeleton {
+  background: linear-gradient(100deg, rgba(255,255,255,.04) 30%, rgba(255,255,255,.1) 50%, rgba(255,255,255,.04) 70%);
+  background-size: 200% 100%; animation: cv-skel 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv-frame-border, .cv-title, .cv-glow, .cv-play, .cv-lock-ring, .cv-spinner, .cv-skeleton { animation: none !important; }
+}
+`;
+=== END FILE ===
+

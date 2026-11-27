@@ -1,0 +1,1362 @@
+=== FILE: src/components/aura/AccessGate.tsx ===
+// src/components/aura/AccessGate.tsx
+//
+// Wrap the <Outlet /> in __root.tsx with this component.
+// A signed-in user WITHOUT an active plan (and who is not staff) sees the lock screen
+// on every page except the public ones listed in lib/access.ts.
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { Loader2, Lock } from "lucide-react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import PricingCards from "@/components/aura/PricingCards";
+import { supabase } from "@/lib/supabase";
+import { cleanupDeadSubscriptions, fetchAccess, isPublicPath } from "@/lib/access";
+
+type Phase = "loading" | "allowed" | "locked" | "error";
+interface Result {
+  uid: string;
+  phase: Phase;
+  hadPlan: boolean;
+}
+
+const RECHECK_MS = 60_000; // while the user has access
+const RECHECK_LOCKED_MS = 5_000; // while locked: picks up a payment that just went through
+
+export default function AccessGate({ children }: { children: ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [authReady, setAuthReady] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [res, setRes] = useState<Result | null>(null);
+
+  const resRef = useRef<Result | null>(null);
+  resRef.current = res;
+  const requestRef = useRef(0);
+  const cleanedFor = useRef<string | null>(null);
+
+  const publicRoute = isPublicPath(pathname);
+  const needsCheck = authReady && !!userId && !publicRoute;
+  const phase: Phase = res && res.uid === userId ? res.phase : "loading";
+  const hadPlan = res && res.uid === userId ? res.hadPlan : false;
+
+  /* ---- who is signed in ---- */
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setUserId(data.session?.user.id ?? null);
+      setAuthReady(true);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user.id ?? null);
+      setAuthReady(true);
+    });
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  /* ---- the access check ---- */
+  const check = useCallback(async (uid: string, silent: boolean) => {
+    const req = ++requestRef.current;
+    if (!silent) {
+      setRes((r) => ({ uid, phase: "loading", hadPlan: r?.uid === uid ? r.hadPlan : false }));
+    }
+    try {
+      const state = await fetchAccess(uid);
+      if (req !== requestRef.current) return;
+
+      if (state.hasAccess) {
+        setRes({ uid, phase: "allowed", hadPlan: false });
+        return;
+      }
+
+      setRes((r) => ({
+        uid,
+        phase: "locked",
+        hadPlan: state.hadPlan || (r?.uid === uid && r.hadPlan),
+      }));
+
+      // Remove the dead plan from the database (once per locked user).
+      if (cleanedFor.current !== uid) {
+        cleanedFor.current = uid;
+        await cleanupDeadSubscriptions();
+      }
+    } catch (err) {
+      if (req !== requestRef.current) return;
+      console.error("[AccessGate] access check failed:", err);
+      // A failed re-check must not kick out someone we already verified; otherwise fail closed.
+      setRes((r) => (r && r.uid === uid && r.phase === "allowed" ? r : { uid, phase: "error", hadPlan: false }));
+    }
+  }, []);
+
+  // Check when the user or the page changes.
+  useEffect(() => {
+    if (!needsCheck || !userId) return;
+    const current = resRef.current;
+    const known = current?.uid === userId && (current.phase === "allowed" || current.phase === "locked");
+    void check(userId, known);
+  }, [needsCheck, userId, pathname, check]);
+
+  // Re-check regularly and when the tab becomes visible again.
+  useEffect(() => {
+    if (!needsCheck || !userId) return;
+    const every = phase === "locked" ? RECHECK_LOCKED_MS : RECHECK_MS;
+    const id = window.setInterval(() => void check(userId, true), every);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void check(userId, true);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [needsCheck, userId, phase, check]);
+
+  /* ---- what to render ---- */
+  if (!publicRoute && !authReady) return <GateLoader />;
+  if (!needsCheck) return <>{children}</>; // signed out (routes handle it) or a public page
+  if (phase === "allowed") return <>{children}</>;
+  if (phase === "locked") return <LockedScreen hadPlan={hadPlan} />;
+  if (phase === "error") return <GateError onRetry={() => userId && void check(userId, false)} />;
+  return <GateLoader />;
+}
+
+/* ------------------------------------------------------------------ */
+
+function useSignOut() {
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+  const signOut = useCallback(async () => {
+    setSigningOut(true);
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error("[AccessGate] sign out failed:", err);
+    } finally {
+      setSigningOut(false);
+      navigate({ to: "/" });
+    }
+  }, [navigate]);
+  return { signOut, signingOut };
+}
+
+function GateLoader() {
+  return (
+    <div className="flex min-h-screen w-full items-center justify-center bg-aura-bg" role="status" aria-label="Loading">
+      <Loader2 className="size-7 animate-spin text-white/60" />
+    </div>
+  );
+}
+
+function GateError({ onRetry }: { onRetry: () => void }) {
+  const { signOut, signingOut } = useSignOut();
+  return (
+    <div className="flex min-h-screen w-full flex-col items-center justify-center gap-5 bg-aura-bg px-6 text-center text-white">
+      <p className="max-w-sm text-sm text-white/65" role="alert">
+        We couldn’t verify your access. Check your connection and try again.
+      </p>
+      <div className="flex flex-wrap justify-center gap-3">
+        <ChromeButton type="button" onClick={onRetry}>
+          TRY AGAIN
+        </ChromeButton>
+        <ChromeButton type="button" variant="secondary" onClick={() => void signOut()} disabled={signingOut}>
+          SIGN OUT
+        </ChromeButton>
+      </div>
+    </div>
+  );
+}
+
+function LockedScreen({ hadPlan }: { hadPlan: boolean }) {
+  const { signOut, signingOut } = useSignOut();
+
+  return (
+    <div className="relative min-h-screen w-full overflow-x-clip bg-aura-bg px-5 pb-24 pt-28 text-white sm:px-8 sm:pt-32">
+      <div className="aura-grain" aria-hidden />
+      <div className="hero-atmosphere absolute inset-0" aria-hidden />
+
+      <div className="relative z-10 mx-auto max-w-6xl">
+        <header className="mx-auto max-w-2xl text-center">
+          <span className="mx-auto grid size-14 place-items-center rounded-full border border-white/20 bg-white/[0.05] shadow-[0_0_44px_-8px_rgba(232,236,242,0.6)]">
+            <Lock className="size-6 text-white/90" />
+          </span>
+          <span className="chrome-text mt-6 block text-[11px] font-semibold uppercase tracking-[0.5em]">
+            Members only
+          </span>
+          <h1 className="chrome-text mt-4 text-3xl font-bold tracking-tight sm:text-5xl">
+            Join AURA to unlock access
+          </h1>
+          <p className="mx-auto mt-5 max-w-lg text-sm leading-relaxed text-white/60 sm:text-base">
+            You need an active plan to access the Academy. Choose your plan below and you’re in.
+          </p>
+          {hadPlan && (
+            <p className="mx-auto mt-3 max-w-lg text-xs leading-relaxed text-white/40">
+              Your previous plan has ended or could not be renewed.
+            </p>
+          )}
+        </header>
+
+        <section className="mt-14" aria-label="Plans">
+          <PricingCards />
+        </section>
+
+        <div className="mt-14 flex justify-center">
+          <ChromeButton type="button" variant="secondary" onClick={() => void signOut()} disabled={signingOut}>
+            {signingOut ? "SIGNING OUT…" : "SIGN OUT"}
+          </ChromeButton>
+        </div>
+      </div>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/AuraWidgetPanel.tsx ===
+import { useEffect, useRef } from "react";
+import AuraFace from "./AuraFace";
+import type { AuraChat } from "./useAuraChat";
+import { useLockedViewport, useMediaQuery } from "./useLockedViewport";
+import { ChatComposer, ChatMessages, ChatMeter, CloseIcon, MuteIcon, SpeakerIcon } from "./AuraChatParts";
+import "./aura-ai.css";
+
+const POP_CSS = `
+@keyframes aura-pop { from { opacity: 0; transform: translateY(14px) scale(0.97); } to { opacity: 1; transform: none; } }
+.aura-pop { animation: aura-pop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@media (prefers-reduced-motion: reduce) { .aura-pop { animation: none; } }
+`;
+
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+type Props = { chat: AuraChat; onClose: () => void };
+
+/**
+ * Το «ελαφρύ» AURA AI: ίδιος χαρακτήρας με lip-sync, ίδια συζήτηση, όρια, κάρτες και φωνή με τη σελίδα /ai.
+ * Desktop: κάρτα κάτω δεξιά. Κινητό: πλήρης οθόνη κλειδωμένη πάνω από το πληκτρολόγιο (τύπου Instagram DM).
+ */
+export default function AuraWidgetPanel({ chat, onClose }: Props) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const vp = useLockedViewport(isMobile);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [chat.messages, chat.loading, vp.keyboard, vp.height]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const { speaking, loading, voiceOn } = chat;
+  const status = speaking ? "Μιλάει…" : loading ? "Σκέφτεται…" : "Online";
+
+  const base = vp.height || (typeof window !== "undefined" ? window.innerHeight : 700);
+  const avatarH = isMobile ? (vp.keyboard ? clamp(base * 0.3, 140, 200) : clamp(base * 0.38, 200, 380)) : 210;
+
+  const body = (
+    <>
+      <style>{POP_CSS}</style>
+
+      <div className="relative shrink-0 transition-[height] duration-300 ease-out" style={{ height: avatarH }}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_35%,rgba(150,170,210,0.22),transparent_70%)]" />
+        <AuraFace getViseme={chat.getViseme} fit="cover" fadeBottom className="h-full w-full" />
+
+        {/* επάνω μπάρα πάνω στον χαρακτήρα */}
+        <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-3 pb-6 pt-[max(10px,env(safe-area-inset-top))] md:pt-3">
+          <div className="flex items-center gap-2 text-[11px] tracking-widest text-slate-200">
+            <span className="aai-live" />
+            <span className="aai-chrome-text text-sm font-semibold">AURA</span>
+            <span className="text-slate-400">{status}</span>
+            <span className={`aai-eq ${speaking ? "on" : ""}`}><i /><i /><i /><i /><i /></span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {chat.messages.length > 0 && (
+              <button className="aai-chip" onClick={chat.newChat}>Νέα</button>
+            )}
+            <button
+              className="aai-icon-btn"
+              onClick={chat.toggleVoice}
+              aria-label={voiceOn ? "Σίγαση" : "Ενεργοποίηση φωνής"}
+            >
+              {voiceOn ? <SpeakerIcon /> : <MuteIcon />}
+            </button>
+            <button className="aai-icon-btn" onClick={onClose} aria-label="Κλείσιμο">
+              <CloseIcon />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div ref={listRef} className="aai-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3">
+        {/* στο κινητό, όταν ανοίγεις μια κάρτα η οθόνη κλείνει ώστε να δεις τη σελίδα */}
+        <ChatMessages chat={chat} onNavigate={isMobile ? onClose : undefined} />
+      </div>
+
+      <div
+        className="shrink-0 border-t border-white/10 bg-black/50 px-3 pt-2"
+        style={{ paddingBottom: isMobile ? (vp.keyboard ? 8 : "max(10px, env(safe-area-inset-bottom))") : 12 }}
+      >
+        <ChatComposer chat={chat} />
+        <div className="mt-2"><ChatMeter chat={chat} /></div>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <section
+        role="dialog"
+        aria-label="AURA AI"
+        className="aura-pop fixed inset-x-0 z-[90] flex flex-col overflow-hidden bg-[#030304] text-white"
+        style={{ top: vp.top, height: vp.height || "100dvh" }}
+      >
+        {body}
+      </section>
+    );
+  }
+
+  return (
+    <section
+      role="dialog"
+      aria-label="AURA AI"
+      className="aura-pop fixed bottom-24 right-5 z-[80] flex h-[min(680px,calc(100dvh-7.5rem))] w-[400px] max-w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#05060a]/95 text-white shadow-[0_30px_90px_-20px_rgba(0,0,0,0.9),0_0_60px_-20px_rgba(160,185,230,0.35)] backdrop-blur-xl"
+    >
+      {body}
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/eyeBlink.ts ===
+// eyeBlink.ts
+// Ρεαλιστικό ανοιγοκλείσιμο ματιών πάνω σε φωτογραφία. Δεν εξαρτάται από DOM/React.
+//
+// Πώς δουλεύει: το πάνω βλέφαρο «κατεβαίνει» και το κάτω «ανεβαίνει» με αντικατάσταση
+// pixels (όχι σχεδιασμένο βλέφαρο). Η άκρη του βλεφάρου κινείται άκαμπτα, το δέρμα
+// ανάμεσα στην πτυχή και την άκρη τεντώνεται από θολωμένη πηγή (χωρίς «ραβδώσεις»),
+// και στο κλείσιμο φαίνεται λεπτή γραμμή βλεφαρίδων. Το βλέφαρο ρίχνει και μικρή σκιά
+// πάνω στον βολβό.
+
+export type Pt = readonly [number, number];
+/** Άκρες βλεφάρων σε κλίμακα 0..1 της εικόνας. `up` = γραμμή πάνω βλεφάρου, `lo` = κάτω βλεφάρου. */
+export type EyeSpec = { readonly up: readonly Pt[]; readonly lo: readonly Pt[] };
+
+// Διαστάσεις σε pixels για μάτι πλάτους 98px (κλιμακώνονται με το πραγματικό πλάτος του ματιού)
+const REF_EYE_W = 98;
+const LID_H = 17; // ύψος δέρματος βλεφάρου από την πτυχή ως την άκρη
+const LOWER_H = 9; // δέρμα κάτω βλεφάρου που συμμετέχει
+const EDGE_UP = 4; // πόσο της άκρης του πάνω βλεφάρου κινείται άκαμπτα
+const EDGE_LO = 2;
+const SHADOW_DEPTH = 5;
+const SHADOW = 0.32; // σκιά του βλεφάρου πάνω στον βολβό
+const SHEEN = 0.22; // μεταλλική λάμψη στο κλειστό βλέφαρο
+const CLOSE_AT = 0.86; // το πάνω βλέφαρο διανύει το 86% του ανοίγματος, το κάτω το υπόλοιπο
+
+export type EyeRuntime = {
+  /** Ορθογώνιο του καμβά που ξαναζωγραφίζεται */
+  rx: number;
+  ry: number;
+  w: number;
+  h: number;
+  /** Αρχικά pixels της περιοχής (RGBA) */
+  orig: Uint8ClampedArray;
+  soft: Uint8ClampedArray;
+  fine: Uint8ClampedArray;
+  /** Άκρες βλεφάρων ανά στήλη, σε τοπικές συντεταγμένες περιοχής */
+  yT: Float32Array;
+  yB: Float32Array;
+  lx0: number;
+  cols: number;
+  s: number;
+};
+
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const sstep = (t: number) => {
+  const x = clamp01(t);
+  return x * x * (3 - 2 * x);
+};
+
+function curveY(pts: readonly Pt[], x: number, W: number, H: number): number {
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  if (x <= first[0] * W) return first[1] * H;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    const ax = a[0] * W;
+    const bx = b[0] * W;
+    if (x <= bx) {
+      const t = (x - ax) / (bx - ax);
+      return (a[1] + (b[1] - a[1]) * t) * H;
+    }
+  }
+  return last[1] * H;
+}
+
+function smooth(a: Float32Array, radius: number, passes: number): Float32Array {
+  let src = a;
+  const n = a.length;
+  for (let p = 0; p < passes; p++) {
+    const dst = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      let sum = 0;
+      for (let j = -radius; j <= radius; j++) sum += src[Math.min(n - 1, Math.max(0, i + j))];
+      dst[i] = sum / (2 * radius + 1);
+    }
+    src = dst;
+  }
+  return src;
+}
+
+function boxBlur(src: Uint8ClampedArray, w: number, h: number, r: number, passes = 2): Uint8ClampedArray {
+  let cur = new Float32Array(src.length);
+  for (let i = 0; i < src.length; i++) cur[i] = src[i];
+  const tmp = new Float32Array(src.length);
+  const win = 2 * r + 1;
+  for (let p = 0; p < passes; p++) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let k = 0; k < 3; k++) {
+          let sum = 0;
+          for (let j = -r; j <= r; j++) sum += cur[(y * w + Math.min(w - 1, Math.max(0, x + j))) * 4 + k];
+          tmp[(y * w + x) * 4 + k] = sum / win;
+        }
+        tmp[(y * w + x) * 4 + 3] = 255;
+      }
+    }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        for (let k = 0; k < 3; k++) {
+          let sum = 0;
+          for (let j = -r; j <= r; j++) sum += tmp[(Math.min(h - 1, Math.max(0, y + j)) * w + x) * 4 + k];
+          cur[(y * w + x) * 4 + k] = sum / win;
+        }
+        cur[(y * w + x) * 4 + 3] = 255;
+      }
+    }
+  }
+  const out = new Uint8ClampedArray(src.length);
+  for (let i = 0; i < out.length; i++) out[i] = cur[i];
+  return out;
+}
+
+/** Προετοιμάζει ένα μάτι. `getRegion` γυρίζει τα RGBA pixels ενός ορθογωνίου της εικόνας. */
+export function buildEye(
+  spec: EyeSpec,
+  W: number,
+  H: number,
+  getRegion: (x: number, y: number, w: number, h: number) => Uint8ClampedArray,
+): EyeRuntime {
+  const all = [...spec.up, ...spec.lo];
+  const x0 = Math.floor(Math.min(...all.map((p) => p[0])) * W);
+  const x1 = Math.ceil(Math.max(...all.map((p) => p[0])) * W);
+  const cols = x1 - x0 + 1;
+  const s = (x1 - x0) / REF_EYE_W;
+
+  let top: Float32Array = new Float32Array(cols);
+  let bot: Float32Array = new Float32Array(cols);
+  for (let i = 0; i < cols; i++) {
+    top[i] = curveY(spec.up, x0 + i, W, H);
+    bot[i] = curveY(spec.lo, x0 + i, W, H);
+  }
+  const rad = Math.max(1, Math.round(3 * s));
+  top = smooth(top, rad, 3);
+  bot = smooth(bot, rad, 3);
+
+  let minTop = Infinity;
+  let maxBot = -Infinity;
+  for (let i = 0; i < cols; i++) {
+    minTop = Math.min(minTop, top[i]);
+    maxBot = Math.max(maxBot, bot[i]);
+  }
+  const lidH = LID_H * s;
+  const lowH = LOWER_H * s;
+  const rx = Math.max(0, x0 - 2);
+  const ry = Math.max(0, Math.floor(minTop - lidH) - 3);
+  const w = Math.min(W, x1 + 3) - rx;
+  const h = Math.min(H, Math.ceil(maxBot + lowH) + 3) - ry;
+
+  const orig = new Uint8ClampedArray(getRegion(rx, ry, w, h));
+  const soft = boxBlur(orig, w, h, Math.max(1, Math.round(2 * s)), 2);
+  const fine = boxBlur(orig, w, h, 1, 1);
+
+  for (let i = 0; i < cols; i++) {
+    top[i] -= ry;
+    bot[i] -= ry;
+  }
+  return { rx, ry, w, h, orig, soft, fine, yT: top, yB: bot, lx0: x0 - rx, cols, s };
+}
+
+/** Ζωγραφίζει το μάτι με κλείσιμο c (0 = ανοιχτό, 1 = κλειστό) μέσα στο `out` (RGBA περιοχής). */
+export function renderEye(e: EyeRuntime, c: number, out: Uint8ClampedArray): void {
+  const { w, h, orig, soft, fine, yT, yB, lx0, cols, s } = e;
+  out.set(orig);
+  if (c <= 0.002) return;
+
+  const lidH = LID_H * s;
+  const lowH = LOWER_H * s;
+  const mUp = EDGE_UP * s;
+  const mLo = EDGE_LO * s;
+  const shDepth = SHADOW_DEPTH * s;
+  const ramp = 8 * s;
+  const wBlend = Math.min(1, c * 2.5);
+  const shadowK = SHADOW * Math.min(1, c * 3);
+  const sheenK = SHEEN * Math.pow(c, 1.5);
+  const lashK = c > 0.6 ? Math.pow(sstep((c - 0.6) / 0.4), 1.3) : 0;
+  const maxY = h - 1.001;
+  const cxMid = lx0 + (cols - 1) / 2;
+  const halfW = Math.max(1, (cols - 1) / 2);
+
+  const a = [0, 0, 0];
+  const b = [0, 0, 0];
+  const sample = (arr: Uint8ClampedArray, lx: number, sy: number, dst: number[]) => {
+    const yy = sy < 0 ? 0 : sy > maxY ? maxY : sy;
+    const y0 = Math.floor(yy);
+    const f = yy - y0;
+    const i0 = (y0 * w + lx) * 4;
+    const i1 = ((y0 + 1) * w + lx) * 4;
+    dst[0] = arr[i0] * (1 - f) + arr[i1] * f;
+    dst[1] = arr[i0 + 1] * (1 - f) + arr[i1 + 1] * f;
+    dst[2] = arr[i0 + 2] * (1 - f) + arr[i1 + 2] * f;
+  };
+
+  for (let i = 0; i < cols; i++) {
+    const lx = lx0 + i;
+    if (lx < 0 || lx >= w) continue;
+    const top = yT[i];
+    const bot = yB[i];
+    const gap = bot - top;
+    if (gap < 1.5 * s) continue; // στις γωνίες του ματιού δεν υπάρχει άνοιγμα
+
+    const yC = top + CLOSE_AT * gap; // γραμμή κλεισίματος
+    const yU = top + c * (yC - top); // άκρη πάνω βλεφάρου τώρα
+    const yL = bot - c * (bot - yC); // άκρη κάτω βλεφάρου τώρα
+    const yCr = top - lidH; // πτυχή βλεφάρου (σταθερή)
+    const yEnd = bot + lowH;
+    const move = sstep((yU - top) / (3 * s)); // στήλες που σχεδόν δεν κινούνται κρατούν τα αρχικά pixels
+    const lat = sstep(i / (10 * s)) * sstep((cols - 1 - i) / (10 * s)); // σβήσιμο προς τις γωνίες
+    const u = (lx - cxMid) / halfW;
+    const sheenX = Math.pow(Math.max(0, 1 - u * u), 1.4);
+
+    const y0 = Math.max(0, Math.floor(yCr));
+    const y1 = Math.min(h - 1, Math.ceil(yEnd));
+    for (let y = y0; y <= y1; y++) {
+      if (y < yCr || y > yEnd) continue;
+      const o = (y * w + lx) * 4;
+
+      const sh = clamp01(1 - (y + 0.5 - yU) / shDepth) * shadowK;
+      let r = orig[o] * (1 - sh);
+      let g = orig[o + 1] * (1 - sh);
+      let bl = orig[o + 2] * (1 - sh);
+
+      const covU = clamp01(yU - y);
+      if (covU > 0) {
+        const rigid = y >= yU - mUp;
+        let sy: number;
+        let amt: number;
+        if (rigid) {
+          sy = top - (yU - y); // άκρη βλεφάρου: μετακινείται άκαμπτα
+          amt = 0.55 * wBlend * move;
+        } else {
+          const t = clamp01((y - yCr) / Math.max(1e-3, yU - mUp - yCr));
+          sy = yCr + t * (top - mUp - yCr); // δέρμα βλεφάρου: τεντώνεται
+          amt = wBlend * move * sstep((y - yCr) / ramp);
+        }
+        sample(orig, lx, sy, a);
+        if (amt > 0) {
+          sample(rigid ? fine : soft, lx, sy, b);
+          a[0] = a[0] * (1 - amt) + b[0] * amt;
+          a[1] = a[1] * (1 - amt) + b[1] * amt;
+          a[2] = a[2] * (1 - amt) + b[2] * amt;
+        }
+        if (!rigid && sheenK > 0) {
+          const tt = clamp01((y - yCr) / Math.max(1e-3, yU - yCr));
+          const amp = sheenK * Math.exp(-Math.pow((tt - 0.42) / 0.17, 2)) * sheenX;
+          a[0] += (255 - a[0]) * amp;
+          a[1] += (255 - a[1]) * amp;
+          a[2] += (255 - a[2]) * amp;
+        }
+        r = r * (1 - covU) + a[0] * covU;
+        g = g * (1 - covU) + a[1] * covU;
+        bl = bl * (1 - covU) + a[2] * covU;
+      }
+
+      const covL = clamp01(y + 1 - yL);
+      if (covL > 0) {
+        const rigid = y <= yL + mLo;
+        let sy: number;
+        let amt: number;
+        if (rigid) {
+          sy = bot + (y - yL);
+          amt = 0.55 * wBlend * move;
+        } else {
+          const t = clamp01((y - (yL + mLo)) / Math.max(1e-3, bot + lowH - (yL + mLo)));
+          sy = bot + mLo + t * (lowH - mLo);
+          amt = wBlend * move;
+        }
+        sample(orig, lx, sy, a);
+        if (amt > 0) {
+          sample(rigid ? fine : soft, lx, sy, b);
+          a[0] = a[0] * (1 - amt) + b[0] * amt;
+          a[1] = a[1] * (1 - amt) + b[1] * amt;
+          a[2] = a[2] * (1 - amt) + b[2] * amt;
+        }
+        r = r * (1 - covL) + a[0] * covL;
+        g = g * (1 - covL) + a[1] * covL;
+        bl = bl * (1 - covL) + a[2] * covL;
+      }
+
+      // στις γωνίες του ματιού το αποτέλεσμα σβήνει προς την αρχική εικόνα
+      out[o] = orig[o] * (1 - lat) + r * lat;
+      out[o + 1] = orig[o + 1] * (1 - lat) + g * lat;
+      out[o + 2] = orig[o + 2] * (1 - lat) + bl * lat;
+      out[o + 3] = 255;
+    }
+
+    // γραμμή βλεφαρίδων: λεία (gaussian), με ακρίβεια κάτω του pixel
+    if (lashK > 0) {
+      const base = Math.floor(yC);
+      for (let yy = base - 3; yy <= base + 3; yy++) {
+        if (yy < 0 || yy >= h) continue;
+        const dy = yy + 0.5 - yC;
+        const k = Math.exp(-(dy * dy) / (2 * 0.85 * 0.85)) * 0.6 * lashK * lat;
+        const o = (yy * w + lx) * 4;
+        out[o] = out[o] * (1 - k) + 22 * k;
+        out[o + 1] = out[o + 1] * (1 - k) + 20 * k;
+        out[o + 2] = out[o + 2] * (1 - k) + 22 * k;
+      }
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Χρονισμός: πότε και πώς ανοιγοκλείνουν τα μάτια                      */
+/* ------------------------------------------------------------------ */
+
+type Blink = { start: number; amp: number; close: number; hold: number; open: number; double: boolean };
+
+/** Καμπύλη κλεισίματος: γρήγορη κάθοδος, μικρή παύση, πιο αργή άνοδος (~280ms συνολικά). */
+export function closureAt(b: Pick<Blink, "amp" | "close" | "hold" | "open">, t: number): number {
+  if (t < 0) return 0;
+  if (t < b.close) {
+    const x = t / b.close;
+    return b.amp * (x * x * (3 - 2 * x));
+  }
+  if (t < b.close + b.hold) return b.amp;
+  const x = (t - b.close - b.hold) / b.open;
+  if (x >= 1) return 0;
+  return b.amp * Math.pow(1 - x, 1.7);
+}
+
+export class BlinkController {
+  private nextAt = 0;
+  private cur: Blink | null = null;
+  private lastNow = 0;
+  private pendingDouble = false;
+
+  constructor(private readonly rand: () => number = Math.random) {}
+
+  /** Αναγκάζει ένα βλεφάρισμα τώρα (π.χ. για δοκιμή). */
+  trigger(now: number, amp = 1): void {
+    this.cur = this.make(now, amp, false);
+    this.lastNow = now;
+  }
+
+  /** Όταν αρχίζει να μιλά, συχνά ακολουθεί ένα φυσικό βλεφάρισμα. */
+  nudge(now: number): void {
+    if (this.cur) return;
+    if (this.nextAt - now > 700 && this.rand() < 0.55) this.nextAt = now + 150 + this.rand() * 300;
+  }
+
+  /** Καλείται σε κάθε frame. Γυρίζει το κλείσιμο 0..1. */
+  update(now: number, speaking: boolean): number {
+    // πρώτη φορά ή επιστροφή από κρυμμένο tab: ξεκίνα ήρεμα
+    if (this.lastNow === 0 || now - this.lastNow > 1000) {
+      this.cur = null;
+      this.nextAt = now + 700 + this.rand() * 900;
+    }
+    this.lastNow = now;
+
+    if (!this.cur && now >= this.nextAt) {
+      const amp = this.pendingDouble ? 0.85 + this.rand() * 0.15 : this.rand() < 0.12 ? 0.55 + this.rand() * 0.25 : 1;
+      this.cur = this.make(now, amp, !this.pendingDouble && amp === 1 && this.rand() < 0.14);
+      this.pendingDouble = false;
+    }
+    const cur = this.cur;
+    if (!cur) return 0;
+
+    const t = now - cur.start;
+    if (t >= cur.close + cur.hold + cur.open) {
+      this.cur = null;
+      if (cur.double) {
+        this.pendingDouble = true;
+        this.nextAt = now + 110 + this.rand() * 120; // διπλό βλεφάρισμα
+      } else {
+        const base = 1900 + this.rand() * 3800; // ~3.8s κατά μέσο όρο (≈15 βλεφαρίσματα/λεπτό)
+        const stare = this.rand() < 0.06 ? 2500 : 0; // πού και πού «κοιτάζει» χωρίς να βλεφαρίζει
+        this.nextAt = now + (base + stare) * (speaking ? 0.8 : 1);
+      }
+      return 0;
+    }
+    return closureAt(cur, t);
+  }
+
+  private make(now: number, amp: number, dbl: boolean): Blink {
+    const full = amp >= 0.99;
+    return {
+      start: now,
+      amp,
+      close: 70 + this.rand() * 30,
+      hold: full ? 20 + this.rand() * 30 : 0,
+      open: (full ? 140 : 110) + this.rand() * 70,
+      double: dbl,
+    };
+  }
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/portfolio/PortfolioProfilePage.tsx ===
+// src/components/aura/portfolio/PortfolioProfilePage.tsx
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowLeft, Gem, Heart, ImagePlus, Instagram, Lock, MapPin, Pencil, Plus } from "lucide-react";
+import {
+  deletePost,
+  fetchPortfolio,
+  fetchPosts,
+  imageUrl,
+  toggleLike,
+  useIsElite,
+  type PortfolioInfo,
+  type PortfolioPost,
+} from "@/lib/portfolio";
+import { useAuthUser } from "@/lib/useAuthUser";
+import { pfCss } from "./pfStyles";
+import PostViewer from "./PostViewer";
+import NewPostModal from "./NewPostModal";
+import UpgradePopup from "./UpgradePopup";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+
+async function loadAllPosts(userId: string): Promise<PortfolioPost[]> {
+  const all: PortfolioPost[] = [];
+  for (let offset = 0; offset < 200; offset += 100) {
+    const page = await fetchPosts(userId, offset, 100);
+    all.push(...page);
+    if (page.length < 100) break;
+  }
+  return all;
+}
+
+export default function PortfolioProfilePage({ slug }: { slug: string }) {
+  const { user, loading: authLoading } = useAuthUser();
+  const { isElite, loading: eliteLoading } = useIsElite(user?.id);
+
+  const [info, setInfo] = useState<PortfolioInfo | null>(null);
+  const [posts, setPosts] = useState<PortfolioPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewIndex, setViewIndex] = useState<number | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  // Load the portfolio + its posts. Re-runs when the user (auth) changes so "liked_by_me" is right.
+  useEffect(() => {
+    if (authLoading) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+    (async () => {
+      try {
+        const p = await fetchPortfolio(slug);
+        if (!active) return;
+        setInfo(p);
+        if (p) setPosts(await loadAllPosts(p.user_id));
+        else setPosts([]);
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : "Κάτι πήγε στραβά.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [slug, authLoading, user?.id]);
+
+  // "Upgrade to Elite" popup for everyone who is not Elite and opens someone else's portfolio.
+  useEffect(() => {
+    if (authLoading || eliteLoading || loading || !info || info.is_owner || isElite) return;
+    const key = "aura_pf_upgrade_seen";
+    try {
+      if (sessionStorage.getItem(key) === slug) return;
+    } catch {
+      /* ignore */
+    }
+    const t = window.setTimeout(() => {
+      setShowUpgrade(true);
+      try {
+        sessionStorage.setItem(key, slug);
+      } catch {
+        /* ignore */
+      }
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [authLoading, eliteLoading, loading, info, isElite, slug]);
+
+  const handleLike = useCallback(
+    async (postId: string) => {
+      if (!user) return;
+      const flip = (list: PortfolioPost[]) =>
+        list.map((p) =>
+          p.id === postId
+            ? { ...p, liked_by_me: !p.liked_by_me, like_count: Math.max(0, p.like_count + (p.liked_by_me ? -1 : 1)) }
+            : p,
+        );
+      setPosts(flip); // optimistic
+      try {
+        const res = await toggleLike(postId);
+        setPosts((list) => list.map((p) => (p.id === postId ? { ...p, liked_by_me: res.liked, like_count: res.like_count } : p)));
+      } catch {
+        setPosts(flip); // revert
+      }
+    },
+    [user],
+  );
+
+  const handleDelete = useCallback(
+    async (post: PortfolioPost) => {
+      await deletePost(post);
+      setPosts((list) => list.filter((p) => p.id !== post.id));
+      setViewIndex((i) => {
+        if (i === null) return null;
+        const remaining = posts.length - 1;
+        if (remaining <= 0) return null;
+        return Math.min(i, remaining - 1);
+      });
+    },
+    [posts.length],
+  );
+
+  const handlePublished = useCallback((post: PortfolioPost) => {
+    setPosts((list) => [post, ...list]);
+    setUploading(false);
+  }, []);
+
+  const totalLikes = posts.reduce((n, p) => n + p.like_count, 0);
+  const canPost = Boolean(info?.is_owner && info.is_live && user);
+
+  /* ------------------------------ states ------------------------------ */
+  const shell = (children: React.ReactNode) => (
+    <main className="pf-root relative min-h-screen overflow-hidden bg-[#050506] px-4 pb-28 pt-28 text-white sm:px-6">
+      <style>{pfCss}</style>
+      <div className="pf-grid-bg absolute inset-x-0 top-0 h-[560px]" />
+      <div className="pf-orb -left-24 top-20 h-80 w-80" />
+      <div className="pf-orb -right-16 top-72 h-96 w-96" />
+      <div className="relative mx-auto max-w-4xl">{children}</div>
+    </main>
+  );
+
+  if (loading || authLoading) {
+    return shell(
+      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:gap-14">
+        <div className="pf-skel size-32 rounded-full sm:size-40" />
+        <div className="w-full flex-1 space-y-4">
+          <div className="pf-skel h-6 w-1/2 rounded" />
+          <div className="pf-skel h-4 w-2/3 rounded" />
+          <div className="pf-skel h-4 w-1/3 rounded" />
+        </div>
+      </div>,
+    );
+  }
+
+  if (error) {
+    return shell(
+      <p className="pf-toast mx-auto max-w-md" role="alert">
+        {error}
+      </p>,
+    );
+  }
+
+  if (!info) {
+    return shell(
+      <div className="pf-panel mx-auto max-w-md p-10 text-center">
+        <Lock className="mx-auto size-9 text-white/40" />
+        <h1 className="pf-title mt-4 text-2xl font-bold">Το portfolio δεν βρέθηκε</h1>
+        <p className="mt-2 text-sm text-white/55">Μπορεί να μην υπάρχει ή να μην είναι ενεργό αυτή τη στιγμή.</p>
+        <Link to="/portfolios" className="pf-btn pf-btn-solid mt-6">
+          <ArrowLeft className="size-4" /> Όλα τα portfolios
+        </Link>
+      </div>,
+    );
+  }
+
+  const name = info.display_name;
+
+  return (
+    <>
+      {shell(
+        <>
+          <Link to="/portfolios" className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-white/45 transition hover:text-white">
+            <ArrowLeft className="size-3.5" /> Portfolios
+          </Link>
+
+          {info.is_owner && !info.is_live && (
+            <div className="pf-toast mt-5" role="status">
+              <Lock className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Το portfolio σου είναι κρυφό γιατί η συνδρομή AURA ELITE δεν είναι ενεργή.{" "}
+                <Link to="/pricing" className="font-semibold underline underline-offset-4">
+                  Ανανέωσε
+                </Link>{" "}
+                για να εμφανιστεί ξανά.
+              </span>
+            </div>
+          )}
+
+          {/* ------------- profile header ------------- */}
+          <motion.section
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: EASE }}
+            className="mt-8 flex flex-col items-center gap-7 text-center sm:flex-row sm:items-start sm:gap-14 sm:text-left"
+          >
+            <span className="pf-ring" style={{ width: 148, height: 148 }}>
+              <span className="pf-ring-inner">
+                {info.avatar_url ? (
+                  <img src={info.avatar_url} alt={name} referrerPolicy="no-referrer" />
+                ) : (
+                  <span style={{ fontSize: 56 }}>{name.slice(0, 1).toUpperCase()}</span>
+                )}
+              </span>
+            </span>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                <h1 className="pf-title truncate text-2xl font-bold tracking-tight sm:text-3xl">{info.username ?? name}</h1>
+                <span className="pf-elite-badge">
+                  <Gem className="size-3" /> Elite
+                </span>
+              </div>
+
+              {info.is_owner && (
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+                  <Link to="/portfolios/create" className="pf-btn">
+                    <Pencil className="size-3.5" /> Επεξεργασία
+                  </Link>
+                  {canPost && (
+                    <button type="button" className="pf-btn pf-btn-solid" onClick={() => setUploading(true)}>
+                      <Plus className="size-4" /> Νέο post
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <ul className="mt-6 flex justify-center gap-8 text-sm sm:justify-start">
+                <li>
+                  <strong className="text-base font-semibold text-white">{posts.length}</strong>{" "}
+                  <span className="text-white/50">posts</span>
+                </li>
+                <li>
+                  <strong className="text-base font-semibold text-white">{totalLikes}</strong>{" "}
+                  <span className="text-white/50">likes</span>
+                </li>
+              </ul>
+
+              <div className="mt-5 space-y-1.5">
+                <p className="text-sm font-semibold text-white">{name}</p>
+                {info.headline && <p className="text-sm text-white/80">{info.headline}</p>}
+                {info.bio && <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-white/60">{info.bio}</p>}
+                <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 pt-2 text-xs text-white/55 sm:justify-start">
+                  {info.city && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin className="size-3.5" /> {info.city}
+                    </span>
+                  )}
+                  {info.instagram && (
+                    <a
+                      href={`https://instagram.com/${info.instagram}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 transition hover:text-white"
+                    >
+                      <Instagram className="size-3.5" /> @{info.instagram}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.section>
+
+          <div className="mt-12 border-t border-white/10" />
+
+          {/* ------------- grid ------------- */}
+          {posts.length === 0 ? (
+            <div className="mx-auto mt-14 max-w-sm text-center">
+              <ImagePlus className="mx-auto size-10 text-white/35" />
+              <p className="mt-4 text-sm text-white/55">
+                {info.is_owner ? "Ανέβασε την πρώτη σου δουλειά." : "Δεν υπάρχουν posts ακόμα."}
+              </p>
+              {canPost && (
+                <button type="button" className="pf-btn pf-btn-solid mt-6" onClick={() => setUploading(true)}>
+                  <Plus className="size-4" /> Νέο post
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="pf-tiles mt-6">
+              {posts.map((p, i) => (
+                <motion.button
+                  key={p.id}
+                  type="button"
+                  className="pf-tile"
+                  initial={{ opacity: 0, scale: 0.94 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, delay: Math.min(i, 12) * 0.04, ease: EASE }}
+                  onClick={() => setViewIndex(i)}
+                  aria-label={`Άνοιγμα post ${i + 1}`}
+                >
+                  <img src={imageUrl(p.image_path)} alt={p.caption ? p.caption.slice(0, 80) : ""} loading="lazy" />
+                  <span className="pf-tile-over">
+                    <Heart className="size-5" fill="currentColor" /> {p.like_count}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          )}
+        </>,
+      )}
+
+      {viewIndex !== null && posts[viewIndex] && (
+        <PostViewer
+          posts={posts}
+          index={viewIndex}
+          author={{ name, username: info.username, avatar: info.avatar_url }}
+          isOwner={info.is_owner}
+          canLike={Boolean(user)}
+          onClose={() => setViewIndex(null)}
+          onIndex={setViewIndex}
+          onLike={(id) => void handleLike(id)}
+          onDelete={handleDelete}
+        />
+      )}
+
+      {uploading && user && <NewPostModal userId={user.id} onClose={() => setUploading(false)} onPublished={handlePublished} />}
+
+      <AnimatePresence>{showUpgrade && <UpgradePopup onClose={() => setShowUpgrade(false)} />}</AnimatePresence>
+    </>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/academy-moderation.ts ===
+// src/lib/academy-moderation.ts
+import { supabase } from "@/lib/supabase";
+
+// Change this if your posts table has another name.
+export const POSTS_TABLE = "academy_posts";
+
+export const MOD_ROLES = ["admin", "super_admin", "operations"];
+export const isModeratorRole = (role?: string | null) => !!role && MOD_ROLES.includes(role);
+
+export interface PostingStatus {
+  banned: boolean;
+  reason: string | null;
+}
+
+export interface BannedUser {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  reason: string | null;
+  banned_at: string | null;
+}
+
+const ERROR_TEXT: Record<string, string> = {
+  POSTING_BANNED: "Η δημοσίευση έχει απενεργοποιηθεί για τον λογαριασμό σου.",
+  CANNOT_BAN_SELF: "Δεν μπορείς να αποκλείσεις τον εαυτό σου.",
+  CANNOT_BAN_MODERATOR: "Δεν μπορείς να αποκλείσεις άλλον διαχειριστή.",
+  USER_NOT_FOUND: "Ο χρήστης δεν βρέθηκε.",
+  FORBIDDEN: "Δεν έχεις δικαίωμα για αυτή την ενέργεια.",
+};
+
+/** Turns a raw Supabase / Postgres error into a friendly Greek message. */
+export function friendlyError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  for (const key of Object.keys(ERROR_TEXT)) if (msg.includes(key)) return ERROR_TEXT[key]!;
+  return msg;
+}
+
+/** Never throws: before the SQL is applied the columns do not exist yet. */
+export async function getMyPostingStatus(userId: string): Promise<PostingStatus> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("posting_banned, posting_ban_reason")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return { banned: false, reason: null };
+  const row = data as { posting_banned?: boolean; posting_ban_reason?: string | null };
+  return { banned: !!row.posting_banned, reason: row.posting_ban_reason ?? null };
+}
+
+export async function getBannedUsers(): Promise<BannedUser[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, avatar_url, posting_ban_reason, posting_banned_at")
+    .eq("posting_banned", true)
+    .order("posting_banned_at", { ascending: false });
+  if (error) throw new Error(friendlyError(new Error(error.message)));
+  return (data ?? []).map((r) => {
+    const row = r as {
+      id: string;
+      full_name: string | null;
+      avatar_url: string | null;
+      posting_ban_reason: string | null;
+      posting_banned_at: string | null;
+    };
+    return {
+      id: row.id,
+      full_name: row.full_name,
+      avatar_url: row.avatar_url,
+      reason: row.posting_ban_reason,
+      banned_at: row.posting_banned_at,
+    };
+  });
+}
+
+export async function setPostingBan(userId: string, banned: boolean, reason?: string): Promise<void> {
+  const { error } = await supabase.rpc("set_posting_ban", {
+    p_user: userId,
+    p_banned: banned,
+    p_reason: reason?.trim() || null,
+  });
+  if (error) throw new Error(friendlyError(new Error(error.message)));
+}
+
+export async function deletePostAsModerator(postId: string): Promise<void> {
+  const { data, error } = await supabase.from(POSTS_TABLE).delete().eq("id", postId).select("id");
+  if (error) throw new Error(friendlyError(new Error(error.message)));
+  // RLS silently deletes 0 rows when you are not allowed to
+  if (!data || data.length === 0) throw new Error("Δεν ήταν δυνατή η διαγραφή (δεν έχεις δικαίωμα).");
+}
+
+/** Best-effort author id: your post objects may use any of these field names. */
+export function getPostAuthorId(post: unknown): string | null {
+  const p = post as Record<string, unknown> & { author?: { id?: string } | null };
+  const id = p.author_id ?? p.user_id ?? p.profile_id ?? p.created_by ?? p.author?.id;
+  return typeof id === "string" ? id : null;
+}
+=== END FILE ===
+
+=== FILE: src/lib/database.types.ts ===
+// Hand-written types that mirror the AURA core schema.
+// Keep in sync if you later run `supabase gen types`.
+
+export type UserRole =
+  | "student" | "educator" | "senior_educator"
+  | "content_manager" | "operations" | "admin" | "super_admin";
+
+export type AuraLevel =
+  | "foundation" | "professional" | "advanced" | "master" | "educator";
+
+export type AccountStatus = "active" | "suspended" | "deleted";
+
+export type CourseStatus =
+  | "draft" | "review" | "approved" | "scheduled" | "published" | "archived";
+
+export type LessonType = "video" | "theory" | "practice";
+
+export type SkillCategory =
+  | "foundation" | "technical" | "analysis" | "design" | "business" | "educator";
+
+export type SkillState =
+  | "locked" | "learning" | "practicing" | "verified" | "mastered";
+
+export type SubmissionStatus =
+  | "draft" | "submitted" | "in_review" | "needs_revision" | "passed";
+
+export type ReviewDecision = "passed" | "needs_revision" | "failed";
+
+export type CertificationStatus =
+  | "not_started" | "in_progress" | "passed"
+  | "needs_improvement" | "failed" | "issued";
+
+export interface Profile {
+  id: string;
+  full_name: string | null;
+  role: UserRole;
+  level: AuraLevel;
+  status: AccountStatus;
+  country: string | null;
+  bio: string | null;
+  headline: string | null;
+  avatar_url: string | null;
+  city: string | null;
+  instagram: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string | null;
+  outcome: string | null;
+  audience: string | null;
+  level: AuraLevel;
+  estimated_hours: number | null;
+  status: CourseStatus;
+  version: number;
+  cover_url: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Module {
+  id: string;
+  course_id: string;
+  title: string;
+  objective: string | null;
+  sort_order: number;
+}
+
+export interface ResourceLink {
+  label: string;
+  url: string;
+}
+
+export interface LessonTimestamp {
+  label: string;
+  seconds: number;
+}
+
+export interface Lesson {
+  id: string;
+  module_id: string;
+  title: string;
+  type: LessonType;
+  objective: string | null;
+  video_url: string | null;
+  transcript: string | null;
+  resources: ResourceLink[];
+  timestamps: LessonTimestamp[];
+  sort_order: number;
+}
+
+export interface LessonProgress {
+  user_id: string;
+  lesson_id: string;
+  completed: boolean;
+  seconds_watched: number;
+  notes: string | null;
+  completed_at: string | null;
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  slug: string;
+  category: SkillCategory;
+  definition: string | null;
+  why_it_matters: string | null;
+  mastery_rule: string | null;
+  prerequisites: string[];
+  sort_order: number;
+}
+
+export interface UserSkill {
+  user_id: string;
+  skill_id: string;
+  state: SkillState;
+  score: number | null;
+  verified_at: string | null;
+}
+
+export interface RubricCriterion {
+  criterion: string;
+  weight: number;
+  max: number;
+}
+
+export interface Assignment {
+  id: string;
+  lesson_id: string | null;
+  skill_id: string | null;
+  title: string;
+  brief: string | null;
+  objective: string | null;
+  tools: string | null;
+  restrictions: string | null;
+  checklist: string[];
+  rubric: RubricCriterion[];
+}
+
+export interface Submission {
+  id: string;
+  assignment_id: string;
+  user_id: string;
+  status: SubmissionStatus;
+  before_media: string[];
+  process_media: string[];
+  after_media: string[];
+  client_context: string | null;
+  observations: string | null;
+  intended_result: string | null;
+  technique: string | null;
+  self_evaluation: string | null;
+  attempt: number;
+  submitted_at: string | null;
+  created_at: string;
+}
+
+export interface Review {
+  id: string;
+  submission_id: string;
+  educator_id: string;
+  score: number | null;
+  rubric_scores: { criterion: string; score: number }[];
+  strengths: string | null;
+  technical_gaps: string | null;
+  method_gaps: string | null;
+  next_actions: string | null;
+  decision: ReviewDecision;
+  created_at: string;
+}
+
+// Composite shapes returned by queries
+export type CourseWithTree = Course & {
+  modules: (Module & { lessons: Lesson[] })[];
+};
+
+export type SkillWithState = Skill & { userSkill: UserSkill | null };
+
+export type HaircutReviewStatus = "pending" | "reviewed";
+
+export interface HaircutReview {
+  id: string;
+  user_id: string;
+  method_description: string;
+  technique: string | null;
+  tools: string | null;
+  notes: string | null;
+  before_media: string[] | null;
+  process_media: string[] | null;
+  after_media: string[] | null;
+  status: string;
+  score: number | null;
+  feedback: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+=== END FILE ===
+

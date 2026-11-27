@@ -1,0 +1,1302 @@
+=== FILE: src/routes/gallery.tsx ===
+import { useEffect, useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  AnimatePresence,
+  animate,
+  motion,
+  useInView,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+  type MotionValue,
+} from "motion/react";
+import { ArrowRight, ChevronLeft, ChevronRight, Expand, Maximize, Minimize, Play, Scissors, X } from "lucide-react";
+import { GALLERY, GALLERY_BLOCKS, GALLERY_FINALE, PHOTO_COUNT, VIDEO_COUNT, type GalleryItem } from "@/lib/gallery";
+
+export const Route = createFileRoute("/gallery")({ component: GalleryRoute });
+
+const chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+const glow = "bg-[radial-gradient(circle,rgba(255,255,255,0.09),transparent_68%)]";
+const shimmerBtn =
+  "group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-8 py-4 text-base font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+
+const indexOfItem = (id: string) => GALLERY.findIndex((g) => g.id === id);
+
+/** One cheap IntersectionObserver per block (instead of one animation engine per tile). */
+function useShown<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -6% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return [ref, shown] as const;
+}
+
+function GalleryRoute() {
+  const reduce = !!useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const glowY = useTransform(scrollYProgress, [0, 1], [0, 1500]);
+  const orbY = useTransform(scrollYProgress, [0, 1], [0, -900]);
+  const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 240]);
+
+  const [open, setOpen] = useState<number | null>(null);
+  const openItem = (item: GalleryItem) => setOpen(indexOfItem(item.id));
+
+  return (
+    <main ref={ref} className="relative min-h-screen overflow-hidden bg-black pb-28 pt-28 text-white selection:bg-white selection:text-black">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px]"
+      />
+      <motion.div aria-hidden style={{ y: reduce ? 0 : glowY }} className={`pointer-events-none absolute -right-60 top-0 -z-10 h-[800px] w-[800px] rounded-full ${glow}`} />
+      <motion.div aria-hidden style={{ y: reduce ? 0 : orbY }} className={`pointer-events-none absolute -left-60 top-[2200px] -z-10 h-[800px] w-[800px] rounded-full ${glow}`} />
+      <motion.div aria-hidden style={{ rotate: reduce ? 0 : ringRotate }} className="pointer-events-none absolute -left-48 top-72 -z-10 h-[520px] w-[520px] rounded-full border border-dashed border-white/10" />
+      <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-10">
+        <motion.header initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}>
+          <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50">
+            <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
+            Portfolio
+          </div>
+          <h1 className="text-5xl font-extrabold leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
+            <motion.span
+              className="inline-block bg-clip-text text-transparent"
+              style={{
+                backgroundImage: "linear-gradient(110deg,#52525b 0%,#fafafa 25%,#a1a1aa 45%,#fafafa 60%,#52525b 100%)",
+                backgroundSize: "250% 100%",
+              }}
+              animate={reduce ? undefined : { backgroundPositionX: ["0%", "-250%"] }}
+              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+            >
+              Barbers' Gallery
+            </motion.span>
+          </h1>
+          <p className="mt-5 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+            AURA is a home for barbers who live for the craft. These are the people, the work and the moments
+            behind our academy. Open any piece to view it full screen.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            {[
+              { n: PHOTO_COUNT, label: "Photos" },
+              { n: VIDEO_COUNT, label: "Films" },
+            ].map((s) => (
+              <div key={s.label} className="flex items-baseline gap-2 rounded-full border border-white/15 bg-white/[0.04] px-5 py-2">
+                <span className={`text-xl font-bold ${chromeText}`}>
+                  <CountUp to={s.n} />
+                </span>
+                <span className="text-xs uppercase tracking-[0.2em] text-zinc-500">{s.label}</span>
+              </div>
+            ))}
+          </div>
+        </motion.header>
+
+        {GALLERY.length === 0 ? (
+          <p className="mt-16 rounded-3xl border border-white/10 bg-zinc-950/70 p-12 text-center text-zinc-500">
+            Add p1.jpg to p31.jpg and p.mp4, p2.mp4 to p8.mp4 in src/assets to fill the gallery.
+          </p>
+        ) : (
+          <div className="mt-14">
+            {GALLERY_BLOCKS.map((b, bi) => (
+              <div key={b.feature.id}>
+                <Block block={b} reduce={reduce} onOpen={openItem} />
+                {bi === 1 && <Marquee reduce={reduce} />}
+                {bi === 3 && <Statement reduce={reduce} />}
+                {bi === 5 && <Marquee reduce={reduce} reverse />}
+                {bi !== 1 && bi !== 3 && bi !== 5 && bi < GALLERY_BLOCKS.length - 1 && <div className="h-1.5 sm:h-3 md:h-4" />}
+              </div>
+            ))}
+            {GALLERY_FINALE.length > 0 && <Finale items={GALLERY_FINALE} onOpen={openItem} />}
+          </div>
+        )}
+
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          className="relative mt-24 overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900/90 via-black to-zinc-950 p-10 text-center shadow-[0_0_80px_-30px_rgba(255,255,255,0.25)] sm:p-14"
+        >
+          <div aria-hidden className={`pointer-events-none absolute left-1/2 top-0 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`} />
+          <Scissors className="relative mx-auto size-7 text-zinc-300" />
+          <h2 className={`relative mt-4 text-3xl font-bold sm:text-4xl ${chromeText}`}>Your chair is waiting.</h2>
+          <p className="relative mx-auto mt-3 max-w-md text-sm text-zinc-400">
+            Train hands-on with Theopistos and become part of the AURA story, in person or online.
+          </p>
+          <div className="relative mt-8 flex flex-wrap items-center justify-center gap-4">
+            <Link to="/seminars" className={shimmerBtn}>
+              <span className="relative">Book a seminar</span>
+              <ArrowRight className="relative size-5 transition-transform duration-300 group-hover:translate-x-1" />
+            </Link>
+            <Link
+              to="/online-seminars"
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-7 py-4 text-base font-medium text-zinc-200 transition hover:border-white/50 hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+            >
+              Online seminars
+            </Link>
+          </div>
+        </motion.div>
+      </div>
+
+      <AnimatePresence>
+        {open !== null && <Lightbox items={GALLERY} index={open} setIndex={setOpen} onClose={() => setOpen(null)} />}
+      </AnimatePresence>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Blocks                                                             */
+/* ------------------------------------------------------------------ */
+
+function Block({ block, reduce, onOpen }: { block: { feature: GalleryItem; side: "left" | "right"; smalls: GalleryItem[] }; reduce: boolean; onOpen: (i: GalleryItem) => void }) {
+  const [ref, shown] = useShown<HTMLDivElement>();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const py = useTransform(scrollYProgress, [0, 1], ["-4%", "4%"]);
+
+  return (
+    <div ref={ref} className="grid aspect-[8/5] grid-flow-dense grid-cols-4 grid-rows-2 gap-1.5 sm:gap-3 md:gap-4">
+      <div className={`col-span-2 row-span-2 min-h-0 min-w-0 ${block.side === "right" ? "col-start-3" : "col-start-1"}`}>
+        <Tile item={block.feature} feature i={0} shown={shown} py={reduce ? undefined : py} onOpen={() => onOpen(block.feature)} />
+      </div>
+      {block.smalls.map((s, si) => (
+        <div key={s.id} className="min-h-0 min-w-0">
+          <Tile item={s} i={si + 1} shown={shown} py={reduce ? undefined : py} onOpen={() => onOpen(s)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Finale({ items, onOpen }: { items: GalleryItem[]; onOpen: (i: GalleryItem) => void }) {
+  const [ref, shown] = useShown<HTMLDivElement>();
+  return (
+    <div ref={ref} className="mt-1.5 flex flex-wrap justify-center gap-1.5 sm:mt-3 sm:gap-3 md:mt-4 md:gap-4">
+      {items.map((f, i) => (
+        <div key={f.id} className="aspect-[4/5] basis-[calc(25%-0.28125rem)] sm:basis-[calc(25%-0.5625rem)] md:basis-[calc(25%-0.75rem)]">
+          <Tile item={f} i={i} shown={shown} onOpen={() => onOpen(f)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Tile (CSS-only hover, no per-tile animation engine)                */
+/* ------------------------------------------------------------------ */
+
+function Tile({ item, feature = false, i, shown, py, onOpen }: { item: GalleryItem; feature?: boolean; i: number; shown: boolean; py?: MotionValue<string>; onOpen: () => void }) {
+  const vref = useRef<HTMLVideoElement>(null);
+  const ease = "cubic-bezier(.16,1,.3,1)";
+  const delay = `${Math.min(i, 5) * 70}ms`;
+
+  const media = "size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]";
+
+  return (
+    <div
+      className="h-full w-full"
+      style={{
+        opacity: shown ? 1 : 0,
+        transform: shown ? "none" : "translateY(28px) scale(0.97)",
+        transition: `opacity 700ms ${ease} ${delay}, transform 700ms ${ease} ${delay}`,
+      }}
+    >
+      <button
+        type="button"
+        onClick={onOpen}
+        onPointerEnter={(e) => {
+          if (e.pointerType === "mouse") vref.current?.play().catch(() => {});
+        }}
+        onPointerLeave={() => vref.current?.pause()}
+        aria-label={`Open item ${item.no} full screen`}
+        className="group relative h-full w-full cursor-zoom-in overflow-hidden rounded-lg border border-white/10 bg-zinc-950 text-left sm:rounded-2xl outline-none transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1 hover:border-white/50 hover:shadow-[0_0_36px_-8px_rgba(255,255,255,0.3)] focus-visible:ring-2 focus-visible:ring-white/60 active:scale-[0.98]"
+      >
+        <motion.div style={py ? { y: py } : undefined} className="absolute inset-x-0 -top-[6%] h-[112%]">
+          {item.type === "image" ? (
+            <img src={item.thumb} alt={`AURA gallery ${item.no}`} loading="lazy" decoding="async" className={media} />
+          ) : (
+            <video ref={vref} src={`${item.src}#t=0.1`} muted loop playsInline preload="metadata" className={media} />
+          )}
+        </motion.div>
+
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-100" />
+        <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full -skew-x-12 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 transition-all duration-1000 group-hover:translate-x-[450%] group-hover:opacity-100" />
+
+        {item.type === "video" && (
+          <span className="absolute left-1.5 top-1.5 flex items-center gap-1.5 rounded-full border border-white/25 bg-black/70 p-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-200 sm:left-3 sm:top-3 sm:px-3 sm:py-1">
+            <Play className="size-2.5 fill-current sm:size-3" /> <span className="hidden sm:inline">Film</span>
+          </span>
+        )}
+        <span className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full border border-white/20 bg-black/70 text-zinc-200 opacity-0 transition-all duration-300 group-hover:scale-110 group-hover:opacity-100 group-hover:shadow-[0_0_20px_rgba(255,255,255,0.4)]">
+          <Expand className="size-4" />
+        </span>
+        <div className={`absolute inset-x-0 bottom-0 p-2 transition-all duration-300 sm:p-4 ${feature ? "opacity-100 sm:translate-y-2 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100" : "translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"}`}>
+          <p className="font-mono text-[8px] uppercase tracking-[0.2em] text-zinc-400 sm:text-[10px] sm:tracking-[0.25em]">AURA · {item.no}</p>
+          {feature && <p className={`mt-0.5 text-xs font-bold sm:mt-1 sm:text-2xl ${chromeText}`}>{item.title}</p>}
+        </div>
+      </button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Small pieces                                                       */
+/* ------------------------------------------------------------------ */
+
+function CountUp({ to }: { to: number }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true });
+  const [v, setV] = useState(0);
+  useEffect(() => {
+    if (!inView) return;
+    const c = animate(0, to, { duration: 1.4, ease: [0.16, 1, 0.3, 1], onUpdate: (l) => setV(Math.round(l)) });
+    return () => c.stop();
+  }, [inView, to]);
+  return <span ref={ref}>{v}</span>;
+}
+
+function Marquee({ reduce, reverse }: { reduce: boolean; reverse?: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const x = useTransform(scrollYProgress, [0, 1], reverse ? ["-40%", "0%"] : ["0%", "-40%"]);
+  const text = "AURA · BARBER ACADEMY · CRAFT · PRECISION · PRIDE · ";
+  return (
+    <div ref={ref} aria-hidden className="my-10 overflow-hidden sm:my-14">
+      <motion.div style={{ x: reduce ? 0 : x }} className="flex w-max whitespace-nowrap will-change-transform">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="select-none pr-6 text-6xl font-black uppercase tracking-tight text-transparent sm:text-8xl"
+            style={{ WebkitTextStroke: "1px rgba(255,255,255,0.2)" }}
+          >
+            {text}
+          </span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
+function Statement({ reduce }: { reduce: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], [30, -30]);
+  const rot = useTransform(scrollYProgress, [0, 1], [0, 50]);
+  return (
+    <div ref={ref} className="relative my-16 overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/70 px-6 py-16 text-center sm:my-24 sm:py-24">
+      <motion.div aria-hidden style={{ rotate: reduce ? 0 : rot }} className="pointer-events-none absolute left-1/2 top-1/2 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/10" />
+      <div aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`} />
+      <motion.div style={{ y: reduce ? 0 : y }} className="relative mx-auto max-w-3xl">
+        <p className="text-xs uppercase tracking-[0.3em] text-zinc-500">The AURA way</p>
+        <p className={`mt-5 text-2xl font-bold leading-snug sm:text-4xl ${chromeText}`}>
+          Barbering is more than a haircut. It is confidence, trust and craft, delivered one client at a time.
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Full-screen lightbox                                               */
+/* ------------------------------------------------------------------ */
+
+const slide = {
+  enter: (d: number) => ({ opacity: 0, x: d * 70 }),
+  center: { opacity: 1, x: 0 },
+  exit: (d: number) => ({ opacity: 0, x: d * -70 }),
+};
+
+function Lightbox({ items, index, setIndex, onClose }: { items: GalleryItem[]; index: number; setIndex: (n: number) => void; onClose: () => void }) {
+  const item = items[index];
+  const box = useRef<HTMLDivElement>(null);
+  const thumbs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [dir, setDir] = useState(1);
+  const [fs, setFs] = useState(false);
+
+  function go(d: number) {
+    setDir(d);
+    setIndex((index + d + items.length) % items.length);
+  }
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") go(1);
+      else if (e.key === "ArrowLeft") go(-1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  useEffect(() => {
+    thumbs.current[index]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    // preload neighbours so next/prev feels instant
+    for (const d of [1, -1]) {
+      const n = items[(index + d + items.length) % items.length];
+      if (n.type === "image") new Image().src = n.src;
+    }
+  }, [index, items]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onFs = () => setFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("fullscreenchange", onFs);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+
+  function toggleFs() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else box.current?.requestFullscreen?.().catch(() => {});
+  }
+
+  const iconBtn =
+    "flex size-10 items-center justify-center rounded-full border border-white/20 bg-black/70 sm:size-11 text-zinc-200 transition hover:border-white/60 hover:bg-white hover:text-black hover:shadow-[0_0_28px_rgba(255,255,255,0.4)]";
+
+  return (
+    <motion.div
+      ref={box}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="fixed inset-0 z-[100] flex flex-col bg-black"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Gallery viewer"
+    >
+      <div aria-hidden className={`pointer-events-none absolute left-1/2 top-1/3 size-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`} />
+
+      <div className="relative z-10 flex items-center justify-between gap-4 p-4 sm:p-6">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">AURA Barber Academy</p>
+          <p className={`text-lg font-bold ${chromeText}`}>{item.title}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-xs text-zinc-500">
+            {String(index + 1).padStart(2, "0")} / {String(items.length).padStart(2, "0")}
+          </span>
+          <button type="button" onClick={toggleFs} aria-label={fs ? "Exit full screen" : "Full screen"} className={iconBtn}>
+            {fs ? <Minimize className="size-5" /> : <Maximize className="size-5" />}
+          </button>
+          <button type="button" onClick={onClose} aria-label="Close" className={iconBtn}>
+            <X className="size-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-3 sm:px-20" onClick={onClose}>
+        <button type="button" onClick={(e) => { e.stopPropagation(); go(-1); }} aria-label="Previous" className={`${iconBtn} absolute left-3 top-1/2 z-20 -translate-y-1/2 sm:left-6`}>
+          <ChevronLeft className="size-5" />
+        </button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); go(1); }} aria-label="Next" className={`${iconBtn} absolute right-3 top-1/2 z-20 -translate-y-1/2 sm:right-6`}>
+          <ChevronRight className="size-5" />
+        </button>
+
+        <AnimatePresence mode="wait" custom={dir}>
+          <motion.div
+            key={item.id}
+            custom={dir}
+            variants={slide}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={0.25}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -80) go(1);
+              else if (info.offset.x > 80) go(-1);
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="flex max-h-full max-w-full items-center justify-center"
+          >
+            {item.type === "image" ? (
+              <img src={item.src} alt={`AURA gallery ${item.no}`} draggable={false} decoding="async" className="max-h-[calc(100dvh-12rem)] max-w-full rounded-xl object-contain" />
+            ) : (
+              <video src={item.src} controls autoPlay loop playsInline className="max-h-[calc(100dvh-12rem)] max-w-full rounded-xl" />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="relative z-10 flex gap-2 overflow-x-auto p-4 sm:justify-center sm:p-6">
+        {items.map((t, i) => (
+          <button
+            key={t.id}
+            ref={(el) => { thumbs.current[i] = el; }}
+            type="button"
+            onClick={() => { setDir(i > index ? 1 : -1); setIndex(i); }}
+            aria-label={`Show item ${t.no}`}
+            className={`relative size-14 shrink-0 overflow-hidden rounded-lg border transition-all duration-300 sm:size-16 ${
+              i === index ? "scale-110 border-white shadow-[0_0_20px_rgba(255,255,255,0.4)]" : "border-white/15 opacity-50 hover:opacity-100"
+            }`}
+          >
+            {t.type === "image" ? (
+              <img src={t.thumb} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
+            ) : (
+              <span className="flex size-full items-center justify-center bg-gradient-to-b from-zinc-700 to-zinc-900">
+                <Play className="size-4 fill-white text-white" />
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/routes/review/haircuts/$haircutId.tsx ===
+import { useState } from "react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import {
+  getMyProfile,
+  getHaircutReviewForGrading,
+  gradeHaircutReview,
+  signedHaircutMediaUrl,
+} from "@/lib/queries";
+import { isAdminRole } from "@/lib/roles";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton, LockedState } from "@/components/aura/States";
+import { Scissors, ArrowLeft, CheckCircle2, AlertCircle, Award, ShieldAlert } from "lucide-react";
+
+export const Route = createFileRoute("/review/haircuts/$haircutId")({
+  component: HaircutReviewDetailPage,
+});
+
+function HaircutReviewDetailPage() {
+  const { haircutId } = Route.useParams();
+  const navigate = useNavigate();
+
+  const profile = useAsync(getMyProfile, []);
+  const admin = profile.data ? isAdminRole(profile.data.role) : false;
+
+  const { data, error, loading } = useAsync(
+    async () => (admin ? getHaircutReviewForGrading(haircutId) : null),
+    [haircutId, admin],
+  );
+
+  const [score, setScore] = useState<number>(0);
+  const [feedback, setFeedback] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const field =
+    "w-full rounded-2xl border border-white/10 bg-black/60 p-4 text-sm text-white/90 outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 placeholder:text-zinc-600";
+
+  async function handleSubmit() {
+    setErr(null);
+    if (!feedback.trim()) {
+      setErr("Γράψε feedback για τον μαθητή.");
+      return;
+    }
+    if (!Number.isFinite(score) || score < 0) {
+      setErr("Το score δεν μπορεί να είναι αρνητικό.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await gradeHaircutReview({ haircutReviewId: haircutId, score, feedback });
+      navigate({ to: "/review/haircuts" });
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto min-h-screen max-w-5xl px-4 sm:px-6 py-16 text-white relative">
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-orange-600/10 blur-[140px] pointer-events-none rounded-full" />
+
+      <div className="mb-8 relative z-10">
+        <Link
+          to="/review/haircuts"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-zinc-900/80 border border-white/10 text-xs font-semibold text-zinc-300 hover:text-white hover:border-orange-500/40 transition-all backdrop-blur-md shadow-inner group"
+        >
+          <ArrowLeft className="w-4 h-4 text-orange-400 group-hover:-translate-x-1 transition-transform" />
+          Επιστροφή στην Ουρά
+        </Link>
+      </div>
+
+      {profile.loading && <LoadingSkeleton rows={4} />}
+      {profile.error && <ErrorState message={profile.error} />}
+
+      {profile.data && !admin && (
+        <div className="relative z-10 p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert className="w-6 h-6" />
+          </div>
+          <LockedState reason="Μόνο admins έχουν πρόσβαση στην αξιολόγηση κουρεμάτων." />
+        </div>
+      )}
+
+      {admin && loading && <LoadingSkeleton rows={4} />}
+      {admin && error && <ErrorState message={error} />}
+
+      {admin && data && (
+        <div className="relative z-10 space-y-8">
+          <header className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner">
+              <Scissors className="w-3.5 h-3.5" />
+              Haircut Review
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+              {data.student?.full_name ?? "Μαθητής"}
+            </h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              Υποβλήθηκε {new Date(data.created_at).toLocaleString("el-GR")}
+            </p>
+          </header>
+
+          <div className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-white/70 mb-6">Φωτογραφίες</h2>
+            <div className="grid gap-6 md:grid-cols-3">
+              <MediaColumn title="Before" paths={data.before_media ?? []} />
+              <MediaColumn title="Process" paths={data.process_media ?? []} />
+              <MediaColumn title="After" paths={data.after_media ?? []} />
+            </div>
+          </div>
+
+          <div className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl space-y-6">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2">
+              <Award className="w-4 h-4 text-orange-400" />
+              Αναφορά Μαθητή
+            </h2>
+            <Reasoning label="Μέθοδος" value={data.method_description} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Reasoning label="Τεχνική" value={data.technique} />
+              <Reasoning label="Εργαλεία" value={data.tools} />
+            </div>
+            <Reasoning label="Σημειώσεις" value={data.notes} />
+          </div>
+
+          <section className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl space-y-6">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-white/70">Βαθμολόγηση</h2>
+
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400">Score</span>
+              <input
+                type="number"
+                min={0}
+                step="any"
+                className="w-40 rounded-xl border border-white/10 bg-black/80 p-2.5 text-center text-sm font-bold text-orange-400 outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                value={score}
+                onChange={(e) => setScore(Number(e.target.value))}
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400">Feedback</span>
+              <textarea
+                rows={4}
+                className={field}
+                placeholder="Σχόλια για τη μέθοδο, την τεχνική, τι πήγε καλά και τι να προσέξει..."
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+              />
+            </label>
+          </section>
+
+          {err && (
+            <div className="p-4 rounded-2xl bg-red-950/60 border border-red-500/30 text-red-300 text-sm flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span role="alert">{err}</span>
+            </div>
+          )}
+
+          <button
+            onClick={handleSubmit}
+            disabled={busy}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-4 text-sm font-bold text-white shadow-[0_0_25px_-5px_rgba(255,90,20,0.5)] hover:shadow-[0_0_35px_-2px_rgba(255,90,20,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            {busy ? "Καταχώρηση..." : "Καταχώρηση Score"}
+          </button>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function MediaColumn({ title, paths }: { title: string; paths: string[] }) {
+  return (
+    <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
+      <h3 className="mb-3 text-xs uppercase tracking-widest text-orange-400 font-bold">{title}</h3>
+      {paths.length === 0 ? (
+        <p className="text-xs text-zinc-600">—</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {paths.map((p) => (
+            <HaircutMediaThumb key={p} path={p} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HaircutMediaThumb({ path }: { path: string }) {
+  const { data: url, loading } = useAsync(() => signedHaircutMediaUrl(path), [path]);
+  if (loading) return <div className="aspect-square rounded-lg bg-white/5 animate-pulse" />;
+  return (
+    <a href={url ?? undefined} target="_blank" rel="noreferrer" className="block">
+      <img src={url ?? undefined} alt="" className="aspect-square w-full rounded-lg object-cover border border-white/10" />
+    </a>
+  );
+}
+
+function Reasoning({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
+      <p className="text-xs uppercase tracking-widest text-orange-400 font-bold">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-300 leading-relaxed">{value}</p>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/ForzaBravaPerk.tsx ===
+// src/components/aura/ForzaBravaPerk.tsx
+//
+// Profile page: "GET YOUR FORZA BRAVA 10% DISCOUNT".
+//   - AURA PRO / ELITE click it -> a pop-up reveals their code, tap to copy.
+//   - AURA BASIC (or no active plan) click it -> a pop-up asks them to upgrade.
+// Nothing opens on its own: pop-ups only appear on click.
+import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Check,
+  Copy,
+  Crown,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Scissors,
+  Tag,
+} from "lucide-react";
+import { CHROME_FILL, ChromeCTA, ChromeCTALink, ChromeText, EASE, FRAME_BORDER } from "@/components/aura/chrome";
+import PopupShell from "@/components/aura/promo/PopupShell";
+import { useMyPerk } from "@/lib/perks";
+import { getPlan } from "@/lib/plans";
+import { usePlans } from "@/lib/usePlans";
+
+const silverText = {
+  backgroundImage: CHROME_FILL,
+  WebkitBackgroundClip: "text",
+  backgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+} as const;
+
+type Dialog = "code" | "upgrade" | "error" | null;
+
+export default function ForzaBravaPerk({ userId }: { userId: string | undefined }) {
+  const reduce = useReducedMotion();
+  const perk = useMyPerk("forza_brava", userId);
+  usePlans(); // live plan names / prices for the pop-ups
+  const [dialog, setDialog] = useState<Dialog>(null);
+
+  // The perk is switched off in the database: show nothing.
+  if (!perk.loading && !perk.error && !perk.available) return null;
+
+  const percent = perk.percent > 0 ? perk.percent : 10;
+
+  function open() {
+    if (perk.loading) return;
+    if (perk.error) setDialog("error");
+    else setDialog(perk.eligible ? "code" : "upgrade");
+  }
+
+  return (
+    <>
+      <motion.button
+        type="button"
+        onClick={open}
+        aria-busy={perk.loading}
+        aria-haspopup="dialog"
+        {...(reduce || perk.loading ? {} : { whileHover: { y: -3 }, whileTap: { scale: 0.985 } })}
+        className="group relative mt-8 block w-full rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+      >
+        {/* breathing glow */}
+        {!reduce && (
+          <motion.span
+            aria-hidden
+            className="pointer-events-none absolute -inset-1.5 rounded-[22px] bg-white/15 blur-xl"
+            animate={{ opacity: [0.25, 0.7, 0.25] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          />
+        )}
+
+        {/* chrome frame */}
+        <span
+          className="relative block rounded-2xl p-px transition-shadow duration-300 group-hover:shadow-[0_0_60px_rgba(255,255,255,0.22)]"
+          style={{ background: FRAME_BORDER, boxShadow: "0 0 40px rgba(0,0,0,0.9)" }}
+        >
+          <span className="relative flex items-center gap-4 overflow-hidden rounded-[15px] bg-[#09090b] px-4 py-4 sm:gap-5 sm:px-6 sm:py-5">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent"
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -left-10 top-1/2 size-40 -translate-y-1/2 rounded-full bg-white/[0.06] blur-3xl"
+            />
+            {/* light sweep */}
+            {!reduce && (
+              <motion.span
+                aria-hidden
+                className="pointer-events-none absolute inset-y-0 left-0 w-1/4 -skew-x-12 bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                animate={{ x: ["-130%", "520%"] }}
+                transition={{ duration: 2.6, repeat: Infinity, repeatDelay: 3.4, ease: "easeInOut" }}
+              />
+            )}
+
+            {/* icon tile */}
+            <span
+              className="relative flex size-12 shrink-0 items-center justify-center rounded-xl text-neutral-950 transition-transform duration-500 group-hover:-rotate-6 group-hover:scale-110 sm:size-14"
+              style={{
+                backgroundImage: CHROME_FILL,
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.95), 0 0 26px rgba(255,255,255,0.28)",
+              }}
+            >
+              <Tag className="size-5 sm:size-6" strokeWidth={2.4} />
+            </span>
+
+            <span className="relative min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-white/45">
+                Member perk
+                <span
+                  className={`rounded-full border px-2 py-px text-[9px] font-bold tracking-[0.2em] ${
+                    perk.eligible
+                      ? "border-white/40 bg-white/10 text-white/85"
+                      : "border-white/15 text-white/45"
+                  }`}
+                >
+                  {perk.loading ? "…" : perk.eligible ? "Unlocked" : "PRO · ELITE"}
+                </span>
+              </span>
+              <span className="mt-1.5 block text-[15px] font-extrabold uppercase leading-snug tracking-wide sm:text-lg">
+                <ChromeText>
+                  Get your Forza Brava {percent}% discount
+                </ChromeText>
+              </span>
+            </span>
+
+            <span
+              className="relative flex size-10 shrink-0 items-center justify-center rounded-full border border-white/25 bg-white/[0.05] text-white/80 transition-all duration-300 group-hover:border-white/60 group-hover:bg-white/10 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.3)]"
+              aria-hidden
+            >
+              {perk.loading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+              )}
+            </span>
+          </span>
+        </span>
+      </motion.button>
+
+      <CodeDialog
+        open={dialog === "code"}
+        onClose={() => setDialog(null)}
+        code={perk.code}
+        percent={percent}
+        planName={getPlan(perk.plan)?.name ?? "AURA MEMBER"}
+        isElite={perk.plan === "high"}
+      />
+      <UpgradeDialog open={dialog === "upgrade"} onClose={() => setDialog(null)} percent={percent} />
+      <ErrorDialog
+        open={dialog === "error"}
+        onClose={() => setDialog(null)}
+        onRetry={() => {
+          perk.reload();
+          setDialog(null);
+        }}
+      />
+    </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Pop-up 1: the code (PRO / ELITE)                                    */
+/* ------------------------------------------------------------------ */
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Older browsers / blocked clipboard API: fall back to a hidden textarea.
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+const BURST = Array.from({ length: 12 }, (_, i) => {
+  const a = (i / 12) * Math.PI * 2;
+  return { x: Math.cos(a) * 110, y: Math.sin(a) * 56 };
+});
+
+function CodeDialog({
+  open,
+  onClose,
+  code,
+  percent,
+  planName,
+  isElite,
+}: {
+  open: boolean;
+  onClose: () => void;
+  code: string | null;
+  percent: number;
+  planName: string;
+  isElite: boolean;
+}) {
+  const reduce = useReducedMotion();
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [burst, setBurst] = useState(0);
+  const timer = useRef<number | undefined>(undefined);
+
+  // Fresh state every time it opens
+  useEffect(() => {
+    if (open) setStatus("idle");
+    return () => window.clearTimeout(timer.current);
+  }, [open]);
+
+  async function copy() {
+    if (!code) return;
+    const ok = await copyText(code);
+    setStatus(ok ? "copied" : "failed");
+    if (ok) setBurst((n) => n + 1);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setStatus("idle"), 2600);
+  }
+
+  const copied = status === "copied";
+  const TierIcon = isElite ? Crown : BadgeCheck;
+
+  return (
+    <PopupShell open={open} onClose={onClose} titleId="fb-code-title" descId="fb-code-desc" className="max-w-md">
+      <div className="relative overflow-hidden rounded-[30px] border border-white/25 bg-[#060608] px-6 pb-7 pt-10 text-center shadow-[0_0_120px_rgba(210,218,230,0.18),0_40px_90px_rgba(0,0,0,0.85)] sm:px-9">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-64"
+          style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.17), transparent 68%)" }}
+        />
+        <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" />
+
+        {/* crest */}
+        <div className="relative mx-auto grid size-24 place-items-center">
+          <motion.span
+            aria-hidden
+            className="absolute inset-0 rounded-full border border-dashed border-white/35"
+            {...(reduce ? {} : { animate: { rotate: 360 }, transition: { duration: 22, repeat: Infinity, ease: "linear" } })}
+          />
+          <motion.span
+            aria-hidden
+            className="absolute inset-3 rounded-full bg-white/20 blur-xl"
+            {...(reduce ? {} : { animate: { opacity: [0.3, 0.85, 0.3] }, transition: { duration: 3.4, repeat: Infinity, ease: "easeInOut" } })}
+          />
+          <span
+            className="relative flex size-16 items-center justify-center rounded-full text-neutral-950"
+            style={{
+              backgroundImage: CHROME_FILL,
+              boxShadow: "inset 0 2px 0 rgba(255,255,255,0.95), inset 0 -6px 14px rgba(0,0,0,0.35), 0 0 40px rgba(255,255,255,0.35)",
+            }}
+          >
+            <Scissors className="size-7" strokeWidth={2.2} />
+          </span>
+        </div>
+
+        <p className="relative mt-5 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/50">
+          <TierIcon className="size-3.5" /> {planName} perk
+        </p>
+        <h2 id="fb-code-title" className="relative mt-3 text-[11px] font-extrabold uppercase tracking-[0.5em] text-white/70">
+          Forza Brava
+        </h2>
+        <p
+          className="relative mt-1 text-7xl font-black leading-none tracking-tighter drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]"
+          style={silverText}
+        >
+          {percent}%
+          <span className="ml-2 align-top text-xl font-extrabold tracking-[0.3em]">OFF</span>
+        </p>
+        <p id="fb-code-desc" className="relative mx-auto mt-4 max-w-xs text-sm leading-relaxed text-zinc-400">
+          Your member code. Tap it to copy, then use it on your next FORZA BRAVA order.
+        </p>
+
+        {/* the code */}
+        <div className="relative mx-auto mt-6 max-w-xs">
+          {!reduce &&
+            copied &&
+            BURST.map((b, i) => (
+              <motion.span
+                key={`${burst}-${i}`}
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 z-20 size-1.5 rounded-full bg-white shadow-[0_0_12px_3px_rgba(255,255,255,0.8)]"
+                initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                animate={{ x: b.x, y: b.y, opacity: 0, scale: 0.3 }}
+                transition={{ duration: 0.85, ease: "easeOut" }}
+              />
+            ))}
+
+          <div className="relative overflow-hidden rounded-2xl p-[1.5px] shadow-[0_0_44px_rgba(255,255,255,0.18)]">
+            <motion.span
+              aria-hidden
+              className="absolute -inset-[90%]"
+              style={{
+                background: "conic-gradient(from 0deg, #2b2b31, #ffffff, #6b6b73, #e8e8ee, #2b2b31, #ffffff, #2b2b31)",
+              }}
+              {...(reduce ? {} : { animate: { rotate: 360 }, transition: { duration: 7, repeat: Infinity, ease: "linear" } })}
+            />
+            <button
+              type="button"
+              onClick={copy}
+              disabled={!code}
+              aria-label={code ? `Copy code ${code}` : "Code unavailable"}
+              className="group relative flex w-full items-center justify-between gap-3 rounded-[14.5px] bg-[#0b0b0e] px-5 py-4 outline-none transition-colors hover:bg-[#101014] focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <span
+                className="flex-1 pl-[0.3em] font-mono text-3xl font-black tracking-[0.3em] drop-shadow-[0_0_18px_rgba(255,255,255,0.45)] sm:text-4xl"
+                style={silverText}
+              >
+                {code ?? "——"}
+              </span>
+              <span
+                className={`flex size-10 shrink-0 items-center justify-center rounded-full border transition-all duration-300 ${
+                  copied
+                    ? "border-white/70 bg-white text-black shadow-[0_0_26px_rgba(255,255,255,0.7)]"
+                    : "border-white/25 bg-white/[0.06] text-white/80 group-hover:border-white/60 group-hover:text-white"
+                }`}
+              >
+                {copied ? <Check className="size-4" strokeWidth={3} /> : <Copy className="size-4" />}
+              </span>
+            </button>
+          </div>
+
+          <p role="status" aria-live="polite" className="mt-3 h-5 text-xs font-semibold tracking-wide">
+            {status === "copied" && <span style={silverText}>Copied to clipboard</span>}
+            {status === "failed" && <span className="text-white/60">Couldn’t copy automatically. Select the code and copy it.</span>}
+            {status === "idle" && <span className="text-white/35">Tap the code to copy</span>}
+          </p>
+        </div>
+
+        <div className="relative mt-5">
+          <ChromeCTA type="button" onClick={onClose} className="w-full">
+            Done
+          </ChromeCTA>
+        </div>
+      </div>
+    </PopupShell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Pop-up 2: upgrade (AURA BASIC / no active plan)                     */
+/* ------------------------------------------------------------------ */
+
+function UpgradeDialog({ open, onClose, percent }: { open: boolean; onClose: () => void; percent: number }) {
+  const reduce = useReducedMotion();
+  const pro = getPlan("mid");
+  const elite = getPlan("high");
+
+  const tiers = [
+    { plan: pro, Icon: BadgeCheck, featured: false },
+    { plan: elite, Icon: Crown, featured: true },
+  ];
+
+  return (
+    <PopupShell open={open} onClose={onClose} titleId="fb-up-title" descId="fb-up-desc" className="max-w-md">
+      <div className="relative overflow-hidden rounded-[30px] border border-white/25 bg-[#060608] px-6 pb-7 pt-10 text-center shadow-[0_0_120px_rgba(210,218,230,0.18),0_40px_90px_rgba(0,0,0,0.85)] sm:px-9">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-64"
+          style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.15), transparent 68%)" }}
+        />
+        <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/90 to-transparent" />
+
+        {/* lock medallion with an orbiting spark */}
+        <div className="relative mx-auto grid size-28 place-items-center">
+          <motion.span
+            aria-hidden
+            className="absolute inset-0"
+            {...(reduce ? {} : { animate: { rotate: 360 }, transition: { duration: 9, repeat: Infinity, ease: "linear" } })}
+          >
+            <span className="absolute left-1/2 top-0 size-2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_16px_5px_rgba(255,255,255,0.85)]" />
+          </motion.span>
+          <span aria-hidden className="absolute inset-1 rounded-full border border-dashed border-white/25" />
+          <motion.span
+            aria-hidden
+            className="absolute inset-5 rounded-full bg-white/25 blur-2xl"
+            {...(reduce ? {} : { animate: { opacity: [0.3, 0.9, 0.3], scale: [0.9, 1.15, 0.9] }, transition: { duration: 3.2, repeat: Infinity, ease: "easeInOut" } })}
+          />
+          <span
+            className="relative flex size-[4.5rem] items-center justify-center rounded-full text-neutral-950"
+            style={{
+              backgroundImage: CHROME_FILL,
+              boxShadow: "inset 0 2px 0 rgba(255,255,255,0.95), inset 0 -8px 16px rgba(0,0,0,0.35), 0 0 46px rgba(255,255,255,0.35)",
+            }}
+          >
+            <Lock className="size-8" strokeWidth={2.3} />
+          </span>
+        </div>
+
+        <p className="relative mt-5 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/50">Members only</p>
+        <h2 id="fb-up-title" className="relative mt-3 text-[1.65rem] font-extrabold uppercase leading-tight tracking-tight sm:text-3xl">
+          <ChromeText>Upgrade to PRO or ELITE</ChromeText>
+        </h2>
+        <p id="fb-up-desc" className="relative mx-auto mt-3 max-w-xs text-sm leading-relaxed text-zinc-400">
+          Upgrade to PRO or ELITE to unlock your <span className="font-semibold text-white/85">FORZA BRAVA {percent}% discount</span> code.
+        </p>
+
+        <ul className="relative mt-6 space-y-2.5 text-left">
+          {tiers.map(({ plan, Icon, featured }, i) =>
+            plan ? (
+              <motion.li
+                key={plan.id}
+                initial={reduce ? false : { opacity: 0, x: -16 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.55, ease: EASE, delay: 0.3 + i * 0.14 }}
+                className={`flex items-center gap-3.5 rounded-2xl border px-4 py-3 ${
+                  featured
+                    ? "border-white/40 bg-gradient-to-r from-white/[0.12] to-white/[0.03] shadow-[0_0_40px_-12px_rgba(255,255,255,0.55)]"
+                    : "border-white/12 bg-white/[0.03]"
+                }`}
+              >
+                <span
+                  className="flex size-10 shrink-0 items-center justify-center rounded-xl text-neutral-950"
+                  style={{ backgroundImage: CHROME_FILL, boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9), 0 0 20px rgba(255,255,255,0.2)" }}
+                >
+                  <Icon className="size-5" strokeWidth={2.4} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 text-sm font-bold text-white">
+                    {plan.name}
+                    {featured && (
+                      <span className="rounded-full border border-white/40 px-2 py-px text-[9px] font-extrabold uppercase tracking-[0.2em] text-white/80">
+                        Everything
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-zinc-400">{percent}% off FORZA BRAVA products</span>
+                </span>
+                <span className="text-sm font-bold text-white/80">
+                  {plan.priceLabel}
+                  <span className="text-[10px] font-medium text-white/40"> /mo</span>
+                </span>
+              </motion.li>
+            ) : null,
+          )}
+        </ul>
+
+        <div className="relative mt-6 flex flex-col gap-3">
+          <ChromeCTALink to="/pricing" className="w-full">
+            Upgrade now
+          </ChromeCTALink>
+          <ChromeCTA type="button" solid={false} onClick={onClose}>
+            Not now
+          </ChromeCTA>
+        </div>
+      </div>
+    </PopupShell>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Pop-up 3: the request failed (so a PRO member is never told to      */
+/* "upgrade" by mistake)                                               */
+/* ------------------------------------------------------------------ */
+
+function ErrorDialog({ open, onClose, onRetry }: { open: boolean; onClose: () => void; onRetry: () => void }) {
+  return (
+    <PopupShell open={open} onClose={onClose} titleId="fb-err-title" descId="fb-err-desc" className="max-w-sm">
+      <div className="relative overflow-hidden rounded-3xl border border-white/20 bg-[#060608] px-6 pb-6 pt-9 text-center shadow-[0_0_80px_rgba(210,218,230,0.12),0_30px_80px_rgba(0,0,0,0.85)]">
+        <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+        <h2 id="fb-err-title" className="text-xl font-extrabold tracking-tight">
+          <ChromeText>We couldn’t load your code</ChromeText>
+        </h2>
+        <p id="fb-err-desc" className="mt-3 text-sm leading-relaxed text-zinc-400">
+          This is a connection problem, not a problem with your plan. Please try again in a moment.
+        </p>
+        <div className="mt-6 flex flex-col gap-3">
+          <ChromeCTA type="button" onClick={onRetry}>
+            <RefreshCw className="size-4" /> Try again
+          </ChromeCTA>
+          <ChromeCTA type="button" solid={false} onClick={onClose}>
+            Close
+          </ChromeCTA>
+        </div>
+      </div>
+    </PopupShell>
+  );
+}
+
+=== END FILE ===
+
+=== FILE: src/lib/checkout-intent.ts ===
+// src/lib/checkout-intent.ts
+import { isPlanId, type PlanId } from "@/lib/plans";
+
+const KEY = "aura.checkout.intent";
+/** Λήγει σε 30′ — αρκεί για OAuth round trip, όχι για την επόμενη μέρα. */
+const TTL_MS = 30 * 60 * 1000;
+
+interface StoredIntent {
+  plan: PlanId;
+  savedAt: number;
+}
+
+function store(): Storage | null {
+  try {
+    if (typeof window === "undefined") return null;
+    // localStorage αντί sessionStorage: το OAuth μπορεί να επιστρέψει σε
+    // νέο tab (in-app browsers στο κινητό), όπου το sessionStorage είναι άδειο.
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function parse(raw: string | null): PlanId | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredIntent>;
+    if (!isPlanId(parsed.plan) || typeof parsed.savedAt !== "number") return null;
+    if (Date.now() - parsed.savedAt > TTL_MS) return null;
+    return parsed.plan;
+  } catch {
+    return null;
+  }
+}
+
+/** Αποθηκεύει το πακέτο που διάλεξε ο επισκέπτης πριν τον στείλουμε στο login. */
+export function setCheckoutIntent(planId: PlanId): void {
+  const s = store();
+  if (!s) return;
+  try {
+    const payload: StoredIntent = { plan: planId, savedAt: Date.now() };
+    s.setItem(KEY, JSON.stringify(payload));
+  } catch {
+    // Private mode / γεμάτο storage — ο χρήστης ξαναδιαλέγει πακέτο.
+  }
+}
+
+/** Διαβάζει χωρίς να σβήνει. */
+export function peekCheckoutIntent(): PlanId | null {
+  const s = store();
+  return s ? parse(s.getItem(KEY)) : null;
+}
+
+/** Διαβάζει ΚΑΙ σβήνει. Μόνο τη στιγμή του redirect προς checkout. */
+export function consumeCheckoutIntent(): PlanId | null {
+  const plan = peekCheckoutIntent();
+  clearCheckoutIntent();
+  return plan;
+}
+
+export function clearCheckoutIntent(): void {
+  const s = store();
+  if (!s) return;
+  try {
+    s.removeItem(KEY);
+  } catch {
+    /* no-op */
+  }
+}
+=== END FILE ===
+
+=== FILE: src/lib/verify-checkout.ts ===
+// src/lib/verify-checkout.ts
+import { supabase } from "@/lib/supabase";
+
+export interface VerifiedSubscription {
+  planId: string;
+  status: string;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+export interface VerifyResult {
+  state: "active" | "pending";
+  hasAccess: boolean;
+  subscription: VerifiedSubscription | null;
+}
+
+interface VerifyPayload extends Partial<VerifyResult> {
+  error?: string;
+}
+
+/**
+ * Επιβεβαιώνει το Stripe Checkout Session και γράφει τη συνδρομή
+ * χωρίς να περιμένει το webhook. Είναι idempotent: μπορεί να κληθεί
+ * όσες φορές χρειαστεί για το ίδιο session.
+ */
+export async function verifyCheckoutSession(
+  sessionId: string,
+): Promise<VerifyResult> {
+  const { data, error } = await supabase.functions.invoke<VerifyPayload>(
+    "verify-checkout-session",
+    { body: { sessionId } },
+  );
+
+  if (error) {
+    // Το FunctionsHttpError κρατά το αρχικό Response στο `context`.
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) throw new Error(payload.error);
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message) throw parseErr;
+      }
+    }
+    throw new Error(error.message || "Η επιβεβαίωση της πληρωμής απέτυχε.");
+  }
+
+  if (!data) throw new Error("Κενή απάντηση από τον server.");
+  if (data.error) throw new Error(data.error);
+
+  return {
+    state: data.state ?? "pending",
+    hasAccess: Boolean(data.hasAccess),
+    subscription: data.subscription ?? null,
+  };
+}
+=== END FILE ===
+

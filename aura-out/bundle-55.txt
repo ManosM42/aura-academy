@@ -1,0 +1,1509 @@
+=== FILE: .output/server/_ssr/queries-DCA4yifx.mjs ===
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/queries-DCA4yifx.js
+async function getCurrentUserId() {
+	const { data, error } = await supabase.auth.getUser();
+	if (error || !data.user) throw new Error("Δεν υπάρχει ενεργή συνεδρία.");
+	return data.user.id;
+}
+async function getMyProfile() {
+	const uid = await getCurrentUserId();
+	const { data, error } = await supabase.from("profiles").select("*").eq("id", uid).single();
+	if (error) throw error;
+	return data;
+}
+var STAFF_ROLES = [
+	"educator",
+	"senior_educator",
+	"content_manager",
+	"operations",
+	"admin",
+	"super_admin"
+];
+var isStaffRole = (role) => STAFF_ROLES.includes(role);
+async function getCourseBySlug(slug) {
+	const { data, error } = await supabase.from("courses").select("*, modules(*, lessons(*))").eq("slug", slug).single();
+	if (error) throw error;
+	const course = data;
+	course.modules = (course.modules ?? []).sort((a, b) => a.sort_order - b.sort_order);
+	for (const m of course.modules) m.lessons = (m.lessons ?? []).sort((a, b) => a.sort_order - b.sort_order);
+	return course;
+}
+async function getLesson(lessonId) {
+	const { data, error } = await supabase.from("lessons").select("*").eq("id", lessonId).single();
+	if (error) throw error;
+	return data;
+}
+async function getLessonProgress(lessonId) {
+	const uid = await getCurrentUserId();
+	const { data, error } = await supabase.from("lesson_progress").select("*").eq("user_id", uid).eq("lesson_id", lessonId).maybeSingle();
+	if (error) throw error;
+	return data ?? null;
+}
+async function saveLessonProgress(lessonId, patch) {
+	const uid = await getCurrentUserId();
+	const { error } = await supabase.from("lesson_progress").upsert({
+		user_id: uid,
+		lesson_id: lessonId,
+		...patch,
+		completed_at: patch.completed ? (/* @__PURE__ */ new Date()).toISOString() : null
+	}, { onConflict: "user_id,lesson_id" });
+	if (error) throw error;
+}
+async function getAssignment(id) {
+	const { data, error } = await supabase.from("assignments").select("*").eq("id", id).single();
+	if (error) throw error;
+	return data;
+}
+async function getOrCreateDraft(assignmentId) {
+	const uid = await getCurrentUserId();
+	const { data: existing, error: readErr } = await supabase.from("submissions").select("*").eq("assignment_id", assignmentId).eq("user_id", uid).order("created_at", { ascending: false }).limit(1).maybeSingle();
+	if (readErr) throw readErr;
+	if (existing) return existing;
+	const { data: created, error: insErr } = await supabase.from("submissions").insert({
+		assignment_id: assignmentId,
+		user_id: uid,
+		status: "draft"
+	}).select("*").single();
+	if (insErr) throw insErr;
+	return created;
+}
+async function uploadSubmissionMedia(submissionId, kind, file) {
+	const uid = await getCurrentUserId();
+	const safe = file.name.replace(/[^\w.\-]/g, "_");
+	const path = `${uid}/${submissionId}/${kind}-${Date.now()}-${safe}`;
+	const { error } = await supabase.storage.from("submissions").upload(path, file, { upsert: false });
+	if (error) throw error;
+	return path;
+}
+async function signedMediaUrl(path) {
+	const { data, error } = await supabase.storage.from("submissions").createSignedUrl(path, 3600);
+	if (error) throw error;
+	return data.signedUrl;
+}
+async function saveSubmission(id, patch) {
+	const { error } = await supabase.from("submissions").update(patch).eq("id", id);
+	if (error) throw error;
+}
+async function submitSubmission(id) {
+	const { error } = await supabase.from("submissions").update({
+		status: "submitted",
+		submitted_at: (/* @__PURE__ */ new Date()).toISOString()
+	}).eq("id", id);
+	if (error) throw error;
+}
+async function getSubmissionReview(submissionId) {
+	const { data, error } = await supabase.from("reviews").select("*").eq("submission_id", submissionId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+	if (error) throw error;
+	return data ?? null;
+}
+async function getMySkills() {
+	const uid = await getCurrentUserId();
+	const [{ data: skills, error: sErr }, { data: mine, error: uErr }] = await Promise.all([supabase.from("skills").select("*").order("sort_order"), supabase.from("user_skills").select("*").eq("user_id", uid)]);
+	if (sErr) throw sErr;
+	if (uErr) throw uErr;
+	const byId = /* @__PURE__ */ new Map();
+	(mine ?? []).forEach((u) => byId.set(u.skill_id, u));
+	return (skills ?? []).map((s) => ({
+		...s,
+		userSkill: byId.get(s.id) ?? null
+	}));
+}
+async function getSkillAssignments() {
+	const { data, error } = await supabase.from("assignments").select("id, skill_id").not("skill_id", "is", null);
+	if (error) throw error;
+	const map = {};
+	for (const row of data ?? []) map[row.skill_id] = row.id;
+	return map;
+}
+async function getReviewQueue() {
+	const { data, error } = await supabase.from("submissions").select("*, assignment:assignments(id,title), student:profiles!submissions_user_id_fkey(id,full_name)").in("status", [
+		"submitted",
+		"in_review",
+		"needs_revision"
+	]).order("submitted_at", { ascending: true });
+	if (error) throw error;
+	return data ?? [];
+}
+async function getSubmissionForReview(submissionId) {
+	const { data, error } = await supabase.from("submissions").select("*, assignment:assignments(*, skill:skills(id,name)), student:profiles!submissions_user_id_fkey(id,full_name,level)").eq("id", submissionId).single();
+	if (error) throw error;
+	const { data: history, error: hErr } = await supabase.from("reviews").select("*").eq("submission_id", submissionId).order("created_at", { ascending: false });
+	if (hErr) throw hErr;
+	return {
+		submission: data,
+		history: history ?? []
+	};
+}
+async function submitReview(input) {
+	const { data, error } = await supabase.rpc("submit_review", {
+		p_submission_id: input.submissionId,
+		p_score: input.score,
+		p_rubric_scores: input.rubricScores,
+		p_strengths: input.strengths,
+		p_technical_gaps: input.technicalGaps,
+		p_method_gaps: input.methodGaps,
+		p_next_actions: input.nextActions,
+		p_decision: input.decision
+	});
+	if (error) throw error;
+	return data;
+}
+async function getDashboard() {
+	const uid = await getCurrentUserId();
+	const profile = await getMyProfile();
+	const [skillsCount, verified, lastProgress, lastReview, openSubs] = await Promise.all([
+		supabase.from("skills").select("id", {
+			count: "exact",
+			head: true
+		}),
+		supabase.from("user_skills").select("skill_id", {
+			count: "exact",
+			head: true
+		}).eq("user_id", uid).in("state", ["verified", "mastered"]),
+		supabase.from("lesson_progress").select("lesson_id, lessons(id,title)").eq("user_id", uid).eq("completed", false).order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+		supabase.from("reviews").select("*, submissions!inner(user_id)").eq("submissions.user_id", uid).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+		supabase.from("submissions").select("id", {
+			count: "exact",
+			head: true
+		}).eq("user_id", uid).in("status", [
+			"submitted",
+			"in_review",
+			"needs_revision"
+		])
+	]);
+	const lp = lastProgress.data;
+	return {
+		profile,
+		verifiedSkills: verified.count ?? 0,
+		totalSkills: skillsCount.count ?? 0,
+		continueLesson: lp?.lessons ?? null,
+		latestReview: lastReview.data ?? null,
+		openSubmissions: openSubs.count ?? 0
+	};
+}
+async function getAdminOverview() {
+	const [users, students, pending, courses] = await Promise.all([
+		supabase.from("profiles").select("id", {
+			count: "exact",
+			head: true
+		}),
+		supabase.from("profiles").select("id", {
+			count: "exact",
+			head: true
+		}).eq("role", "student"),
+		supabase.from("submissions").select("id", {
+			count: "exact",
+			head: true
+		}).in("status", [
+			"submitted",
+			"in_review",
+			"needs_revision"
+		]),
+		supabase.from("courses").select("id", {
+			count: "exact",
+			head: true
+		}).eq("status", "published")
+	]);
+	if (users.error) throw users.error;
+	if (students.error) throw students.error;
+	if (pending.error) throw pending.error;
+	if (courses.error) throw courses.error;
+	const total = users.count ?? 0;
+	const studentCount = students.count ?? 0;
+	return {
+		totalUsers: total,
+		students: studentCount,
+		staff: Math.max(total - studentCount, 0),
+		pendingReviews: pending.count ?? 0,
+		publishedCourses: courses.count ?? 0
+	};
+}
+async function getAllProfiles() {
+	const { data, error } = await supabase.from("profiles").select("*").order("updated_at", { ascending: false });
+	if (error) throw error;
+	return data ?? [];
+}
+async function updateUserRole(userId, role) {
+	const { error } = await supabase.from("profiles").update({ role }).eq("id", userId);
+	if (error) throw error;
+}
+async function updateUserStatus(userId, status) {
+	const { error } = await supabase.from("profiles").update({ status }).eq("id", userId);
+	if (error) throw error;
+}
+async function getAuditLog(limit = 50) {
+	const { data, error } = await supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(limit);
+	if (error) throw error;
+	return data ?? [];
+}
+async function updateMyProfile(patch) {
+	const uid = await getCurrentUserId();
+	const { data, error } = await supabase.from("profiles").update(patch).eq("id", uid).select("*").single();
+	if (error) throw error;
+	return data;
+}
+async function uploadAvatar(file) {
+	const uid = await getCurrentUserId();
+	if (!file.type.startsWith("image/")) throw new Error("Επίτρεψε μόνο εικόνες για το avatar.");
+	if (file.size > 5242880) throw new Error("Η εικόνα ξεπερνά τα 5MB.");
+	const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+	const path = `${uid}/avatar-${Date.now()}.${ext}`;
+	const { error } = await supabase.storage.from("avatars").upload(path, file, {
+		upsert: true,
+		contentType: file.type
+	});
+	if (error) throw error;
+	const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+	return data.publicUrl;
+}
+async function getAcademyFeed() {
+	const { data, error } = await supabase.from("academy_posts").select(`id, content, image_url, created_at,
+       author:profiles!academy_posts_author_id_fkey(id,full_name,avatar_url,role),
+       likes:academy_post_likes(user_id),
+       comments:academy_post_comments(
+         id, content, created_at,
+         author:profiles!academy_post_comments_author_id_fkey(id,full_name,avatar_url,role)
+       )`).order("created_at", { ascending: false });
+	if (error) throw error;
+	return data ?? [];
+}
+async function createAcademyPost(content, imageFile) {
+	const uid = await getCurrentUserId();
+	let imageUrl = null;
+	if (imageFile) {
+		const ext = imageFile.name.split(".").pop()?.toLowerCase() || "jpg";
+		const path = `${uid}/${Date.now()}.${ext}`;
+		const { error: upErr } = await supabase.storage.from("academy-posts").upload(path, imageFile, {
+			upsert: false,
+			contentType: imageFile.type
+		});
+		if (upErr) throw upErr;
+		const { data } = supabase.storage.from("academy-posts").getPublicUrl(path);
+		imageUrl = data.publicUrl;
+	}
+	const { error } = await supabase.from("academy_posts").insert({
+		author_id: uid,
+		content,
+		image_url: imageUrl
+	});
+	if (error) throw error;
+}
+async function toggleAcademyPostLike(postId, currentlyLiked) {
+	const uid = await getCurrentUserId();
+	if (currentlyLiked) {
+		const { error } = await supabase.from("academy_post_likes").delete().eq("post_id", postId).eq("user_id", uid);
+		if (error) throw error;
+	} else {
+		const { error } = await supabase.from("academy_post_likes").insert({
+			post_id: postId,
+			user_id: uid
+		});
+		if (error) throw error;
+	}
+}
+async function addAcademyPostComment(postId, content) {
+	const uid = await getCurrentUserId();
+	const { error } = await supabase.from("academy_post_comments").insert({
+		post_id: postId,
+		author_id: uid,
+		content
+	});
+	if (error) throw error;
+}
+async function deleteAcademyPost(postId) {
+	const { error } = await supabase.from("academy_posts").delete().eq("id", postId);
+	if (error) throw error;
+}
+async function getActiveStories() {
+	const uid = await getCurrentUserId();
+	const nowIso = (/* @__PURE__ */ new Date()).toISOString();
+	const [{ data: rows, error: sErr }, { data: myViews, error: vErr }] = await Promise.all([supabase.from("stories").select(`id, author_id, media_url, media_type, audio_url, audio_title, created_at, expires_at,
+           author:profiles!stories_author_id_fkey(id, full_name, avatar_url)`).gt("expires_at", nowIso).order("created_at", { ascending: true }), supabase.from("story_views").select("story_id").eq("viewer_id", uid)]);
+	if (sErr) throw sErr;
+	if (vErr) throw vErr;
+	const viewedIds = new Set((myViews ?? []).map((v) => v.story_id));
+	const groups = /* @__PURE__ */ new Map();
+	for (const row of rows ?? []) {
+		if (!row.author) continue;
+		if (!groups.has(row.author.id)) groups.set(row.author.id, {
+			author: row.author,
+			stories: [],
+			allViewed: true
+		});
+		groups.get(row.author.id).stories.push({
+			id: row.id,
+			author_id: row.author_id,
+			media_url: row.media_url,
+			media_type: row.media_type,
+			audio_url: row.audio_url,
+			audio_title: row.audio_title,
+			created_at: row.created_at,
+			expires_at: row.expires_at
+		});
+	}
+	for (const group of groups.values()) group.allViewed = group.stories.every((s) => viewedIds.has(s.id));
+	const list = Array.from(groups.values());
+	list.sort((a, b) => {
+		if (a.author.id === uid) return -1;
+		if (b.author.id === uid) return 1;
+		if (a.allViewed !== b.allViewed) return a.allViewed ? 1 : -1;
+		const aLatest = a.stories.at(-1)?.created_at ?? "";
+		return (b.stories.at(-1)?.created_at ?? "").localeCompare(aLatest);
+	});
+	return list;
+}
+async function createStory(file, audio) {
+	const uid = await getCurrentUserId();
+	const isImage = file.type.startsWith("image/");
+	const isVideo = file.type.startsWith("video/");
+	if (!isImage && !isVideo) throw new Error("Επίτρεψε μόνο εικόνες ή βίντεο για το story.");
+	const maxBytes = isVideo ? 52428800 : 10485760;
+	if (file.size > maxBytes) throw new Error(isVideo ? "Το βίντεο ξεπερνά τα 50MB." : "Η εικόνα ξεπερνά τα 10MB.");
+	const ext = file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
+	const path = `${uid}/${Date.now()}.${ext}`;
+	const { error: upErr } = await supabase.storage.from("stories").upload(path, file, {
+		upsert: false,
+		contentType: file.type
+	});
+	if (upErr) throw upErr;
+	const { data: mediaData } = supabase.storage.from("stories").getPublicUrl(path);
+	let audioUrl = null;
+	if (audio) {
+		if (audio.file.size > 10485760) throw new Error("Το αρχείο ήχου ξεπερνά τα 10MB.");
+		const audioExt = audio.file.name.split(".").pop()?.toLowerCase() || "mp3";
+		const audioPath = `${uid}/audio-${Date.now()}.${audioExt}`;
+		const { error: audioErr } = await supabase.storage.from("stories").upload(audioPath, audio.file, {
+			upsert: false,
+			contentType: audio.file.type
+		});
+		if (audioErr) throw audioErr;
+		const { data: audioData } = supabase.storage.from("stories").getPublicUrl(audioPath);
+		audioUrl = audioData.publicUrl;
+	}
+	const { error } = await supabase.from("stories").insert({
+		author_id: uid,
+		media_url: mediaData.publicUrl,
+		media_type: isVideo ? "video" : "image",
+		audio_url: audioUrl,
+		audio_title: audio?.title ?? null
+	});
+	if (error) throw error;
+}
+async function markStoryViewed(storyId) {
+	const uid = await getCurrentUserId();
+	const { error } = await supabase.from("story_views").upsert({
+		story_id: storyId,
+		viewer_id: uid
+	}, { onConflict: "story_id,viewer_id" });
+	if (error) throw error;
+}
+async function deleteStory(storyId) {
+	const { error } = await supabase.from("stories").delete().eq("id", storyId);
+	if (error) throw error;
+}
+async function uploadHaircutMedia(haircutReviewId, kind, file) {
+	const uid = await getCurrentUserId();
+	const safe = file.name.replace(/[^\w.\-]/g, "_");
+	const path = `${uid}/${haircutReviewId}/${kind}-${Date.now()}-${safe}`;
+	const { error } = await supabase.storage.from("haircut-media").upload(path, file, { upsert: false });
+	if (error) throw error;
+	return path;
+}
+async function signedHaircutMediaUrl(path) {
+	const { data, error } = await supabase.storage.from("haircut-media").createSignedUrl(path, 3600);
+	if (error) throw error;
+	return data.signedUrl;
+}
+async function submitHaircutReview(input) {
+	const uid = await getCurrentUserId();
+	const { data: row, error: insErr } = await supabase.from("haircut_reviews").insert({
+		user_id: uid,
+		method_description: input.methodDescription,
+		technique: input.technique || null,
+		tools: input.tools || null,
+		notes: input.notes || null
+	}).select("id").single();
+	if (insErr) throw insErr;
+	const id = row.id;
+	const [beforePaths, processPaths, afterPaths] = await Promise.all([
+		Promise.all(input.before.map((f) => uploadHaircutMedia(id, "before", f))),
+		Promise.all(input.process.map((f) => uploadHaircutMedia(id, "process", f))),
+		Promise.all(input.after.map((f) => uploadHaircutMedia(id, "after", f)))
+	]);
+	const { error: updErr } = await supabase.from("haircut_reviews").update({
+		before_media: beforePaths,
+		process_media: processPaths,
+		after_media: afterPaths
+	}).eq("id", id);
+	if (updErr) throw updErr;
+	return id;
+}
+async function getHaircutReviewQueue() {
+	const { data, error } = await supabase.from("haircut_reviews").select("*, student:profiles!haircut_reviews_user_id_fkey(id,full_name)").eq("status", "pending").order("created_at", { ascending: true });
+	if (error) throw error;
+	return data ?? [];
+}
+async function getHaircutReviewForGrading(haircutReviewId) {
+	const { data, error } = await supabase.from("haircut_reviews").select("*, student:profiles!haircut_reviews_user_id_fkey(id,full_name,level)").eq("id", haircutReviewId).single();
+	if (error) throw error;
+	return data;
+}
+async function gradeHaircutReview(input) {
+	const { error } = await supabase.rpc("submit_haircut_review", {
+		p_haircut_review_id: input.haircutReviewId,
+		p_score: input.score,
+		p_feedback: input.feedback
+	});
+	if (error) throw error;
+}
+//#endregion
+export { saveSubmission as A, uploadAvatar as B, getSkillAssignments as C, isStaffRole as D, gradeHaircutReview as E, submitSubmission as F, toggleAcademyPostLike as I, updateMyProfile as L, signedMediaUrl as M, submitHaircutReview as N, markStoryViewed as O, submitReview as P, updateUserRole as R, getReviewQueue as S, getSubmissionReview as T, uploadSubmissionMedia as V, getLesson as _, deleteStory as a, getMySkills as b, getAdminOverview as c, getAuditLog as d, getCourseBySlug as f, getHaircutReviewQueue as g, getHaircutReviewForGrading as h, deleteAcademyPost as i, signedHaircutMediaUrl as j, saveLessonProgress as k, getAllProfiles as l, getDashboard as m, createAcademyPost as n, getAcademyFeed as o, getCurrentUserId as p, createStory as r, getActiveStories as s, addAcademyPostComment as t, getAssignment as u, getLessonProgress as v, getSubmissionForReview as w, getOrCreateDraft as x, getMyProfile as y, updateUserStatus as z };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/PricingCards.tsx ===
+// src/components/aura/PricingCards.tsx
+import { useRef, useState, type MouseEvent } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { Check, ChevronDown } from "lucide-react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import UpgradeModal from "@/components/aura/UpgradeModal";
+import { useAuth } from "@/lib/useAuth";
+import { useSubscription } from "@/lib/useSubscription";
+import { setCheckoutIntent } from "@/lib/checkout-intent";
+import { getPlanCardState, type PlanCardState } from "@/lib/changePlan";
+import type { AuraPlan, PlanId } from "@/lib/plans";
+import { usePlans } from "@/lib/usePlans";
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+const COLLAPSED = 7;
+
+function PlanCard({
+  plan,
+  index,
+  state,
+  loading,
+  onSelect,
+}: {
+  plan: AuraPlan;
+  index: number;
+  state: PlanCardState;
+  loading: boolean;
+  onSelect: (id: PlanId) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  const list = open ? plan.features : plan.features.slice(0, COLLAPSED);
+  const hidden = plan.features.length - COLLAPSED;
+  const short = plan.name.replace("AURA ", "");
+
+  const label =
+    state === "current"
+      ? "ΕΧΕΙΣ ΠΡΟΣΒΑΣΗ"
+      : state === "upgrade"
+        ? `ΑΝΑΒΑΘΜΙΣΗ ΣΕ ${short}`
+        : state === "lower"
+          ? "ΠΕΡΙΛΑΜΒΑΝΕΤΑΙ"
+          : `ΞΕΚΙΝΑ ΜΕ ${short}`;
+
+  const note =
+    state === "upgrade"
+      ? "Πληρώνεις μόνο τις υπόλοιπες μέρες του κύκλου σου με τη νέα τιμή. Η ημέρα χρέωσης δεν αλλάζει."
+      : state === "lower"
+        ? "Έχεις ήδη πρόσβαση μέσω του ανώτερου πλάνου σου."
+        : null;
+
+  function onMove(e: MouseEvent<HTMLElement>) {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    el.style.setProperty("--my", `${e.clientY - r.top}px`);
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 56, filter: "blur(8px)" }}
+      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "0px 0px -12% 0px" }}
+      transition={{ duration: 0.95, ease: EASE, delay: index * 0.12 }}
+      className={plan.highlight ? "lg:-my-5" : ""}
+    >
+      <article
+        ref={ref}
+        onMouseMove={onMove}
+        className={`pr-wrap ${plan.highlight ? "pr-wrap-hi" : ""} ${state === "lower" ? "pr-lower" : ""}`}
+        aria-labelledby={`plan-${plan.id}`}
+      >
+        {plan.highlight && <span className="pr-border" aria-hidden />}
+        <div className="pr-card">
+          <div className="pr-spot" aria-hidden />
+
+          <div className="relative flex flex-1 flex-col">
+            <div className="flex min-h-7 items-center">
+              {state === "current" ? (
+                <span className="pr-badge">ΤΟ ΠΛΑΝΟ ΣΟΥ</span>
+              ) : plan.badge ? (
+                <span className="pr-badge">{plan.badge}</span>
+              ) : null}
+            </div>
+
+            <h3 id={`plan-${plan.id}`} className="pr-name mt-3 text-2xl font-bold tracking-[0.12em]">
+              {plan.name}
+            </h3>
+            <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.32em] text-white/70">
+              {plan.slogan}
+            </p>
+            <p className="mt-4 text-sm leading-relaxed text-white/55">{plan.tagline}</p>
+
+            <div className="mt-7 border-y border-white/[0.07] py-6">
+              <span className="text-[10px] uppercase tracking-[0.35em] text-white/35">
+                Monthly subscription
+              </span>
+              <p className="mt-2 flex items-baseline gap-2">
+                <span className="pr-price">{plan.priceLabel}</span>
+                <span className="text-xs uppercase tracking-[0.25em] text-white/45">/ Μήνα</span>
+              </p>
+            </div>
+
+            <p className="mt-6 text-[10px] font-semibold uppercase tracking-[0.4em] text-white/40">
+              Περιλαμβάνει
+            </p>
+            <ul className="mt-4 space-y-3">
+              {list.map((feature) => (
+                <li key={feature} className="flex items-start gap-3 text-sm leading-snug text-white/75">
+                  <span className="pr-check" aria-hidden>
+                    <Check className="size-3" strokeWidth={3} />
+                  </span>
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            {hidden > 0 && (
+              <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
+                className="pr-more mt-4"
+              >
+                {open ? "Λιγότερα" : `+ ${hidden} ακόμη προνόμια`}
+                <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+              </button>
+            )}
+
+            <div className="mt-auto pt-8">
+              <ChromeButton
+                type="button"
+                variant={plan.highlight || state === "upgrade" ? "primary" : "secondary"}
+                className="w-full"
+                disabled={loading || state === "lower"}
+                onClick={() => onSelect(plan.id)}
+              >
+                {label}
+              </ChromeButton>
+              {note && <p className="mt-3 text-center text-[11px] leading-relaxed text-white/45">{note}</p>}
+            </div>
+          </div>
+        </div>
+      </article>
+    </motion.div>
+  );
+}
+
+function PlansSkeleton() {
+  return (
+    <div className="grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6" aria-busy="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="h-[520px] animate-pulse rounded-[1.4rem] border border-white/10 bg-white/[0.03]" />
+      ))}
+    </div>
+  );
+}
+
+export default function PricingCards() {
+  const navigate = useNavigate();
+  const { session } = useAuth();
+  const { subscription, hasAccess, loading, refresh } = useSubscription(session?.user.id);
+  const { plans, loading: plansLoading } = usePlans();
+  const [upgradeTarget, setUpgradeTarget] = useState<AuraPlan | null>(null);
+
+  // Only meaningful for a signed-in user with an active/trialing subscription.
+  const currentPlanId: PlanId | null = session && hasAccess ? (subscription?.plan_id ?? null) : null;
+
+  function handleSelect(planId: PlanId) {
+    if (!session) {
+      // Το intent μένει ως fallback (in-app browsers, ανανέωση σελίδας),
+      // αλλά ο κύριος φορέας είναι πλέον το ?plan= στο URL.
+      setCheckoutIntent(planId);
+      navigate({ to: "/login", search: { plan: planId } });
+      return;
+    }
+
+    const state = getPlanCardState(currentPlanId, planId);
+
+    if (state === "lower") return;
+
+    if (state === "current") {
+      navigate({ to: "/academy" });
+      return;
+    }
+
+    if (state === "upgrade") {
+      const target = plans.find((p) => p.id === planId);
+      if (target) setUpgradeTarget(target);
+      return;
+    }
+
+    // No active subscription: normal checkout.
+    navigate({ to: "/checkout", search: { plan: planId } });
+  }
+
+  return (
+    <>
+      <style>{css}</style>
+      {plansLoading ? (
+        <PlansSkeleton />
+      ) : (
+        <div className="grid items-stretch gap-8 lg:grid-cols-3 lg:gap-6">
+          {plans.map((plan, i) => (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              index={i}
+              state={getPlanCardState(currentPlanId, plan.id)}
+              loading={loading}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      )}
+
+      {upgradeTarget && (
+        <UpgradeModal
+          plan={upgradeTarget}
+          open
+          onClose={() => setUpgradeTarget(null)}
+          onUpgraded={refresh}
+        />
+      )}
+    </>
+  );
+}
+
+const css = `
+@keyframes pr-spin { to { transform: rotate(360deg); } }
+@keyframes pr-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.pr-wrap {
+  position: relative; height: 100%; padding: 1px; border-radius: 1.4rem; overflow: hidden; isolation: isolate;
+  background: rgba(255,255,255,.09);
+  transition: transform .5s cubic-bezier(.22,1,.36,1), box-shadow .5s, background .5s, opacity .4s;
+}
+.pr-wrap:hover { transform: translateY(-6px); background: rgba(255,255,255,.22); box-shadow: 0 34px 90px -34px rgba(220,228,240,.3); }
+.pr-wrap-hi { background: rgba(255,255,255,.1); box-shadow: 0 0 90px -30px rgba(232,236,242,.5); }
+.pr-wrap-hi:hover { background: rgba(255,255,255,.1); }
+.pr-lower { opacity: .6; }
+.pr-lower:hover { transform: none; box-shadow: none; background: rgba(255,255,255,.09); }
+.pr-border {
+  position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0 50%, rgba(255,255,255,0) 56%, rgba(232,236,242,.98) 74%, rgba(255,255,255,0) 90%, transparent 100%);
+  animation: pr-spin 7s linear infinite;
+}
+.pr-card {
+  position: relative; display: flex; flex-direction: column; height: 100%; padding: 2rem; overflow: hidden;
+  border-radius: calc(1.4rem - 1px);
+  background: linear-gradient(180deg, rgba(22,23,29,.96), rgba(8,9,12,.98));
+}
+.pr-wrap-hi .pr-card { background: linear-gradient(180deg, rgba(28,29,36,.97), rgba(9,10,13,.99)); }
+.pr-spot {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(255,255,255,.08), transparent 60%);
+}
+.pr-name, .pr-price {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 25%, #9ca3af 45%, #ffffff 60%, #8b93a1 80%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pr-shimmer 7s linear infinite;
+}
+.pr-price { font-size: 3.2rem; line-height: 1; font-weight: 700; letter-spacing: -.02em; }
+.pr-badge {
+  border-radius: 9999px; padding: .3rem .8rem; font-size: 10px; letter-spacing: .3em; color: #f1f5f9;
+  border: 1px solid rgba(232,236,242,.45); background: rgba(255,255,255,.07); box-shadow: 0 0 20px -4px rgba(232,236,242,.55);
+}
+.pr-check {
+  display: grid; place-items: center; flex-shrink: 0; width: 1.15rem; height: 1.15rem; margin-top: .15rem; border-radius: 9999px;
+  color: #f1f5f9; border: 1px solid rgba(232,236,242,.4); background: rgba(255,255,255,.06); box-shadow: 0 0 12px -2px rgba(232,236,242,.5);
+}
+.pr-more {
+  display: inline-flex; width: fit-content; align-items: center; gap: .4rem; font-size: 11px; letter-spacing: .2em;
+  text-transform: uppercase; color: rgba(255,255,255,.6); transition: color .2s, text-shadow .2s;
+}
+.pr-more:hover { color: #fff; text-shadow: 0 0 14px rgba(232,236,242,.7); }
+@media (prefers-reduced-motion: reduce) { .pr-border, .pr-name, .pr-price { animation: none !important; } }
+`;
+=== END FILE ===
+
+=== FILE: .output/public/assets/checkout.return-BUPj3cb4.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/checkout.return-Bi3mkH5b.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/useNavigate-BR9bgUfC.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/useAuth-B1WX5JkE.js","assets/queries-B7Arqryn.js","assets/plans-BkcWWgXs.js","assets/ChromeButton-CdfVnEPs.js","assets/checkout-intent-CYMuNmEZ.js","assets/useSubscription-CI-f8eKe.js","assets/db-DXn9ZPwL.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";var r=e(`/checkout/return`)({validateSearch:e=>({session_id:typeof e.session_id==`string`&&e.session_id.length>0?e.session_id:void 0}),head:()=>({meta:[{title:`AURA — Επιβεβαίωση πληρωμής`}]}),component:t(()=>n(()=>import(`./checkout.return-Bi3mkH5b.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13])),`component`)});export{r as t};
+=== END FILE ===
+
+=== FILE: src/components/aura/PostCardPro.tsx ===
+import { useState } from "react";
+import { Crown, Heart, MessageCircle, Send, Trash2 } from "lucide-react";
+import {
+  addAcademyPostComment,
+  deleteAcademyPost,
+  toggleAcademyPostLike,
+  isStaffRole,
+  type AcademyPost,
+} from "@/lib/queries";
+
+const ROLE_LABEL: Record<string, string> = {
+  student: "Student",
+  educator: "Educator",
+  senior_educator: "Senior Educator",
+  content_manager: "Content Manager",
+  operations: "Operations",
+  admin: "Admin",
+  super_admin: "Super Admin",
+};
+
+function initials(name: string | null) {
+  if (!name) return "?";
+  return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function timeAgo(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "τώρα";
+  if (mins < 60) return `${mins}λ`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}ω`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}μ`;
+  return new Date(iso).toLocaleDateString("el-GR");
+}
+
+function Avatar({
+  url,
+  name,
+  size = 44,
+  ring = "ring-white/15",
+}: {
+  url: string | null | undefined;
+  name: string | null | undefined;
+  size?: number;
+  ring?: string;
+}) {
+  if (url) {
+    return (
+      <img
+        src={url}
+        alt={name ?? ""}
+        style={{ width: size, height: size }}
+        className={`shrink-0 rounded-full object-cover ring-2 ${ring}`}
+      />
+    );
+  }
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className={`flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-neutral-700 to-neutral-900 text-xs font-semibold text-neutral-200 ring-2 ${ring}`}
+    >
+      {initials(name ?? null)}
+    </div>
+  );
+}
+
+export default function PostCardPro({
+  post,
+  currentUserId,
+  currentUserRole,
+  onChanged,
+}: {
+  post: AcademyPost;
+  currentUserId: string;
+  currentUserRole: string;
+  onChanged: () => void;
+}) {
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const liked = post.likes.some((l) => l.user_id === currentUserId);
+  const authorIsStaff = post.author ? isStaffRole(post.author.role) : false;
+  const canDelete =
+    post.author?.id === currentUserId || isStaffRole(currentUserRole);
+
+  async function handleLike() {
+    setBusy(true);
+    try {
+      await toggleAcademyPostLike(post.id, liked);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleComment() {
+    if (!commentText.trim()) return;
+    setBusy(true);
+    try {
+      await addAcademyPostComment(post.id, commentText.trim());
+      setCommentText("");
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("Διαγραφή αυτής της ανάρτησης;")) return;
+    setBusy(true);
+    try {
+      await deleteAcademyPost(post.id);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <article
+      className="group relative overflow-hidden rounded-2xl border p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]"
+      style={{
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 100%)",
+        borderImage:
+          "linear-gradient(135deg, rgba(220,220,225,0.35), rgba(255,255,255,0.04) 40%, rgba(180,180,190,0.18) 100%) 1",
+        borderWidth: 1,
+        borderStyle: "solid",
+      }}
+    >
+      {/* πάνω chrome hairline */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+      <header className="flex items-start gap-3.5">
+        <Avatar
+          url={post.author?.avatar_url}
+          name={post.author?.full_name}
+          ring={authorIsStaff ? "ring-amber-400/40" : "ring-white/12"}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] font-semibold tracking-tight text-white">
+              {post.author?.full_name ?? "Άγνωστος"}
+            </span>
+            {authorIsStaff && (
+              <span
+                title={ROLE_LABEL[post.author?.role ?? ""] ?? "Staff"}
+                className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-gradient-to-b from-amber-300/20 to-amber-500/10 px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-amber-300 shadow-[0_0_12px_-4px_rgba(251,191,36,0.6)]"
+              >
+                <Crown size={11} className="fill-amber-300 text-amber-300" />
+                {ROLE_LABEL[post.author?.role ?? ""] ?? "Staff"}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            {timeAgo(post.created_at)}
+          </p>
+        </div>
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={busy}
+            title="Διαγραφή"
+            className="rounded-lg p-1.5 text-neutral-500 opacity-0 transition hover:bg-white/10 hover:text-rose-300 disabled:opacity-30 group-hover:opacity-100"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </header>
+
+      <p className="mt-4 whitespace-pre-wrap text-[14.5px] leading-relaxed text-neutral-200">
+        {post.content}
+      </p>
+
+      {post.image_url && (
+        <div className="mt-4 overflow-hidden rounded-xl ring-1 ring-white/10">
+          <img
+            src={post.image_url}
+            alt=""
+            className="max-h-[520px] w-full object-cover"
+          />
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4">
+        <button
+          onClick={handleLike}
+          disabled={busy}
+          className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+            liked
+              ? "border-rose-400/40 bg-rose-500/10 text-rose-300"
+              : "border-white/10 bg-white/[0.02] text-neutral-400 hover:border-white/20 hover:text-white"
+          }`}
+        >
+          <Heart size={14} className={liked ? "fill-rose-400" : ""} />
+          {post.likes.length > 0 ? post.likes.length : "Like"}
+        </button>
+        <button
+          onClick={() => setShowComments((s) => !s)}
+          className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3.5 py-1.5 text-xs font-medium text-neutral-400 transition hover:border-white/20 hover:text-white"
+        >
+          <MessageCircle size={14} />
+          {post.comments.length > 0 ? post.comments.length : "Σχόλιο"}
+        </button>
+      </div>
+
+      {showComments && (
+        <div className="mt-4 space-y-3 border-t border-white/[0.06] pt-4">
+          {post.comments
+            .slice()
+            .sort(
+              (a, b) =>
+                new Date(a.created_at).getTime() -
+                new Date(b.created_at).getTime(),
+            )
+            .map((c) => (
+              <div key={c.id} className="flex items-start gap-2.5">
+                <Avatar
+                  url={c.author?.avatar_url}
+                  name={c.author?.full_name}
+                  size={30}
+                  ring={
+                    c.author && isStaffRole(c.author.role)
+                      ? "ring-amber-400/30"
+                      : "ring-white/10"
+                  }
+                />
+                <div className="min-w-0 flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-neutral-200">
+                      {c.author?.full_name ?? "Άγνωστος"}
+                    </p>
+                    {c.author && isStaffRole(c.author.role) && (
+                      <Crown size={10} className="fill-amber-300 text-amber-300" />
+                    )}
+                  </div>
+                  <p className="mt-0.5 text-sm text-neutral-300">
+                    {c.content}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleComment()}
+              placeholder="Γράψε ένα σχόλιο…"
+              className="w-full rounded-full border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none transition focus:border-white/30"
+            />
+            <button
+              onClick={handleComment}
+              disabled={busy || !commentText.trim()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-neutral-100 to-neutral-300 text-black shadow-[0_2px_8px_-2px_rgba(255,255,255,0.3)] transition hover:brightness-110 disabled:opacity-30"
+            >
+              <Send size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/Seminars.tsx ===
+import { useRef, useState } from "react";
+import type { PointerEvent, ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import {
+  AnimatePresence,
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from "motion/react";
+import {
+  ArrowRight,
+  Compass,
+  Crown,
+  Eye,
+  Hand,
+  Layers,
+  MessageCircle,
+  Ruler,
+  Scissors,
+  User,
+  Users,
+} from "lucide-react";
+<section id="seminars">
+  <Seminars />
+</section>
+
+/* ------------------------------------------------------------------ */
+/* Content (edit freely)                                              */
+/* ------------------------------------------------------------------ */
+
+const DAYS = [
+  {
+    day: "Day 1",
+    icon: Eye,
+    title: "Look & Learn",
+    where: "On a mannequin",
+    text: "Watch every technique broken down step by step, then practice it until it clicks.",
+  },
+  {
+    day: "Day 2",
+    icon: Hand,
+    title: "Workshop",
+    where: "On a real model",
+    text: "Put everything to work on a live model, the way you will in your own chair.",
+  },
+];
+
+const TOPICS = [
+  {
+    icon: Ruler,
+    title: "Cutting geometry",
+    text: "The shapes and structure behind every clean cut.",
+  },
+  {
+    icon: Scissors,
+    title: "Scissors, razor, clipper",
+    text: "Control every tool, one technique at a time.",
+  },
+  {
+    icon: Layers,
+    title: "Fades and blending",
+    text: "Fast fades, photo-ready fades and seamless blends.",
+  },
+  {
+    icon: Compass,
+    title: "Styling and face shapes",
+    text: "Choose the right cut for every client.",
+  },
+  {
+    icon: MessageCircle,
+    title: "Client experience",
+    text: "Communication and service that build loyalty.",
+  },
+  {
+    icon: Crown,
+    title: "Professional mindset",
+    text: "The image and confidence of a working pro.",
+  },
+];
+
+const FORMATS = [
+  {
+    key: "group",
+    label: "Group",
+    icon: Users,
+    text: "Train alongside other barbers, swap ideas and push each other to improve.",
+  },
+  {
+    key: "private",
+    label: "Private",
+    icon: User,
+    text: "One-to-one attention, with the seminar shaped around your level and goals.",
+  },
+] as const;
+
+type FormatKey = (typeof FORMATS)[number]["key"];
+
+const chromeText =
+  "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+
+/* ------------------------------------------------------------------ */
+/* Card with spotlight glow and optional 3D tilt                       */
+/* ------------------------------------------------------------------ */
+
+function ChromeCard({
+  children,
+  tilt = false,
+}: {
+  children: ReactNode;
+  tilt?: boolean;
+}) {
+  const reduce = useReducedMotion();
+  const x = useMotionValue(-300);
+  const y = useMotionValue(-300);
+  const rx = useSpring(0, { stiffness: 160, damping: 18 });
+  const ry = useSpring(0, { stiffness: 160, damping: 18 });
+  const spot = useMotionTemplate`radial-gradient(280px circle at ${x}px ${y}px, rgba(255,255,255,0.13), transparent 70%)`;
+
+  function onMove(e: PointerEvent<HTMLDivElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+    x.set(px);
+    y.set(py);
+    if (tilt && !reduce) {
+      ry.set((px / r.width - 0.5) * 10);
+      rx.set(-(py / r.height - 0.5) * 10);
+    }
+  }
+
+  function onLeave() {
+    rx.set(0);
+    ry.set(0);
+  }
+
+  return (
+    <div className="h-full" style={{ perspective: 1000 }}>
+      <motion.div
+        onPointerMove={onMove}
+        onPointerLeave={onLeave}
+        style={{ rotateX: rx, rotateY: ry }}
+        whileHover={{ y: -4 }}
+        transition={{ type: "spring", stiffness: 300, damping: 22 }}
+        className="group relative h-full overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-6 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/30"
+      >
+        <motion.div
+          aria-hidden
+          style={{ background: spot }}
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        />
+        <div className="relative h-full">{children}</div>
+      </motion.div>
+    </div>
+  );
+}
+
+function IconRing({ icon: Icon }: { icon: typeof Scissors }) {
+  return (
+    <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+      <Icon className="size-5" />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Section                                                            */
+/* ------------------------------------------------------------------ */
+
+export default function Seminars() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const [format, setFormat] = useState<FormatKey>("group");
+  const active = FORMATS.find((f) => f.key === format) ?? FORMATS[0];
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start end", "end start"],
+  });
+  const ringY = useTransform(scrollYProgress, [0, 1], [90, -90]);
+  const orbY = useTransform(scrollYProgress, [0, 1], [-80, 80]);
+  const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 90]);
+
+  return (
+    <section
+      ref={sectionRef}
+      id="seminars"
+      className="relative isolate overflow-hidden py-24 sm:py-32"
+    >
+      {/* Parallax background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
+      />
+      <motion.div
+        aria-hidden
+        style={{ y: ringY, rotate: ringRotate }}
+        className="pointer-events-none absolute -left-40 top-24 -z-10 h-[520px] w-[520px] rounded-full border border-dashed border-white/10"
+      />
+      <motion.div
+        aria-hidden
+        style={{ y: orbY }}
+        className="pointer-events-none absolute -right-32 top-1/2 -z-10 h-[480px] w-[480px] rounded-full bg-white/[0.05] blur-[130px]"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+      />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-10">
+        {/* ----------------------- Header ----------------------- */}
+        <div className="grid items-end gap-10 lg:grid-cols-[1.4fr_1fr]">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50">
+              <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
+              Seminars
+            </div>
+            <h2
+              className={`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText}`}
+            >
+              Train hands-on with Theopistos.
+            </h2>
+            <p className="mt-6 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+              This seminar is for barbers and hairstylists who want to grow and
+              stand out. Theopistos shares the techniques, secrets and
+              experience behind his own work, along with the mindset that comes
+              with it.
+            </p>
+          </motion.div>
+
+          {/* Founder badge */}
+          <div className="group relative flex items-center gap-4 rounded-2xl border border-white/10 bg-zinc-950/70 p-5 backdrop-blur transition-colors duration-300 hover:border-white/30 lg:justify-self-end">
+            <div className="relative size-16 shrink-0">
+              <motion.div
+                aria-hidden
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background:
+                    "conic-gradient(from 0deg, #fafafa, #52525b, #fafafa, #27272a, #fafafa)",
+                }}
+                animate={reduce ? undefined : { rotate: 360 }}
+                transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+              />
+              <div className="absolute inset-[2px] flex items-center justify-center rounded-full bg-black font-serif text-2xl text-zinc-100 transition-shadow duration-300 group-hover:shadow-[0_0_28px_rgba(255,255,255,0.35)]">
+                T
+              </div>
+            </div>
+            <div>
+              <p className="text-lg font-semibold text-white">Theopistos</p>
+              <p className="text-sm text-zinc-400">
+                Founder and Head Educator, AURA
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ----------------------- Two days ----------------------- */}
+        <div className="mt-16 grid items-stretch gap-4 md:grid-cols-[1fr_auto_1fr] md:gap-2">
+          <ChromeCard tilt>
+            <DayContent {...DAYS[0]} />
+          </ChromeCard>
+
+          <div
+            aria-hidden
+            className="relative flex items-center justify-center py-1 md:py-0"
+          >
+            <span className="hidden h-px w-8 bg-gradient-to-r from-transparent to-white/30 md:block" />
+            <div className="relative mx-2 flex size-11 items-center justify-center rounded-full border border-white/25 bg-black">
+              {!reduce && (
+                <motion.span
+                  className="absolute inset-0 rounded-full border border-white/40"
+                  animate={{ scale: [1, 1.7], opacity: [0.6, 0] }}
+                  transition={{
+                    duration: 2.4,
+                    repeat: Infinity,
+                    ease: "easeOut",
+                  }}
+                />
+              )}
+              <ArrowRight className="size-4 rotate-90 text-zinc-200 md:rotate-0" />
+            </div>
+            <span className="hidden h-px w-8 bg-gradient-to-l from-transparent to-white/30 md:block" />
+          </div>
+
+          <ChromeCard tilt>
+            <DayContent {...DAYS[1]} />
+          </ChromeCard>
+        </div>
+
+        {/* ----------------------- What you'll work on ----------------------- */}
+        <div className="mt-20">
+          <h3 className="text-xl font-semibold text-white sm:text-2xl">
+            What you will work on
+          </h3>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {TOPICS.map((t) => (
+              <ChromeCard key={t.title}>
+                <div className="flex items-start gap-4">
+                  <IconRing icon={t.icon} />
+                  <div>
+                    <h4 className="text-sm font-semibold text-white">
+                      {t.title}
+                    </h4>
+                    <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+                      {t.text}
+                    </p>
+                  </div>
+                </div>
+              </ChromeCard>
+            ))}
+          </div>
+        </div>
+
+        {/* ----------------------- Format and booking ----------------------- */}
+        <div className="relative mt-20 overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900/90 via-black to-zinc-950 p-8 shadow-[0_0_80px_-30px_rgba(255,255,255,0.25)] sm:p-12">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-white/[0.07] blur-[90px]"
+          />
+          <div className="relative grid items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
+            <div>
+              <h3 className="text-2xl font-semibold text-white sm:text-3xl">
+                Private or group, your choice.
+              </h3>
+
+              <div
+                role="tablist"
+                aria-label="Seminar format"
+                className="mt-6 inline-flex rounded-full border border-white/15 bg-black/60 p-1"
+              >
+                {FORMATS.map((f) => {
+                  const selected = format === f.key;
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      onClick={() => setFormat(f.key)}
+                      className={`relative z-10 flex cursor-pointer items-center gap-2 rounded-full px-5 py-2 text-sm font-medium outline-none transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-white/50 ${
+                        selected
+                          ? "text-black"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      {selected && (
+                        <motion.span
+                          layoutId="seminar-format-pill"
+                          className="absolute inset-0 -z-10 rounded-full bg-gradient-to-b from-zinc-100 to-zinc-400"
+                          transition={{
+                            type: "spring",
+                            stiffness: 380,
+                            damping: 30,
+                          }}
+                        />
+                      )}
+                      <f.icon className="size-4" />
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="mt-5 min-h-[3.5rem] max-w-md">
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={active.key}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.25 }}
+                    className="text-base leading-relaxed text-zinc-400"
+                  >
+                    {active.text}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-start gap-4 lg:items-end lg:text-right">
+              <p className="max-w-xs text-sm leading-relaxed text-zinc-400">
+                Tell us which format you want and we will help you pick the
+                right dates.
+              </p>
+              <motion.div
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-block"
+              >
+                <Link
+                  to="/seminars"
+                  className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-8 py-4 text-base font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                >
+                  <span className="relative">Book your seminar</span>
+                  <ArrowRight className="relative size-5 transition-transform duration-300 group-hover:translate-x-1" />
+                </Link>
+              </motion.div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DayContent({
+  day,
+  icon,
+  title,
+  where,
+  text,
+}: {
+  day: string;
+  icon: typeof Scissors;
+  title: string;
+  where: string;
+  text: string;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center justify-between">
+        <IconRing icon={icon} />
+        <span className="rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-medium text-zinc-300">
+          {day}
+        </span>
+      </div>
+      <h3 className={`mt-6 text-2xl font-bold sm:text-3xl ${chromeText}`}>
+        {title}
+      </h3>
+      <p className="mt-1 text-sm font-medium text-zinc-300">{where}</p>
+      <p className="mt-3 text-sm leading-relaxed text-zinc-400">{text}</p>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/create-checkout-session.ts ===
+// src/lib/create-checkout-session.ts
+import { supabase } from "@/lib/supabase";
+import type { PlanId } from "@/lib/plans";
+
+/**
+ * Calls the create-checkout-session Edge Function and returns the Stripe
+ * client secret. Throws an Error whose message is the function's own error
+ * text, so failures are readable instead of "non-2xx status code".
+ */
+export async function createCheckoutSession(planId: PlanId): Promise<string> {
+  const { data, error } = await supabase.functions.invoke<{
+    clientSecret?: string;
+    sessionId?: string;
+    error?: string;
+  }>("create-checkout-session", {
+    body: { planId },
+  });
+
+  if (error) {
+    // FunctionsHttpError carries the original Response on `context`.
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) throw new Error(payload.error);
+      } catch (parseErr) {
+        if (parseErr instanceof Error && parseErr.message) throw parseErr;
+      }
+    }
+    throw new Error(error.message || "Checkout could not be started.");
+  }
+
+  if (data?.error) throw new Error(data.error);
+  if (!data?.clientSecret) throw new Error("Stripe returned no client secret.");
+
+  return data.clientSecret;
+}
+
+
+=== END FILE ===
+

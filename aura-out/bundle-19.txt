@@ -1,0 +1,1168 @@
+=== FILE: .output/server/_libs/framer-motion+[...].mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "./@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "./react+tanstack__react-query.mjs";
+//#region node_modules/framer-motion/dist/es/context/LayoutGroupContext.mjs
+var import_jsx_runtime = require_jsx_runtime();
+var import_react = /* @__PURE__ */ __toESM(require_react(), 1);
+var LayoutGroupContext = (0, import_react.createContext)({});
+//#endregion
+//#region node_modules/framer-motion/dist/es/utils/use-constant.mjs
+/**
+* Creates a constant value over the lifecycle of a component.
+*
+* Even if `useMemo` is provided an empty array as its final argument, it doesn't offer
+* a guarantee that it won't re-run for performance reasons later on. By using `useConstant`
+* you can ensure that initialisers don't execute twice or more.
+*/
+function useConstant(init) {
+	const ref = (0, import_react.useRef)(null);
+	if (ref.current === null) ref.current = init();
+	return ref.current;
+}
+//#endregion
+//#region node_modules/framer-motion/dist/es/utils/use-isomorphic-effect.mjs
+var useIsomorphicLayoutEffect = typeof window !== "undefined" ? import_react.useLayoutEffect : import_react.useEffect;
+//#endregion
+//#region node_modules/framer-motion/dist/es/context/PresenceContext.mjs
+/**
+* @public
+*/
+var PresenceContext = /* @__PURE__ */ (0, import_react.createContext)(null);
+//#endregion
+//#region node_modules/motion-utils/dist/es/array.mjs
+function addUniqueItem(arr, item) {
+	if (arr.indexOf(item) === -1) arr.push(item);
+}
+function removeItem(arr, item) {
+	const index = arr.indexOf(item);
+	if (index > -1) arr.splice(index, 1);
+}
+//#endregion
+//#region node_modules/motion-utils/dist/es/clamp.mjs
+var clamp = (min, max, v) => {
+	if (v > max) return max;
+	if (v < min) return min;
+	return v;
+};
+//#endregion
+//#region node_modules/motion-utils/dist/es/global-config.mjs
+var MotionGlobalConfig = {};
+//#endregion
+//#region node_modules/motion-utils/dist/es/is-numerical-string.mjs
+/**
+* Check if value is a numerical string, ie a string that is purely a number eg "100" or "-100.1"
+*/
+var isNumericalString = (v) => /^-?(?:\d+(?:\.\d+)?|\.\d+)$/u.test(v);
+//#endregion
+//#region node_modules/motion-utils/dist/es/is-object.mjs
+var isObject = (value) => typeof value === "object" && value !== null;
+//#endregion
+//#region node_modules/motion-utils/dist/es/is-zero-value-string.mjs
+/**
+* Check if the value is a zero value string like "0px" or "0%"
+*/
+var isZeroValueString = (v) => /^0[^.\s]+$/u.test(v);
+//#endregion
+//#region node_modules/motion-utils/dist/es/memo.mjs
+/*#__NO_SIDE_EFFECTS__*/
+function memo(callback) {
+	let result;
+	return () => {
+		if (result === void 0) result = callback();
+		return result;
+	};
+}
+//#endregion
+//#region node_modules/motion-utils/dist/es/noop.mjs
+var noop = /* @__NO_SIDE_EFFECTS__ */ (any) => any;
+//#endregion
+//#region node_modules/motion-utils/dist/es/pipe.mjs
+/**
+* Pipe
+* Compose other transformers to run linearily
+* pipe(min(20), max(40))
+* @param  {...functions} transformers
+* @return {function}
+*/
+var pipe = (...transformers) => transformers.reduce((a, b) => (v) => b(a(v)));
+//#endregion
+//#region node_modules/motion-utils/dist/es/progress.mjs
+var progress = /* @__NO_SIDE_EFFECTS__ */ (from, to, value) => {
+	const range = to - from;
+	return range ? (value - from) / range : 1;
+};
+//#endregion
+//#region node_modules/motion-utils/dist/es/subscription-manager.mjs
+var SubscriptionManager = class {
+	constructor() {
+		this.subscriptions = [];
+	}
+	add(handler) {
+		addUniqueItem(this.subscriptions, handler);
+		return () => removeItem(this.subscriptions, handler);
+	}
+	notify(a, b, c) {
+		const numSubscriptions = this.subscriptions.length;
+		if (!numSubscriptions) return;
+		if (numSubscriptions === 1)
+ /**
+		* If there's only a single handler we can just call it without invoking a loop.
+		*/
+		this.subscriptions[0](a, b, c);
+		else for (let i = 0; i < numSubscriptions; i++) {
+			/**
+			* Check whether the handler exists before firing as it's possible
+			* the subscriptions were modified during this loop running.
+			*/
+			const handler = this.subscriptions[i];
+			handler && handler(a, b, c);
+		}
+	}
+	getSize() {
+		return this.subscriptions.length;
+	}
+	clear() {
+		this.subscriptions.length = 0;
+	}
+};
+//#endregion
+//#region node_modules/motion-utils/dist/es/time-conversion.mjs
+/**
+* Converts seconds to milliseconds
+*
+* @param seconds - Time in seconds.
+* @return milliseconds - Converted time in milliseconds.
+*/
+var secondsToMilliseconds = /* @__NO_SIDE_EFFECTS__ */ (seconds) => seconds * 1e3;
+var millisecondsToSeconds = /* @__NO_SIDE_EFFECTS__ */ (milliseconds) => milliseconds / 1e3;
+//#endregion
+//#region node_modules/motion-utils/dist/es/velocity-per-second.mjs
+var velocityPerSecond = /* @__NO_SIDE_EFFECTS__ */ (velocity, frameDuration) => frameDuration ? velocity * (1e3 / frameDuration) : 0;
+//#endregion
+//#region node_modules/motion-utils/dist/es/wrap.mjs
+var wrap = (min, max, v) => {
+	const rangeSize = max - min;
+	return ((v - min) % rangeSize + rangeSize) % rangeSize + min;
+};
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/cubic-bezier.mjs
+var calcBezier = (t, a1, a2) => (((1 - 3 * a2 + 3 * a1) * t + (3 * a2 - 6 * a1)) * t + 3 * a1) * t;
+var subdivisionPrecision = 1e-7;
+var subdivisionMaxIterations = 12;
+function binarySubdivide(x, lowerBound, upperBound, mX1, mX2) {
+	let currentX;
+	let currentT;
+	let i = 0;
+	do {
+		currentT = lowerBound + (upperBound - lowerBound) / 2;
+		currentX = calcBezier(currentT, mX1, mX2) - x;
+		if (currentX > 0) upperBound = currentT;
+		else lowerBound = currentT;
+	} while (Math.abs(currentX) > subdivisionPrecision && ++i < subdivisionMaxIterations);
+	return currentT;
+}
+/*#__NO_SIDE_EFFECTS__*/
+function cubicBezier(mX1, mY1, mX2, mY2) {
+	if (mX1 === mY1 && mX2 === mY2) return noop;
+	const getTForX = (aX) => binarySubdivide(aX, 0, 1, mX1, mX2);
+	return (t) => t === 0 || t === 1 ? t : calcBezier(getTForX(t), mY1, mY2);
+}
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/modifiers/mirror.mjs
+var mirrorEasing = /* @__NO_SIDE_EFFECTS__ */ (easing) => (p) => p <= .5 ? easing(2 * p) / 2 : (2 - easing(2 * (1 - p))) / 2;
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/modifiers/reverse.mjs
+var reverseEasing = /* @__NO_SIDE_EFFECTS__ */ (easing) => (p) => 1 - easing(1 - p);
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/back.mjs
+var backOut = /*@__PURE__*/ cubicBezier(.33, 1.53, .69, .99);
+var backIn = /*@__PURE__*/ reverseEasing(backOut);
+var backInOut = /*@__PURE__*/ mirrorEasing(backIn);
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/anticipate.mjs
+var anticipate = (p) => p >= 1 ? 1 : (p *= 2) < 1 ? .5 * backIn(p) : .5 * (2 - Math.pow(2, -10 * (p - 1)));
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/circ.mjs
+var circIn = (p) => 1 - Math.sin(Math.acos(p));
+var circOut = /* @__PURE__ */ reverseEasing(circIn);
+var circInOut = /* @__PURE__ */ mirrorEasing(circIn);
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/ease.mjs
+var easeIn = /*@__PURE__*/ cubicBezier(.42, 0, 1, 1);
+var easeOut = /*@__PURE__*/ cubicBezier(0, 0, .58, 1);
+var easeInOut = /*@__PURE__*/ cubicBezier(.42, 0, .58, 1);
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/utils/is-easing-array.mjs
+var isEasingArray = /* @__NO_SIDE_EFFECTS__ */ (ease) => {
+	return Array.isArray(ease) && typeof ease[0] !== "number";
+};
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/utils/get-easing-for-segment.mjs
+/*#__NO_SIDE_EFFECTS__*/
+function getEasingForSegment(easing, i) {
+	return /* @__PURE__ */ isEasingArray(easing) ? easing[wrap(0, easing.length, i)] : easing;
+}
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/utils/is-bezier-definition.mjs
+var isBezierDefinition = /* @__NO_SIDE_EFFECTS__ */ (easing) => Array.isArray(easing) && typeof easing[0] === "number";
+//#endregion
+//#region node_modules/motion-utils/dist/es/easing/utils/map.mjs
+var easingLookup = {
+	linear: noop,
+	easeIn,
+	easeInOut,
+	easeOut,
+	circIn,
+	circInOut,
+	circOut,
+	backIn,
+	backInOut,
+	backOut,
+	anticipate
+};
+var isValidEasing = (easing) => {
+	return typeof easing === "string";
+};
+var easingDefinitionToFunction = (definition) => {
+	if (/* @__PURE__ */ isBezierDefinition(definition)) {
+		definition.length;
+		const [x1, y1, x2, y2] = definition;
+		return /* @__PURE__ */ cubicBezier(x1, y1, x2, y2);
+	} else if (isValidEasing(definition)) {
+		easingLookup[definition], `${definition}`;
+		return easingLookup[definition];
+	}
+	return definition;
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/frameloop/order.mjs
+var stepsOrder = [
+	"setup",
+	"read",
+	"resolveKeyframes",
+	"preUpdate",
+	"update",
+	"preRender",
+	"render",
+	"postRender"
+];
+//#endregion
+//#region node_modules/motion-dom/dist/es/frameloop/render-step.mjs
+function createRenderStep(runNextFrame) {
+	/**
+	* We create and reuse two queues, one to queue jobs for the current frame
+	* and one for the next. We reuse to avoid triggering GC after x frames.
+	*/
+	let thisFrame = /* @__PURE__ */ new Set();
+	let nextFrame = /* @__PURE__ */ new Set();
+	/**
+	* Track whether we're currently processing jobs in this step. This way
+	* we can decide whether to schedule new jobs for this frame or next.
+	*/
+	let isProcessing = false;
+	let flushNextFrame = false;
+	/**
+	* A set of processes which were marked keepAlive when scheduled.
+	*/
+	const toKeepAlive = /* @__PURE__ */ new WeakSet();
+	let latestFrameData = {
+		delta: 0,
+		timestamp: 0,
+		isProcessing: false
+	};
+	function triggerCallback(callback) {
+		if (toKeepAlive.has(callback)) {
+			step.schedule(callback);
+			runNextFrame();
+		}
+		callback(latestFrameData);
+	}
+	const step = {
+		/**
+		* Schedule a process to run on the next frame.
+		*/
+		schedule: (callback, keepAlive = false, immediate = false) => {
+			const queue = immediate && isProcessing ? thisFrame : nextFrame;
+			if (keepAlive) toKeepAlive.add(callback);
+			queue.add(callback);
+			return callback;
+		},
+		/**
+		* Cancel the provided callback from running on the next frame.
+		*/
+		cancel: (callback) => {
+			nextFrame.delete(callback);
+			toKeepAlive.delete(callback);
+		},
+		/**
+		* Execute all schedule callbacks.
+		*/
+		process: (frameData) => {
+			latestFrameData = frameData;
+			/**
+			* If we're already processing we've probably been triggered by a flushSync
+			* inside an existing process. Instead of executing, mark flushNextFrame
+			* as true and ensure we flush the following frame at the end of this one.
+			*/
+			if (isProcessing) {
+				flushNextFrame = true;
+				return;
+			}
+			isProcessing = true;
+			const prevFrame = thisFrame;
+			thisFrame = nextFrame;
+			nextFrame = prevFrame;
+			thisFrame.forEach(triggerCallback);
+			thisFrame.clear();
+			isProcessing = false;
+			if (flushNextFrame) {
+				flushNextFrame = false;
+				step.process(frameData);
+			}
+		}
+	};
+	return step;
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/frameloop/batcher.mjs
+var maxElapsed$1 = 40;
+function createRenderBatcher(scheduleNextBatch, allowKeepAlive) {
+	let runNextFrame = false;
+	let useDefaultElapsed = true;
+	const state = {
+		delta: 0,
+		timestamp: 0,
+		isProcessing: false
+	};
+	const flagRunNextFrame = () => runNextFrame = true;
+	const steps = stepsOrder.reduce((acc, key) => {
+		acc[key] = createRenderStep(flagRunNextFrame);
+		return acc;
+	}, {});
+	const { setup, read, resolveKeyframes, preUpdate, update, preRender, render, postRender } = steps;
+	const processBatch = () => {
+		const useManualTiming = MotionGlobalConfig.useManualTiming;
+		const timestamp = useManualTiming ? state.timestamp : performance.now();
+		runNextFrame = false;
+		if (!useManualTiming) state.delta = useDefaultElapsed ? 1e3 / 60 : Math.max(Math.min(timestamp - state.timestamp, maxElapsed$1), 1);
+		state.timestamp = timestamp;
+		state.isProcessing = true;
+		setup.process(state);
+		read.process(state);
+		resolveKeyframes.process(state);
+		preUpdate.process(state);
+		update.process(state);
+		preRender.process(state);
+		render.process(state);
+		postRender.process(state);
+		state.isProcessing = false;
+		if (runNextFrame && allowKeepAlive) {
+			useDefaultElapsed = false;
+			scheduleNextBatch(processBatch);
+		}
+	};
+	const wake = () => {
+		runNextFrame = true;
+		useDefaultElapsed = true;
+		if (!state.isProcessing) scheduleNextBatch(processBatch);
+	};
+	const schedule = stepsOrder.reduce((acc, key) => {
+		const step = steps[key];
+		acc[key] = (process, keepAlive = false, immediate = false) => {
+			if (!runNextFrame) wake();
+			return step.schedule(process, keepAlive, immediate);
+		};
+		return acc;
+	}, {});
+	const cancel = (process) => {
+		for (let i = 0; i < stepsOrder.length; i++) steps[stepsOrder[i]].cancel(process);
+	};
+	return {
+		schedule,
+		cancel,
+		state,
+		steps
+	};
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/frameloop/frame.mjs
+var { schedule: frame, cancel: cancelFrame, state: frameData, steps: frameSteps } = /* @__PURE__ */ createRenderBatcher(typeof requestAnimationFrame !== "undefined" ? requestAnimationFrame : noop, true);
+//#endregion
+//#region node_modules/motion-dom/dist/es/frameloop/sync-time.mjs
+var now;
+function clearTime() {
+	now = void 0;
+}
+/**
+* An eventloop-synchronous alternative to performance.now().
+*
+* Ensures that time measurements remain consistent within a synchronous context.
+* Usually calling performance.now() twice within the same synchronous context
+* will return different values which isn't useful for animations when we're usually
+* trying to sync animations to the same frame.
+*/
+var time = {
+	now: () => {
+		if (now === void 0) time.set(frameData.isProcessing || MotionGlobalConfig.useManualTiming ? frameData.timestamp : performance.now());
+		return now;
+	},
+	set: (newTime) => {
+		now = newTime;
+		queueMicrotask(clearTime);
+	}
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/utils/is-css-variable.mjs
+var checkStringStartsWith = (token) => (key) => typeof key === "string" && key.startsWith(token);
+var isCSSVariableName = /*@__PURE__*/ checkStringStartsWith("--");
+var startsAsVariableToken = /*@__PURE__*/ checkStringStartsWith("var(--");
+var isCSSVariableToken = (value) => {
+	if (!startsAsVariableToken(value)) return false;
+	return singleCssVariableRegex.test(value.split("/*")[0].trim());
+};
+var singleCssVariableRegex = /var\(--(?:[\w-]+\s*|[\w-]+\s*,(?:\s*[^)(\s]|\s*\((?:[^)(]|\([^)(]*\))*\))+\s*)\)$/iu;
+/**
+* Check if a value contains a CSS variable anywhere (e.g. inside calc()).
+* Unlike isCSSVariableToken which checks if the value IS a var() token,
+* this checks if the value CONTAINS var() somewhere in the string.
+*/
+function containsCSSVariable(value) {
+	if (typeof value !== "string") return false;
+	return value.split("/*")[0].includes("var(--");
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/numbers/index.mjs
+var number = {
+	test: (v) => typeof v === "number",
+	parse: parseFloat,
+	transform: (v) => v
+};
+var alpha = {
+	...number,
+	transform: (v) => clamp(0, 1, v)
+};
+var scale = {
+	...number,
+	default: 1
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/utils/sanitize.mjs
+var sanitize = (v) => Math.round(v * 1e5) / 1e5;
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/utils/float-regex.mjs
+var floatRegex = /-?(?:\d+(?:\.\d+)?|\.\d+)/gu;
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/utils/is-nullish.mjs
+function isNullish(v) {
+	return v == null;
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/utils/single-color-regex.mjs
+var singleColorRegex = /^(?:#[\da-f]{3,8}|(?:rgb|hsl)a?\((?:-?[\d.]+%?[,\s]+){2}-?[\d.]+%?\s*(?:[,/]\s*)?(?:\b\d+(?:\.\d+)?|\.\d+)?%?\))$/iu;
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/color/utils.mjs
+/**
+* Returns true if the provided string is a color, ie rgba(0,0,0,0) or #000,
+* but false if a number or multiple colors
+*/
+var isColorString = (type, testProp) => (v) => {
+	return Boolean(typeof v === "string" && singleColorRegex.test(v) && v.startsWith(type) || testProp && !isNullish(v) && Object.prototype.hasOwnProperty.call(v, testProp));
+};
+var splitColor = (aName, bName, cName) => (v) => {
+	if (typeof v !== "string") return v;
+	const [a, b, c, alpha] = v.match(floatRegex);
+	return {
+		[aName]: parseFloat(a),
+		[bName]: parseFloat(b),
+		[cName]: parseFloat(c),
+		alpha: alpha !== void 0 ? parseFloat(alpha) : 1
+	};
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/color/rgba.mjs
+var clampRgbUnit = (v) => clamp(0, 255, v);
+var rgbUnit = {
+	...number,
+	transform: (v) => Math.round(clampRgbUnit(v))
+};
+var rgba = {
+	test: /*@__PURE__*/ isColorString("rgb", "red"),
+	parse: /*@__PURE__*/ splitColor("red", "green", "blue"),
+	transform: ({ red, green, blue, alpha: alpha$1 = 1 }) => "rgba(" + rgbUnit.transform(red) + ", " + rgbUnit.transform(green) + ", " + rgbUnit.transform(blue) + ", " + sanitize(alpha.transform(alpha$1)) + ")"
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/color/hex.mjs
+function parseHex(v) {
+	let r = "";
+	let g = "";
+	let b = "";
+	let a = "";
+	if (v.length > 5) {
+		r = v.substring(1, 3);
+		g = v.substring(3, 5);
+		b = v.substring(5, 7);
+		a = v.substring(7, 9);
+	} else {
+		r = v.substring(1, 2);
+		g = v.substring(2, 3);
+		b = v.substring(3, 4);
+		a = v.substring(4, 5);
+		r += r;
+		g += g;
+		b += b;
+		a += a;
+	}
+	return {
+		red: parseInt(r, 16),
+		green: parseInt(g, 16),
+		blue: parseInt(b, 16),
+		alpha: a ? parseInt(a, 16) / 255 : 1
+	};
+}
+var hex = {
+	test: /*@__PURE__*/ isColorString("#"),
+	parse: parseHex,
+	transform: rgba.transform
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/numbers/units.mjs
+var createUnitType = /* @__NO_SIDE_EFFECTS__ */ (unit) => ({
+	test: (v) => typeof v === "string" && v.endsWith(unit) && v.split(" ").length === 1,
+	parse: parseFloat,
+	transform: (v) => `${v}${unit}`
+});
+var degrees = /*@__PURE__*/ createUnitType("deg");
+var percent = /*@__PURE__*/ createUnitType("%");
+var px = /*@__PURE__*/ createUnitType("px");
+var vh = /*@__PURE__*/ createUnitType("vh");
+var vw = /*@__PURE__*/ createUnitType("vw");
+var progressPercentage = /*@__PURE__*/ (() => ({
+	...percent,
+	parse: (v) => percent.parse(v) / 100,
+	transform: (v) => percent.transform(v * 100)
+}))();
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/color/hsla.mjs
+var hsla = {
+	test: /*@__PURE__*/ isColorString("hsl", "hue"),
+	parse: /*@__PURE__*/ splitColor("hue", "saturation", "lightness"),
+	transform: ({ hue, saturation, lightness, alpha: alpha$1 = 1 }) => {
+		return "hsla(" + Math.round(hue) + ", " + percent.transform(sanitize(saturation)) + ", " + percent.transform(sanitize(lightness)) + ", " + sanitize(alpha.transform(alpha$1)) + ")";
+	}
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/color/index.mjs
+var color = {
+	test: (v) => rgba.test(v) || hex.test(v) || hsla.test(v),
+	parse: (v) => {
+		if (rgba.test(v)) return rgba.parse(v);
+		else if (hsla.test(v)) return hsla.parse(v);
+		else return hex.parse(v);
+	},
+	transform: (v) => {
+		return typeof v === "string" ? v : v.hasOwnProperty("red") ? rgba.transform(v) : hsla.transform(v);
+	},
+	getAnimatableNone: (v) => {
+		const parsed = color.parse(v);
+		parsed.alpha = 0;
+		return color.transform(parsed);
+	}
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/utils/color-regex.mjs
+var colorRegex = /(?:#[\da-f]{3,8}|(?:rgb|hsl)a?\((?:-?[\d.]+%?[,\s]+){2}-?[\d.]+%?\s*(?:[,/]\s*)?(?:\b\d+(?:\.\d+)?|\.\d+)?%?\))/giu;
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/complex/index.mjs
+function test(v) {
+	return isNaN(v) && typeof v === "string" && (v.match(floatRegex)?.length || 0) + (v.match(colorRegex)?.length || 0) > 0;
+}
+var NUMBER_TOKEN = "number";
+var COLOR_TOKEN = "color";
+var VAR_TOKEN = "var";
+var VAR_FUNCTION_TOKEN = "var(";
+var SPLIT_TOKEN = "${}";
+var complexRegex = /var\s*\(\s*--(?:[\w-]+\s*|[\w-]+\s*,(?:\s*[^)(\s]|\s*\((?:[^)(]|\([^)(]*\))*\))+\s*)\)|#[\da-f]{3,8}|(?:rgb|hsl)a?\((?:-?[\d.]+%?[,\s]+){2}-?[\d.]+%?\s*(?:[,/]\s*)?(?:\b\d+(?:\.\d+)?|\.\d+)?%?\)|-?(?:\d+(?:\.\d+)?|\.\d+)/giu;
+function analyseComplexValue(value) {
+	const originalValue = value.toString();
+	const values = [];
+	const indexes = {
+		color: [],
+		number: [],
+		var: []
+	};
+	const types = [];
+	let i = 0;
+	return {
+		values,
+		split: originalValue.replace(complexRegex, (parsedValue) => {
+			if (color.test(parsedValue)) {
+				indexes.color.push(i);
+				types.push(COLOR_TOKEN);
+				values.push(color.parse(parsedValue));
+			} else if (parsedValue.startsWith(VAR_FUNCTION_TOKEN)) {
+				indexes.var.push(i);
+				types.push(VAR_TOKEN);
+				values.push(parsedValue);
+			} else {
+				indexes.number.push(i);
+				types.push(NUMBER_TOKEN);
+				values.push(parseFloat(parsedValue));
+			}
+			++i;
+			return SPLIT_TOKEN;
+		}).split(SPLIT_TOKEN),
+		indexes,
+		types
+	};
+}
+function parseComplexValue(v) {
+	return analyseComplexValue(v).values;
+}
+function buildTransformer({ split, types }) {
+	const numSections = split.length;
+	return (v) => {
+		let output = "";
+		for (let i = 0; i < numSections; i++) {
+			output += split[i];
+			if (v[i] !== void 0) {
+				const type = types[i];
+				if (type === NUMBER_TOKEN) output += sanitize(v[i]);
+				else if (type === COLOR_TOKEN) output += color.transform(v[i]);
+				else output += v[i];
+			}
+		}
+		return output;
+	};
+}
+function createTransformer(source) {
+	return buildTransformer(analyseComplexValue(source));
+}
+var convertNumbersToZero = (v) => typeof v === "number" ? 0 : color.test(v) ? color.getAnimatableNone(v) : v;
+/**
+* Convert a parsed value to its zero equivalent, but preserve numbers
+* that act as divisors in CSS calc() expressions.
+*
+* analyseComplexValue extracts numbers from CSS strings and puts the
+* surrounding text into a `split` template array. For example:
+*   "calc(var(--gap) / 5)"  →  values: [var(--gap), 5]
+*                               split:  ["calc(", " / ", ")"]
+*
+* When building a zero-equivalent for animation, naively zeroing all
+* numbers turns the divisor into 0 → "calc(var(--gap) / 0)" → NaN.
+* We detect this by checking whether the text preceding a number
+* (split[i]) ends with "/" — the CSS calc division operator.
+*/
+var convertToZero = (value, splitBefore) => {
+	if (typeof value === "number") return splitBefore?.trim().endsWith("/") ? value : 0;
+	return convertNumbersToZero(value);
+};
+function getAnimatableNone$1(v) {
+	const info = analyseComplexValue(v);
+	return buildTransformer(info)(info.values.map((value, i) => convertToZero(value, info.split[i])));
+}
+var complex = {
+	test,
+	parse: parseComplexValue,
+	createTransformer,
+	getAnimatableNone: getAnimatableNone$1
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/value/types/color/hsla-to-rgba.mjs
+function hueToRgb(p, q, t) {
+	if (t < 0) t += 1;
+	if (t > 1) t -= 1;
+	if (t < 1 / 6) return p + (q - p) * 6 * t;
+	if (t < 1 / 2) return q;
+	if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+	return p;
+}
+function hslaToRgba({ hue, saturation, lightness, alpha }) {
+	hue /= 360;
+	saturation /= 100;
+	lightness /= 100;
+	let red = 0;
+	let green = 0;
+	let blue = 0;
+	if (!saturation) red = green = blue = lightness;
+	else {
+		const q = lightness < .5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
+		const p = 2 * lightness - q;
+		red = hueToRgb(p, q, hue + 1 / 3);
+		green = hueToRgb(p, q, hue);
+		blue = hueToRgb(p, q, hue - 1 / 3);
+	}
+	return {
+		red: Math.round(red * 255),
+		green: Math.round(green * 255),
+		blue: Math.round(blue * 255),
+		alpha
+	};
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/utils/mix/immediate.mjs
+function mixImmediate(a, b) {
+	return (p) => p > 0 ? b : a;
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/utils/mix/number.mjs
+var mixNumber$1 = (from, to, progress) => {
+	return from + (to - from) * progress;
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/utils/mix/color.mjs
+var mixLinearColor = (from, to, v) => {
+	const fromExpo = from * from;
+	const expo = v * (to * to - fromExpo) + fromExpo;
+	return expo < 0 ? 0 : Math.sqrt(expo);
+};
+var colorTypes = [
+	hex,
+	rgba,
+	hsla
+];
+var getColorType = (v) => colorTypes.find((type) => type.test(v));
+function asRGBA(color) {
+	const type = getColorType(color);
+	`${color}`;
+	if (!Boolean(type)) return false;
+	let model = type.parse(color);
+	if (type === hsla) model = hslaToRgba(model);
+	return model;
+}
+var mixColor = (from, to) => {
+	const fromRGBA = asRGBA(from);
+	const toRGBA = asRGBA(to);
+	if (!fromRGBA || !toRGBA) return mixImmediate(from, to);
+	const blended = { ...fromRGBA };
+	return (v) => {
+		blended.red = mixLinearColor(fromRGBA.red, toRGBA.red, v);
+		blended.green = mixLinearColor(fromRGBA.green, toRGBA.green, v);
+		blended.blue = mixLinearColor(fromRGBA.blue, toRGBA.blue, v);
+		blended.alpha = mixNumber$1(fromRGBA.alpha, toRGBA.alpha, v);
+		return rgba.transform(blended);
+	};
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/utils/mix/visibility.mjs
+var invisibleValues = /* @__PURE__ */ new Set(["none", "hidden"]);
+/**
+* Returns a function that, when provided a progress value between 0 and 1,
+* will return the "none" or "hidden" string only when the progress is that of
+* the origin or target.
+*/
+function mixVisibility(origin, target) {
+	if (invisibleValues.has(origin)) return (p) => p <= 0 ? origin : target;
+	else return (p) => p >= 1 ? target : origin;
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/utils/mix/complex.mjs
+function mixNumber(a, b) {
+	return (p) => mixNumber$1(a, b, p);
+}
+function getMixer(a) {
+	if (typeof a === "number") return mixNumber;
+	else if (typeof a === "string") return isCSSVariableToken(a) ? mixImmediate : color.test(a) ? mixColor : mixComplex;
+	else if (Array.isArray(a)) return mixArray;
+	else if (typeof a === "object") return color.test(a) ? mixColor : mixObject;
+	return mixImmediate;
+}
+function mixArray(a, b) {
+	const output = [...a];
+	const numValues = output.length;
+	const blendValue = a.map((v, i) => getMixer(v)(v, b[i]));
+	return (p) => {
+		for (let i = 0; i < numValues; i++) output[i] = blendValue[i](p);
+		return output;
+	};
+}
+function mixObject(a, b) {
+	const output = {
+		...a,
+		...b
+	};
+	const blendValue = {};
+	for (const key in output) if (a[key] !== void 0 && b[key] !== void 0) blendValue[key] = getMixer(a[key])(a[key], b[key]);
+	return (v) => {
+		for (const key in blendValue) output[key] = blendValue[key](v);
+		return output;
+	};
+}
+function matchOrder(origin, target) {
+	const orderedOrigin = [];
+	const pointers = {
+		color: 0,
+		var: 0,
+		number: 0
+	};
+	for (let i = 0; i < target.values.length; i++) {
+		const type = target.types[i];
+		const originIndex = origin.indexes[type][pointers[type]];
+		const originValue = origin.values[originIndex] ?? 0;
+		orderedOrigin[i] = originValue;
+		pointers[type]++;
+	}
+	return orderedOrigin;
+}
+var mixComplex = (origin, target) => {
+	const template = complex.createTransformer(target);
+	const originStats = analyseComplexValue(origin);
+	const targetStats = analyseComplexValue(target);
+	if (originStats.indexes.var.length === targetStats.indexes.var.length && originStats.indexes.color.length === targetStats.indexes.color.length && originStats.indexes.number.length >= targetStats.indexes.number.length) {
+		if (invisibleValues.has(origin) && !targetStats.values.length || invisibleValues.has(target) && !originStats.values.length) return mixVisibility(origin, target);
+		return pipe(mixArray(matchOrder(originStats, targetStats), targetStats.values), template);
+	} else {
+		`${origin}${target}`;
+		return mixImmediate(origin, target);
+	}
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/utils/mix/index.mjs
+function mix(from, to, p) {
+	if (typeof from === "number" && typeof to === "number" && typeof p === "number") return mixNumber$1(from, to, p);
+	return getMixer(from)(from, to);
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/drivers/frame.mjs
+var frameloopDriver = (update) => {
+	const passTimestamp = ({ timestamp }) => update(timestamp);
+	return {
+		start: (keepAlive = true) => frame.update(passTimestamp, keepAlive),
+		stop: () => cancelFrame(passTimestamp),
+		/**
+		* If we're processing this frame we can use the
+		* framelocked timestamp to keep things in sync.
+		*/
+		now: () => frameData.isProcessing ? frameData.timestamp : time.now()
+	};
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/waapi/utils/linear.mjs
+var generateLinearEasing = (easing, duration, resolution = 10) => {
+	let points = "";
+	const numPoints = Math.max(Math.round(duration / resolution), 2);
+	for (let i = 0; i < numPoints; i++) points += Math.round(easing(i / (numPoints - 1)) * 1e4) / 1e4 + ", ";
+	return `linear(${points.substring(0, points.length - 2)})`;
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/generators/utils/calc-duration.mjs
+/**
+* Implement a practical max duration for keyframe generation
+* to prevent infinite loops
+*/
+var maxGeneratorDuration = 2e4;
+function calcGeneratorDuration(generator) {
+	let duration = 0;
+	const timeStep = 50;
+	let state = generator.next(duration);
+	while (!state.done && duration < 2e4) {
+		duration += timeStep;
+		state = generator.next(duration);
+	}
+	return duration >= 2e4 ? Infinity : duration;
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/generators/utils/create-generator-easing.mjs
+/**
+* Create a progress => progress easing function from a generator.
+*/
+function createGeneratorEasing(options, scale = 100, createGenerator) {
+	const generator = createGenerator({
+		...options,
+		keyframes: [0, scale]
+	});
+	const duration = Math.min(calcGeneratorDuration(generator), maxGeneratorDuration);
+	return {
+		type: "keyframes",
+		ease: (progress) => {
+			return generator.next(duration * progress).value / scale;
+		},
+		duration: /* @__PURE__ */ millisecondsToSeconds(duration)
+	};
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/generators/spring.mjs
+var springDefaults = {
+	stiffness: 100,
+	damping: 10,
+	mass: 1,
+	velocity: 0,
+	duration: 800,
+	bounce: .3,
+	visualDuration: .3,
+	restSpeed: {
+		granular: .01,
+		default: 2
+	},
+	restDelta: {
+		granular: .005,
+		default: .5
+	},
+	minDuration: .01,
+	maxDuration: 10,
+	minDamping: .05,
+	maxDamping: 1
+};
+function calcAngularFreq(undampedFreq, dampingRatio) {
+	return undampedFreq * Math.sqrt(1 - dampingRatio * dampingRatio);
+}
+var rootIterations = 12;
+function approximateRoot(envelope, derivative, initialGuess) {
+	let result = initialGuess;
+	for (let i = 1; i < rootIterations; i++) result = result - envelope(result) / derivative(result);
+	return result;
+}
+/**
+* This is ported from the Framer implementation of duration-based spring resolution.
+*/
+var safeMin = .001;
+function findSpring({ duration = springDefaults.duration, bounce = springDefaults.bounce, velocity = springDefaults.velocity, mass = springDefaults.mass }) {
+	let envelope;
+	let derivative;
+	springDefaults.maxDuration;
+	let dampingRatio = 1 - bounce;
+	/**
+	* Restrict dampingRatio and duration to within acceptable ranges.
+	*/
+	dampingRatio = clamp(springDefaults.minDamping, springDefaults.maxDamping, dampingRatio);
+	duration = clamp(springDefaults.minDuration, springDefaults.maxDuration, /* @__PURE__ */ millisecondsToSeconds(duration));
+	if (dampingRatio < 1) {
+		/**
+		* Underdamped spring
+		*/
+		envelope = (undampedFreq) => {
+			const exponentialDecay = undampedFreq * dampingRatio;
+			const delta = exponentialDecay * duration;
+			const a = exponentialDecay - velocity;
+			const b = calcAngularFreq(undampedFreq, dampingRatio);
+			const c = Math.exp(-delta);
+			return safeMin - a / b * c;
+		};
+		derivative = (undampedFreq) => {
+			const delta = undampedFreq * dampingRatio * duration;
+			const d = delta * velocity + velocity;
+			const e = Math.pow(dampingRatio, 2) * Math.pow(undampedFreq, 2) * duration;
+			const f = Math.exp(-delta);
+			const g = calcAngularFreq(Math.pow(undampedFreq, 2), dampingRatio);
+			return (-envelope(undampedFreq) + safeMin > 0 ? -1 : 1) * ((d - e) * f) / g;
+		};
+	} else {
+		/**
+		* Critically-damped spring
+		*/
+		envelope = (undampedFreq) => {
+			return -.001 + Math.exp(-undampedFreq * duration) * ((undampedFreq - velocity) * duration + 1);
+		};
+		derivative = (undampedFreq) => {
+			return Math.exp(-undampedFreq * duration) * ((velocity - undampedFreq) * (duration * duration));
+		};
+	}
+	const initialGuess = 5 / duration;
+	const undampedFreq = approximateRoot(envelope, derivative, initialGuess);
+	duration = /* @__PURE__ */ secondsToMilliseconds(duration);
+	if (isNaN(undampedFreq)) return {
+		stiffness: springDefaults.stiffness,
+		damping: springDefaults.damping,
+		duration
+	};
+	else {
+		const stiffness = Math.pow(undampedFreq, 2) * mass;
+		return {
+			stiffness,
+			damping: dampingRatio * 2 * Math.sqrt(mass * stiffness),
+			duration
+		};
+	}
+}
+var durationKeys = ["duration", "bounce"];
+var physicsKeys = [
+	"stiffness",
+	"damping",
+	"mass"
+];
+function isSpringType(options, keys) {
+	return keys.some((key) => options[key] !== void 0);
+}
+function getSpringOptions(options) {
+	let springOptions = {
+		velocity: springDefaults.velocity,
+		stiffness: springDefaults.stiffness,
+		damping: springDefaults.damping,
+		mass: springDefaults.mass,
+		isResolvedFromDuration: false,
+		...options
+	};
+	if (!isSpringType(options, physicsKeys) && isSpringType(options, durationKeys)) {
+		springOptions.velocity = 0;
+		if (options.visualDuration) {
+			const visualDuration = options.visualDuration;
+			const root = 2 * Math.PI / (visualDuration * 1.2);
+			const stiffness = root * root;
+			const damping = 2 * clamp(.05, 1, 1 - (options.bounce || 0)) * Math.sqrt(stiffness);
+			springOptions = {
+				...springOptions,
+				mass: springDefaults.mass,
+				stiffness,
+				damping
+			};
+		} else {
+			const derived = findSpring({
+				...options,
+				velocity: 0
+			});
+			springOptions = {
+				...springOptions,
+				...derived,
+				mass: springDefaults.mass
+			};
+			springOptions.isResolvedFromDuration = true;
+		}
+	}
+	return springOptions;
+}
+function spring(optionsOrVisualDuration = springDefaults.visualDuration, bounce = springDefaults.bounce) {
+	const options = typeof optionsOrVisualDuration !== "object" ? {
+		visualDuration: optionsOrVisualDuration,
+		keyframes: [0, 1],
+		bounce
+	} : optionsOrVisualDuration;
+	let { restSpeed, restDelta } = options;
+	const origin = options.keyframes[0];
+	const target = options.keyframes[options.keyframes.length - 1];
+	/**
+	* This is the Iterator-spec return value. We ensure it's mutable rather than using a generator
+	* to reduce GC during animation.
+	*/
+	const state = {
+		done: false,
+		value: origin
+	};
+	const { stiffness, damping, mass, duration, velocity, isResolvedFromDuration } = getSpringOptions({
+		...options,
+		velocity: -/* @__PURE__ */ millisecondsToSeconds(options.velocity || 0)
+	});
+	const initialVelocity = velocity || 0;
+	const dampingRatio = damping / (2 * Math.sqrt(stiffness * mass));
+	const initialDelta = target - origin;
+	const undampedAngularFreq = /* @__PURE__ */ millisecondsToSeconds(Math.sqrt(stiffness / mass));
+	/**
+	* If we're working on a granular scale, use smaller defaults for determining
+	* when the spring is finished.
+	*
+	* These defaults have been selected emprically based on what strikes a good
+	* ratio between feeling good and finishing as soon as changes are imperceptible.
+	*/
+	const isGranularScale = Math.abs(initialDelta) < 5;
+	restSpeed || (restSpeed = isGranularScale ? springDefaults.restSpeed.granular : springDefaults.restSpeed.default);
+	restDelta || (restDelta = isGranularScale ? springDefaults.restDelta.granular : springDefaults.restDelta.default);
+	let resolveSpring;
+	let resolveVelocity;
+	let angularFreq;
+	let A;
+	let sinCoeff;
+	let cosCoeff;
+	if (dampingRatio < 1) {
+		angularFreq = calcAngularFreq(undampedAngularFreq, dampingRatio);
+		A = (initialVelocity + dampingRatio * undampedAngularFreq * initialDelta) / angularFreq;
+		resolveSpring = (t) => {
+			const envelope = Math.exp(-dampingRatio * undampedAngularFreq * t);
+			return target - envelope * (A * Math.sin(angularFreq * t) + initialDelta * Math.cos(angularFreq * t));
+		};
+		sinCoeff = dampingRatio * undampedAngularFreq * A + initialDelta * angularFreq;
+		cosCoeff = dampingRatio * undampedAngularFreq * initialDelta - A * angularFreq;
+		resolveVelocity = (t) => {
+			return Math.exp(-dampingRatio * undampedAngularFreq * t) * (sinCoeff * Math.sin(angularFreq * t) + cosCoeff * Math.cos(angularFreq * t));
+		};
+	} else if (dampingRatio === 1) {
+		resolveSpring = (t) => target - Math.exp(-undampedAngularFreq * t) * (initialDelta + (initialVelocity + undampedAngularFreq * initialDelta) * t);
+		const C = initialVelocity + undampedAngularFreq * initialDelta;
+		resolveVelocity = (t) => Math.exp(-undampedAngularFreq * t) * (undampedAngularFreq * C * t - initialVelocity);
+	} else {
+		const dampedAngularFreq = undampedAngularFreq * Math.sqrt(dampingRatio * dampingRatio - 1);
+		resolveSpring = (t) => {
+			const envelope = Math.exp(-dampingRatio * undampedAngularFreq * t);
+			const freqForT = Math.min(dampedAngularFreq * t, 300);
+			return target - envelope * ((initialVelocity + dampingRatio * undampedAngularFreq * initialDelta) * Math.sinh(freqForT) + dampedAngularFreq * initialDelta * Math.cosh(freqForT)) / dampedAngularFreq;
+		};
+		const P = (initialVelocity + dampingRatio * undampedAngularFreq * initialDelta) / dampedAngularFreq;
+		const sinhCoeff = dampingRatio * undampedAngularFreq * P - initialDelta * dampedAngularFreq;
+		const coshCoeff = dampingRatio * undampedAngularFreq * initialDelta - P * dampedAngularFreq;
+		resolveVelocity = (t) => {
+			const envelope = Math.exp(-dampingRatio * undampedAngularFreq * t);
+			const freqForT = Math.min(dampedAngularFreq * t, 300);
+			return envelope * (sinhCoeff * Math.sinh(freqForT) + coshCoeff * Math.cosh(freqForT));
+		};
+	}
+	const generator = {
+		calculatedDuration: isResolvedFromDuration ? duration || null : null,
+		velocity: (t) => /* @__PURE__ */ secondsToMilliseconds(resolveVelocity(t)),
+		next: (t) => {
+			/**
+			* For underdamped physics springs we need both position and
+			* velocity each tick. Compute shared trig values once to avoid
+			* duplicate Math.exp/sin/cos calls on the hot path.
+			*/
+			if (!isResolvedFromDuration && dampingRatio < 1) {
+				const envelope = Math.exp(-dampingRatio * undampedAngularFreq * t);
+				const sin = Math.sin(angularFreq * t);
+				const cos = Math.cos(angularFreq * t);
+				const current = target - envelope * (A * sin + initialDelta * cos);
+				const currentVelocity = /* @__PURE__ */ secondsToMilliseconds(envelope * (sinCoeff * sin + cosCoeff * cos));
+				state.done = Math.abs(currentVelocity) <= restSpeed && Math.abs(target - current) <= restDelta;
+				state.value = state.done ? target : current;
+				return state;
+			}
+			const current = resolveSpring(t);
+			if (!isResolvedFromDuration) {
+				const currentVelocity = /* @__PURE__ */ secondsToMilliseconds(resolveVelocity(t));
+				state.done = Math.abs(currentVelocity) <= restSpeed && Math.abs(target - current) <= restDelta;
+			} else state.done = t >= duration;
+			state.value = state.done ? target : current;
+			return state;
+		},
+		toString: () => {
+			const calculatedDuration = Math.min(calcGeneratorDuration(generator), maxGeneratorDuration);
+			const easing = generateLinearEasing((progress) => generator.next(calculatedDuration * progress).value, calculatedDuration, 30);
+			return calculatedDuration + "ms " + easing;
+		},
+		toTransition: () => {}
+	};
+	return generator;
+}
+spring.applyToOptions = (options) => {
+	const generatorOptions = createGeneratorEasing(options, 100, spring);
+	options.ease = generatorOptions.ease;
+	options.duration = /* @__PURE__ */ secondsToMilliseconds(generatorOptions.duration);
+	options.type = "keyframes";
+	return options;
+};
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/generators/utils/velocity.mjs
+var velocitySampleDuration = 5;
+function getGeneratorVelocity(resolveValue, t, current) {
+	const prevT = Math.max(t - velocitySampleDuration, 0);
+	return /* @__PURE__ */ velocityPerSecond(current - resolveValue(prevT), t - prevT);
+}
+//#endregion
+//#region node_modules/motion-dom/dist/es/animation/generators/inertia.mjs
+function inertia({ keyframes, velocity = 0, power = .8, timeConstant = 325, bounceDamping = 10, bounceStiffness = 500, modifyTarget, min, max, restDelta = .5, restSpeed }) {
+	const origin = keyframes[0];
+	const state = {
+		done: false,
+		value: origin
+	};
+	const isOutOfBounds = (v) => min !== void 0 && v < min || max !== void 0 && v > max;
+	const nearestBoundary = (v) => {
+		if (min === void 0) return max;
+		if (max === void 0) return min;
+		return Math.abs(min - v) < Math.abs(max - v) ? min : max;
+	};
+	let amplitude = power * velocity;
+	const ideal = origin + amplitude;
+	const target = modifyTarget === void 0 ? ideal : modifyTarget(ideal);
+	/**
+	* If the target has changed we need to re-calculate the amplitude, otherwise
+	* the
+[TRUNCATED: file is 405672 bytes, first 40960 included]
+=== END FILE ===
+

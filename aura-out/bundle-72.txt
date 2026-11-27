@@ -1,0 +1,1034 @@
+=== FILE: src/routes/haircut-review.tsx ===
+import { useState } from "react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { submitHaircutReview } from "@/lib/queries";
+import { ArrowLeft, CheckCircle2, AlertCircle, Scissors } from "lucide-react";
+
+export const Route = createFileRoute("/haircut-review")({
+  component: HaircutReviewPage,
+});
+
+function toArray(fileList: FileList | null): File[] {
+  return fileList ? Array.from(fileList) : [];
+}
+
+function HaircutReviewPage() {
+  const navigate = useNavigate();
+
+  const [before, setBefore] = useState<File[]>([]);
+  const [process, setProcess] = useState<File[]>([]);
+  const [after, setAfter] = useState<File[]>([]);
+  const [methodDescription, setMethodDescription] = useState("");
+  const [technique, setTechnique] = useState("");
+  const [tools, setTools] = useState("");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const field =
+    "w-full rounded-2xl border border-white/10 bg-black/60 p-4 text-sm text-white/90 outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all duration-300 placeholder:text-zinc-600";
+
+  async function handleSubmit() {
+    setErr(null);
+    if (before.length === 0 || after.length === 0) {
+      setErr("Χρειάζεται τουλάχιστον μία φωτογραφία Before και μία After.");
+      return;
+    }
+    if (!methodDescription.trim()) {
+      setErr("Περιγράψτε τη μέθοδο που επιλέξατε.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await submitHaircutReview({
+        before,
+        process,
+        after,
+        methodDescription,
+        technique,
+        tools,
+        notes,
+      });
+      navigate({ to: "/dashboard" });
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto min-h-screen max-w-3xl px-4 sm:px-6 py-16 text-white relative">
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-orange-600/10 blur-[140px] pointer-events-none rounded-full" />
+
+      <div className="mb-8 relative z-10">
+        <Link
+          to="/dashboard"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-zinc-900/80 border border-white/10 text-xs font-semibold text-zinc-300 hover:text-white hover:border-orange-500/40 transition-all backdrop-blur-md shadow-inner group"
+        >
+          <ArrowLeft className="w-4 h-4 text-orange-400 group-hover:-translate-x-1 transition-transform" />
+          Επιστροφή στο Dashboard
+        </Link>
+      </div>
+
+      <div className="relative z-10 space-y-8">
+        <header className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner">
+            <Scissors className="w-3.5 h-3.5" />
+            Haircut Review
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+            Υποβολή Κουρέματος για Review
+          </h1>
+          <p className="mt-2 text-sm text-zinc-400">
+            Ανέβασε φωτογραφίες πριν / κατά τη διάρκεια / μετά και εξήγησε τη μέθοδο σου. Ένας εκπαιδευτής θα σου δώσει feedback και πόντους.
+          </p>
+        </header>
+
+        <section className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Labeled label="Before *">
+              <input type="file" accept="image/*" multiple onChange={(e) => setBefore(toArray(e.target.files))} className={field} />
+            </Labeled>
+            <Labeled label="Process (προαιρετικό)">
+              <input type="file" accept="image/*" multiple onChange={(e) => setProcess(toArray(e.target.files))} className={field} />
+            </Labeled>
+            <Labeled label="After *">
+              <input type="file" accept="image/*" multiple onChange={(e) => setAfter(toArray(e.target.files))} className={field} />
+            </Labeled>
+          </div>
+
+          <Labeled label="Ποια μέθοδο επέλεξες και γιατί *">
+            <textarea
+              rows={4}
+              className={field}
+              placeholder="π.χ. Skin fade στα πλαγία με #1 guard, scissor-over-comb στο πάνω μέρος γιατί ο πελάτης ήθελε όγκο..."
+              value={methodDescription}
+              onChange={(e) => setMethodDescription(e.target.value)}
+            />
+          </Labeled>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <Labeled label="Τεχνική">
+              <input className={field} placeholder="π.χ. Taper fade" value={technique} onChange={(e) => setTechnique(e.target.value)} />
+            </Labeled>
+            <Labeled label="Εργαλεία">
+              <input className={field} placeholder="π.χ. #2 guard, thinning shears" value={tools} onChange={(e) => setTools(e.target.value)} />
+            </Labeled>
+          </div>
+
+          <Labeled label="Επιπλέον σημειώσεις">
+            <textarea
+              rows={3}
+              className={field}
+              placeholder="Τύπος μαλλιού πελάτη, δυσκολίες που αντιμετώπισες, τι θα έκανες διαφορετικά..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Labeled>
+        </section>
+
+        {err && (
+          <div className="p-4 rounded-2xl bg-red-950/60 border border-red-500/30 text-red-300 text-sm flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            <span role="alert">{err}</span>
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={busy}
+          className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-4 text-sm font-bold text-white shadow-[0_0_25px_-5px_rgba(255,90,20,0.5)] hover:shadow-[0_0_35px_-2px_rgba(255,90,20,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+        >
+          <CheckCircle2 className="w-5 h-5" />
+          {busy ? "Υποβολή..." : "Υποβολή για Review"}
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400">{label}</span>
+      {children}
+    </label>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/review.index-BrdS8biq.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{t as n}from"./use-reduced-motion-CNAPwhZE.js";import{t as r}from"./react-D9fOyxUn.js";import{D as i,S as a,y as o}from"./queries-B7Arqryn.js";import{t as s}from"./chevron-right-LS5pF-bM.js";import{t as c}from"./clock-CqoNLjzH.js";import{t as l}from"./shield-alert-B8o1doM_.js";import{t as u}from"./sparkles-gf6_8K8H.js";import{t as d}from"./user-BFT04SdI.js";import{t as f}from"./useAsync-CZJ1G06G.js";import{i as p,n as m,r as h,t as g}from"./States-BulpY35p.js";var _=e(),v=[.22,1,.36,1],y=`linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)`,b=`linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))`;function x({children:e,className:t=``,inner:n=`p-6`}){return(0,_.jsx)(`div`,{className:`relative rounded-3xl p-px ${t}`,style:{background:b,boxShadow:`0 0 60px rgba(0,0,0,0.9)`},children:(0,_.jsxs)(`div`,{className:`relative overflow-hidden rounded-[23px] bg-[#0a0a0b] ${n}`,children:[(0,_.jsx)(`div`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-x-0 top-0 h-24`,style:{background:`linear-gradient(180deg, rgba(255,255,255,0.05), transparent)`}}),(0,_.jsx)(`div`,{className:`relative`,children:e})]})})}function S(){let e=n(),b=f(o,[]),S=b.data?i(b.data.role):!1,C=f(async()=>S?a():[],[S]);return(0,_.jsxs)(`main`,{className:`relative mx-auto min-h-screen max-w-5xl overflow-hidden px-4 py-16 text-white sm:px-6`,children:[(0,_.jsx)(r.div,{"aria-hidden":!0,className:`pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(800px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full`,style:{background:`radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)`},animate:e?void 0:{opacity:[.4,1,.4]},transition:{duration:8,repeat:1/0,ease:`easeInOut`}}),(0,_.jsxs)(r.header,{initial:{opacity:0,y:20},animate:{opacity:1,y:0},transition:{duration:.8,ease:v},className:`relative mb-12 flex flex-col justify-between gap-5 border-b border-white/10 pb-8 sm:flex-row sm:items-end`,children:[(0,_.jsxs)(`div`,{children:[(0,_.jsxs)(`div`,{className:`mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.05] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.3em] text-white/80`,children:[(0,_.jsx)(u,{className:`size-3.5`}),`Educator Hub`]}),(0,_.jsx)(`h1`,{className:`text-4xl font-extrabold tracking-tight sm:text-6xl`,children:(0,_.jsx)(r.span,{initial:{backgroundPosition:`0% 50%`},animate:e?void 0:{backgroundPosition:`100% 50%`},transition:{duration:4,repeat:1/0,repeatType:`reverse`,ease:`easeInOut`},style:{backgroundImage:y,backgroundSize:`300% auto`,WebkitBackgroundClip:`text`,backgroundClip:`text`,WebkitTextFillColor:`transparent`},className:`inline-block drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]`,children:`Review Queue`})})]}),C.data&&C.data.length>0&&(0,_.jsxs)(`div`,{className:`flex items-center gap-3 self-start rounded-full border border-white/20 bg-white/[0.04] px-4 py-2 text-xs text-white/60 backdrop-blur-md sm:self-auto`,children:[(0,_.jsxs)(`span`,{className:`relative flex size-2`,children:[(0,_.jsx)(`span`,{className:`absolute inline-flex size-full animate-ping rounded-full bg-white opacity-70`}),(0,_.jsx)(`span`,{className:`relative inline-flex size-2 rounded-full bg-white`})]}),(0,_.jsxs)(`span`,{children:[(0,_.jsx)(`strong`,{className:`font-bold text-white`,children:C.data.length}),` εκκρεμείς αξιολογήσεις`]})]})]}),(0,_.jsxs)(`div`,{className:`relative`,children:[b.loading&&(0,_.jsx)(h,{rows:3}),b.error&&(0,_.jsx)(m,{message:b.error}),b.data&&!S&&(0,_.jsxs)(x,{inner:`p-8 text-center`,children:[(0,_.jsx)(`div`,{className:`mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl border border-white/20 bg-white/[0.05] text-white`,children:(0,_.jsx)(l,{className:`size-6`})}),(0,_.jsx)(p,{reason:`Μόνο εκπαιδευτές έχουν πρόσβαση στην ουρά αξιολόγησης.`})]}),S&&(0,_.jsxs)(_.Fragment,{children:[C.loading&&(0,_.jsx)(h,{rows:4}),C.error&&(0,_.jsx)(m,{message:C.error}),C.data&&C.data.length===0&&(0,_.jsx)(x,{inner:`p-12 text-center`,children:(0,_.jsx)(g,{title:`Καμία εκκρεμής υποβολή`,hint:`Όταν ένας student υποβάλει εργασία, θα εμφανιστεί εδώ.`})}),C.data&&C.data.length>0&&(0,_.jsx)(`ul`,{className:`space-y-4`,children:C.data.map((e,n)=>(0,_.jsx)(r.li,{initial:{opacity:0,y:20},animate:{opacity:1,y:0},transition:{duration:.65,ease:v,delay:.15+n*.07},whileHover:{y:-3},children:(0,_.jsx)(t,{to:`/review/$submissionId`,params:{submissionId:e.id},className:`group block rounded-3xl outline-none focus-visible:ring-2 focus-visible:ring-white/60`,children:(0,_.jsxs)(x,{inner:`p-5 sm:p-6`,children:[(0,_.jsx)(`span`,{"aria-hidden":!0,className:`pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.08] to-transparent transition-transform duration-[1200ms] ease-out group-hover:translate-x-[320%]`}),(0,_.jsxs)(`div`,{className:`relative flex flex-col justify-between gap-4 sm:flex-row sm:items-center`,children:[(0,_.jsxs)(`div`,{className:`flex min-w-0 items-start gap-4`,children:[(0,_.jsx)(`span`,{className:`flex size-12 shrink-0 items-center justify-center rounded-2xl border border-white/20 bg-white/[0.05] text-white transition-all duration-300 group-hover:scale-105 group-hover:border-white/60 group-hover:shadow-[0_0_26px_rgba(255,255,255,0.35)]`,children:(0,_.jsx)(c,{className:`size-5`})}),(0,_.jsxs)(`div`,{className:`min-w-0`,children:[(0,_.jsx)(`p`,{className:`truncate text-base font-bold text-white`,children:e.assignment?.title??`—`}),(0,_.jsxs)(`p`,{className:`mt-1 flex items-center gap-2 truncate text-xs text-white/50`,children:[(0,_.jsx)(d,{className:`size-3.5 text-white/40`}),(0,_.jsx)(`span`,{className:`text-white/70`,children:e.student?.full_name??`Άγνωστος μαθητής`}),(0,_.jsx)(`span`,{children:`·`}),(0,_.jsxs)(`span`,{children:[`attempt `,e.attempt]})]})]})]}),(0,_.jsxs)(`div`,{className:`flex shrink-0 items-center gap-4 self-end sm:self-center`,children:[(0,_.jsx)(`span`,{className:`rounded-full border border-white/25 bg-white/[0.06] px-3.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white/80`,children:e.status}),(0,_.jsx)(`span`,{className:`flex size-9 items-center justify-center rounded-full text-neutral-950 transition-transform duration-300 group-hover:translate-x-1 group-hover:shadow-[0_0_22px_rgba(255,255,255,0.6)]`,style:{backgroundImage:`linear-gradient(180deg,#ffffff,#b4b4bc 50%,#f4f4f6)`},children:(0,_.jsx)(s,{className:`size-4`})})]})]})]})})},e.id))})]})]})]})}export{S as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/academy._slug-CNuNeyi7.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{t as n}from"./use-reduced-motion-CNAPwhZE.js";import{t as r}from"./react-D9fOyxUn.js";import{f as i}from"./queries-B7Arqryn.js";import{t as a}from"./arrow-left-Brxe6F5I.js";import{t as o}from"./arrow-right-D_t5sPRj.js";import{t as s}from"./clock-CqoNLjzH.js";import{t as c}from"./layers-Cp6xWl69.js";import{t as l}from"./users-mt-IxESh.js";import{t as u}from"./academy._slug-snKSkque.js";import{t as d}from"./useAsync-CZJ1G06G.js";import{n as f,r as p}from"./States-BulpY35p.js";import{a as m,i as h,s as g}from"./chrome-DYZby3h2.js";var _=e();function v(){let e=n(),{slug:v}=u.useParams(),{data:b,error:x,loading:S}=d(()=>i(v),[v]);return(0,_.jsxs)(`main`,{className:`relative min-h-screen overflow-x-hidden bg-[#070707] px-4 pb-24 pt-28 text-white sm:px-6 sm:pt-36`,children:[(0,_.jsx)(r.div,{"aria-hidden":!0,className:`pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(900px,130%)] -translate-x-1/2 -translate-y-1/3 rounded-full md:block`,style:{background:`radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(170,180,190,0.035) 40%, transparent 70%)`},animate:e?void 0:{opacity:[.45,1,.45]},transition:{duration:9,repeat:1/0,ease:`easeInOut`}}),(0,_.jsxs)(`div`,{className:`relative mx-auto max-w-4xl`,children:[(0,_.jsx)(r.div,{whileHover:{x:-3},className:`inline-block`,children:(0,_.jsxs)(t,{to:`/academy`,className:`group inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-white/75 outline-none transition-all hover:border-white/60 hover:bg-white/[0.09] hover:text-white hover:shadow-[0_0_22px_rgba(255,255,255,0.14)] focus-visible:ring-2 focus-visible:ring-white/60`,children:[(0,_.jsx)(a,{className:`size-3.5 transition-transform group-hover:-translate-x-1`}),`Πίσω στην Academy`]})}),S&&(0,_.jsx)(`div`,{className:`mt-8`,children:(0,_.jsx)(p,{rows:4})}),x&&(0,_.jsx)(`div`,{className:`mt-8`,children:(0,_.jsx)(f,{message:x})}),b&&(0,_.jsxs)(_.Fragment,{children:[(0,_.jsx)(r.header,{initial:{opacity:0,y:18},animate:{opacity:1,y:0},transition:{duration:.7,ease:m},className:`mt-8`,children:(0,_.jsxs)(g,{inner:`p-6 sm:p-10`,children:[(0,_.jsx)(`span`,{className:`inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-950`,style:{backgroundImage:`linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)`,boxShadow:`0 0 18px rgba(255,255,255,0.3)`},children:b.level}),(0,_.jsx)(`h1`,{className:`mt-5 text-3xl font-extrabold tracking-tight sm:text-5xl`,children:(0,_.jsx)(h,{children:b.title})}),b.outcome&&(0,_.jsx)(`p`,{className:`mt-4 max-w-2xl text-sm leading-relaxed text-white/65 sm:text-base`,children:b.outcome}),(0,_.jsxs)(`dl`,{className:`mt-8 grid gap-4 sm:grid-cols-3`,children:[b.audience&&(0,_.jsx)(y,{icon:(0,_.jsx)(l,{className:`size-4`}),label:`Για ποιον`,value:b.audience}),b.estimated_hours!=null&&(0,_.jsx)(y,{icon:(0,_.jsx)(s,{className:`size-4`}),label:`Διάρκεια`,value:`${b.estimated_hours} ώρες`}),(0,_.jsx)(y,{icon:(0,_.jsx)(c,{className:`size-4`}),label:`Modules`,value:String(b.modules.length)})]})]})}),(0,_.jsxs)(`section`,{className:`mt-10 space-y-5`,children:[b.modules.length===0&&(0,_.jsx)(`p`,{className:`text-sm text-white/50`,children:`Δεν έχουν προστεθεί modules ακόμη.`}),b.modules.map((n,i)=>(0,_.jsx)(r.div,{initial:i<3&&!e&&{opacity:0,y:20},animate:{opacity:1,y:0},transition:{duration:.6,ease:m,delay:.15+i*.07},style:{contentVisibility:`auto`,containIntrinsicSize:`auto 260px`},children:(0,_.jsxs)(g,{inner:`p-5 sm:p-7`,children:[(0,_.jsxs)(`div`,{className:`flex items-start gap-4`,children:[(0,_.jsx)(`span`,{className:`font-extrabold leading-none text-white/25 sm:text-3xl text-2xl`,style:{fontVariantNumeric:`tabular-nums`},children:String(i+1).padStart(2,`0`)}),(0,_.jsxs)(`div`,{className:`min-w-0`,children:[(0,_.jsx)(`h2`,{className:`text-lg font-bold text-white sm:text-xl`,children:n.title}),n.objective&&(0,_.jsx)(`p`,{className:`mt-1 text-sm leading-relaxed text-white/55`,children:n.objective})]})]}),(0,_.jsxs)(`ul`,{className:`mt-5 space-y-1.5`,children:[n.lessons.map(e=>(0,_.jsx)(`li`,{children:(0,_.jsxs)(t,{to:`/lesson/$lessonId`,params:{lessonId:e.id},className:`group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-sm text-white/80 outline-none transition-all duration-300 hover:border-white/25 hover:bg-white/[0.05] hover:text-white hover:shadow-[0_0_24px_rgba(255,255,255,0.06)] focus-visible:border-white/50 focus-visible:ring-2 focus-visible:ring-white/40`,children:[(0,_.jsx)(`span`,{className:`shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/45 transition-colors group-hover:border-white/40 group-hover:text-white/80`,children:e.type}),(0,_.jsx)(`span`,{className:`min-w-0 flex-1 truncate`,children:e.title}),(0,_.jsx)(`span`,{className:`flex size-7 shrink-0 items-center justify-center rounded-full text-neutral-950 opacity-60 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 group-hover:shadow-[0_0_18px_rgba(255,255,255,0.5)]`,style:{backgroundImage:`linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)`},children:(0,_.jsx)(o,{className:`size-3.5`})})]})},e.id)),n.lessons.length===0&&(0,_.jsx)(`li`,{className:`px-3 py-3 text-sm text-white/40`,children:`Χωρίς μαθήματα ακόμη.`})]})]})},n.id))]})]})]})]})}function y({icon:e,label:t,value:n}){return(0,_.jsxs)(`div`,{className:`rounded-2xl border border-white/10 bg-white/[0.03] p-4`,children:[(0,_.jsxs)(`dt`,{className:`flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-white/40`,children:[(0,_.jsx)(`span`,{className:`text-white/70`,children:e}),t]}),(0,_.jsx)(`dd`,{className:`mt-2 text-sm font-semibold text-white/90`,children:n})]})}export{v as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/academy._slug-COscl5CB.mjs ===
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { $ as Layers, Bt as ArrowLeft, s as Users, yt as Clock, zt as ArrowRight } from "../_libs/lucide-react.mjs";
+import { f as getCourseBySlug } from "./queries-DCA4yifx.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { r as useReducedMotion } from "../_libs/framer-motion+[...].mjs";
+import { t as Route } from "./academy._slug-CKxxMks0.mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { a as EASE, i as ChromeText, s as Frame } from "./chrome-CqNlZkJS.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/academy._slug-COscl5CB.js
+var import_jsx_runtime = require_jsx_runtime();
+function CoursePage() {
+	const reduce = useReducedMotion();
+	const { slug } = Route.useParams();
+	const { data, error, loading } = useAsync(() => getCourseBySlug(slug), [slug]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "relative min-h-screen overflow-x-hidden bg-[#070707] px-4 pb-24 pt-28 text-white sm:px-6 sm:pt-36",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+			"aria-hidden": true,
+			className: "pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(900px,130%)] -translate-x-1/2 -translate-y-1/3 rounded-full md:block",
+			style: { background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, rgba(170,180,190,0.035) 40%, transparent 70%)" },
+			animate: reduce ? void 0 : { opacity: [
+				.45,
+				1,
+				.45
+			] },
+			transition: {
+				duration: 9,
+				repeat: Infinity,
+				ease: "easeInOut"
+			}
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "relative mx-auto max-w-4xl",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					whileHover: { x: -3 },
+					className: "inline-block",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+						to: "/academy",
+						className: "group inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-white/75 outline-none transition-all hover:border-white/60 hover:bg-white/[0.09] hover:text-white hover:shadow-[0_0_22px_rgba(255,255,255,0.14)] focus-visible:ring-2 focus-visible:ring-white/60",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowLeft, { className: "size-3.5 transition-transform group-hover:-translate-x-1" }), "Πίσω στην Academy"]
+					})
+				}),
+				loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-8",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 4 })
+				}),
+				error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-8",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: error })
+				}),
+				data && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.header, {
+					initial: {
+						opacity: 0,
+						y: 18
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					transition: {
+						duration: .7,
+						ease: EASE
+					},
+					className: "mt-8",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Frame, {
+						inner: "p-6 sm:p-10",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-neutral-950",
+								style: {
+									backgroundImage: "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)",
+									boxShadow: "0 0 18px rgba(255,255,255,0.3)"
+								},
+								children: data.level
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+								className: "mt-5 text-3xl font-extrabold tracking-tight sm:text-5xl",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeText, { children: data.title })
+							}),
+							data.outcome && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-4 max-w-2xl text-sm leading-relaxed text-white/65 sm:text-base",
+								children: data.outcome
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dl", {
+								className: "mt-8 grid gap-4 sm:grid-cols-3",
+								children: [
+									data.audience && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Meta, {
+										icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Users, { className: "size-4" }),
+										label: "Για ποιον",
+										value: data.audience
+									}),
+									data.estimated_hours != null && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Meta, {
+										icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Clock, { className: "size-4" }),
+										label: "Διάρκεια",
+										value: `${data.estimated_hours} ώρες`
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Meta, {
+										icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Layers, { className: "size-4" }),
+										label: "Modules",
+										value: String(data.modules.length)
+									})
+								]
+							})
+						]
+					})
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					className: "mt-10 space-y-5",
+					children: [data.modules.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-sm text-white/50",
+						children: "Δεν έχουν προστεθεί modules ακόμη."
+					}), data.modules.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+						initial: i < 3 && !reduce ? {
+							opacity: 0,
+							y: 20
+						} : false,
+						animate: {
+							opacity: 1,
+							y: 0
+						},
+						transition: {
+							duration: .6,
+							ease: EASE,
+							delay: .15 + i * .07
+						},
+						style: {
+							contentVisibility: "auto",
+							containIntrinsicSize: "auto 260px"
+						},
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Frame, {
+							inner: "p-5 sm:p-7",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "flex items-start gap-4",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "font-extrabold leading-none text-white/25 sm:text-3xl text-2xl",
+									style: { fontVariantNumeric: "tabular-nums" },
+									children: String(i + 1).padStart(2, "0")
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "min-w-0",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+										className: "text-lg font-bold text-white sm:text-xl",
+										children: m.title
+									}), m.objective && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "mt-1 text-sm leading-relaxed text-white/55",
+										children: m.objective
+									})]
+								})]
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", {
+								className: "mt-5 space-y-1.5",
+								children: [m.lessons.map((lesson) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+									to: "/lesson/$lessonId",
+									params: { lessonId: lesson.id },
+									className: "group flex items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-sm text-white/80 outline-none transition-all duration-300 hover:border-white/25 hover:bg-white/[0.05] hover:text-white hover:shadow-[0_0_24px_rgba(255,255,255,0.06)] focus-visible:border-white/50 focus-visible:ring-2 focus-visible:ring-white/40",
+									children: [
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "shrink-0 rounded-full border border-white/15 bg-white/[0.04] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/45 transition-colors group-hover:border-white/40 group-hover:text-white/80",
+											children: lesson.type
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "min-w-0 flex-1 truncate",
+											children: lesson.title
+										}),
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "flex size-7 shrink-0 items-center justify-center rounded-full text-neutral-950 opacity-60 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100 group-hover:shadow-[0_0_18px_rgba(255,255,255,0.5)]",
+											style: { backgroundImage: "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)" },
+											children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "size-3.5" })
+										})
+									]
+								}) }, lesson.id)), m.lessons.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", {
+									className: "px-3 py-3 text-sm text-white/40",
+									children: "Χωρίς μαθήματα ακόμη."
+								})]
+							})]
+						})
+					}, m.id))]
+				})] })
+			]
+		})]
+	});
+}
+function Meta({ icon, label, value }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "rounded-2xl border border-white/10 bg-white/[0.03] p-4",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dt", {
+			className: "flex items-center gap-2 text-[11px] uppercase tracking-[0.25em] text-white/40",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "text-white/70",
+				children: icon
+			}), label]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", {
+			className: "mt-2 text-sm font-semibold text-white/90",
+			children: value
+		})]
+	});
+}
+//#endregion
+export { CoursePage as component };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/AppHeader.tsx ===
+// src/components/aura/AppHeader.tsx
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { AnimatePresence, motion, type Variants } from "motion/react";
+import ChromeButton from "./ChromeButton";
+import AuraAvatar from "./AuraAvatar";
+import HamburgerButton from "./HamburgerButton";
+import { useAuth } from "@/hooks/useAuth";
+import { useProfile } from "@/hooks/useProfile";
+import logo from "@/assets/logo.jpg";
+
+const NAV = [
+  { label: "Dashboard", to: "/dashboard" as const },
+  { label: "Profile", to: "/profile" as const },
+];
+
+const listVariants: Variants = {
+  open: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
+  closed: {},
+};
+
+const itemVariants: Variants = {
+  closed: { opacity: 0, y: 24, filter: "blur(6px)" },
+  open: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+export default function AppHeader() {
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { profile } = useProfile(user);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [open, setOpen] = useState(false);
+
+  // Lock body scroll + close on Escape while the overlay is open.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  async function handleSignOut() {
+    setOpen(false);
+    await signOut();
+    navigate({ to: "/login" });
+  }
+
+  return (
+    <>
+      <header className="nav-scrolled sticky top-0 z-50">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
+          <Link
+            to="/"
+            className="flex items-center gap-3"
+            aria-label="AURA home"
+            onClick={() => setOpen(false)}
+          >
+            <img src={logo} alt="AURA" className="nav-logo" draggable={false} />
+            <span className="chrome-text font-aura text-sm font-extrabold uppercase tracking-[0.4em]">
+              Aura
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-4">
+            <Link
+              to="/profile"
+              aria-label="Your profile"
+              className="rounded-full"
+              onClick={() => setOpen(false)}
+            >
+              <AuraAvatar
+                name={profile?.full_name}
+                email={user?.email}
+                src={profile?.avatar_url}
+                size={36}
+              />
+            </Link>
+            <HamburgerButton open={open} onClick={() => setOpen((v) => !v)} />
+          </div>
+        </div>
+      </header>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="app-menu-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="menu-overlay fixed inset-0 z-40"
+          >
+            <div className="hero-atmosphere absolute inset-0" aria-hidden />
+
+            <motion.nav
+              className="relative z-10 flex min-h-screen flex-col items-center justify-center gap-3 px-6"
+              variants={listVariants}
+              initial="closed"
+              animate="open"
+              exit="closed"
+            >
+              <motion.div
+                variants={itemVariants}
+                className="mb-6 flex flex-col items-center gap-3"
+              >
+                <AuraAvatar
+                  name={profile?.full_name}
+                  email={user?.email}
+                  src={profile?.avatar_url}
+                  size={64}
+                />
+                {user?.email && (
+                  <span className="font-aura text-sm text-aura-text-secondary">
+                    {user.email}
+                  </span>
+                )}
+              </motion.div>
+
+              {NAV.map((item) => (
+                <motion.div key={item.to} variants={itemVariants}>
+                  <Link
+                    to={item.to}
+                    onClick={() => setOpen(false)}
+                    className={`menu-link ${
+                      pathname === item.to ? "is-active" : ""
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                </motion.div>
+              ))}
+
+              <motion.div variants={itemVariants} className="mt-8">
+                <ChromeButton variant="secondary" onClick={handleSignOut}>
+                  Sign out
+                </ChromeButton>
+              </motion.div>
+            </motion.nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/AuraAI.tsx ===
+import { useEffect, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client"; // ← προσαρμόσε στο δικό σου path
+import AuraFace from "./AuraFace";
+import AuraChatCards, { speakable, type AuraCard } from "@/components/aura/AuraChatCards";
+import { useAuraSpeech } from "@/hooks/useAuraSpeech";
+import "./aura-ai.css";
+
+type Msg = { role: "user" | "assistant"; content: string; cards?: AuraCard[] };
+
+const DEFAULT_LIMIT = 10; // μέχρι να απαντήσει ο server με το πραγματικό όριο
+const MAX_PIPS = 12; // πάνω από αυτό δείχνουμε αριθμό αντί για κουκκίδες
+const STORE_KEY = "aura_chat_v1";
+const SUGGESTIONS = [
+  "Δείξε μου βίντεο Graduation",
+  "Τι online σεμινάρια υπάρχουν;",
+  "Θέλω να κλείσω σεμινάριο",
+  "Τι πλάνα έχετε;",
+];
+const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+  left: (i * 37 + 11) % 100,
+  size: 2 + (i % 3),
+  delay: (i * 0.9) % 8,
+  dur: 9 + (i % 5) * 2,
+}));
+
+const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem("aura_device");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("aura_device", id);
+    }
+    return id;
+  } catch {
+    return "unknown";
+  }
+}
+
+function loadMessages(): Msg[] {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    const parsed = raw ? (JSON.parse(raw) as Msg[]) : [];
+    return Array.isArray(parsed) ? parsed.slice(-20) : [];
+  } catch {
+    return [];
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Hooks: κινητό + «κλείδωμα» τύπου Instagram DM                        */
+/* ------------------------------------------------------------------ */
+
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const update = () => setMatch(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, [query]);
+  return match;
+}
+
+/**
+ * Στο κινητό η σελίδα «κλειδώνει» στο ορατό τμήμα της οθόνης (visualViewport). Όταν ανοίγει το
+ * πληκτρολόγιο, όλο το UI μικραίνει ώστε να χωράει πάνω από αυτό, και ο χαρακτήρας μένει ορατός.
+ * Η σελίδα πίσω δεν κινείται.
+ */
+function useLockedViewport(enabled: boolean) {
+  const [vp, setVp] = useState({ height: 0, top: 0, keyboard: false });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const vv = window.visualViewport;
+    let maxH = 0;
+    let lastW = window.innerWidth;
+
+    const update = () => {
+      if (window.innerWidth !== lastW) {
+        lastW = window.innerWidth; // περιστροφή οθόνης
+        maxH = 0;
+      }
+      const height = Math.round(vv ? vv.height : window.innerHeight);
+      const top = Math.round(vv ? vv.offsetTop : 0);
+      maxH = Math.max(maxH, height); // το μεγαλύτερο ύψος που είδαμε = πληκτρολόγιο κλειστό
+      const keyboard = maxH - height > 120;
+      setVp((p) => (p.height === height && p.top === top && p.keyboard === keyboard ? p : { height, top, keyboard }));
+      if (window.scrollY !== 0) window.scrollTo(0, 0); // το iOS σκρολάρει τη σελίδα όταν εστιάζεις input
+    };
+    update();
+
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+
+    // κλείδωσε τη σελίδα πίσω από το chat
+    const html = document.documentElement;
+    const body = document.body;
+    const scrollY = window.scrollY;
+    const prev = {
+      hOverflow: html.style.overflow,
+      hOverscroll: html.style.overscrollBehavior,
+      bOverflow: body.style.overflow,
+      bPosition: body.style.position,
+      bTop: body.style.top,
+      bWidth: body.style.width,
+    };
+    html.style.overflow = "hidden";
+    html.style.overscrollBehavior = "none";
+    body.style.overflow = "hidden";
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+
+    return () => {
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      html.style.overflow = prev.hOverflow;
+      html.style.overscrollBehavior = prev.hOverscroll;
+      body.style.overflow = prev.bOverflow;
+      body.style.position = prev.bPosition;
+      body.style.top = prev.bTop;
+      body.style.width = prev.bWidth;
+      window.scrollTo(0, scrollY);
+    };
+  }, [enabled]);
+
+  return vp;
+}
+
+/* ------------------------------------------------------------------ */
+/* Εικονίδια                                                            */
+/* ------------------------------------------------------------------ */
+
+const SpeakerIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 5 6 9H3v6h3l5 4V5z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" />
+  </svg>
+);
+const MuteIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 5 6 9H3v6h3l5 4V5z" /><path d="m16 9 5 6M21 9l-5 6" />
+  </svg>
+);
+const SendIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </svg>
+);
+const BackIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m15 5-7 7 7 7" />
+  </svg>
+);
+
+/* ------------------------------------------------------------------ */
+/* Σελίδα                                                               */
+/* ------------------------------------------------------------------ */
+
+export default function AuraAI() {
+  const [messages, setMessages] = useState<Msg[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [remaining, setRemaining] = useState<number | null>(null);
+  const [limit, setLimit] = useState(DEFAULT_LIMIT);
+  const [limitReached, setLimitReached] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [debug, setDebug] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const isMobile = useMediaQuery("(max-width: 767px)");
+  const vp = useLockedViewport(isMobile);
+  const { speak, stop, speaking, voiceIssue, getViseme } = useAuraSpeech();
+
+  useEffect(() => {
+    setDebug(new URLSearchParams(window.location.search).has("debug"));
+    setMessages(loadMessages()); // αν ο χρήστης πάτησε μια κάρτα και γύρισε πίσω, η συζήτηση συνεχίζεται
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORE_KEY, JSON.stringify(messages.slice(-20)));
+    } catch {
+      /* ignore */
+    }
+  }, [messages]);
+
+  // σκρολάρισμα στο τέλος: νέο μήνυμα, άνοιγμα/κλείσιμο πληκτρολογίου
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages, loading, vp.keyboard, vp.height]);
+
+  async function send(override?: string) {
+    const text = (override ?? input).trim();
+    if (!text || loading || limitReached) return;
+
+    stop();
+    const next: Msg[] = [...messages, { role: "user", content: text }];
+    setMessages(next);
+    setInput("");
+    setLoading(true);
+
+    try {
+      let reply: string | null = null;
+      let cards: AuraCard[] | undefined;
+      const payload = next.map(({ role, content }) => ({ role, content })); // στον server μόνο κείμενο
+
+      for (let attempt = 0; attempt < 2 && !reply; attempt++) {
+        try {
+          const { data, error: invokeErr } = await supabase.functions.invoke("ai-chat", {
+            body: { messages: payload, deviceId: getDeviceId() },
+          });
+          if (invokeErr) throw invokeErr;
+
+          if (data?.error === "limit_reached") {
+            setLimitReached(true);
+            setRemaining(0);
+            return;
+          }
+          if (typeof data?.reply === "string" && data.reply.trim()) {
+            reply = data.reply;
+            cards = Array.isArray(data.cards) && data.cards.length ? (data.cards as AuraCard[]) : undefined;
+            if (typeof data.remaining === "number") setRemaining(data.remaining);
+            if (typeof data.limit === "number") setLimit(data.limit);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      const finalReply = reply ?? "Συγγνώμη, είχα ένα μικρό πρόβλημα σύνδεσης. Στείλε μου ξανά το μήνυμά σου.";
+      setMessages([...next, { role: "assistant", content: finalReply, cards }]);
+      if (voiceOn) void speak(speakable(finalReply)); // η φωνή διαβάζει μόνο τις πρώτες προτάσεις
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function newChat() {
+    stop();
+    setMessages([]);
+  }
+
+  function goBack() {
+    if (window.history.length > 1) window.history.back();
+    else window.location.href = "/";
+  }
+
+  const left = remaining ?? limit;
+  const status = speaking ? "Μιλάει…" : loading ? "Σκέφτεται…" : "Online";
+  const lastIndex = messages.length - 1;
+
+  /* ── Κοινά κομμάτια (ίδια σε desktop και κινητό) ─────────────────────── */
+
+  const messagesView = (
+    <>
+      <div className="aai-bubble-ai aai-rise max-w-[88%] px-4 py-3 text-sm">
+        Γεια σου, είμαι η AURA. Ρώτησέ με για barbering και τεχνικές, ζήτα μου βίντεο από τα μαθήματα, ή δες μαζί μου σεμινάρια και πλάνα.
+      </div>
+
+      {messages.map((m, i) =>
+        m.role === "user" ? (
+          <div key={i} className="aai-rise flex justify-end">
+            <div className="aai-bubble-user max-w-[85%] px-4 py-2.5 text-sm">{m.content}</div>
+          </div>
+        ) : (
+          <div key={i} className="aai-rise">
+            <div className="flex items-end gap-2">
+              <div className="aai-bubble-ai max-w-[88%] whitespace-pre-line px-4 py-3 text-sm">{m.content}</div>
+              {i === lastIndex && (
+                <button className="aai-icon-btn shrink-0" onClick={() => void speak(speakable(m.content))} title="Άκουσέ το ξανά">
+                  <SpeakerIcon />
+                </button>
+              )}
+            </div>
+            {m.cards && m.cards.length > 0 && (
+              <div className="max-w-[94%]">
+                <AuraChatCards cards={m.cards} />
+              </div>
+            )}
+          </div>
+        ),
+      )}
+
+      {loading && (
+        <div className="aai-bubble-ai aai-rise inline-block px-4 py-3">
+          <div className="aai-typing"><i /><i /><i /></div>
+        </div>
+      )}
+
+      {messages.length === 0 && !limitReached && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {SUGGESTIONS.map((s) => (
+            <button key={s} className="aai-chip" onClick={() => send(s)}>{s}</button>
+          ))}
+        </div>
+      )}
+
+      {voiceIssue && voiceOn && (
+        <p className="rounded-lg border border-amber-200/30 bg-amber-200/10 p-2 text-[11px] leading-snug text-amber-100">
+          {voiceIssue === "no-greek-voice"
+            ? "Δεν βρέθηκε ελληνική φωνή στη συσκευή σου, οπότε η AURA μιλάει χωρίς ήχο."
+            : "Ο browser δεν έπαιξε ήχο (σίγαση ή μπλοκάρισμα). Δοκίμασε το κουμπί με το ηχείο δίπλα στην απάντηση."}
+        </p>
+      )}
+    </>
+  );
+
+  const meter = (
+    <div className="flex items-center justify-between text-[11px] text-slate-400">
+      <span className="uppercase tracking-widest">Διαθέσιμα μηνύματα</span>
+      {limit <= MAX_PIPS ? (
+        <span className="flex gap-1.5">
+          {Array.from({ length: limit }).map((_, i) => (
+            <span key={i} className={`aai-pip ${i < left ? "on" : ""}`} />
+          ))}
+        </span>
+      ) : (
+        <span className="tracking-widest">{left}</span>
+      )}
+    </div>
+  );
+
+  const composer = (
+    <>
+      {limitReached ? (
+        <a href="/pricing" className="aai-btn block px-4 py-3 text-center">
+          Τέλος διαθέσιμων μηνυμάτων — Δες τα πλάνα
+        </a>
+      ) : (
+        <div className="flex gap-2">
+          <input
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            maxLength={500}
+            placeholder="Γράψε το μήνυμά σου…"
+            enterKeyHint="send"
+            autoComplete="off"
+            className="aai-input flex-1 px-4 py-3"
+            style={{ fontSize: 16 }} /* 16px: το iOS δεν κάνει zoom όταν εστιάζεις */
+          />
+          <button
+            onPointerDown={(e) => e.preventDefault()} /* το πληκτρολόγιο μένει ανοιχτό μετά την αποστολή */
+            onClick={() => send()}
+            disabled={loading}
+            className="aai-btn flex items-center px-4"
+            aria-label="Αποστολή"
+          >
+            <SendIcon />
+          </button>
+        </div>
+      )}
+    </>
+  );
+
+  const debugBtn = debug && (
+    <button
+      onClick={() => void speak("Γεια σου, είμαι η Άουρα. Πώς μπορώ να σε βοηθήσω σήμερα;")}
+      className="mt-2 w-full rounded-lg border border-yellow-300/60 py-1 text-xs text-yellow-200"
+    >
+      DEBUG: δοκιμή φωνής (δεν χρεώνει χρήση) · πάτα B για βλεφάρισμα
+    </button>
+  );
+
+  /* ── ΚΙΝΗΤΟ: κλειδωμένη οθόνη τύπου Instagram DM ─────────────────────── */
+
+  if (isMobile) {
+    const base = vp.height || (typeof window !== "undefined" ? window.innerHeight : 700);
+    // ο χαρακτήρας μικραίνει όταν ανοίγει το πληκτρολόγιο, αλλά μένει πάντα ορατός
+    const avatarH = vp.keyboard ? clamp(base * 0.3, 140, 200) : clamp(base * 0.42, 230, 440);
+
+    return (
+      <section
+        className="fixed inset-x-0 z-[60] flex flex-col overflow-hidden bg-[#030304] text-white"
+        style={{ top: vp.top, height: vp.height || "100dvh" }}
+      >
+        <div className="relative shrink-0 transition-[height] duration-300 ease-out" style={{ height: avatarH }}>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_35%,rgba(150,170,210,0.22),transparent_70%)]" />
+          <AuraFace getViseme={getViseme} fit="cover" fadeBottom className="h-full w-full" debug={debug} />
+
+          {/* επάνω μπάρα πάνω στον χαρακτήρα */}
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between bg-gradient-to-b from-black/70 to-transparent px-3 pb-6 pt-[max(10px,env(safe-area-inset-top))]">
+            <button className="aai-icon-btn" onClick={goBack} aria-label="Πίσω"><BackIcon /></button>
+            <div className="flex items-center gap-2 text-[11px] tracking-widest text-slate-200">
+              <span className="aai-live" />
+              <span className="aai-chrome-text text-sm font-semibold">AURA</span>
+              <span className="text-slate-400">{status}</span>
+              <span className={`aai-eq ${speaking ? "on" : ""}`}><i /><i /><i /><i /><i /></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {messages.length > 0 && (
+                <button className="aai-chip" onClick={newChat}>Νέα</button>
+              )}
+              <button
+                className="aai-icon-btn"
+                onClick={() => { if (voiceOn) stop(); setVoiceOn(!voiceOn); }}
+                aria-label={voiceOn ? "Σίγαση" : "Ενεργοποίηση φωνής"}
+              >
+                {voiceOn ? <SpeakerIcon /> : <MuteIcon />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div ref={listRef} className="aai-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-3">
+          {messagesView}
+        </div>
+
+        <div
+          className="shrink-0 border-t border-white/10 bg-black/60 px-3 pt-2 backdrop-blur"
+          style={{ paddingBottom: vp.keyboard ? 8 : "max(10px, env(safe-area-inset-bottom))" }}
+        >
+          {composer}
+          <div className="mt-2">{meter}</div>
+          {debugBtn}
+        </div>
+      </section>
+    );
+  }
+
+  /* ── DESKTOP: μεγάλος χαρακτήρας + chat στο ίδιο ύψος ─────────────────── */
+
+  const boxH = "min(84vh, 920px)";
+
+  return (
+    <section className="aai-root pb-10 pt-20">
+      <div className="aai-rays" />
+      {PARTICLES.map((p, i) => (
+        <span
+          key={i}
+          className="aai-dot"
+          style={{
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.size,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.dur}s`,
+          }}
+        />
+      ))}
+
+      <div className="relative z-10 mx-auto grid w-full max-w-[1480px] items-center gap-6 px-4 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:gap-10 lg:px-8">
+        {/* ── Χαρακτήρας ── */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative w-full" style={{ height: boxH }}>
+            <div
+              className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${speaking ? "opacity-100" : "opacity-60"}`}
+              style={{ background: "radial-gradient(55% 50% at 50% 38%, rgba(160,180,225,0.20), transparent 72%)" }}
+            />
+            <AuraFace getViseme={getViseme} fit="contain" className="h-full w-full" debug={debug} />
+          </div>
+          <div className="flex items-center gap-3 text-xs tracking-widest text-slate-300">
+            <span className="aai-live" />
+            <span>AURA AI · {status}</span>
+            <span className={`aai-eq ${speaking ? "on" : ""}`}><i /><i /><i /><i /><i /></span>
+          </div>
+        </div>
+
+        {/* ── Chat ── */}
+        <div className="aai-frame flex flex-col" style={{ height: boxH }}>
+          <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+            <div>
+              <div className="aai-chrome-text text-xl font-semibold">AURA</div>
+              <div className="mt-0.5 text-[11px] uppercase tracking-[0.25em] text-slate-400">Barber Academy · AI Assistant</div>
+            </div>
+            <div className="flex items-center gap-2">
+              {messages.length > 0 && (
+                <button className="aai-chip" onClick={newChat} title="Νέα συζήτηση">Νέα συζήτηση</button>
+              )}
+              <button
+                className="aai-icon-btn"
+                onClick={() => { if (voiceOn) stop(); setVoiceOn(!voiceOn); }}
+                title={voiceOn ? "Σίγαση" : "Ενεργοποίηση φωνής"}
+              >
+                {voiceOn ? <SpeakerIcon /> : <MuteIcon />}
+              </button>
+            </div>
+          </div>
+
+          <div ref={listRef} className="aai-scroll min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {messagesView}
+          </div>
+
+          <div className="border-t border-white/10 px-4 pb-4 pt-3">
+            {composer}
+            <div className="mt-3">{meter}</div>
+            {debugBtn}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+=== END FILE ===
+

@@ -1,0 +1,1010 @@
+=== FILE: .output/server/_ssr/academy.index-DgowwJSe.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { C as ShieldCheck, Dt as ChevronDown, G as MessageCircle, I as Pencil, It as Ban, Ot as Check, S as ShieldOff, T as Send, Y as Lock, Z as LoaderCircle, et as Instagram, g as Trash2, gt as Crown, i as Volume2, it as Heart, j as Plus, kt as Camera, n as X, nt as Images, p as Type, q as MapPin, r as VolumeX, rt as ImagePlus, xt as Circle, y as Sparkles, z as Music2 } from "../_libs/lucide-react.mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { D as isStaffRole, I as toggleAcademyPostLike, O as markStoryViewed, a as deleteStory, i as deleteAcademyPost, n as createAcademyPost, o as getAcademyFeed, r as createStory, s as getActiveStories, t as addAcademyPostComment, y as getMyProfile } from "./queries-DCA4yifx.mjs";
+import { n as isAdminRole } from "./roles-DmnR1ATT.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton, t as EmptyState } from "./States-CTtcXN7r.mjs";
+import { r as useReducedMotion, u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { a as EASE, i as ChromeText, o as FRAME_BORDER, t as CHROME_FILL } from "./chrome-CqNlZkJS.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+import { i as getProfileById, r as getOrCreateDirectConversation } from "./messagingQueries-RnKcgYgf.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/academy.index-DgowwJSe.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var ROLE_LABEL = {
+	student: "Student",
+	educator: "Educator",
+	senior_educator: "Senior Educator",
+	content_manager: "Content Manager",
+	operations: "Operations",
+	admin: "Admin",
+	super_admin: "Super Admin"
+};
+function initials(name) {
+	if (!name) return "?";
+	return name.split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
+function timeAgo(iso) {
+	const diffMs = Date.now() - new Date(iso).getTime();
+	const mins = Math.floor(diffMs / 6e4);
+	if (mins < 1) return "τώρα";
+	if (mins < 60) return `${mins}λ`;
+	const hours = Math.floor(mins / 60);
+	if (hours < 24) return `${hours}ω`;
+	const days = Math.floor(hours / 24);
+	if (days < 7) return `${days}μ`;
+	return new Date(iso).toLocaleDateString("el-GR");
+}
+function Avatar$1({ url, name, size = 44, ring = "ring-white/15" }) {
+	if (url) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+		src: url,
+		alt: name ?? "",
+		style: {
+			width: size,
+			height: size
+		},
+		className: `shrink-0 rounded-full object-cover ring-2 ${ring}`
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		style: {
+			width: size,
+			height: size
+		},
+		className: `flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-neutral-700 to-neutral-900 text-xs font-semibold text-neutral-200 ring-2 ${ring}`,
+		children: initials(name ?? null)
+	});
+}
+function PostCardPro({ post, currentUserId, currentUserRole, onChanged }) {
+	const [showComments, setShowComments] = (0, import_react.useState)(false);
+	const [commentText, setCommentText] = (0, import_react.useState)("");
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const liked = post.likes.some((l) => l.user_id === currentUserId);
+	const authorIsStaff = post.author ? isStaffRole(post.author.role) : false;
+	const canDelete = post.author?.id === currentUserId || isStaffRole(currentUserRole);
+	async function handleLike() {
+		setBusy(true);
+		try {
+			await toggleAcademyPostLike(post.id, liked);
+			onChanged();
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleComment() {
+		if (!commentText.trim()) return;
+		setBusy(true);
+		try {
+			await addAcademyPostComment(post.id, commentText.trim());
+			setCommentText("");
+			onChanged();
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleDelete() {
+		if (!confirm("Διαγραφή αυτής της ανάρτησης;")) return;
+		setBusy(true);
+		try {
+			await deleteAcademyPost(post.id);
+			onChanged();
+		} finally {
+			setBusy(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("article", {
+		className: "group relative overflow-hidden rounded-2xl border p-6 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]",
+		style: {
+			background: "linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 100%)",
+			borderImage: "linear-gradient(135deg, rgba(220,220,225,0.35), rgba(255,255,255,0.04) 40%, rgba(180,180,190,0.18) 100%) 1",
+			borderWidth: 1,
+			borderStyle: "solid"
+		},
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "flex items-start gap-3.5",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar$1, {
+						url: post.author?.avatar_url,
+						name: post.author?.full_name,
+						ring: authorIsStaff ? "ring-amber-400/40" : "ring-white/12"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "min-w-0 flex-1",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex flex-wrap items-center gap-2",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-[15px] font-semibold tracking-tight text-white",
+								children: post.author?.full_name ?? "Άγνωστος"
+							}), authorIsStaff && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								title: ROLE_LABEL[post.author?.role ?? ""] ?? "Staff",
+								className: "flex items-center gap-1 rounded-full border border-amber-400/40 bg-gradient-to-b from-amber-300/20 to-amber-500/10 px-2.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-amber-300 shadow-[0_0_12px_-4px_rgba(251,191,36,0.6)]",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Crown, {
+									size: 11,
+									className: "fill-amber-300 text-amber-300"
+								}), ROLE_LABEL[post.author?.role ?? ""] ?? "Staff"]
+							})]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-0.5 text-xs text-neutral-500",
+							children: timeAgo(post.created_at)
+						})]
+					}),
+					canDelete && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						onClick: handleDelete,
+						disabled: busy,
+						title: "Διαγραφή",
+						className: "rounded-lg p-1.5 text-neutral-500 opacity-0 transition hover:bg-white/10 hover:text-rose-300 disabled:opacity-30 group-hover:opacity-100",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Trash2, { size: 15 })
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 whitespace-pre-wrap text-[14.5px] leading-relaxed text-neutral-200",
+				children: post.content
+			}),
+			post.image_url && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-4 overflow-hidden rounded-xl ring-1 ring-white/10",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+					src: post.image_url,
+					alt: "",
+					className: "max-h-[520px] w-full object-cover"
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-5 flex items-center gap-2 border-t border-white/[0.06] pt-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					onClick: handleLike,
+					disabled: busy,
+					className: `flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-medium transition disabled:opacity-50 ${liked ? "border-rose-400/40 bg-rose-500/10 text-rose-300" : "border-white/10 bg-white/[0.02] text-neutral-400 hover:border-white/20 hover:text-white"}`,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Heart, {
+						size: 14,
+						className: liked ? "fill-rose-400" : ""
+					}), post.likes.length > 0 ? post.likes.length : "Like"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					onClick: () => setShowComments((s) => !s),
+					className: "flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3.5 py-1.5 text-xs font-medium text-neutral-400 transition hover:border-white/20 hover:text-white",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageCircle, { size: 14 }), post.comments.length > 0 ? post.comments.length : "Σχόλιο"]
+				})]
+			}),
+			showComments && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-4 space-y-3 border-t border-white/[0.06] pt-4",
+				children: [post.comments.slice().sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-start gap-2.5",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Avatar$1, {
+						url: c.author?.avatar_url,
+						name: c.author?.full_name,
+						size: 30,
+						ring: c.author && isStaffRole(c.author.role) ? "ring-amber-400/30" : "ring-white/10"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "min-w-0 flex-1 rounded-2xl bg-white/[0.04] px-3.5 py-2.5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex items-center gap-1.5",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-xs font-semibold text-neutral-200",
+								children: c.author?.full_name ?? "Άγνωστος"
+							}), c.author && isStaffRole(c.author.role) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Crown, {
+								size: 10,
+								className: "fill-amber-300 text-amber-300"
+							})]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-0.5 text-sm text-neutral-300",
+							children: c.content
+						})]
+					})]
+				}, c.id)), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center gap-2 pt-1",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						value: commentText,
+						onChange: (e) => setCommentText(e.target.value),
+						onKeyDown: (e) => e.key === "Enter" && handleComment(),
+						placeholder: "Γράψε ένα σχόλιο…",
+						className: "w-full rounded-full border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-white outline-none transition focus:border-white/30"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						onClick: handleComment,
+						disabled: busy || !commentText.trim(),
+						className: "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-neutral-100 to-neutral-300 text-black shadow-[0_2px_8px_-2px_rgba(255,255,255,0.3)] transition hover:brightness-110 disabled:opacity-30",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Send, { size: 15 })
+					})]
+				})]
+			})
+		]
+	});
+}
+var CHANNEL_NAME = "academy-online-users";
+/**
+* Δείχνει ποιοι είναι online ΤΩΡΑ, μέσω Supabase Realtime Presence.
+* Δεν γράφει τίποτα στη βάση — μηδενικό storage cost, καθαρίζεται
+* αυτόματα μόλις κάποιος κλείσει το tab / αποσυνδεθεί.
+*/
+function useOnlinePresence(me) {
+	const [users, setUsers] = (0, import_react.useState)([]);
+	(0, import_react.useEffect)(() => {
+		if (!me) {
+			setUsers([]);
+			return;
+		}
+		const channel = supabase.channel(CHANNEL_NAME, { config: { presence: { key: me.id } } });
+		channel.on("presence", { event: "sync" }, () => {
+			const state = channel.presenceState();
+			const flat = Object.values(state).map((presences) => presences[0]).filter(Boolean);
+			setUsers(flat);
+		});
+		channel.subscribe(async (status) => {
+			if (status === "SUBSCRIBED") await channel.track({
+				id: me.id,
+				full_name: me.full_name,
+				avatar_url: me.avatar_url,
+				role: me.role
+			});
+		});
+		return () => {
+			supabase.removeChannel(channel);
+		};
+	}, [
+		me?.id,
+		me?.full_name,
+		me?.avatar_url,
+		me?.role
+	]);
+	return users;
+}
+function UserProfileModal({ userId, onClose }) {
+	const navigate = useNavigate();
+	const [profile, setProfile] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(true);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [sending, setSending] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		setLoading(true);
+		getProfileById(userId).then((p) => {
+			if (!cancelled) setProfile(p);
+		}).catch((e) => {
+			if (!cancelled) setError(e.message);
+		}).finally(() => {
+			if (!cancelled) setLoading(false);
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, [userId]);
+	async function handleMessage() {
+		setSending(true);
+		setError(null);
+		try {
+			const conversationId = await getOrCreateDirectConversation(userId);
+			onClose();
+			navigate({
+				to: "/messages",
+				search: { with: conversationId }
+			});
+		} catch (e) {
+			setError(e.message);
+		} finally {
+			setSending(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+		initial: { opacity: 0 },
+		animate: { opacity: 1 },
+		exit: { opacity: 0 },
+		className: "fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm",
+		onClick: onClose,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			initial: {
+				opacity: 0,
+				y: 20,
+				scale: .97
+			},
+			animate: {
+				opacity: 1,
+				y: 0,
+				scale: 1
+			},
+			exit: {
+				opacity: 0,
+				y: 10,
+				scale: .97
+			},
+			transition: {
+				duration: .25,
+				ease: [
+					.16,
+					1,
+					.3,
+					1
+				]
+			},
+			onClick: (e) => e.stopPropagation(),
+			className: "relative w-full max-w-sm overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-[#111] to-[#070707] shadow-[0_20px_60px_rgba(0,0,0,0.6)]",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					onClick: onClose,
+					className: "absolute right-3 top-3 z-10 rounded-full bg-black/50 p-1.5 text-white/70 transition hover:bg-white hover:text-black",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { size: 15 })
+				}),
+				loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "flex h-64 items-center justify-center",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "animate-spin text-white/50" })
+				}),
+				error && !loading && !profile && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "p-6 text-sm text-rose-400",
+					children: error
+				}),
+				profile && !loading && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-20 bg-gradient-to-r from-white/10 via-white/5 to-transparent" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "-mt-10 px-6 pb-6",
+					children: [
+						profile.avatar_url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+							src: profile.avatar_url,
+							alt: "",
+							className: "h-20 w-20 rounded-full object-cover ring-4 ring-[#0a0a0a]"
+						}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-xl font-semibold text-white/80 ring-4 ring-[#0a0a0a]",
+							children: profile.full_name?.[0]?.toUpperCase() ?? "?"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mt-3 flex items-center gap-2",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+								className: "text-lg font-semibold text-white",
+								children: profile.full_name ?? "Χρήστης"
+							}), isAdminRole(profile.role) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, {
+								size: 16,
+								className: "text-white/70"
+							})]
+						}),
+						profile.headline && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-0.5 text-sm text-white/50",
+							children: profile.headline
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mt-3 flex flex-wrap gap-3 text-xs text-white/40",
+							children: [profile.city && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "flex items-center gap-1",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MapPin, { size: 12 }),
+									" ",
+									profile.city
+								]
+							}), profile.instagram && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+								className: "flex items-center gap-1",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Instagram, { size: 12 }),
+									" ",
+									profile.instagram
+								]
+							})]
+						}),
+						profile.bio && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-4 whitespace-pre-line text-sm leading-relaxed text-white/70",
+							children: profile.bio
+						}),
+						error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-3 text-xs text-rose-400",
+							children: error
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							onClick: handleMessage,
+							disabled: sending,
+							className: "mt-6 flex w-full items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-black transition hover:bg-white/90 disabled:opacity-50",
+							children: [sending ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, {
+								size: 14,
+								className: "animate-spin"
+							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageCircle, { size: 14 }), "Στείλε μήνυμα"]
+						})
+					]
+				})] })
+			]
+		})
+	}) });
+}
+function OnlineUsersPanel() {
+	const { profile } = useAuth();
+	const onlineUsers = useOnlinePresence(profile ? {
+		id: profile.id,
+		full_name: profile.full_name,
+		avatar_url: profile.avatar_url,
+		role: profile.role
+	} : null);
+	const [openUserId, setOpenUserId] = (0, import_react.useState)(null);
+	const { admins, students } = (0, import_react.useMemo)(() => {
+		return {
+			admins: onlineUsers.filter((u) => isAdminRole(u.role)),
+			students: onlineUsers.filter((u) => !isAdminRole(u.role))
+		};
+	}, [onlineUsers]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("aside", {
+		className: "flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "border-b border-white/10 px-5 py-4",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-xs uppercase tracking-[0.25em] text-white/50",
+				children: "Online τώρα"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-1 text-sm text-white/40",
+				children: [onlineUsers.length, " συνδεδεμένοι"]
+			})]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex-1 space-y-6 overflow-y-auto px-3 py-4",
+			children: [admins.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40",
+				children: "Admins"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "space-y-1",
+				children: admins.map((u) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UserRow, {
+					user: u,
+					isAdmin: true,
+					onClick: () => setOpenUserId(u.id)
+				}, u.id))
+			})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40",
+				children: "Μαθητές"
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "space-y-1",
+				children: [students.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "px-2 text-xs text-white/30",
+					children: "Κανείς online."
+				}), students.map((u) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UserRow, {
+					user: u,
+					isAdmin: false,
+					onClick: () => setOpenUserId(u.id)
+				}, u.id))]
+			})] })]
+		})]
+	}), openUserId && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(UserProfileModal, {
+		userId: openUserId,
+		onClose: () => setOpenUserId(null)
+	})] });
+}
+function UserRow({ user, isAdmin, onClick }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+		onClick,
+		className: "flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-white/[0.06]",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative shrink-0",
+				children: [user.avatar_url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+					src: user.avatar_url,
+					alt: "",
+					className: "h-9 w-9 rounded-full object-cover ring-1 ring-white/15"
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white/70",
+					children: user.full_name?.[0]?.toUpperCase() ?? "?"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Circle, {
+					size: 10,
+					className: "absolute -bottom-0.5 -right-0.5 rounded-full fill-emerald-400 text-emerald-400 ring-2 ring-[#070707]"
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "min-w-0 flex-1 truncate text-sm text-white/85",
+				children: user.full_name ?? "Χρήστης"
+			}),
+			isAdmin && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, {
+				size: 15,
+				className: "shrink-0 text-white/70"
+			})
+		]
+	});
+}
+function makeId() {
+	if (typeof crypto !== "undefined" && crypto.randomUUID) try {
+		return crypto.randomUUID();
+	} catch {}
+	return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+var FILTERS = [
+	{
+		name: "Κανονικό",
+		css: "none"
+	},
+	{
+		name: "Clarendon",
+		css: "contrast(1.2) saturate(1.35) brightness(1.05)"
+	},
+	{
+		name: "Ζωηρό",
+		css: "saturate(1.6) contrast(1.1)"
+	},
+	{
+		name: "Θερμό",
+		css: "sepia(0.25) saturate(1.3) brightness(1.05)"
+	},
+	{
+		name: "Ψυχρό",
+		css: "hue-rotate(-10deg) saturate(1.15) brightness(1.02)"
+	},
+	{
+		name: "Noir",
+		css: "grayscale(1) contrast(1.15)"
+	},
+	{
+		name: "Ξεθωριασμένο",
+		css: "contrast(0.9) brightness(1.1) saturate(0.75)"
+	}
+];
+var TEXT_COLORS = [
+	"#ffffff",
+	"#000000",
+	"#ef4444",
+	"#eab308",
+	"#22c55e",
+	"#3b82f6",
+	"#ec4899"
+];
+var DRAW_COLORS = [
+	"#ffffff",
+	"#000000",
+	"#ef4444",
+	"#eab308",
+	"#22c55e",
+	"#3b82f6",
+	"#ec4899"
+];
+function CreateStoryModal({ open, onClose, onCreated }) {
+	const [file, setFile] = (0, import_react.useState)(null);
+	const [mediaUrl, setMediaUrl] = (0, import_react.useState)(null);
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const [err, setErr] = (0, import_react.useState)(null);
+	const [tool, setTool] = (0, import_react.useState)(null);
+	const [filter, setFilter] = (0, import_react.useState)(FILTERS[0]);
+	const [textLayers, setTextLayers] = (0, import_react.useState)([]);
+	const [draftText, setDraftText] = (0, import_react.useState)("");
+	const [draftColor, setDraftColor] = (0, import_react.useState)(TEXT_COLORS[0]);
+	const [draftBg, setDraftBg] = (0, import_react.useState)(false);
+	const [strokes, setStrokes] = (0, import_react.useState)([]);
+	const [drawColor, setDrawColor] = (0, import_react.useState)(DRAW_COLORS[0]);
+	const [brushSize, setBrushSize] = (0, import_react.useState)(6);
+	const currentStroke = (0, import_react.useRef)(null);
+	const drawingRef = (0, import_react.useRef)(false);
+	const [audioFile, setAudioFile] = (0, import_react.useState)(null);
+	const [audioTitle, setAudioTitle] = (0, import_react.useState)("");
+	const cameraInputRef = (0, import_react.useRef)(null);
+	const libraryInputRef = (0, import_react.useRef)(null);
+	const audioInputRef = (0, import_react.useRef)(null);
+	const containerRef = (0, import_react.useRef)(null);
+	const drawCanvasRef = (0, import_react.useRef)(null);
+	const isVideo = file?.type.startsWith("video/") ?? false;
+	function resetAll() {
+		setFile(null);
+		if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+		setMediaUrl(null);
+		setTool(null);
+		setFilter(FILTERS[0]);
+		setTextLayers([]);
+		setDraftText("");
+		setDraftBg(false);
+		setStrokes([]);
+		setAudioFile(null);
+		setAudioTitle("");
+		setErr(null);
+		setBusy(false);
+	}
+	function pick(f) {
+		setErr(null);
+		setFile(f);
+		if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+		setMediaUrl(f ? URL.createObjectURL(f) : null);
+	}
+	(0, import_react.useEffect)(() => {
+		if (!containerRef.current || !drawCanvasRef.current) return;
+		const el = containerRef.current;
+		const canvas = drawCanvasRef.current;
+		const resize = () => {
+			canvas.width = el.clientWidth;
+			canvas.height = el.clientHeight;
+			redrawCanvas();
+		};
+		resize();
+		const ro = new ResizeObserver(resize);
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [mediaUrl]);
+	function redrawCanvas() {
+		const canvas = drawCanvasRef.current;
+		if (!canvas) return;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return;
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		for (const stroke of strokes) drawStroke(ctx, stroke, canvas.width, canvas.height);
+	}
+	function drawStroke(ctx, stroke, w, h) {
+		if (stroke.points.length < 2) return;
+		ctx.strokeStyle = stroke.color;
+		ctx.lineWidth = stroke.width;
+		ctx.lineCap = "round";
+		ctx.lineJoin = "round";
+		ctx.beginPath();
+		ctx.moveTo(stroke.points[0].x * w, stroke.points[0].y * h);
+		for (const p of stroke.points.slice(1)) ctx.lineTo(p.x * w, p.y * h);
+		ctx.stroke();
+	}
+	(0, import_react.useEffect)(() => {
+		redrawCanvas();
+	}, [strokes]);
+	function relativePos(e) {
+		const el = containerRef.current;
+		if (!el) return {
+			x: 0,
+			y: 0
+		};
+		const rect = el.getBoundingClientRect();
+		return {
+			x: (e.clientX - rect.left) / rect.width,
+			y: (e.clientY - rect.top) / rect.height
+		};
+	}
+	function handleDrawStart(e) {
+		if (tool !== "draw") return;
+		drawingRef.current = true;
+		const p = relativePos(e);
+		currentStroke.current = {
+			color: drawColor,
+			width: brushSize / 200,
+			points: [p]
+		};
+	}
+	function handleDrawMove(e) {
+		if (!drawingRef.current || !currentStroke.current) return;
+		const p = relativePos(e);
+		currentStroke.current.points.push(p);
+		const canvas = drawCanvasRef.current;
+		const ctx = canvas?.getContext("2d");
+		if (canvas && ctx) {
+			redrawCanvas();
+			drawStroke(ctx, currentStroke.current, canvas.width, canvas.height);
+		}
+	}
+	function handleDrawEnd() {
+		if (currentStroke.current && currentStroke.current.points.length > 1) setStrokes((s) => [...s, currentStroke.current]);
+		currentStroke.current = null;
+		drawingRef.current = false;
+	}
+	function startDragText(id, e) {
+		if (tool === "draw") return;
+		e.stopPropagation();
+		const el = containerRef.current;
+		if (!el) return;
+		const move = (ev) => {
+			const rect = el.getBoundingClientRect();
+			const xPct = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+			const yPct = Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height));
+			setTextLayers((layers) => layers.map((l) => l.id === id ? {
+				...l,
+				xPct,
+				yPct
+			} : l));
+		};
+		const up = () => {
+			window.removeEventListener("pointermove", move);
+			window.removeEventListener("pointerup", up);
+		};
+		window.addEventListener("pointermove", move);
+		window.addEventListener("pointerup", up);
+	}
+	function addTextLayer() {
+		if (!draftText.trim()) {
+			setTool(null);
+			return;
+		}
+		setTextLayers((l) => [...l, {
+			id: makeId(),
+			text: draftText.trim(),
+			xPct: .5,
+			yPct: .5,
+			color: draftColor,
+			fontSize: 32,
+			background: draftBg
+		}]);
+		setDraftText("");
+		setDraftBg(false);
+		setTool(null);
+	}
+	function removeTextLayer(id) {
+		setTextLayers((l) => l.filter((t) => t.id !== id));
+	}
+	async function compositeImage() {
+		const img = new Image();
+		img.crossOrigin = "anonymous";
+		img.src = mediaUrl;
+		await new Promise((res, rej) => {
+			img.onload = res;
+			img.onerror = rej;
+		});
+		const targetW = 1080;
+		const targetH = 1920;
+		const canvas = document.createElement("canvas");
+		canvas.width = targetW;
+		canvas.height = targetH;
+		const ctx = canvas.getContext("2d");
+		ctx.fillStyle = "#000";
+		ctx.fillRect(0, 0, targetW, targetH);
+		const scale = Math.min(targetW / img.width, targetH / img.height);
+		const drawW = img.width * scale;
+		const drawH = img.height * scale;
+		const dx = (targetW - drawW) / 2;
+		const dy = (targetH - drawH) / 2;
+		ctx.filter = filter.css;
+		ctx.drawImage(img, dx, dy, drawW, drawH);
+		ctx.filter = "none";
+		for (const stroke of strokes) drawStroke(ctx, {
+			...stroke,
+			width: stroke.width * targetH
+		}, targetW, targetH);
+		for (const t of textLayers) {
+			const fontPx = t.fontSize / 360 * targetH;
+			ctx.font = `700 ${fontPx}px sans-serif`;
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			const x = t.xPct * targetW;
+			const y = t.yPct * targetH;
+			if (t.background) {
+				const metrics = ctx.measureText(t.text);
+				const padX = fontPx * .4;
+				const padY = fontPx * .3;
+				ctx.fillStyle = "rgba(0,0,0,0.55)";
+				ctx.fillRect(x - metrics.width / 2 - padX, y - fontPx / 2 - padY, metrics.width + padX * 2, fontPx + padY * 2);
+			}
+			ctx.fillStyle = t.color;
+			ctx.fillText(t.text, x, y);
+		}
+		return new Promise((resolve, reject) => {
+			canvas.toBlob((blob) => blob ? resolve(blob) : reject(/* @__PURE__ */ new Error("Αποτυχία εξαγωγής εικόνας.")), "image/jpeg", .92);
+		});
+	}
+	async function handleShare() {
+		if (!file) return;
+		setBusy(true);
+		setErr(null);
+		try {
+			let finalFile;
+			if (isVideo) finalFile = file;
+			else {
+				const blob = await compositeImage();
+				finalFile = new File([blob], "story.jpg", { type: "image/jpeg" });
+			}
+			const audio = audioFile ? {
+				file: audioFile,
+				title: audioTitle || audioFile.name
+			} : null;
+			await createStory(finalFile, audio);
+			resetAll();
+			onCreated();
+			onClose();
+		} catch (e) {
+			setErr(e.message);
+		} finally {
+			setBusy(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: open && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+		initial: { opacity: 0 },
+		animate: { opacity: 1 },
+		exit: { opacity: 0 },
+		className: "fixed inset-0 z-[70] flex items-center justify-center bg-black",
+		children: !mediaUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			initial: {
+				opacity: 0,
+				scale: .95
+			},
+			animate: {
+				opacity: 1,
+				scale: 1
+			},
+			exit: {
+				opacity: 0,
+				scale: .95
+			},
+			className: "relative w-full max-w-sm rounded-2xl border border-white/15 bg-[#0a0a0a] p-6 shadow-2xl",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					onClick: () => {
+						resetAll();
+						onClose();
+					},
+					className: "absolute right-4 top-4 rounded-full p-1.5 text-white/60 hover:bg-white/10 hover:text-white",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { size: 16 })
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+					className: "mb-5 text-sm font-bold uppercase tracking-[0.2em] text-white",
+					children: "Νέο Story"
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "grid grid-cols-2 gap-3",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							onClick: () => cameraInputRef.current?.click(),
+							className: "flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] py-8 text-white/80 transition hover:border-white/40 hover:bg-white/[0.08] hover:text-white",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Camera, { size: 22 }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-xs font-medium",
+								children: "Κάμερα"
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+							onClick: () => libraryInputRef.current?.click(),
+							className: "flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/[0.03] py-8 text-white/80 transition hover:border-white/40 hover:bg-white/[0.08] hover:text-white",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Images, { size: 22 }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "text-xs font-medium",
+								children: "Βιβλιοθήκη"
+							})]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							ref: cameraInputRef,
+							type: "file",
+							accept: "image/*,video/*",
+							capture: "environment",
+							className: "hidden",
+							onChange: (e) => pick(e.target.files?.[0] ?? null)
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							ref: libraryInputRef,
+							type: "file",
+							accept: "image/*,video/*",
+							className: "hidden",
+							onChange: (e) => pick(e.target.files?.[0] ?? null)
+						})
+					]
+				})
+			]
+		}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			initial: { opacity: 0 },
+			animate: { opacity: 1 },
+			exit: { opacity: 0 },
+			className: "relative flex h-full w-full max-w-md flex-col bg-black sm:h-[92vh] sm:rounded-2xl sm:overflow-hidden",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "z-20 flex items-center justify-between px-3 pt-4",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: () => {
+								resetAll();
+							},
+							className: "rounded-full bg-black/40 p-2 text-white hover:bg-black/60",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { size: 20 })
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "flex gap-2",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ToolButton, {
+									icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Type, { size: 18 }),
+									active: tool === "text",
+									onClick: () => setTool(tool === "text" ? null : "text"),
+									disabled: isVideo
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ToolButton, {
+									icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Pencil, { size: 18 }),
+									active: tool === "draw",
+									onClick: () => setTool(tool === "draw" ? null : "draw"),
+									disabled: isVideo
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ToolButton, {
+									icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Music2, { size: 18 }),
+									active: tool === "music",
+									onClick: () => setTool(tool === "music" ? null : "music")
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ToolButton, {
+									icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { size: 18 }),
+									active: tool === "filters",
+									onClick: () => setTool(tool === "filters" ? null : "filters"),
+									disabled: isVideo
+								})
+							]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "w-9" })
+					]
+				}),
+				isVideo && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "z-20 px-4 pt-2 text-center text-[11px] text-white/40",
+					children: "Κείμενο, σχέδιο και φίλτρα είναι διαθέσιμα μόνο για φωτογραφίες."
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "relative flex flex-1 items-center justify-center overflow-hidden",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						ref: containerRef,
+						className: "relative aspect-[9/16] max-h-full w-full max-w-sm overflow-hidden bg-black touch-none",
+						onPointerDown: handleDrawStart,
+						onPointerMove: handleDrawMove,
+						onPointerUp: handleDrawEnd,
+						onPointerLeave: handleDrawEnd,
+						children: [
+							isVideo ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+								src: mediaUrl,
+								className: "h-full w-full object-contain",
+								style: { filter: filter.css },
+								autoPlay: true,
+								loop: true,
+								muted: true,
+								playsInline: true
+							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+								src: mediaUrl,
+								className: "h-full w-full object-contain",
+								style: { filter: filter.css },
+								alt: ""
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("canvas", {
+								ref: drawCanvasRef,
+								className: "pointer-events-none absolute inset-0 h-full w-full"
+							}),
+							textLayers.map((t) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								onPointerDown: (e) => startDragText(t.id, e),
+								className: "group absolute -translate-x-1/2 -translate-y-1/2 cursor-move select-none px-1",
+								style: {
+									left: `${t.xPct * 100}%`,
+									top: `${t.yPct * 100}%`
+								},
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "whitespace-nowrap font-bold",
+									style: {
+										color: t.color,
+										fontSize: t.fontSize,
+										background: t.background ? "rgba(0,0,0,0.55)" : "transparent",
+										padding: t.background ? "4px 10px" : 0,
+										borderRadius: t.background ? 8 : 0
+									},
+									children: t.text
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+									onClick: (e) => {
+										e.stopPropagation();
+										removeTextLayer(t.id);
+									},
+									className: "absolute -right-2 -top-2 hidden rounded-full bg-white p-0.5 text-black group-hover:block",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { size: 10 })
+								})]
+							}, t.id)),
+							audioFile && tool !== "music" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white backdrop-blur",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Music2, { size: 12 }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "max-w-[140px] truncate",
+									children: audioTitle || audioFile.name
+								})]
+							})
+						]
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "z-20 bg-gradient-to-t from-black via-black/95 to-transparent px-4 pb-6 pt-3",
+					children: [
+						tool === "text" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "space-y-3",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									autoFocus: true,
+									value: draftText,
+									onChange: (e) => setDraftText(e.target.value),
+									placeholder: "Πρόσθεσε κείμενο…",
+									className: "w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-center text-white outline-none placeholder:text-white/40"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "flex items-center justify-center gap-2",
+									children: [TEXT_COLORS.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										onClick: () => setDraftColor(c),
+										className: `h-6 w-6 rounded-full ring-2 ${draftColor === c ? "ring-white" : "ring-transparent"}`,
+										style: { backgroundColor: c }
+									}, c)), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										onClick: () => setDraftBg((b) => !b),
+										className: `ml-2 rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-wide ${draftBg ? "border-white bg-white text-black" : "border-white/30 text-white/70"}`,
+										children: "Aa"
+									})]
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									onClick: addTextLayer,
+									className: "mx-auto flex items-center gap-1 rounded-full bg-white px-5 py-2 text-xs font-bold uppercase text-black",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { size: 14 }), " Ολοκλήρωση"]
+								})
+							]
+						}),
+						tool === "draw" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "space-y-3",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "flex items-center justify-center gap-2",
+									children: DRAW_COLORS.map((c) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										onClick: () => setDrawColor(c),
+										className: `h-6 w-6 rounded-full ring-2 ${drawColor === c ? "rin
+[TRUNCATED: file is 90785 bytes, first 40960 included]
+=== END FILE ===
+

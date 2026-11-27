@@ -1,0 +1,1762 @@
+=== FILE: .output/server/_ssr/online-seminars-DIq_-Ol9.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { n as EmbeddedCheckoutProvider, r as require_react, t as EmbeddedCheckout } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { At as Calendar, Bt as ArrowLeft, C as ShieldCheck, J as Mail, N as Phone, Ot as Check, Z as LoaderCircle, a as Video, c as User, n as X, s as Users, st as Globe, yt as Clock, zt as ArrowRight } from "../_libs/lucide-react.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { a as useTransform, c as useScroll, r as useReducedMotion, u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { a as getPublicOnlineSeminars, l as startOnlineCheckout, n as formatPrice, u as waitForPaid } from "./onlineSeminars-BIk1PE2V.mjs";
+import { t as loadStripe } from "../_libs/stripe__stripe-js.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/online-seminars-DIq_-Ol9.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var stripePromise = loadStripe("pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd");
+var chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+var shimmerBtn = "group relative inline-flex items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-7 py-3.5 text-sm font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 enabled:hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] enabled:hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40";
+function OnlineSeminarsRoute() {
+	const reduce = useReducedMotion();
+	const ref = (0, import_react.useRef)(null);
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start start", "end start"]
+	});
+	const glowY = useTransform(scrollYProgress, [0, 1], [-60, 140]);
+	const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 80]);
+	const [reload, setReload] = (0, import_react.useState)(0);
+	const { data, error, loading } = useAsync(getPublicOnlineSeminars, [reload]);
+	const [selected, setSelected] = (0, import_react.useState)(null);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		ref,
+		className: "relative min-h-screen overflow-hidden bg-black pb-24 pt-28 text-white selection:bg-white selection:text-black",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute inset-0 -z-10 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				style: { y: glowY },
+				className: "pointer-events-none absolute -right-40 top-20 -z-10 h-[520px] w-[520px] rounded-full bg-white/[0.06] blur-[140px]"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				style: { rotate: ringRotate },
+				className: "pointer-events-none absolute -left-44 top-64 -z-10 h-[480px] w-[480px] rounded-full border border-dashed border-white/10"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mx-auto max-w-6xl px-4 sm:px-6 md:px-10",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+					initial: {
+						opacity: 0,
+						y: 20
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					transition: {
+						duration: .6,
+						ease: [
+							.16,
+							1,
+							.3,
+							1
+						]
+					},
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+							to: "/seminars",
+							className: "mb-6 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowLeft, { className: "size-3.5" }), " Σεμινάρια επί τόπου"]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-px w-10 bg-gradient-to-r from-white/60 to-transparent" }), "Online σεμινάρια"]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+							className: `text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText}`,
+							children: "Μάθε από οπουδήποτε."
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg",
+							children: "Live online σεμινάρια με τον Theopistos. Κλείσε τη θέση σου, πλήρωσε με ασφάλεια και θα επικοινωνήσουμε μαζί σου με όλες τις λεπτομέρειες."
+						})
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-12",
+					children: [
+						loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 3 }),
+						error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: error }),
+						data && data.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "rounded-3xl border border-white/10 bg-zinc-950/70 p-12 text-center",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Globe, { className: "mx-auto size-8 text-zinc-500" }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "mt-4 text-zinc-400",
+									children: "Δεν υπάρχουν προγραμματισμένα online σεμινάρια αυτή τη στιγμή."
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "mt-1 text-sm text-zinc-600",
+									children: "Ξανάλεγξε σύντομα."
+								})
+							]
+						}),
+						data && data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "grid gap-6 md:grid-cols-2",
+							children: data.map((s, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SeminarCard, {
+								s,
+								index: i,
+								reduce: !!reduce,
+								onBook: () => setSelected(s)
+							}, s.id))
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, { children: selected && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BookingModal, {
+				seminar: selected,
+				onClose: () => {
+					setSelected(null);
+					setReload((n) => n + 1);
+				}
+			}) })
+		]
+	});
+}
+function SeminarCard({ s, index, reduce, onBook }) {
+	const left = s.capacity ? s.capacity - s.taken : null;
+	const soldOut = left !== null && left <= 0;
+	const date = new Date(s.starts_at);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.article, {
+		initial: {
+			opacity: 0,
+			y: 28
+		},
+		whileInView: {
+			opacity: 1,
+			y: 0
+		},
+		viewport: {
+			once: true,
+			margin: "-60px"
+		},
+		transition: {
+			duration: .6,
+			delay: index * .08,
+			ease: [
+				.16,
+				1,
+				.3,
+				1
+			]
+		},
+		whileHover: reduce ? void 0 : { y: -6 },
+		className: "group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-7 shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/35",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-white/[0.07] blur-[70px] transition-opacity duration-500 group-hover:opacity-100"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative flex items-start justify-between gap-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "flex size-12 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Video, { className: "size-6" })
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: `bg-clip-text text-2xl font-extrabold text-transparent bg-gradient-to-b from-white to-zinc-400`,
+					children: formatPrice(s.price_cents, s.currency)
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+				className: `relative mt-5 text-2xl font-bold ${chromeText}`,
+				children: s.title
+			}),
+			s.description && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "relative mt-3 line-clamp-4 text-sm leading-relaxed text-zinc-400",
+				children: s.description
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("ul", {
+				className: "relative mt-5 space-y-2 text-sm text-zinc-300",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+						className: "flex items-center gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Calendar, { className: "size-4 text-zinc-500" }), date.toLocaleDateString("el-GR", {
+							weekday: "long",
+							day: "numeric",
+							month: "long"
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+						className: "flex items-center gap-2",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Clock, { className: "size-4 text-zinc-500" }),
+							date.toLocaleTimeString("el-GR", {
+								hour: "2-digit",
+								minute: "2-digit"
+							}),
+							" · ",
+							s.duration_minutes,
+							" λεπτά"
+						]
+					}),
+					left !== null && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+						className: `flex items-center gap-2 ${left <= 3 && !soldOut ? "text-amber-400" : ""}`,
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Users, { className: "size-4 text-zinc-500" }), soldOut ? "Sold out" : `${left} θέσεις διαθέσιμες`]
+					})
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "relative mt-7",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					type: "button",
+					disabled: soldOut,
+					onClick: onBook,
+					className: shimmerBtn,
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "relative",
+						children: soldOut ? "Γεμάτο" : "Κλείσε θέση"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "relative size-4 transition-transform duration-300 group-enabled:group-hover:translate-x-1" })]
+				})
+			})
+		]
+	});
+}
+function BookingModal({ seminar, onClose }) {
+	const [stage, setStage] = (0, import_react.useState)("details");
+	const [fullName, setFullName] = (0, import_react.useState)("");
+	const [email, setEmail] = (0, import_react.useState)("");
+	const [phone, setPhone] = (0, import_react.useState)("");
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [secret, setSecret] = (0, import_react.useState)(null);
+	const [confirmed, setConfirmed] = (0, import_react.useState)(true);
+	const valid = fullName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) && phone.trim().length >= 6;
+	async function toPayment() {
+		if (!valid || busy) return;
+		setBusy(true);
+		setError(null);
+		try {
+			const { clientSecret, sessionId } = await startOnlineCheckout({
+				seminarId: seminar.id,
+				fullName,
+				email,
+				phone
+			});
+			setSecret(clientSecret);
+			sessionRef.current = sessionId;
+			setStage("pay");
+		} catch (e) {
+			setError(e instanceof Error && e.message === "sold_out" ? "Δυστυχώς οι θέσεις εξαντλήθηκαν." : "Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.");
+		} finally {
+			setBusy(false);
+		}
+	}
+	const sessionRef = (0, import_react.useRef)("");
+	async function onComplete() {
+		setStage("verifying");
+		setConfirmed(await waitForPaid(sessionRef.current));
+		setStage("done");
+	}
+	const inputWrap = "flex items-center gap-2 rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 transition-colors focus-within:border-white/40 focus-within:ring-2 focus-within:ring-white/10";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+		initial: { opacity: 0 },
+		animate: { opacity: 1 },
+		exit: { opacity: 0 },
+		className: "fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-md",
+		onClick: stage === "details" || stage === "done" ? onClose : void 0,
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			initial: {
+				opacity: 0,
+				y: 30,
+				scale: .97
+			},
+			animate: {
+				opacity: 1,
+				y: 0,
+				scale: 1
+			},
+			exit: {
+				opacity: 0,
+				y: 30,
+				scale: .97
+			},
+			transition: {
+				duration: .35,
+				ease: [
+					.16,
+					1,
+					.3,
+					1
+				]
+			},
+			onClick: (e) => e.stopPropagation(),
+			className: "relative my-auto w-full max-w-lg overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900 via-black to-zinc-950 p-6 shadow-[0_0_100px_-30px_rgba(255,255,255,0.3)] sm:p-8",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					"aria-hidden": true,
+					className: "pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-white/[0.07] blur-[80px]"
+				}),
+				stage !== "verifying" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+					type: "button",
+					onClick: onClose,
+					"aria-label": "Κλείσιμο",
+					className: "absolute right-4 top-4 z-10 text-zinc-500 transition hover:text-white",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(X, { className: "size-5" })
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "relative",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(AnimatePresence, {
+						mode: "wait",
+						children: [
+							stage === "details" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+								initial: {
+									opacity: 0,
+									x: 20
+								},
+								animate: {
+									opacity: 1,
+									x: 0
+								},
+								exit: {
+									opacity: 0,
+									x: -20
+								},
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "text-xs uppercase tracking-[0.25em] text-zinc-500",
+										children: "Κράτηση θέσης"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+										className: `mt-2 text-2xl font-bold ${chromeText}`,
+										children: seminar.title
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										className: "mt-1 text-sm text-zinc-400",
+										children: [
+											new Date(seminar.starts_at).toLocaleString("el-GR", {
+												dateStyle: "long",
+												timeStyle: "short"
+											}),
+											" ·",
+											" ",
+											formatPrice(seminar.price_cents, seminar.currency)
+										]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "mt-6 space-y-4",
+										children: [
+											{
+												icon: User,
+												label: "Ονοματεπώνυμο",
+												v: fullName,
+												set: setFullName,
+												type: "text",
+												ac: "name"
+											},
+											{
+												icon: Mail,
+												label: "Email",
+												v: email,
+												set: setEmail,
+												type: "email",
+												ac: "email"
+											},
+											{
+												icon: Phone,
+												label: "Τηλέφωνο",
+												v: phone,
+												set: setPhone,
+												type: "tel",
+												ac: "tel"
+											}
+										].map((f) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+											className: "block",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: "mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500",
+												children: f.label
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												className: inputWrap,
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(f.icon, { className: "size-4 shrink-0 text-zinc-500" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+													type: f.type,
+													value: f.v,
+													autoComplete: f.ac,
+													onChange: (e) => f.set(e.target.value),
+													className: "w-full bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+												})]
+											})]
+										}, f.label))
+									}),
+									error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300",
+										children: error
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										disabled: !valid || busy,
+										onClick: toPayment,
+										className: `${shimmerBtn} mt-6 w-full`,
+										children: busy ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "relative size-5 animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "relative",
+											children: "Συνέχεια στην πληρωμή"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "relative size-4" })] })
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										className: "mt-3 flex items-center justify-center gap-1.5 text-[11px] text-zinc-600",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "size-3.5" }), " Ασφαλής πληρωμή μέσω Stripe"]
+									})
+								]
+							}, "d"),
+							stage === "pay" && secret && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+								initial: {
+									opacity: 0,
+									x: 20
+								},
+								animate: {
+									opacity: 1,
+									x: 0
+								},
+								exit: {
+									opacity: 0,
+									x: -20
+								},
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+									type: "button",
+									onClick: () => setStage("details"),
+									className: "mb-3 inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowLeft, { className: "size-3.5" }), " Πίσω"]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "overflow-hidden rounded-2xl bg-white",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmbeddedCheckoutProvider, {
+										stripe: stripePromise,
+										options: {
+											clientSecret: secret,
+											onComplete
+										},
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EmbeddedCheckout, {})
+									})
+								})]
+							}, "p"),
+							stage === "verifying" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+								initial: { opacity: 0 },
+								animate: { opacity: 1 },
+								exit: { opacity: 0 },
+								className: "flex flex-col items-center py-14 text-center",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "size-10 animate-spin text-zinc-300" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "mt-5 text-zinc-300",
+									children: "Επιβεβαίωση πληρωμής…"
+								})]
+							}, "v"),
+							stage === "done" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+								initial: { opacity: 0 },
+								animate: { opacity: 1 },
+								className: "flex flex-col items-center py-6 text-center",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+										initial: {
+											scale: .6,
+											opacity: 0
+										},
+										animate: {
+											scale: 1,
+											opacity: 1
+										},
+										transition: {
+											type: "spring",
+											stiffness: 260,
+											damping: 18
+										},
+										className: "flex size-20 items-center justify-center rounded-full border border-white/25 bg-black shadow-[0_0_40px_rgba(255,255,255,0.3)]",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Check, { className: "size-9 text-zinc-100" })
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h3", {
+										className: `mt-6 text-2xl font-bold ${chromeText}`,
+										children: confirmed ? "Η πληρωμή ολοκληρώθηκε!" : "Λάβαμε την πληρωμή σου!"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+										className: "mt-3 max-w-sm text-sm leading-relaxed text-zinc-400",
+										children: [
+											"Ο διαχειριστής θα επικοινωνήσει σύντομα μαζί σου στο ",
+											/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: "text-zinc-200",
+												children: email
+											}),
+											" με όλες τις πληροφορίες για το σεμινάριο.",
+											!confirmed && " Η επιβεβαίωση μπορεί να διαρκέσει λίγα λεπτά."
+										]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										onClick: onClose,
+										className: `${shimmerBtn} mt-7`,
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "relative",
+											children: "Τέλεια"
+										})
+									})
+								]
+							}, "x")
+						]
+					})
+				})
+			]
+		})
+	});
+}
+//#endregion
+export { OnlineSeminarsRoute as component };
+
+=== END FILE ===
+
+=== FILE: src/lib/queries.ts ===
+import { supabase } from "@/lib/supabase";
+import type {
+  AccountStatus, Assignment, Course, CourseWithTree, Lesson, LessonProgress,
+  Profile, Review, ReviewDecision, Skill, SkillWithState,
+  Submission, UserRole, UserSkill,
+} from "@/lib/database.types";
+
+// --- helpers -------------------------------------------------
+
+export async function getCurrentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("Δεν υπάρχει ενεργή συνεδρία.");
+  return data.user.id;
+}
+
+export async function getMyProfile(): Promise<Profile> {
+  const uid = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("profiles").select("*").eq("id", uid).single();
+  if (error) throw error;
+  return data as Profile;
+}
+
+const STAFF_ROLES = [
+  "educator", "senior_educator", "content_manager",
+  "operations", "admin", "super_admin",
+];
+export const isStaffRole = (role: string) => STAFF_ROLES.includes(role);
+
+// --- Academy (screen 10) ------------------------------------
+
+export async function getPublishedCourses(): Promise<Course[]> {
+  const { data, error } = await supabase
+    .from("courses")
+    .select("*")
+    .eq("status", "published")
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Course[];
+}
+
+// --- Course overview (screen 11) ----------------------------
+
+export async function getCourseBySlug(slug: string): Promise<CourseWithTree> {
+  const { data, error } = await supabase
+    .from("courses")
+    .select("*, modules(*, lessons(*))")
+    .eq("slug", slug)
+    .single();
+  if (error) throw error;
+
+  const course = data as unknown as CourseWithTree;
+  course.modules = (course.modules ?? []).sort(
+    (a, b) => a.sort_order - b.sort_order,
+  );
+  for (const m of course.modules) {
+    m.lessons = (m.lessons ?? []).sort((a, b) => a.sort_order - b.sort_order);
+  }
+  return course;
+}
+
+// --- Lesson player (screen 13) ------------------------------
+
+export async function getLesson(lessonId: string): Promise<Lesson> {
+  const { data, error } = await supabase
+    .from("lessons").select("*").eq("id", lessonId).single();
+  if (error) throw error;
+  return data as Lesson;
+}
+
+export async function getLessonProgress(
+  lessonId: string,
+): Promise<LessonProgress | null> {
+  const uid = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("lesson_progress")
+    .select("*")
+    .eq("user_id", uid)
+    .eq("lesson_id", lessonId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as LessonProgress) ?? null;
+}
+
+export async function saveLessonProgress(
+  lessonId: string,
+  patch: { completed?: boolean; seconds_watched?: number; notes?: string },
+): Promise<void> {
+  const uid = await getCurrentUserId();
+  const { error } = await supabase.from("lesson_progress").upsert(
+    {
+      user_id: uid,
+      lesson_id: lessonId,
+      ...patch,
+      completed_at: patch.completed ? new Date().toISOString() : null,
+    },
+    { onConflict: "user_id,lesson_id" },
+  );
+  if (error) throw error;
+}
+
+// --- Assignments (screen 15) --------------------------------
+
+export async function getAssignment(id: string): Promise<Assignment> {
+  const { data, error } = await supabase
+    .from("assignments").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data as Assignment;
+}
+
+// --- Submissions (screen 16) --------------------------------
+
+export async function getOrCreateDraft(
+  assignmentId: string,
+): Promise<Submission> {
+  const uid = await getCurrentUserId();
+
+  const { data: existing, error: readErr } = await supabase
+    .from("submissions")
+    .select("*")
+    .eq("assignment_id", assignmentId)
+    .eq("user_id", uid)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (readErr) throw readErr;
+  if (existing) return existing as Submission;
+
+  const { data: created, error: insErr } = await supabase
+    .from("submissions")
+    .insert({ assignment_id: assignmentId, user_id: uid, status: "draft" })
+    .select("*")
+    .single();
+  if (insErr) throw insErr;
+  return created as Submission;
+}
+
+export async function uploadSubmissionMedia(
+  submissionId: string,
+  kind: "before" | "process" | "after",
+  file: File,
+): Promise<string> {
+  const uid = await getCurrentUserId();
+  const safe = file.name.replace(/[^\w.\-]/g, "_");
+  const path = `${uid}/${submissionId}/${kind}-${Date.now()}-${safe}`;
+  const { error } = await supabase.storage
+    .from("submissions")
+    .upload(path, file, { upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function signedMediaUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("submissions")
+    .createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function saveSubmission(
+  id: string,
+  patch: Partial<Submission>,
+): Promise<void> {
+  const { error } = await supabase.from("submissions").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
+export async function submitSubmission(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("submissions")
+    .update({ status: "submitted", submitted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function getSubmissionReview(
+  submissionId: string,
+): Promise<Review | null> {
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("*")
+    .eq("submission_id", submissionId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as Review) ?? null;
+}
+
+// --- Skills (screen 19) -------------------------------------
+
+export async function getMySkills(): Promise<SkillWithState[]> {
+  const uid = await getCurrentUserId();
+  const [{ data: skills, error: sErr }, { data: mine, error: uErr }] =
+    await Promise.all([
+      supabase.from("skills").select("*").order("sort_order"),
+      supabase.from("user_skills").select("*").eq("user_id", uid),
+    ]);
+  if (sErr) throw sErr;
+  if (uErr) throw uErr;
+
+  const byId = new Map<string, UserSkill>();
+  (mine ?? []).forEach((u) => byId.set((u as UserSkill).skill_id, u as UserSkill));
+
+  return (skills ?? []).map((s) => ({
+    ...(s as Skill),
+    userSkill: byId.get((s as Skill).id) ?? null,
+  }));
+}
+
+export async function getSkillAssignments(): Promise<Record<string, string>> {
+  const { data, error } = await supabase
+    .from("assignments")
+    .select("id, skill_id")
+    .not("skill_id", "is", null);
+  if (error) throw error;
+  const map: Record<string, string> = {};
+  for (const row of (data ?? []) as { id: string; skill_id: string }[]) {
+    map[row.skill_id] = row.id;
+  }
+  return map;
+}
+
+// --- Educator review queue (screens 17–18) ------------------
+
+export type QueueRow = Submission & {
+  assignment: Pick<Assignment, "id" | "title"> | null;
+  student: Pick<Profile, "id" | "full_name"> | null;
+};
+
+export async function getReviewQueue(): Promise<QueueRow[]> {
+  const { data, error } = await supabase
+    .from("submissions")
+    .select(
+      "*, assignment:assignments(id,title), student:profiles!submissions_user_id_fkey(id,full_name)",
+    )
+    .in("status", ["submitted", "in_review", "needs_revision"])
+    .order("submitted_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as QueueRow[];
+}
+
+export type ReviewDetail = Submission & {
+  assignment: Assignment | null;
+  student: Pick<Profile, "id" | "full_name" | "level"> | null;
+};
+
+export async function getSubmissionForReview(
+  submissionId: string,
+): Promise<{ submission: ReviewDetail; history: Review[] }> {
+  const { data, error } = await supabase
+    .from("submissions")
+    .select(
+      "*, assignment:assignments(*, skill:skills(id,name)), student:profiles!submissions_user_id_fkey(id,full_name,level)",
+    )
+    .eq("id", submissionId)
+    .single();
+  if (error) throw error;
+
+  const { data: history, error: hErr } = await supabase
+    .from("reviews")
+    .select("*")
+    .eq("submission_id", submissionId)
+    .order("created_at", { ascending: false });
+  if (hErr) throw hErr;
+
+  return {
+    submission: data as unknown as ReviewDetail,
+    history: (history ?? []) as Review[],
+  };
+}
+
+export async function submitReview(input: {
+  submissionId: string;
+  score: number;
+  rubricScores: { criterion: string; score: number }[];
+  strengths: string;
+  technicalGaps: string;
+  methodGaps: string;
+  nextActions: string;
+  decision: ReviewDecision;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("submit_review", {
+    p_submission_id: input.submissionId,
+    p_score: input.score,
+    p_rubric_scores: input.rubricScores,
+    p_strengths: input.strengths,
+    p_technical_gaps: input.technicalGaps,
+    p_method_gaps: input.methodGaps,
+    p_next_actions: input.nextActions,
+    p_decision: input.decision,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+// --- Dashboard (screen 09) ----------------------------------
+
+export interface DashboardData {
+  profile: Profile;
+  verifiedSkills: number;
+  totalSkills: number;
+  continueLesson: { id: string; title: string } | null;
+  latestReview: Review | null;
+  openSubmissions: number;
+}
+
+export async function getDashboard(): Promise<DashboardData> {
+  const uid = await getCurrentUserId();
+  const profile = await getMyProfile();
+
+  const [skillsCount, verified, lastProgress, lastReview, openSubs] =
+    await Promise.all([
+      supabase.from("skills").select("id", { count: "exact", head: true }),
+      supabase
+        .from("user_skills")
+        .select("skill_id", { count: "exact", head: true })
+        .eq("user_id", uid)
+        .in("state", ["verified", "mastered"]),
+      supabase
+        .from("lesson_progress")
+        .select("lesson_id, lessons(id,title)")
+        .eq("user_id", uid)
+        .eq("completed", false)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("reviews")
+        .select("*, submissions!inner(user_id)")
+        .eq("submissions.user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", uid)
+        .in("status", ["submitted", "in_review", "needs_revision"]),
+    ]);
+
+  const lp = lastProgress.data as { lessons: { id: string; title: string } } | null;
+
+  return {
+    profile,
+    verifiedSkills: verified.count ?? 0,
+    totalSkills: skillsCount.count ?? 0,
+    continueLesson: lp?.lessons ?? null,
+    latestReview: (lastReview.data as Review) ?? null,
+    openSubmissions: openSubs.count ?? 0,
+  };
+}
+// ============================================================
+// ADMIN  (screen: /admin — staff view, role edits = admin-only)
+// Πρόσθεσε στο τέλος του υπάρχοντος queries.ts.
+// Βεβαιώσου ότι το import των types περιλαμβάνει: UserRole, AccountStatus
+// ============================================================
+
+const ADMIN_ROLES = ["operations", "admin", "super_admin"];
+export const isAdminRole = (role: string) => ADMIN_ROLES.includes(role);
+
+export interface AdminOverview {
+  totalUsers: number;
+  students: number;
+  staff: number;
+  pendingReviews: number;
+  publishedCourses: number;
+}
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const [users, students, pending, courses] = await Promise.all([
+    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "student"),
+    supabase
+      .from("submissions")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["submitted", "in_review", "needs_revision"]),
+    supabase
+      .from("courses")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "published"),
+  ]);
+
+  if (users.error) throw users.error;
+  if (students.error) throw students.error;
+  if (pending.error) throw pending.error;
+  if (courses.error) throw courses.error;
+
+  const total = users.count ?? 0;
+  const studentCount = students.count ?? 0;
+
+  return {
+    totalUsers: total,
+    students: studentCount,
+    staff: Math.max(total - studentCount, 0),
+    pendingReviews: pending.count ?? 0,
+    publishedCourses: courses.count ?? 0,
+  };
+}
+
+export async function getAllProfiles(): Promise<Profile[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as Profile[];
+}
+
+export async function updateUserRole(
+  userId: string,
+  role: UserRole,
+): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ role })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+export async function updateUserStatus(
+  userId: string,
+  status: AccountStatus,
+): Promise<void> {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ status })
+    .eq("id", userId);
+  if (error) throw error;
+}
+
+export interface AuditEntry {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function getAuditLog(limit = 50): Promise<AuditEntry[]> {
+  const { data, error } = await supabase
+    .from("audit_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as AuditEntry[];
+}
+// ============================================================
+// PROFILE editing + avatar upload
+// Append to the end of the existing queries.ts.
+// ============================================================
+
+export async function updateMyProfile(
+  patch: Partial<
+    Pick<
+      Profile,
+      "full_name" | "bio" | "headline" | "avatar_url" | "city" | "instagram" | "country"
+    >
+  >,
+): Promise<Profile> {
+  const uid = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(patch)
+    .eq("id", uid)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Profile;
+}
+
+export async function uploadAvatar(file: File): Promise<string> {
+  const uid = await getCurrentUserId();
+
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Επίτρεψε μόνο εικόνες για το avatar.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Η εικόνα ξεπερνά τα 5MB.");
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `${uid}/avatar-${Date.now()}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from("avatars")
+    .upload(path, file, { upsert: true, contentType: file.type });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl;
+}
+// ============================================================
+// ACADEMY FEED (screen: /academy — posts / likes / comments)
+// Πρόσθεσε στο τέλος του υπάρχοντος queries.ts.
+// ============================================================
+
+export interface AcademyPostAuthor {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  role: UserRole;
+}
+
+export interface AcademyPostComment {
+  id: string;
+  content: string;
+  created_at: string;
+  author: AcademyPostAuthor | null;
+}
+
+export interface AcademyPost {
+  id: string;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  author: AcademyPostAuthor | null;
+  likes: { user_id: string }[];
+  comments: AcademyPostComment[];
+}
+
+export async function getAcademyFeed(): Promise<AcademyPost[]> {
+  const { data, error } = await supabase
+    .from("academy_posts")
+    .select(
+      `id, content, image_url, created_at,
+       author:profiles!academy_posts_author_id_fkey(id,full_name,avatar_url,role),
+       likes:academy_post_likes(user_id),
+       comments:academy_post_comments(
+         id, content, created_at,
+         author:profiles!academy_post_comments_author_id_fkey(id,full_name,avatar_url,role)
+       )`,
+    )
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as unknown as AcademyPost[];
+}
+
+export async function createAcademyPost(
+  content: string,
+  imageFile?: File,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+
+  let imageUrl: string | null = null;
+  if (imageFile) {
+    const ext = imageFile.name.split(".").pop()?.toLowerCase() || "jpg";
+    const path = `${uid}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("academy-posts")
+      .upload(path, imageFile, {
+        upsert: false,
+        contentType: imageFile.type,
+      });
+    if (upErr) throw upErr;
+    const { data } = supabase.storage
+      .from("academy-posts")
+      .getPublicUrl(path);
+    imageUrl = data.publicUrl;
+  }
+
+  const { error } = await supabase
+    .from("academy_posts")
+    .insert({ author_id: uid, content, image_url: imageUrl });
+  if (error) throw error;
+}
+
+export async function toggleAcademyPostLike(
+  postId: string,
+  currentlyLiked: boolean,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+  if (currentlyLiked) {
+    const { error } = await supabase
+      .from("academy_post_likes")
+      .delete()
+      .eq("post_id", postId)
+      .eq("user_id", uid);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("academy_post_likes")
+      .insert({ post_id: postId, user_id: uid });
+    if (error) throw error;
+  }
+}
+
+export async function addAcademyPostComment(
+  postId: string,
+  content: string,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+  const { error } = await supabase
+    .from("academy_post_comments")
+    .insert({ post_id: postId, author_id: uid, content });
+  if (error) throw error;
+}
+
+export async function deleteAcademyPost(postId: string): Promise<void> {
+  const { error } = await supabase
+    .from("academy_posts")
+    .delete()
+    .eq("id", postId);
+  if (error) throw error;
+}
+
+// --- Leaderboard ----------------------------------------------
+
+export interface LeaderboardEntry {
+  userId: string;
+  fullName: string | null;
+  avatarUrl: string | null;
+  totalPoints: number;
+}
+
+// Calls the get_leaderboard() SQL function (see
+// supabase/migrations/20260906130000_get_leaderboard_rpc.sql). It's
+// SECURITY DEFINER so it can read every student's aggregate points even
+// though `profiles` RLS only allows reading your own row — it only ever
+// returns name / avatar / total points, nothing sensitive.
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
+  const { data, error } = await supabase.rpc("get_leaderboard");
+  if (error) throw error;
+  return (
+    (data as
+      | {
+          user_id: string;
+          full_name: string | null;
+          avatar_url: string | null;
+          total_points: number;
+        }[]
+      | null) ?? []
+  ).map((row) => ({
+    userId: row.user_id,
+    fullName: row.full_name,
+    avatarUrl: row.avatar_url,
+        totalPoints: Number(row.total_points),
+  }));
+}
+// ============================================================
+// STORIES (screen: /academy — 24h ephemeral stories)
+// ============================================================
+
+export interface StoryAuthor {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export interface Story {
+  id: string;
+  author_id: string;
+  media_url: string;
+  media_type: "image" | "video";
+  audio_url: string | null;
+  audio_title: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface StoryGroup {
+  author: StoryAuthor;
+  stories: Story[];
+  allViewed: boolean;
+}
+
+interface RawStoryRow {
+  id: string;
+  author_id: string;
+  media_url: string;
+  media_type: "image" | "video";
+  audio_url: string | null;
+  audio_title: string | null;
+  created_at: string;
+  expires_at: string;
+  author: StoryAuthor | null;
+}
+
+export async function getActiveStories(): Promise<StoryGroup[]> {
+  const uid = await getCurrentUserId();
+  const nowIso = new Date().toISOString();
+
+  const [{ data: rows, error: sErr }, { data: myViews, error: vErr }] =
+    await Promise.all([
+      supabase
+        .from("stories")
+        .select(
+          `id, author_id, media_url, media_type, audio_url, audio_title, created_at, expires_at,
+           author:profiles!stories_author_id_fkey(id, full_name, avatar_url)`,
+        )
+        .gt("expires_at", nowIso)
+        .order("created_at", { ascending: true }),
+      supabase.from("story_views").select("story_id").eq("viewer_id", uid),
+    ]);
+  if (sErr) throw sErr;
+  if (vErr) throw vErr;
+
+  const viewedIds = new Set((myViews ?? []).map((v) => v.story_id as string));
+  const groups = new Map<string, StoryGroup>();
+
+  for (const row of (rows ?? []) as unknown as RawStoryRow[]) {
+    if (!row.author) continue;
+    if (!groups.has(row.author.id)) {
+      groups.set(row.author.id, { author: row.author, stories: [], allViewed: true });
+    }
+    groups.get(row.author.id)!.stories.push({
+      id: row.id,
+      author_id: row.author_id,
+      media_url: row.media_url,
+      media_type: row.media_type,
+      audio_url: row.audio_url,
+      audio_title: row.audio_title,
+      created_at: row.created_at,
+      expires_at: row.expires_at,
+    });
+  }
+
+  for (const group of groups.values()) {
+    group.allViewed = group.stories.every((s) => viewedIds.has(s.id));
+  }
+
+  const list = Array.from(groups.values());
+  list.sort((a, b) => {
+    if (a.author.id === uid) return -1;
+    if (b.author.id === uid) return 1;
+    if (a.allViewed !== b.allViewed) return a.allViewed ? 1 : -1;
+    const aLatest = a.stories.at(-1)?.created_at ?? "";
+    const bLatest = b.stories.at(-1)?.created_at ?? "";
+    return bLatest.localeCompare(aLatest);
+  });
+
+  return list;
+}
+
+export async function createStory(
+  file: File,
+  audio?: { file: File; title: string } | null,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  if (!isImage && !isVideo) {
+    throw new Error("Επίτρεψε μόνο εικόνες ή βίντεο για το story.");
+  }
+  const maxBytes = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    throw new Error(
+      isVideo ? "Το βίντεο ξεπερνά τα 50MB." : "Η εικόνα ξεπερνά τα 10MB.",
+    );
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || (isVideo ? "mp4" : "jpg");
+  const path = `${uid}/${Date.now()}.${ext}`;
+
+  const { error: upErr } = await supabase.storage
+    .from("stories")
+    .upload(path, file, { upsert: false, contentType: file.type });
+  if (upErr) throw upErr;
+  const { data: mediaData } = supabase.storage.from("stories").getPublicUrl(path);
+
+  let audioUrl: string | null = null;
+  if (audio) {
+    if (audio.file.size > 10 * 1024 * 1024) {
+      throw new Error("Το αρχείο ήχου ξεπερνά τα 10MB.");
+    }
+    const audioExt = audio.file.name.split(".").pop()?.toLowerCase() || "mp3";
+    const audioPath = `${uid}/audio-${Date.now()}.${audioExt}`;
+    const { error: audioErr } = await supabase.storage
+      .from("stories")
+      .upload(audioPath, audio.file, { upsert: false, contentType: audio.file.type });
+    if (audioErr) throw audioErr;
+    const { data: audioData } = supabase.storage.from("stories").getPublicUrl(audioPath);
+    audioUrl = audioData.publicUrl;
+  }
+
+  const { error } = await supabase.from("stories").insert({
+    author_id: uid,
+    media_url: mediaData.publicUrl,
+    media_type: isVideo ? "video" : "image",
+    audio_url: audioUrl,
+    audio_title: audio?.title ?? null,
+  });
+  if (error) throw error;
+}
+
+export async function markStoryViewed(storyId: string): Promise<void> {
+  const uid = await getCurrentUserId();
+  const { error } = await supabase
+    .from("story_views")
+    .upsert({ story_id: storyId, viewer_id: uid }, { onConflict: "story_id,viewer_id" });
+  if (error) throw error;
+}
+
+export async function deleteStory(storyId: string): Promise<void> {
+  const { error } = await supabase.from("stories").delete().eq("id", storyId);
+  if (error) throw error;
+}
+
+// ============================================================
+// HAIRCUT REVIEW (2nd points path)
+// ============================================================
+import type { HaircutReview } from "@/lib/database.types";
+
+export async function uploadHaircutMedia(
+  haircutReviewId: string,
+  kind: "before" | "process" | "after",
+  file: File,
+): Promise<string> {
+  const uid = await getCurrentUserId();
+  const safe = file.name.replace(/[^\w.\-]/g, "_");
+  const path = `${uid}/${haircutReviewId}/${kind}-${Date.now()}-${safe}`;
+  const { error } = await supabase.storage
+    .from("haircut-media")
+    .upload(path, file, { upsert: false });
+  if (error) throw error;
+  return path;
+}
+
+export async function signedHaircutMediaUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("haircut-media")
+    .createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function submitHaircutReview(input: {
+  before: File[];
+  process: File[];
+  after: File[];
+  methodDescription: string;
+  technique?: string;
+  tools?: string;
+  notes?: string;
+}): Promise<string> {
+  const uid = await getCurrentUserId();
+
+  const { data: row, error: insErr } = await supabase
+    .from("haircut_reviews")
+    .insert({
+      user_id: uid,
+      method_description: input.methodDescription,
+      technique: input.technique || null,
+      tools: input.tools || null,
+      notes: input.notes || null,
+    })
+    .select("id")
+    .single();
+  if (insErr) throw insErr;
+  const id = (row as { id: string }).id;
+
+  const [beforePaths, processPaths, afterPaths] = await Promise.all([
+    Promise.all(input.before.map((f) => uploadHaircutMedia(id, "before", f))),
+    Promise.all(input.process.map((f) => uploadHaircutMedia(id, "process", f))),
+    Promise.all(input.after.map((f) => uploadHaircutMedia(id, "after", f))),
+  ]);
+
+  const { error: updErr } = await supabase
+    .from("haircut_reviews")
+    .update({
+      before_media: beforePaths,
+      process_media: processPaths,
+      after_media: afterPaths,
+    })
+    .eq("id", id);
+  if (updErr) throw updErr;
+
+  return id;
+}
+
+export type HaircutQueueRow = HaircutReview & {
+  student: Pick<Profile, "id" | "full_name"> | null;
+};
+
+export async function getHaircutReviewQueue(): Promise<HaircutQueueRow[]> {
+  const { data, error } = await supabase
+    .from("haircut_reviews")
+    .select("*, student:profiles!haircut_reviews_user_id_fkey(id,full_name)")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as HaircutQueueRow[];
+}
+
+export type HaircutReviewDetail = HaircutReview & {
+  student: Pick<Profile, "id" | "full_name" | "level"> | null;
+};
+
+export async function getHaircutReviewForGrading(
+  haircutReviewId: string,
+): Promise<HaircutReviewDetail> {
+  const { data, error } = await supabase
+    .from("haircut_reviews")
+    .select("*, student:profiles!haircut_reviews_user_id_fkey(id,full_name,level)")
+    .eq("id", haircutReviewId)
+    .single();
+  if (error) throw error;
+  return data as unknown as HaircutReviewDetail;
+}
+
+export async function gradeHaircutReview(input: {
+  haircutReviewId: string;
+  score: number;
+  feedback: string;
+}): Promise<void> {
+  const { error } = await supabase.rpc("submit_haircut_review", {
+    p_haircut_review_id: input.haircutReviewId,
+    p_score: input.score,
+    p_feedback: input.feedback,
+  });
+  if (error) throw error;
+}
+export type MyHaircutReviewRow = {
+  id: string;
+  method_description: string;
+  status: string;
+  score: number | null;
+  created_at: string;
+};
+
+export async function getMyHaircutReviews(): Promise<MyHaircutReviewRow[]> {
+  const uid = await getCurrentUserId();
+  const { data, error } = await supabase
+    .from("haircut_reviews")
+    .select("id, method_description, status, score, created_at")
+    .eq("user_id", uid)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as MyHaircutReviewRow[];
+}
+=== END FILE ===
+
+=== FILE: src/lib/useVoiceRecorder.ts ===
+// src/lib/useVoiceRecorder.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCallback, useEffect, useRef, useState } from "react";
+
+export const MAX_VOICE_MS = 120_000; // 2 minutes
+export const MIN_VOICE_MS = 700;
+export const LIVE_BARS = 34;
+const SAVED_BARS = 48;
+const TICK_MS = 80;
+
+export interface VoiceClip {
+  blob: Blob;
+  /** Clean mime type without codec parameters, e.g. "audio/mp4". */
+  mime: string;
+  durationMs: number;
+  /** SAVED_BARS integers 0..100, stored with the message and drawn when playing. */
+  waveform: number[];
+}
+
+export type RecState = "idle" | "starting" | "recording" | "paused";
+
+// mp4/aac plays everywhere (including iPhone), so try it first.
+const MIME_CANDIDATES = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+
+function pickMime(): string | undefined {
+  if (typeof MediaRecorder === "undefined" || typeof MediaRecorder.isTypeSupported !== "function") return undefined;
+  return MIME_CANDIDATES.find((m) => MediaRecorder.isTypeSupported(m));
+}
+
+export function baseMime(m: string): string {
+  return (m.split(";")[0] || "audio/webm").trim().toLowerCase();
+}
+
+function toWaveform(samples: number[]): number[] {
+  const n = samples.length;
+  if (n === 0) return Array.from({ length: SAVED_BARS }, () => 12);
+  const out: number[] = [];
+  for (let i = 0; i < SAVED_BARS; i += 1) {
+    const a = Math.floor((i * n) / SAVED_BARS);
+    const b = Math.max(a + 1, Math.floor(((i + 1) * n) / SAVED_BARS));
+    let peak = 0;
+    for (let j = a; j < b && j < n; j += 1) peak = Math.max(peak, samples[j] ?? 0);
+    out.push(peak);
+  }
+  const top = Math.max(0.25, ...out);
+  return out.map((v) => Math.max(8, Math.min(100, Math.round((v / top) * 100))));
+}
+
+function micError(e: unknown): string {
+  const name = (e as any)?.name as string | undefined;
+  if (name === "NotAllowedError" || name === "SecurityError") {
+    return "Microphone access is blocked. Allow it in your browser settings and try again.";
+  }
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone was found.";
+  return "Could not start the microphone.";
+}
+
+export function useVoiceRecorder() {
+  const [state, setState] = useState<RecState>("idle");
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [live, setLive] = useState<number[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const stateRef = useRef<RecState>("idle");
+  const recRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const timerRef = useRef<number | undefined>(undefined);
+  const chunksRef = useRef<Blob[]>([]);
+  const samplesRef = useRef<number[]>([]);
+  const elapsedRef = useRef(0);
+  const mimeRef = useRef("audio/webm");
+  const tokenRef = useRef(0);
+
+  const setS = useCallback((s: RecState) => {
+    stateRef.current = s;
+    setState(s);
+  }, []);
+
+  const teardown = useCallback(() => {
+    if (timerRef.current !== undefined) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = undefined;
+    }
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    const ctx = ctxRef.current;
+    ctxRef.current = null;
+    if (ctx && ctx.state !== "closed") void ctx.close().catch(() => undefined);
+    recRef.current = null;
+  }, []);
+
+  const reset = useCallback(() => {
+    elapsedRef.current = 0;
+    samplesRef.current = [];
+    chunksRef.current = [];
+    setElapsedMs(0);
+    setLive([]);
+  }, []);
+
+  const start = useCallback(async (): Promise<boolean> => {
+    if (stateRef.current !== "idle") return false;
+    setError(null);
+
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setError("Voice messages are not supported here. Use a modern browser over HTTPS.");
+      return false;
+    }
+
+    const token = ++tokenRef.current;
+    setS("starting");
+    reset();
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+    } catch (e) {
+      if (token === tokenRef.current) {
+        setS("idle");
+        setError(micError(e));
+      }
+      return false;
+    }
+
+    // cancelled while the permission prompt / microphone was starting
+    if (token !== tokenRef.current) {
+      stream.getTracks().forEach((t) => t.stop());
+      return false;
+    }
+
+    const mime = pickMime();
+    let recorder: MediaRecorder;
+    try {
+      recorder = mime
+        ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64000 })
+        : new MediaRecorder(stream);
+    } catch {
+      try {
+        recorder = new MediaRecorder(stream);
+      } catch (e) {
+        stream.getTracks().forEach((t) => t.stop());
+        setS("idle");
+        setError(micError(e));
+        return false;
+      }
+    }
+
+    mimeRef.current = baseMime(recorder.mimeType || mime || "audio/webm");
+    chunksRef.current = [];
+    recorder.ondataavailable = (ev: BlobEvent) => {
+      if (ev.data && ev.data.size > 0) chunksRef.current.push(ev.data);
+    };
+
+    // live level meter (optional: falls back to a gentle fake level)
+    let analyser: AnalyserNode | null = null;
+    try {
+      const AC: typeof AudioContext | undefined = window.AudioContext || (window as any).webkitAudioContext;
+      if (AC) {
+        const ctx = new AC();
+        void ctx.resume?.().catch(() => undefined);
+        const src = ctx.createMediaStreamSource(stream);
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        src.connect(analyser);
+        ctxRef.current = ctx;
+      }
+    } catch {
+      analyser = null;
+    }
+
+    streamRef.current = stream;
+    recRef.current = recorder;
+    elapsedRef.current = 0;
+    samplesRef.current = [];
+
+    try {
+      recorder.start(250);
+    } catch (e) {
+      teardown();
+      setS("idle");
+      setError(micError(e));
+      return false;
+    }
+    setS("recording");
+
+    const buf = analyser ? new Uint8Array(analyser.fftSize) : null;
+    let last = performance.now();
+    timerRef.current = window.setInterval(() => {
+      const now = performance.now();
+      const dt = now - last;
+      last = now;
+      if (stateRef.current !== "recording") return;
+
+      elapsedRef.current += dt;
+      let level = 0.2 + Math.random() * 0.25;
+      if (analyser && buf) {
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i += 1) {
+          const x = ((buf[i] ?? 128) - 128) / 128;
+          sum += x * x;
+        }
+        level = Math.min(1, Math.sqrt(sum / buf.length) * 3.4);
+      }
+      samplesRef.current.push(level);
+      setElapsedMs(Math.round(elapsedRef.current));
+      setLive((prev) => [...prev.slice(-(LIVE_BARS - 1)), level]);
+    }, TICK_MS);
+
+    return true;
+  }, [reset, setS, teardown]);
+
+  const stop = useCallback(
+    (): Promise<VoiceClip | null> =>
+      new Promise((resolve) => {
+        const rec = recRef.current;
+        if (!rec || (stateRef.current !== "recording" && stateRef.current !== "paused")) {
+          resolve(null);
+          return;
+        }
+        const durationMs = Math.round(elapsedRef.current);
+        const samples = samplesRef.current.slice();
+
+        rec.onstop = () => {
+          const mime = baseMime(rec.mimeType || mimeRef.current);
+          const blob = new Blob(chunksRef.current, { type: mime });
+          teardown();
+          reset();
+          setS("idle");
+          resolve(blob.size > 0 ? { blob, mime, durationMs, waveform: toWaveform(samples) } : null);
+        };
+        try {
+          rec.stop();
+        } catch {
+          teardown();
+          reset();
+          setS("idle");
+          resolve(null);
+        }
+      }),
+    [reset, setS, teardown],
+  );
+
+  const cancel = useCallback(() => {
+    tokenRef.current += 1; // invalidates a start() that is still waiting for the mic
+    const rec = recRef.current;
+    if (rec) {
+      rec.ondataavailable = null;
+      rec.onstop = null;
+      try {
+        if (rec.state !== "inactive") rec.stop();
+      } catch {
+        /* already stopped */
+      }
+    }
+    teardown();
+    reset();
+    setS("idle");
+  }, [reset, setS, teardown]);
+
+  const togglePause = useCallback(() => {
+    const rec = recRef.current;
+    if (!rec) return;
+    try {
+      if (stateRef.current === "recording") {
+        rec.pause();
+        setS("paused");
+      } else if (stateRef.current === "paused") {
+        rec.resume();
+        setS("recording");
+      }
+    } catch {
+      /* pause is not supported everywhere */
+    }
+  }, [setS]);
+
+  useEffect(
+    () => () => {
+      tokenRef.current += 1;
+      const rec = recRef.current;
+      if (rec) {
+        rec.ondataavailable = null;
+        rec.onstop = null;
+        try {
+          if (rec.state !== "inactive") rec.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+      teardown();
+    },
+    [teardown],
+  );
+
+  return { state, elapsedMs, live, error, setError, start, stop, cancel, togglePause };
+}
+=== END FILE ===
+

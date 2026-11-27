@@ -1,0 +1,984 @@
+=== FILE: .output/public/assets/practice._assignmentId-DOVpzOcu.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{A as r,F as i,T as a,V as o,u as s,x as c}from"./queries-B7Arqryn.js";import{t as l}from"./createLucideIcon-Dz5w4CtK.js";import{t as u}from"./award-DqqZqsrp.js";import{t as d}from"./circle-alert-Bs1x-kqg.js";import{t as f}from"./circle-check-DcupJV4n.js";import{t as p}from"./sparkles-gf6_8K8H.js";import{t as m}from"./practice._assignmentId-Dk1FjmfQ.js";import{t as h}from"./useAsync-CZJ1G06G.js";import{n as g,r as _}from"./States-BulpY35p.js";import{t as v}from"./MediaThumb-CuzlgNR-.js";var y=l(`file-check`,[[`path`,{d:`M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z`,key:`1oefj6`}],[`path`,{d:`M14 2v5a1 1 0 0 0 1 1h5`,key:`wfsgrz`}],[`path`,{d:`m9 15 2 2 4-4`,key:`1grp1n`}]]),b=l(`message-square`,[[`path`,{d:`M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z`,key:`18887p`}]]),x=l(`save`,[[`path`,{d:`M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z`,key:`1c8476`}],[`path`,{d:`M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7`,key:`1ydtos`}],[`path`,{d:`M7 3v4a1 1 0 0 0 1 1h7`,key:`t51u73`}]]),S=l(`upload`,[[`path`,{d:`M12 3v12`,key:`1x0j5s`}],[`path`,{d:`m17 8-5-5-5 5`,key:`7q97r8`}],[`path`,{d:`M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4`,key:`ih7n3h`}]]),C=e(n()),w=t();function T(){let{assignmentId:e}=m.useParams(),[t,n]=(0,C.useState)(0),r=h(()=>s(e),[e]),i=h(()=>c(e),[e,t]);return(0,w.jsxs)(`main`,{className:`mx-auto min-h-screen max-w-4xl px-4 sm:px-6 py-16 text-white relative`,children:[(0,w.jsx)(`div`,{className:`absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-orange-600/10 blur-[140px] pointer-events-none rounded-full`}),(0,w.jsxs)(`div`,{className:`relative z-10`,children:[(r.loading||i.loading)&&(0,w.jsx)(_,{rows:4}),r.error&&(0,w.jsx)(g,{message:r.error}),i.error&&(0,w.jsx)(g,{message:i.error}),r.data&&i.data&&(0,w.jsx)(E,{assignment:r.data,draft:i.data,onSubmitted:()=>n(e=>e+1)})]})]})}function E({assignment:e,draft:t,onSubmitted:n}){let[s,c]=(0,C.useState)({client_context:t.client_context??``,observations:t.observations??``,intended_result:t.intended_result??``,technique:t.technique??``,self_evaluation:t.self_evaluation??``}),[l,m]=(0,C.useState)({before:t.before_media??[],process:t.process_media??[],after:t.after_media??[]}),[g,_]=(0,C.useState)(!1),[T,E]=(0,C.useState)(null),A=h(()=>a(t.id),[t.id]),j=t.status===`submitted`||t.status===`in_review`;(0,C.useEffect)(()=>{E(null)},[t.status]);async function M(e,n){if(n?.length){_(!0);try{let i=[];for(let r of Array.from(n))i.push(await o(t.id,e,r));let a={...l,[e]:[...l[e],...i]};m(a),await r(t.id,{before_media:a.before,process_media:a.process,after_media:a.after}),E(`Τα αρχεία ανέβηκαν επιτυχώς.`)}catch(e){E(`Αποτυχία upload: `+e.message)}finally{_(!1)}}}async function N(){_(!0);try{await r(t.id,s),E(`Το προσχέδιο αποθηκεύτηκε.`)}catch(e){E(`Αποτυχία αποθήκευσης: `+e.message)}finally{_(!1)}}async function P(){if(l.after.length===0){E(`Χρειάζεται τουλάχιστον μία φωτογραφία αποτελέσματος (after).`);return}_(!0);try{await r(t.id,s),await i(t.id),E(`Η υποβολή στάλθηκε για αξιολόγηση.`),n()}catch(e){E(`Αποτυχία υποβολής: `+e.message)}finally{_(!1)}}let F=`w-full rounded-2xl border border-white/10 bg-black/60 p-4 text-sm text-white/90 outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50 transition-all duration-300 placeholder:text-zinc-600`;return(0,w.jsxs)(`div`,{className:`space-y-8`,children:[(0,w.jsxs)(`header`,{className:`p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6`,children:[(0,w.jsxs)(`div`,{children:[(0,w.jsxs)(`div`,{className:`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner`,children:[(0,w.jsx)(p,{className:`w-3.5 h-3.5 animate-pulse`}),`Practice Assignment`]}),(0,w.jsx)(`h1`,{className:`text-2xl sm:text-3xl font-extrabold text-white`,children:e.title}),e.brief&&(0,w.jsx)(`p`,{className:`mt-2 text-sm text-zinc-400 leading-relaxed max-w-2xl`,children:e.brief})]}),(0,w.jsx)(`div`,{children:(0,w.jsx)(D,{status:t.status})})]}),e.checklist.length>0&&(0,w.jsxs)(`section`,{className:`p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl`,children:[(0,w.jsxs)(`h2`,{className:`mb-4 text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2`,children:[(0,w.jsx)(y,{className:`w-4 h-4 text-orange-400`}),`Submission Checklist`]}),(0,w.jsx)(`ul`,{className:`grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-zinc-300`,children:e.checklist.map((e,t)=>(0,w.jsxs)(`li`,{className:`flex items-center gap-2.5 p-3 rounded-xl bg-black/40 border border-white/5`,children:[(0,w.jsx)(`span`,{className:`w-2 h-2 rounded-full bg-orange-400 shrink-0`}),(0,w.jsx)(`span`,{children:e})]},t))})]}),(0,w.jsx)(`div`,{className:`grid grid-cols-1 md:grid-cols-3 gap-6`,children:[`before`,`process`,`after`].map(e=>(0,w.jsx)(`section`,{className:`p-6 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl flex flex-col justify-between`,children:(0,w.jsxs)(`div`,{children:[(0,w.jsxs)(`div`,{className:`mb-4 flex items-center justify-between`,children:[(0,w.jsxs)(`h2`,{className:`text-xs font-bold uppercase tracking-widest text-orange-400`,children:[e,` media`]}),!j&&t.status!==`passed`&&(0,w.jsxs)(`label`,{className:`cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-orange-500 hover:border-orange-500 transition-all duration-300 group shadow-inner`,children:[(0,w.jsx)(S,{className:`w-3.5 h-3.5 text-orange-400 group-hover:text-white`}),(0,w.jsx)(`span`,{children:`Upload`}),(0,w.jsx)(`input`,{type:`file`,multiple:!0,accept:`image/*,video/*`,className:`hidden`,disabled:g,onChange:t=>M(e,t.target.files)})]})]}),l[e].length>0?(0,w.jsx)(`div`,{className:`grid grid-cols-2 gap-2`,children:l[e].map(e=>(0,w.jsx)(v,{path:e},e))}):(0,w.jsx)(`div`,{className:`py-8 text-center border border-dashed border-white/10 rounded-2xl bg-black/20`,children:(0,w.jsx)(`p`,{className:`text-xs text-zinc-600`,children:`Κανένα αρχείο ακόμη.`})})]})},e))}),(0,w.jsxs)(`section`,{className:`p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl space-y-6`,children:[(0,w.jsxs)(`h2`,{className:`text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2`,children:[(0,w.jsx)(b,{className:`w-4 h-4 text-orange-400`}),`Λεπτομέρειες & Αυτο-αξιολόγηση`]}),(0,w.jsxs)(`div`,{className:`grid grid-cols-1 md:grid-cols-2 gap-6`,children:[(0,w.jsx)(O,{label:`Client context`,value:s.client_context,disabled:j||t.status===`passed`,onChange:e=>c({...s,client_context:e}),className:F,placeholder:`Περιγράψτε το προφίλ και τις ανάγκες του πελάτη...`}),(0,w.jsx)(O,{label:`Παρατηρήσεις`,value:s.observations,disabled:j||t.status===`passed`,onChange:e=>c({...s,observations:e}),className:F,placeholder:`Σημαντικές παρατηρήσεις κατά τη διαδικασία...`}),(0,w.jsx)(O,{label:`Επιδιωκόμενο αποτέλεσμα`,value:s.intended_result,disabled:j||t.status===`passed`,onChange:e=>c({...s,intended_result:e}),className:F,placeholder:`Ποιος ήταν ο στόχος του κουρέματος...`}),(0,w.jsx)(O,{label:`Τεχνική & γιατί`,value:s.technique,disabled:j||t.status===`passed`,onChange:e=>c({...s,technique:e}),className:F,placeholder:`Εξηγείστε τις τεχνικές που χρησιμοποιήσατε...`})]}),(0,w.jsx)(`div`,{children:(0,w.jsx)(O,{label:`Αυτο-αξιολόγηση`,value:s.self_evaluation,disabled:j||t.status===`passed`,onChange:e=>c({...s,self_evaluation:e}),className:F,placeholder:`Πώς κρίνετε εσείς προσωπικά το αποτέλεσμα;`})})]}),T&&(0,w.jsxs)(`div`,{className:`p-4 rounded-2xl bg-zinc-950/80 border border-white/10 text-zinc-300 text-sm flex items-center gap-3 backdrop-blur-xl shadow-lg`,children:[(0,w.jsx)(d,{className:`w-5 h-5 text-orange-400 shrink-0`}),(0,w.jsx)(`span`,{role:`status`,children:T})]}),!j&&t.status!==`passed`&&(0,w.jsxs)(`div`,{className:`flex flex-wrap gap-4 pt-2`,children:[(0,w.jsxs)(`button`,{onClick:N,disabled:g,className:`flex items-center gap-2 rounded-2xl border border-white/15 bg-zinc-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-zinc-800 hover:border-white/30 disabled:opacity-50 cursor-pointer shadow-inner`,children:[(0,w.jsx)(x,{className:`w-4 h-4 text-orange-400`}),`Αποθήκευση προσχεδίου`]}),(0,w.jsxs)(`button`,{onClick:P,disabled:g,className:`flex items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-3.5 text-sm font-bold text-white shadow-[0_0_25px_-5px_rgba(255,90,20,0.5)] hover:shadow-[0_0_35px_-2px_rgba(255,90,20,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none cursor-pointer`,children:[(0,w.jsx)(f,{className:`w-5 h-5`}),`Υποβολή για αξιολόγηση`]})]}),A.data&&(0,w.jsxs)(`section`,{className:`p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-orange-500/30 shadow-[0_0_40px_-10px_rgba(255,90,20,0.2)] backdrop-blur-xl space-y-4`,children:[(0,w.jsxs)(`div`,{className:`flex items-center justify-between border-b border-white/10 pb-4`,children:[(0,w.jsxs)(`h2`,{className:`text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2`,children:[(0,w.jsx)(u,{className:`w-5 h-5`}),`Feedback Εκπαιδευτή`]}),A.data.score!=null&&(0,w.jsxs)(`div`,{className:`text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500`,children:[A.data.score,(0,w.jsx)(`span`,{className:`text-xs font-normal text-zinc-500`,children:` / 100`})]})]}),(0,w.jsxs)(`div`,{className:`grid grid-cols-1 md:grid-cols-2 gap-6 pt-2`,children:[(0,w.jsx)(k,{label:`Δυνατά σημεία`,value:A.data.strengths}),(0,w.jsx)(k,{label:`Τεχνικά κενά`,value:A.data.technical_gaps}),(0,w.jsx)(k,{label:`Κενά μεθόδου`,value:A.data.method_gaps}),(0,w.jsx)(k,{label:`Επόμενες ενέργειες`,value:A.data.next_actions})]})]})]})}function D({status:e}){return(0,w.jsx)(`span`,{className:`inline-block rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider shadow-inner ${{draft:`bg-white/5 border border-white/10 text-zinc-400`,submitted:`bg-blue-500/10 border border-blue-500/20 text-blue-400`,in_review:`bg-amber-500/10 border border-amber-500/20 text-amber-400`,needs_revision:`bg-orange-500/10 border border-orange-500/20 text-orange-400`,passed:`bg-emerald-500/10 border border-emerald-500/20 text-emerald-400`}[e]}`,children:e})}function O({label:e,value:t,onChange:n,disabled:r,className:i,placeholder:a}){return(0,w.jsxs)(`label`,{className:`block`,children:[(0,w.jsx)(`span`,{className:`mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400`,children:e}),(0,w.jsx)(`textarea`,{rows:3,value:t,disabled:r,onChange:e=>n(e.target.value),className:i,placeholder:a})]})}function k({label:e,value:t}){return t?(0,w.jsxs)(`div`,{className:`p-4 rounded-2xl bg-black/40 border border-white/5`,children:[(0,w.jsx)(`p`,{className:`text-xs uppercase tracking-widest text-orange-400 font-bold`,children:e}),(0,w.jsx)(`p`,{className:`mt-2 whitespace-pre-wrap text-sm text-zinc-300 leading-relaxed`,children:t})]}):null}export{T as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/practice._assignmentId-D3dvw_7O.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { D as Save, Rt as Award, St as CircleCheck, W as MessageSquare, d as Upload, ut as FileCheck, wt as CircleAlert, y as Sparkles } from "../_libs/lucide-react.mjs";
+import { A as saveSubmission, F as submitSubmission, T as getSubmissionReview, V as uploadSubmissionMedia, u as getAssignment, x as getOrCreateDraft } from "./queries-DCA4yifx.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { t as Route } from "./practice._assignmentId-7CMjLI7e.mjs";
+import { t as MediaThumb } from "./MediaThumb-CkcdXQAy.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/practice._assignmentId-D3dvw_7O.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function PracticePage() {
+	const { assignmentId } = Route.useParams();
+	const [reload, setReload] = (0, import_react.useState)(0);
+	const assignment = useAsync(() => getAssignment(assignmentId), [assignmentId]);
+	const draft = useAsync(() => getOrCreateDraft(assignmentId), [assignmentId, reload]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto min-h-screen max-w-4xl px-4 sm:px-6 py-16 text-white relative",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-orange-600/10 blur-[140px] pointer-events-none rounded-full" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "relative z-10",
+			children: [
+				(assignment.loading || draft.loading) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 4 }),
+				assignment.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: assignment.error }),
+				draft.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: draft.error }),
+				assignment.data && draft.data && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SubmissionForm, {
+					assignment: assignment.data,
+					draft: draft.data,
+					onSubmitted: () => setReload((n) => n + 1)
+				})
+			]
+		})]
+	});
+}
+function SubmissionForm({ assignment, draft, onSubmitted }) {
+	const [form, setForm] = (0, import_react.useState)({
+		client_context: draft.client_context ?? "",
+		observations: draft.observations ?? "",
+		intended_result: draft.intended_result ?? "",
+		technique: draft.technique ?? "",
+		self_evaluation: draft.self_evaluation ?? ""
+	});
+	const [media, setMedia] = (0, import_react.useState)({
+		before: draft.before_media ?? [],
+		process: draft.process_media ?? [],
+		after: draft.after_media ?? []
+	});
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const [msg, setMsg] = (0, import_react.useState)(null);
+	const review = useAsync(() => getSubmissionReview(draft.id), [draft.id]);
+	const locked = draft.status === "submitted" || draft.status === "in_review";
+	(0, import_react.useEffect)(() => {
+		setMsg(null);
+	}, [draft.status]);
+	async function handleUpload(kind, files) {
+		if (!files?.length) return;
+		setBusy(true);
+		try {
+			const paths = [];
+			for (const file of Array.from(files)) paths.push(await uploadSubmissionMedia(draft.id, kind, file));
+			const next = {
+				...media,
+				[kind]: [...media[kind], ...paths]
+			};
+			setMedia(next);
+			await saveSubmission(draft.id, {
+				before_media: next.before,
+				process_media: next.process,
+				after_media: next.after
+			});
+			setMsg("Τα αρχεία ανέβηκαν επιτυχώς.");
+		} catch (e) {
+			setMsg("Αποτυχία upload: " + e.message);
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleSaveDraft() {
+		setBusy(true);
+		try {
+			await saveSubmission(draft.id, form);
+			setMsg("Το προσχέδιο αποθηκεύτηκε.");
+		} catch (e) {
+			setMsg("Αποτυχία αποθήκευσης: " + e.message);
+		} finally {
+			setBusy(false);
+		}
+	}
+	async function handleSubmit() {
+		if (media.after.length === 0) {
+			setMsg("Χρειάζεται τουλάχιστον μία φωτογραφία αποτελέσματος (after).");
+			return;
+		}
+		setBusy(true);
+		try {
+			await saveSubmission(draft.id, form);
+			await submitSubmission(draft.id);
+			setMsg("Η υποβολή στάλθηκε για αξιολόγηση.");
+			onSubmitted();
+		} catch (e) {
+			setMsg("Αποτυχία υποβολής: " + e.message);
+		} finally {
+			setBusy(false);
+		}
+	}
+	const field = "w-full rounded-2xl border border-white/10 bg-black/60 p-4 text-sm text-white/90 outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50 transition-all duration-300 placeholder:text-zinc-600";
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "space-y-8",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { className: "w-3.5 h-3.5 animate-pulse" }), "Practice Assignment"]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+						className: "text-2xl sm:text-3xl font-extrabold text-white",
+						children: assignment.title
+					}),
+					assignment.brief && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-2 text-sm text-zinc-400 leading-relaxed max-w-2xl",
+						children: assignment.brief
+					})
+				] }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StatusBadge, { status: draft.status }) })]
+			}),
+			assignment.checklist.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+					className: "mb-4 text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FileCheck, { className: "w-4 h-4 text-orange-400" }), "Submission Checklist"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+					className: "grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-zinc-300",
+					children: assignment.checklist.map((item, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", {
+						className: "flex items-center gap-2.5 p-3 rounded-xl bg-black/40 border border-white/5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "w-2 h-2 rounded-full bg-orange-400 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: item })]
+					}, i))
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "grid grid-cols-1 md:grid-cols-3 gap-6",
+				children: [
+					"before",
+					"process",
+					"after"
+				].map((kind) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+					className: "p-6 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl flex flex-col justify-between",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "mb-4 flex items-center justify-between",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+							className: "text-xs font-bold uppercase tracking-widest text-orange-400",
+							children: [kind, " media"]
+						}), !locked && draft.status !== "passed" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+							className: "cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-orange-500 hover:border-orange-500 transition-all duration-300 group shadow-inner",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Upload, { className: "w-3.5 h-3.5 text-orange-400 group-hover:text-white" }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "Upload" }),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+									type: "file",
+									multiple: true,
+									accept: "image/*,video/*",
+									className: "hidden",
+									disabled: busy,
+									onChange: (e) => handleUpload(kind, e.target.files)
+								})
+							]
+						})]
+					}), media[kind].length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "grid grid-cols-2 gap-2",
+						children: media[kind].map((p) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MediaThumb, { path: p }, p))
+					}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "py-8 text-center border border-dashed border-white/10 rounded-2xl bg-black/20",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "text-xs text-zinc-600",
+							children: "Κανένα αρχείο ακόμη."
+						})
+					})] })
+				}, kind))
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl space-y-6",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+						className: "text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageSquare, { className: "w-4 h-4 text-orange-400" }), "Λεπτομέρειες & Αυτο-αξιολόγηση"]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "grid grid-cols-1 md:grid-cols-2 gap-6",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Textarea, {
+								label: "Client context",
+								value: form.client_context,
+								disabled: locked || draft.status === "passed",
+								onChange: (v) => setForm({
+									...form,
+									client_context: v
+								}),
+								className: field,
+								placeholder: "Περιγράψτε το προφίλ και τις ανάγκες του πελάτη..."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Textarea, {
+								label: "Παρατηρήσεις",
+								value: form.observations,
+								disabled: locked || draft.status === "passed",
+								onChange: (v) => setForm({
+									...form,
+									observations: v
+								}),
+								className: field,
+								placeholder: "Σημαντικές παρατηρήσεις κατά τη διαδικασία..."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Textarea, {
+								label: "Επιδιωκόμενο αποτέλεσμα",
+								value: form.intended_result,
+								disabled: locked || draft.status === "passed",
+								onChange: (v) => setForm({
+									...form,
+									intended_result: v
+								}),
+								className: field,
+								placeholder: "Ποιος ήταν ο στόχος του κουρέματος..."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Textarea, {
+								label: "Τεχνική & γιατί",
+								value: form.technique,
+								disabled: locked || draft.status === "passed",
+								onChange: (v) => setForm({
+									...form,
+									technique: v
+								}),
+								className: field,
+								placeholder: "Εξηγείστε τις τεχνικές που χρησιμοποιήσατε..."
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Textarea, {
+						label: "Αυτο-αξιολόγηση",
+						value: form.self_evaluation,
+						disabled: locked || draft.status === "passed",
+						onChange: (v) => setForm({
+							...form,
+							self_evaluation: v
+						}),
+						className: field,
+						placeholder: "Πώς κρίνετε εσείς προσωπικά το αποτέλεσμα;"
+					}) })
+				]
+			}),
+			msg && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "p-4 rounded-2xl bg-zinc-950/80 border border-white/10 text-zinc-300 text-sm flex items-center gap-3 backdrop-blur-xl shadow-lg",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleAlert, { className: "w-5 h-5 text-orange-400 shrink-0" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					role: "status",
+					children: msg
+				})]
+			}),
+			!locked && draft.status !== "passed" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap gap-4 pt-2",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					onClick: handleSaveDraft,
+					disabled: busy,
+					className: "flex items-center gap-2 rounded-2xl border border-white/15 bg-zinc-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-zinc-800 hover:border-white/30 disabled:opacity-50 cursor-pointer shadow-inner",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Save, { className: "w-4 h-4 text-orange-400" }), "Αποθήκευση προσχεδίου"]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+					onClick: handleSubmit,
+					disabled: busy,
+					className: "flex items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-3.5 text-sm font-bold text-white shadow-[0_0_25px_-5px_rgba(255,90,20,0.5)] hover:shadow-[0_0_35px_-2px_rgba(255,90,20,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none cursor-pointer",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheck, { className: "w-5 h-5" }), "Υποβολή για αξιολόγηση"]
+				})]
+			}),
+			review.data && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-orange-500/30 shadow-[0_0_40px_-10px_rgba(255,90,20,0.2)] backdrop-blur-xl space-y-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex items-center justify-between border-b border-white/10 pb-4",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h2", {
+						className: "text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Award, { className: "w-5 h-5" }), "Feedback Εκπαιδευτή"]
+					}), review.data.score != null && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500",
+						children: [review.data.score, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "text-xs font-normal text-zinc-500",
+							children: " / 100"
+						})]
+					})]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "grid grid-cols-1 md:grid-cols-2 gap-6 pt-2",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FeedbackBlock, {
+							label: "Δυνατά σημεία",
+							value: review.data.strengths
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FeedbackBlock, {
+							label: "Τεχνικά κενά",
+							value: review.data.technical_gaps
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FeedbackBlock, {
+							label: "Κενά μεθόδου",
+							value: review.data.method_gaps
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(FeedbackBlock, {
+							label: "Επόμενες ενέργειες",
+							value: review.data.next_actions
+						})
+					]
+				})]
+			})
+		]
+	});
+}
+function StatusBadge({ status }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: `inline-block rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider shadow-inner ${{
+			draft: "bg-white/5 border border-white/10 text-zinc-400",
+			submitted: "bg-blue-500/10 border border-blue-500/20 text-blue-400",
+			in_review: "bg-amber-500/10 border border-amber-500/20 text-amber-400",
+			needs_revision: "bg-orange-500/10 border border-orange-500/20 text-orange-400",
+			passed: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+		}[status]}`,
+		children: status
+	});
+}
+function Textarea({ label, value, onChange, disabled, className, placeholder }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+		className: "block",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+			rows: 3,
+			value,
+			disabled,
+			onChange: (e) => onChange(e.target.value),
+			className,
+			placeholder
+		})]
+	});
+}
+function FeedbackBlock({ label, value }) {
+	if (!value) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "p-4 rounded-2xl bg-black/40 border border-white/5",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "text-xs uppercase tracking-widest text-orange-400 font-bold",
+			children: label
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "mt-2 whitespace-pre-wrap text-sm text-zinc-300 leading-relaxed",
+			children: value
+		})]
+	});
+}
+//#endregion
+export { PracticePage as component };
+
+=== END FILE ===
+
+=== FILE: src/routes/practice.$assignmentId.tsx ===
+import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import {
+  getAssignment,
+  getOrCreateDraft,
+  getSubmissionReview,
+  saveSubmission,
+  submitSubmission,
+  uploadSubmissionMedia,
+} from "@/lib/queries";
+import { useAsync } from "@/lib/useAsync";
+import { ErrorState, LoadingSkeleton } from "@/components/aura/States";
+import { MediaThumb } from "@/components/aura/MediaThumb";
+import type { Submission } from "@/lib/database.types";
+import { Sparkles, Upload, CheckCircle2, Save, AlertCircle, FileCheck, Award, MessageSquare } from "lucide-react";
+
+export const Route = createFileRoute("/practice/$assignmentId")({
+  component: PracticePage,
+});
+
+type MediaKind = "before" | "process" | "after";
+
+function PracticePage() {
+  const { assignmentId } = Route.useParams();
+  const [reload, setReload] = useState(0);
+
+  const assignment = useAsync(
+    () => getAssignment(assignmentId),
+    [assignmentId],
+  );
+  const draft = useAsync(
+    () => getOrCreateDraft(assignmentId),
+    [assignmentId, reload],
+  );
+
+  return (
+    <main className="mx-auto min-h-screen max-w-4xl px-4 sm:px-6 py-16 text-white relative">
+      {/* Ambient background blur */}
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-orange-600/10 blur-[140px] pointer-events-none rounded-full" />
+
+      <div className="relative z-10">
+        {(assignment.loading || draft.loading) && <LoadingSkeleton rows={4} />}
+        {assignment.error && <ErrorState message={assignment.error} />}
+        {draft.error && <ErrorState message={draft.error} />}
+
+        {assignment.data && draft.data && (
+          <SubmissionForm
+            assignment={assignment.data}
+            draft={draft.data}
+            onSubmitted={() => setReload((n) => n + 1)}
+          />
+        )}
+      </div>
+    </main>
+  );
+}
+
+function SubmissionForm({
+  assignment,
+  draft,
+  onSubmitted,
+}: {
+  assignment: Awaited<ReturnType<typeof getAssignment>>;
+  draft: Submission;
+  onSubmitted: () => void;
+}) {
+  const [form, setForm] = useState({
+    client_context: draft.client_context ?? "",
+    observations: draft.observations ?? "",
+    intended_result: draft.intended_result ?? "",
+    technique: draft.technique ?? "",
+    self_evaluation: draft.self_evaluation ?? "",
+  });
+  const [media, setMedia] = useState({
+    before: draft.before_media ?? [],
+    process: draft.process_media ?? [],
+    after: draft.after_media ?? [],
+  });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const review = useAsync(() => getSubmissionReview(draft.id), [draft.id]);
+  const locked = draft.status === "submitted" || draft.status === "in_review";
+
+  useEffect(() => {
+    setMsg(null);
+  }, [draft.status]);
+
+  async function handleUpload(kind: MediaKind, files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true);
+    try {
+      const paths: string[] = [];
+      for (const file of Array.from(files)) {
+        paths.push(await uploadSubmissionMedia(draft.id, kind, file));
+      }
+      const next = { ...media, [kind]: [...media[kind], ...paths] };
+      setMedia(next);
+      await saveSubmission(draft.id, {
+        before_media: next.before,
+        process_media: next.process,
+        after_media: next.after,
+      });
+      setMsg("Τα αρχεία ανέβηκαν επιτυχώς.");
+    } catch (e) {
+      setMsg("Αποτυχία upload: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSaveDraft() {
+    setBusy(true);
+    try {
+      await saveSubmission(draft.id, form);
+      setMsg("Το προσχέδιο αποθηκεύτηκε.");
+    } catch (e) {
+      setMsg("Αποτυχία αποθήκευσης: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSubmit() {
+    if (media.after.length === 0) {
+      setMsg("Χρειάζεται τουλάχιστον μία φωτογραφία αποτελέσματος (after).");
+      return;
+    }
+    setBusy(true);
+    try {
+      await saveSubmission(draft.id, form);
+      await submitSubmission(draft.id);
+      setMsg("Η υποβολή στάλθηκε για αξιολόγηση.");
+      onSubmitted();
+    } catch (e) {
+      setMsg("Αποτυχία υποβολής: " + (e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const field =
+    "w-full rounded-2xl border border-white/10 bg-black/60 p-4 text-sm text-white/90 outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50 transition-all duration-300 placeholder:text-zinc-600";
+
+  return (
+    <div className="space-y-8">
+      {/* Header Card */}
+      <header className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner">
+            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+            Practice Assignment
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+            {assignment.title}
+          </h1>
+          {assignment.brief && (
+            <p className="mt-2 text-sm text-zinc-400 leading-relaxed max-w-2xl">
+              {assignment.brief}
+            </p>
+          )}
+        </div>
+        <div>
+          <StatusBadge status={draft.status} />
+        </div>
+      </header>
+
+      {/* Checklist Card */}
+      {assignment.checklist.length > 0 && (
+        <section className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+          <h2 className="mb-4 text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2">
+            <FileCheck className="w-4 h-4 text-orange-400" />
+            Submission Checklist
+          </h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-zinc-300">
+            {assignment.checklist.map((item, i) => (
+              <li key={i} className="flex items-center gap-2.5 p-3 rounded-xl bg-black/40 border border-white/5">
+                <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Media Upload Sections */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {(["before", "process", "after"] as MediaKind[]).map((kind) => (
+          <section key={kind} className="p-6 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl flex flex-col justify-between">
+            <div>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-orange-400">
+                  {kind} media
+                </h2>
+                {!locked && draft.status !== "passed" && (
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white hover:bg-orange-500 hover:border-orange-500 transition-all duration-300 group shadow-inner">
+                    <Upload className="w-3.5 h-3.5 text-orange-400 group-hover:text-white" />
+                    <span>Upload</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      className="hidden"
+                      disabled={busy}
+                      onChange={(e) => handleUpload(kind, e.target.files)}
+                    />
+                  </label>
+                )}
+              </div>
+              {media[kind].length > 0 ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {media[kind].map((p) => (
+                    <MediaThumb key={p} path={p} />
+                  ))}
+                </div>
+              ) : (
+                <div className="py-8 text-center border border-dashed border-white/10 rounded-2xl bg-black/20">
+                  <p className="text-xs text-zinc-600">Κανένα αρχείο ακόμη.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {/* Form Fields Card */}
+      <section className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl space-y-6">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-white/70 flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-orange-400" />
+          Λεπτομέρειες & Αυτο-αξιολόγηση
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Textarea
+            label="Client context"
+            value={form.client_context}
+            disabled={locked || draft.status === "passed"}
+            onChange={(v) => setForm({ ...form, client_context: v })}
+            className={field}
+            placeholder="Περιγράψτε το προφίλ και τις ανάγκες του πελάτη..."
+          />
+          <Textarea
+            label="Παρατηρήσεις"
+            value={form.observations}
+            disabled={locked || draft.status === "passed"}
+            onChange={(v) => setForm({ ...form, observations: v })}
+            className={field}
+            placeholder="Σημαντικές παρατηρήσεις κατά τη διαδικασία..."
+          />
+          <Textarea
+            label="Επιδιωκόμενο αποτέλεσμα"
+            value={form.intended_result}
+            disabled={locked || draft.status === "passed"}
+            onChange={(v) => setForm({ ...form, intended_result: v })}
+            className={field}
+            placeholder="Ποιος ήταν ο στόχος του κουρέματος..."
+          />
+          <Textarea
+            label="Τεχνική & γιατί"
+            value={form.technique}
+            disabled={locked || draft.status === "passed"}
+            onChange={(v) => setForm({ ...form, technique: v })}
+            className={field}
+            placeholder="Εξηγείστε τις τεχνικές που χρησιμοποιήσατε..."
+          />
+        </div>
+        <div>
+          <Textarea
+            label="Αυτο-αξιολόγηση"
+            value={form.self_evaluation}
+            disabled={locked || draft.status === "passed"}
+            onChange={(v) => setForm({ ...form, self_evaluation: v })}
+            className={field}
+            placeholder="Πώς κρίνετε εσείς προσωπικά το αποτέλεσμα;"
+          />
+        </div>
+      </section>
+
+      {msg && (
+        <div className="p-4 rounded-2xl bg-zinc-950/80 border border-white/10 text-zinc-300 text-sm flex items-center gap-3 backdrop-blur-xl shadow-lg">
+          <AlertCircle className="w-5 h-5 text-orange-400 shrink-0" />
+          <span role="status">{msg}</span>
+        </div>
+      )}
+
+      {/* Action Buttons */}
+      {!locked && draft.status !== "passed" && (
+        <div className="flex flex-wrap gap-4 pt-2">
+          <button
+            onClick={handleSaveDraft}
+            disabled={busy}
+            className="flex items-center gap-2 rounded-2xl border border-white/15 bg-zinc-900 px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-zinc-800 hover:border-white/30 disabled:opacity-50 cursor-pointer shadow-inner"
+          >
+            <Save className="w-4 h-4 text-orange-400" />
+            Αποθήκευση προσχεδίου
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={busy}
+            className="flex items-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 px-8 py-3.5 text-sm font-bold text-white shadow-[0_0_25px_-5px_rgba(255,90,20,0.5)] hover:shadow-[0_0_35px_-2px_rgba(255,90,20,0.7)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            Υποβολή για αξιολόγηση
+          </button>
+        </div>
+      )}
+
+      {/* Instructor Feedback Section */}
+      {review.data && (
+        <section className="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-orange-500/30 shadow-[0_0_40px_-10px_rgba(255,90,20,0.2)] backdrop-blur-xl space-y-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-orange-400 flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              Feedback Εκπαιδευτή
+            </h2>
+            {review.data.score != null && (
+              <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500">
+                {review.data.score}
+                <span className="text-xs font-normal text-zinc-500"> / 100</span>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <FeedbackBlock label="Δυνατά σημεία" value={review.data.strengths} />
+            <FeedbackBlock label="Τεχνικά κενά" value={review.data.technical_gaps} />
+            <FeedbackBlock label="Κενά μεθόδου" value={review.data.method_gaps} />
+            <FeedbackBlock label="Επόμενες ενέργειες" value={review.data.next_actions} />
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: Submission["status"] }) {
+  const map: Record<Submission["status"], string> = {
+    draft: "bg-white/5 border border-white/10 text-zinc-400",
+    submitted: "bg-blue-500/10 border border-blue-500/20 text-blue-400",
+    in_review: "bg-amber-500/10 border border-amber-500/20 text-amber-400",
+    needs_revision: "bg-orange-500/10 border border-orange-500/20 text-orange-400",
+    passed: "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400",
+  };
+  return (
+    <span
+      className={`inline-block rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-wider shadow-inner ${map[status]}`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function Textarea({
+  label,
+  value,
+  onChange,
+  disabled,
+  className,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled: boolean;
+  className: string;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400">{label}</span>
+      <textarea
+        rows={3}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className={className}
+        placeholder={placeholder}
+      />
+    </label>
+  );
+}
+
+function FeedbackBlock({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | null;
+}) {
+  if (!value) return null;
+  return (
+    <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
+      <p className="text-xs uppercase tracking-widest text-orange-400 font-bold">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm text-zinc-300 leading-relaxed">{value}</p>
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/checkout.return-m46Bfk_c.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+import { n as getPlan } from "./plans-sHsWJraA.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { t as clearCheckoutIntent } from "./checkout-intent-Cw-r21JH.mjs";
+import { r as useSubscription } from "./useSubscription-CNKMk-yc.mjs";
+import { t as Route } from "./checkout.return-CuDd3lzf.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/checkout.return-m46Bfk_c.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+/**
+* Επιβεβαιώνει το Stripe Checkout Session και γράφει τη συνδρομή
+* χωρίς να περιμένει το webhook. Είναι idempotent: μπορεί να κληθεί
+* όσες φορές χρειαστεί για το ίδιο session.
+*/
+async function verifyCheckoutSession(sessionId) {
+	const { data, error } = await supabase.functions.invoke("verify-checkout-session", { body: { sessionId } });
+	if (error) {
+		const res = error.context;
+		if (res && typeof res.json === "function") try {
+			const payload = await res.json();
+			if (payload?.error) throw new Error(payload.error);
+		} catch (parseErr) {
+			if (parseErr instanceof Error && parseErr.message) throw parseErr;
+		}
+		throw new Error(error.message || "Η επιβεβαίωση της πληρωμής απέτυχε.");
+	}
+	if (!data) throw new Error("Κενή απάντηση από τον server.");
+	if (data.error) throw new Error(data.error);
+	return {
+		state: data.state ?? "pending",
+		hasAccess: Boolean(data.hasAccess),
+		subscription: data.subscription ?? null
+	};
+}
+var MAX_ATTEMPTS = 12;
+var VERIFY_DELAY_MS = 1500;
+var POLL_DELAY_MS = 2e3;
+function wait(ms) {
+	return new Promise((resolve) => {
+		window.setTimeout(resolve, ms);
+	});
+}
+function CheckoutReturnPage() {
+	const navigate = useNavigate();
+	const { session_id: sessionId } = Route.useSearch();
+	const { session, loading: authLoading } = useAuth();
+	const { subscription, hasAccess, loading, refresh } = useSubscription(session?.user.id);
+	const [attempts, setAttempts] = (0, import_react.useState)(0);
+	const [verified, setVerified] = (0, import_react.useState)(false);
+	const [verifiedPlan, setVerifiedPlan] = (0, import_react.useState)(null);
+	const [verifyError, setVerifyError] = (0, import_react.useState)(null);
+	const [exhausted, setExhausted] = (0, import_react.useState)(false);
+	const [retryToken, setRetryToken] = (0, import_react.useState)(0);
+	const refreshRef = (0, import_react.useRef)(refresh);
+	(0, import_react.useEffect)(() => {
+		refreshRef.current = refresh;
+	}, [refresh]);
+	const startedRef = (0, import_react.useRef)(null);
+	(0, import_react.useEffect)(() => {
+		clearCheckoutIntent();
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (authLoading || !session?.user.id || !sessionId || verified) return;
+		const runKey = `${sessionId}:${retryToken}`;
+		if (startedRef.current === runKey) return;
+		startedRef.current = runKey;
+		let cancelled = false;
+		const run = async () => {
+			for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+				if (cancelled) return;
+				setAttempts(attempt);
+				try {
+					const result = await verifyCheckoutSession(sessionId);
+					if (cancelled) return;
+					if (result.hasAccess) {
+						setVerifiedPlan(result.subscription?.planId ?? null);
+						setVerifyError(null);
+						setVerified(true);
+						refreshRef.current();
+						return;
+					}
+					setVerifyError(null);
+				} catch (err) {
+					if (cancelled) return;
+					setVerifyError(err instanceof Error && err.message ? err.message : "Η επιβεβαίωση της πληρωμής απέτυχε.");
+				}
+				if (attempt < MAX_ATTEMPTS) await wait(VERIFY_DELAY_MS);
+			}
+			if (!cancelled) setExhausted(true);
+		};
+		run();
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		authLoading,
+		session?.user.id,
+		sessionId,
+		verified,
+		retryToken
+	]);
+	(0, import_react.useEffect)(() => {
+		if (sessionId) return;
+		if (authLoading || loading || hasAccess || attempts >= MAX_ATTEMPTS) return;
+		const timer = window.setTimeout(() => {
+			setAttempts((n) => n + 1);
+			refreshRef.current();
+		}, POLL_DELAY_MS);
+		return () => window.clearTimeout(timer);
+	}, [
+		sessionId,
+		authLoading,
+		loading,
+		hasAccess,
+		attempts
+	]);
+	const activated = hasAccess || verified;
+	(0, import_react.useEffect)(() => {
+		if (!activated) return;
+		const timer = window.setTimeout(() => navigate({
+			to: "/dashboard",
+			replace: true
+		}), 1600);
+		return () => window.clearTimeout(timer);
+	}, [activated, navigate]);
+	const handleRetry = (0, import_react.useCallback)(() => {
+		setAttempts(0);
+		setExhausted(false);
+		setVerifyError(null);
+		setRetryToken((t) => t + 1);
+		refreshRef.current();
+	}, []);
+	const planLabel = getPlan(subscription?.plan_id ?? verifiedPlan)?.name ?? null;
+	const noSession = !authLoading && !session?.user.id;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40",
+		children: activated ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-500",
+				children: "ΕΝΕΡΓΟΠΟΙΗΘΗΚΕ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: "Καλώς όρισες στην AURA."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-4 text-sm leading-relaxed text-neutral-400",
+				children: [
+					"Η συνδρομή σου είναι ενεργή",
+					planLabel ? ` (${planLabel})` : "",
+					". Σε μεταφέρουμε στο dashboard…"
+				]
+			})
+		] }) : !activated && (noSession || exhausted || !sessionId && attempts >= MAX_ATTEMPTS) ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: "ΣΕ ΕΚΚΡΕΜΟΤΗΤΑ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: noSession ? "Χρειάζεται σύνδεση" : "Η επιβεβαίωση καθυστερεί"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 text-sm leading-relaxed text-neutral-400",
+				children: noSession ? "Για να ενεργοποιηθεί η συνδρομή πρέπει να είσαι συνδεδεμένος με τον λογαριασμό που έκανε την πληρωμή." : "Η πληρωμή μπορεί να ολοκληρώθηκε αλλά η ενεργοποίηση δεν έχει καταγραφεί ακόμη. Δοκίμασε ανανέωση σε λίγο — αν συνεχίσει, στείλε μας μήνυμα και το ελέγχουμε άμεσα."
+			}),
+			verifyError ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 text-sm leading-relaxed text-red-400",
+				role: "alert",
+				children: verifyError
+			}) : null,
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center",
+				children: [noSession ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/login",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						children: "ΣΥΝΔΕΣΗ"
+					})
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+					type: "button",
+					onClick: handleRetry,
+					children: "ΕΛΕΓΞΕ ΞΑΝΑ"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/contact",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						variant: "secondary",
+						children: "ΕΠΙΚΟΙΝΩΝΙΑ"
+					})
+				})]
+			})
+		] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: "ΕΠΙΒΕΒΑΙΩΣΗ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: "Ενεργοποιούμε την πρόσβασή σου… Κάνε refresh για είσοδο στην ακαδημία."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mx-auto mt-10 h-px w-56 overflow-hidden bg-white/10",
+				role: "progressbar",
+				"aria-label": "Επιβεβαίωση πληρωμής",
+				"aria-valuemin": 0,
+				"aria-valuemax": MAX_ATTEMPTS,
+				"aria-valuenow": attempts,
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "block h-full bg-white/70 transition-all duration-500",
+					style: { width: `${Math.min(100, attempts / MAX_ATTEMPTS * 100)}%` }
+				})
+			})
+		] })
+	});
+}
+//#endregion
+export { CheckoutReturnPage as component };
+
+=== END FILE ===
+

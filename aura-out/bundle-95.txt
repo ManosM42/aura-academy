@@ -1,0 +1,1294 @@
+=== FILE: .output/server/_ssr/admin.courses._courseId-DlZlKrZz.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { y as getMyProfile } from "./queries-DCA4yifx.mjs";
+import { r as isContentRole } from "./roles-DmnR1ATT.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { t as Route } from "./admin.courses._courseId-3Hpuw3T8.mjs";
+import { _ as updateCourse, a as clearCourseVideo, c as getCourseForEdit, g as setCourseVideo, s as deleteCourse } from "./courses-A6CEttdz.mjs";
+import { t as VideoEntryForm } from "./VideoEntryForm-DlDeTruc.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/admin.courses._courseId-DlZlKrZz.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function EditCoursePage() {
+	const { courseId } = Route.useParams();
+	const navigate = useNavigate();
+	const [reloadToken, setReloadToken] = (0, import_react.useState)(0);
+	const load = (0, import_react.useCallback)(async () => {
+		const profile = await getMyProfile();
+		if (!isContentRole(profile.role)) throw new Error("Η επεξεργασία video απαιτεί ρόλο content manager και πάνω.");
+		return getCourseForEdit(courseId);
+	}, [courseId]);
+	const { data, error, loading } = useAsync(load, [courseId, reloadToken]);
+	const [saving, setSaving] = (0, import_react.useState)(false);
+	const [saveError, setSaveError] = (0, import_react.useState)(null);
+	const [notice, setNotice] = (0, import_react.useState)(null);
+	const handleSave = (0, import_react.useCallback)(async (input) => {
+		if (!data) return;
+		setSaving(true);
+		setSaveError(null);
+		setNotice(null);
+		try {
+			await updateCourse(courseId, input, data.course.slug, data.course.status);
+			setNotice("Αποθηκεύτηκε.");
+			setReloadToken((n) => n + 1);
+		} catch (err) {
+			setSaveError(err instanceof Error ? err.message : "Η αποθήκευση απέτυχε.");
+		} finally {
+			setSaving(false);
+		}
+	}, [courseId, data]);
+	const handleVideoUploaded = (0, import_react.useCallback)(async (path, durationSeconds, meta) => {
+		setSaveError(null);
+		try {
+			await setCourseVideo(courseId, {
+				path,
+				durationSeconds,
+				storageProvider: meta.storageProvider,
+				sizeBytes: meta.sizeBytes,
+				mimeType: meta.mimeType,
+				originalFilename: meta.originalFilename,
+				uploadedAt: meta.uploadedAt
+			});
+			setNotice("Το βίντεο αποθηκεύτηκε.");
+			setReloadToken((n) => n + 1);
+		} catch (err) {
+			setSaveError(err instanceof Error ? err.message : "Η αποθήκευση του βίντεο απέτυχε.");
+		}
+	}, [courseId]);
+	const handleVideoCleared = (0, import_react.useCallback)(async () => {
+		setSaveError(null);
+		try {
+			await clearCourseVideo(courseId);
+			setReloadToken((n) => n + 1);
+		} catch (err) {
+			setSaveError(err instanceof Error ? err.message : "Η διαγραφή του βίντεο απέτυχε.");
+		}
+	}, [courseId]);
+	const handleDelete = (0, import_react.useCallback)(async () => {
+		if (typeof window !== "undefined") {
+			if (!window.confirm("Το video θα διαγραφεί οριστικά. Συνέχεια;")) return;
+		}
+		setSaving(true);
+		setSaveError(null);
+		try {
+			await deleteCourse(courseId);
+			await navigate({
+				to: "/admin/courses",
+				replace: true
+			});
+		} catch (err) {
+			setSaveError(err instanceof Error ? err.message : "Η διαγραφή απέτυχε.");
+			setSaving(false);
+		}
+	}, [courseId, navigate]);
+	if (loading) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-3xl px-5 pb-28 pt-32",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-8 w-56 animate-pulse rounded bg-white/10" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-10 h-64 animate-pulse rounded-2xl bg-white/[0.04]" })]
+	});
+	if (error || !data) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-lg px-5 pb-28 pt-32 text-center",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "text-2xl font-semibold text-neutral-100",
+				children: "Δεν φορτώθηκε"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 text-sm text-red-400",
+				role: "alert",
+				children: error instanceof Error ? error.message : "Άγνωστο σφάλμα."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/admin/courses",
+				className: "mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200",
+				children: "← VIDEOS"
+			})
+		]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-3xl px-5 pb-28 pt-28 sm:pt-32",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/admin/courses",
+				className: "text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200",
+				children: "← VIDEOS"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-3 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: data.course.title
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-2 text-[10px] uppercase tracking-[0.3em] text-neutral-500",
+				children: ["/courses/", data.course.slug]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-12",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VideoEntryForm, {
+					course: data.course,
+					saving,
+					error: saveError,
+					notice,
+					onSave: handleSave,
+					onDelete: handleDelete,
+					onVideoUploaded: handleVideoUploaded,
+					onVideoCleared: handleVideoCleared,
+					videoPath: data.course.video_path,
+					courseId: data.course.id
+				}, `${data.course.id}-${reloadToken}`)
+			})
+		]
+	});
+}
+//#endregion
+export { EditCoursePage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/admin.courses.new-Ete_Eg0y.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { y as getMyProfile } from "./queries-DCA4yifx.mjs";
+import { r as isContentRole } from "./roles-DmnR1ATT.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { g as setCourseVideo, o as createCourse } from "./courses-A6CEttdz.mjs";
+import { t as VideoEntryForm } from "./VideoEntryForm-DlDeTruc.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/admin.courses.new-Ete_Eg0y.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function NewCoursePage() {
+	const navigate = useNavigate();
+	const { data: profile, error: profileError, loading } = useAsync(getMyProfile, []);
+	const [saving, setSaving] = (0, import_react.useState)(false);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [createdId, setCreatedId] = (0, import_react.useState)(null);
+	const [videoPath, setVideoPath] = (0, import_react.useState)(null);
+	const handleSave = (0, import_react.useCallback)(async (input) => {
+		setSaving(true);
+		setError(null);
+		try {
+			const course = await createCourse(input);
+			setCreatedId(course.id);
+			setSaving(false);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Η αποθήκευση απέτυχε.");
+			setSaving(false);
+		}
+	}, []);
+	const handleVideoUploaded = (0, import_react.useCallback)(async (path, durationSeconds, meta) => {
+		setVideoPath(path);
+		if (!createdId) return;
+		try {
+			await setCourseVideo(createdId, {
+				path,
+				durationSeconds,
+				storageProvider: meta.storageProvider,
+				sizeBytes: meta.sizeBytes,
+				mimeType: meta.mimeType,
+				originalFilename: meta.originalFilename,
+				uploadedAt: meta.uploadedAt
+			});
+			await navigate({
+				to: "/admin/courses/$courseId",
+				params: { courseId: createdId },
+				replace: true
+			});
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Η αποθήκευση του βίντεο απέτυχε.");
+		}
+	}, [createdId, navigate]);
+	if (loading) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto max-w-3xl px-5 pb-28 pt-32",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-8 w-56 animate-pulse rounded bg-white/10" })
+	});
+	if (profileError || !profile || !isContentRole(profile.role)) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-lg px-5 pb-28 pt-32 text-center",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "text-2xl font-semibold text-neutral-100",
+				children: "Χωρίς πρόσβαση"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 text-sm text-neutral-400",
+				children: "Η δημιουργία video απαιτεί ρόλο content manager και πάνω."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/dashboard",
+				className: "mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200",
+				children: "← DASHBOARD"
+			})
+		]
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-3xl px-5 pb-28 pt-28 sm:pt-32",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/admin/courses",
+				className: "text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200",
+				children: "← VIDEOS"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-3 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: "Νέο video"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-12",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(VideoEntryForm, {
+					course: null,
+					saving,
+					error,
+					notice: createdId && !videoPath ? "Το video δημιουργήθηκε — ανέβασε τώρα το αρχείο βίντεο." : null,
+					onSave: handleSave,
+					onVideoUploaded: handleVideoUploaded,
+					onVideoCleared: () => setVideoPath(null),
+					videoPath,
+					courseId: createdId
+				})
+			})
+		]
+	});
+}
+//#endregion
+export { NewCoursePage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/aura-BExz5ChF.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/aura-BExz5ChF.js
+var aura_default = "/assets/aura-CtJu3i2Z.jpg";
+//#endregion
+export { aura_default as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/AuraMark-Bx5oMvbX.mjs ===
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as aura_default } from "./aura-BExz5ChF.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/AuraMark-Bx5oMvbX.js
+var import_jsx_runtime = require_jsx_runtime();
+var SIZE_CLASS = {
+	sm: "aura-mark-sm",
+	md: "",
+	lg: "aura-mark-lg"
+};
+/**
+* The AURA emblem: the brand image (aura.JPG) framed in a chrome disc with a
+* slow metallic light sweep. Used everywhere the mark appears EXCEPT the
+* navbars, which use logo.jpg directly.
+*/
+function AuraMark({ size = "md", className = "" }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		className: `aura-mark ${SIZE_CLASS[size]} ${className}`,
+		role: "img",
+		"aria-label": "AURA",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+			src: aura_default,
+			alt: "",
+			className: "aura-mark-img",
+			draggable: false
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "aura-mark-sweep",
+			"aria-hidden": true
+		})]
+	});
+}
+//#endregion
+export { AuraMark as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/auth.callback-Zz2bFf7m.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { r as isPlanId } from "./plans-sHsWJraA.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/auth.callback-Zz2bFf7m.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var LANGS = ["el", "en"];
+var STORAGE_KEY = "aura.lang";
+function isLang(value) {
+	return typeof value === "string" && LANGS.includes(value);
+}
+var DICTIONARIES = {
+	el: {
+		"nav.mainNav": "Κύρια πλοήγηση",
+		"nav.home": "AURA — Αρχική",
+		"nav.menu": "Μενού",
+		"nav.openMenu": "Άνοιγμα μενού",
+		"nav.closeMenu": "Κλείσιμο μενού",
+		"nav.language": "Γλώσσα",
+		"nav.about": "ΕΜΕΙΣ",
+		"nav.contact": "ΕΠΙΚΟΙΝΩΝΙΑ",
+		"nav.method": "ΜΕΘΟΔΟΣ",
+		"nav.prices": "ΤΙΜΕΣ",
+		"nav.dashboard": "Dashboard",
+		"nav.academy": "Ακαδημία",
+		"nav.courses": "Courses",
+		"nav.skills": "Δεξιότητες",
+		"nav.reviewQueue": "Ουρά αξιολόγησης",
+		"nav.adminPanel": "Πάνελ Admin",
+		"nav.inbox": "Μηνύματα",
+		"nav.start": "ΞΕΚΙΝΑ",
+		"nav.startNow": "ΞΕΚΙΝΑ ΤΩΡΑ",
+		"nav.signIn": "Σύνδεση",
+		"nav.signOut": "Αποσύνδεση",
+		"nav.myProfile": "Το προφίλ μου",
+		"nav.viewProfile": "Προβολή προφίλ",
+		"nav.tagline": "AURA — HAIR METHOD",
+		"auth.finishingTitle": "Ολοκληρώνουμε τη σύνδεση…",
+		"auth.finishingKicker": "ΣΥΝΔΕΣΗ",
+		"auth.timeoutKicker": "ΚΑΘΥΣΤΕΡΗΣΗ",
+		"auth.timeoutTitle": "Η σύνδεση δεν ολοκληρώθηκε",
+		"auth.timeoutBody": "Δεν καταφέραμε να επιβεβαιώσουμε τη σύνδεσή σου. Δοκίμασε ξανά από τη σελίδα σύνδεσης.",
+		"auth.errorKicker": "ΣΦΑΛΜΑ",
+		"auth.errorTitle": "Η σύνδεση απέτυχε",
+		"auth.backToLogin": "ΠΙΣΩ ΣΤΗ ΣΥΝΔΕΣΗ",
+		"auth.goHome": "Αρχική"
+	},
+	en: {
+		"nav.mainNav": "Main navigation",
+		"nav.home": "AURA — Home",
+		"nav.menu": "Menu",
+		"nav.openMenu": "Open menu",
+		"nav.closeMenu": "Close menu",
+		"nav.language": "Language",
+		"nav.about": "ABOUT US",
+		"nav.contact": "CONTACT",
+		"nav.method": "METHOD",
+		"nav.prices": "PRICES",
+		"nav.dashboard": "Dashboard",
+		"nav.academy": "Academy",
+		"nav.courses": "Courses",
+		"nav.skills": "Skills",
+		"nav.reviewQueue": "Review Queue",
+		"nav.adminPanel": "Admin Panel",
+		"nav.inbox": "Inbox",
+		"nav.start": "START",
+		"nav.startNow": "START NOW",
+		"nav.signIn": "Sign in",
+		"nav.signOut": "Sign out",
+		"nav.myProfile": "My profile",
+		"nav.viewProfile": "View profile",
+		"nav.tagline": "AURA — HAIR METHOD",
+		"auth.finishingTitle": "Finishing your sign-in…",
+		"auth.finishingKicker": "SIGNING IN",
+		"auth.timeoutKicker": "TAKING TOO LONG",
+		"auth.timeoutTitle": "Sign-in did not complete",
+		"auth.timeoutBody": "We could not confirm your session. Please try again from the login page.",
+		"auth.errorKicker": "ERROR",
+		"auth.errorTitle": "Sign-in failed",
+		"auth.backToLogin": "BACK TO LOGIN",
+		"auth.goHome": "Home"
+	}
+};
+var I18nContext = (0, import_react.createContext)(null);
+function readStoredLang() {
+	try {
+		const stored = window.localStorage.getItem(STORAGE_KEY);
+		return isLang(stored) ? stored : null;
+	} catch {
+		return null;
+	}
+}
+function detectBrowserLang() {
+	const candidates = navigator.languages?.length ? navigator.languages : [navigator.language];
+	for (const value of candidates) {
+		if (typeof value !== "string") continue;
+		const base = value.slice(0, 2).toLowerCase();
+		if (base === "el") return "el";
+		if (base === "en") return "en";
+	}
+	return "el";
+}
+function I18nProvider({ children }) {
+	const [lang, setLangState] = (0, import_react.useState)("el");
+	(0, import_react.useEffect)(() => {
+		const next = readStoredLang() ?? detectBrowserLang();
+		if (next !== "el") setLangState(next);
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (typeof document !== "undefined") document.documentElement.lang = lang;
+	}, [lang]);
+	const setLang = (0, import_react.useCallback)((next) => {
+		setLangState(next);
+		try {
+			window.localStorage.setItem(STORAGE_KEY, next);
+		} catch {}
+	}, []);
+	const t = (0, import_react.useCallback)((key, vars) => {
+		const template = DICTIONARIES[lang][key] ?? DICTIONARIES["el"][key] ?? key;
+		if (!vars) return template;
+		return template.replace(/\{(\w+)\}/g, (match, name) => {
+			const value = vars[name];
+			return value === void 0 ? match : String(value);
+		});
+	}, [lang]);
+	const value = (0, import_react.useMemo)(() => ({
+		lang,
+		setLang,
+		t
+	}), [
+		lang,
+		setLang,
+		t
+	]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(I18nContext.Provider, {
+		value,
+		children
+	});
+}
+function useI18n() {
+	const ctx = (0, import_react.useContext)(I18nContext);
+	if (!ctx) throw new Error("useI18n must be used inside <I18nProvider>.");
+	return ctx;
+}
+var $$splitComponentImporter = () => import("./auth.callback-ZUUfT7wT.mjs");
+var Route = createFileRoute("/auth/callback")({
+	validateSearch: (search) => ({
+		...search,
+		plan: isPlanId(search["plan"]) ? search["plan"] : void 0
+	}),
+	head: () => ({ meta: [{ title: "AURA — Sign in" }] }),
+	component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+//#endregion
+export { Route as n, useI18n as r, I18nProvider as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/book-B5U9vdLJ.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/book-B5U9vdLJ.js
+var book_default = "/assets/book-yOoDu1sO.png";
+//#endregion
+export { book_default as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/ChromeCursor-BJgZMGhf.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/ChromeCursor-BJgZMGhf.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+/**
+* A barely-visible grayscale radial light that follows the pointer,
+* evoking reflected light on polished metal. Not an RGB gaming glow.
+* Disabled on touch devices and when reduced motion is preferred.
+*/
+function ChromeCursor() {
+	const ref = (0, import_react.useRef)(null);
+	(0, import_react.useEffect)(() => {
+		const el = ref.current;
+		if (!el) return;
+		const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+		const coarse = window.matchMedia("(pointer: coarse)").matches;
+		if (reduced || coarse) return;
+		let raf = 0;
+		let x = window.innerWidth / 2;
+		let y = window.innerHeight / 2;
+		const render = () => {
+			el.style.transform = `translate3d(${x - 300}px, ${y - 300}px, 0)`;
+			raf = requestAnimationFrame(render);
+		};
+		const onMove = (e) => {
+			x = e.clientX;
+			y = e.clientY;
+		};
+		window.addEventListener("pointermove", onMove, { passive: true });
+		raf = requestAnimationFrame(render);
+		return () => {
+			window.removeEventListener("pointermove", onMove);
+			cancelAnimationFrame(raf);
+		};
+	}, []);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		ref,
+		"aria-hidden": "true",
+		className: "pointer-events-none fixed left-0 top-0 z-[2] h-[600px] w-[600px] rounded-full",
+		style: { background: "radial-gradient(circle, rgba(255,255,255,0.045) 0%, rgba(191,192,194,0.02) 35%, transparent 62%)" }
+	});
+}
+//#endregion
+export { ChromeCursor as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/client-DO3FmCD9.mjs ===
+import { t as createClient } from "../_libs/supabase__supabase-js.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/client-DO3FmCD9.js
+function brokeredPreviewStorage() {
+	if (typeof window === "undefined") return void 0;
+	const host = location.hostname;
+	const projectId = [
+		"lovableproject.com",
+		"lovableproject-dev.com",
+		"lovable.app",
+		"gpt-eng.com",
+		"gptengineer.run"
+	].some((z) => host === z || host.endsWith("." + z)) ? host.match(/* @__PURE__ */ new RegExp("^(?:id-preview(?:-[a-z0-9]+)?|project)--([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?:-dev)?(?=\\.|$)", "i"))?.[1] ?? host.match(/* @__PURE__ */ new RegExp("^([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})(?=[.-])", "i"))?.[1] : void 0;
+	const framed = window.parent && window.parent !== window;
+	if (!projectId || !framed) return localStorage;
+	const dev = host.endsWith(".lovableproject-dev.com") || host.endsWith(".gpt-eng.com");
+	const EDITOR = dev ? /^https:\/\/([a-z0-9-]+\.)*(lovable\.dev|gptengineer\.app)$|^http:\/\/localhost:3000$/ : /^https:\/\/([a-z0-9-]+\.)*(lovable\.dev|gptengineer\.app)$/;
+	const ancestor = location.ancestorOrigins && location.ancestorOrigins[0] || (document.referrer ? new URL(document.referrer).origin : "");
+	const editorOrigins = ancestor && EDITOR.test(ancestor) ? [ancestor] : dev ? ["https://lovable.dev", "http://localhost:3000"] : ["https://lovable.dev"];
+	const RESULT = "lovable-preview-auth:result";
+	const TIMEOUT = 2e3;
+	const newId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+	const request = (type, key, value) => new Promise((resolve) => {
+		const requestId = newId();
+		let done = false;
+		let timer;
+		const finish = (r) => {
+			if (done) return;
+			done = true;
+			clearTimeout(timer);
+			window.removeEventListener("message", onMessage);
+			resolve(r);
+		};
+		const onMessage = (e) => {
+			if (editorOrigins.indexOf(e.origin) < 0) return;
+			const d = e.data;
+			if (d && d.type === RESULT && d.requestId === requestId) finish(d);
+		};
+		window.addEventListener("message", onMessage);
+		const msg = {
+			type,
+			requestId,
+			projectId,
+			key
+		};
+		if (value !== void 0) msg["value"] = value;
+		for (const origin of editorOrigins) window.parent.postMessage(msg, origin);
+		timer = setTimeout(() => finish(null), TIMEOUT);
+	});
+	let firstGet = true;
+	const RETRY_DELAY = 250;
+	return {
+		getItem: async (key) => {
+			let res = await request("lovable-preview-auth:get", key);
+			if (!res && firstGet) {
+				await new Promise((r) => setTimeout(r, RETRY_DELAY));
+				res = await request("lovable-preview-auth:get", key);
+			}
+			firstGet = false;
+			if (res && res.ok && typeof res.value === "string") {
+				if (res.value === "") {
+					localStorage.removeItem(key);
+					return null;
+				}
+				return res.value;
+			}
+			return localStorage.getItem(key);
+		},
+		setItem: (key, value) => {
+			localStorage.setItem(key, value);
+			return request("lovable-preview-auth:set", key, value).then(() => void 0);
+		},
+		removeItem: (key) => {
+			localStorage.removeItem(key);
+			return request("lovable-preview-auth:remove", key).then(() => void 0);
+		}
+	};
+}
+function isNewSupabaseApiKey(value) {
+	return value.startsWith("sb_publishable_") || value.startsWith("sb_secret_");
+}
+function createSupabaseFetch(supabaseKey) {
+	return (input, init) => {
+		const headers = new Headers(typeof Request !== "undefined" && input instanceof Request ? input.headers : void 0);
+		if (init?.headers) new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+		if (isNewSupabaseApiKey(supabaseKey) && headers.get("Authorization") === `Bearer ${supabaseKey}`) headers.delete("Authorization");
+		headers.set("apikey", supabaseKey);
+		return fetch(input, {
+			...init,
+			headers
+		});
+	};
+}
+function createSupabaseClient() {
+	const SUPABASE_URL = {
+		"BASE_URL": "/",
+		"DEV": false,
+		"MODE": "production",
+		"PROD": true,
+		"SSR": true,
+		"TSS_DEV_SERVER": "false",
+		"TSS_DEV_SSR_STYLES_BASEPATH": "/",
+		"TSS_DEV_SSR_STYLES_ENABLED": "true",
+		"TSS_DISABLE_CSRF_MIDDLEWARE_WARNING": "false",
+		"TSS_INLINE_CSS_ENABLED": "false",
+		"TSS_ROUTER_BASEPATH": "",
+		"TSS_SERVER_FN_BASE": "/_serverFn/",
+		"VITE_SITE_URL": "https://theauramethod.site",
+		"VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd",
+		"VITE_SUPABASE_ANON_KEY": "[REDACTED_JWT]",
+		"VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_L9Swjao34Gznj1IT7lLPuA_cCWSetH5",
+		"VITE_SUPABASE_URL": "https://kvnpixezrebxuvgbznqr.supabase.co",
+		"VITE_TURNSTILE_SITE_KEY": "0x4AAAAAAFuQC8D2OUlnvZo3"
+	}["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"];
+	const SUPABASE_PUBLISHABLE_KEY = {
+		"BASE_URL": "/",
+		"DEV": false,
+		"MODE": "production",
+		"PROD": true,
+		"SSR": true,
+		"TSS_DEV_SERVER": "false",
+		"TSS_DEV_SSR_STYLES_BASEPATH": "/",
+		"TSS_DEV_SSR_STYLES_ENABLED": "true",
+		"TSS_DISABLE_CSRF_MIDDLEWARE_WARNING": "false",
+		"TSS_INLINE_CSS_ENABLED": "false",
+		"TSS_ROUTER_BASEPATH": "",
+		"TSS_SERVER_FN_BASE": "/_serverFn/",
+		"VITE_SITE_URL": "https://theauramethod.site",
+		"VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd",
+		"VITE_SUPABASE_ANON_KEY": "[REDACTED_JWT]",
+		"VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_L9Swjao34Gznj1IT7lLPuA_cCWSetH5",
+		"VITE_SUPABASE_URL": "https://kvnpixezrebxuvgbznqr.supabase.co",
+		"VITE_TURNSTILE_SITE_KEY": "0x4AAAAAAFuQC8D2OUlnvZo3"
+	}["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+	if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+		const message = `Missing Supabase environment variable(s): ${[...!SUPABASE_URL ? ["SUPABASE_URL"] : [], ...!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []].join(", ")}. Connect Supabase in Lovable Cloud.`;
+		console.error(`[Supabase] ${message}`);
+		throw new Error(message);
+	}
+	return createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+		global: { fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY) },
+		auth: {
+			storage: brokeredPreviewStorage(),
+			persistSession: true,
+			autoRefreshToken: true
+		}
+	});
+}
+var _supabase;
+var supabase = new Proxy({}, { get(_, prop, receiver) {
+	if (!_supabase) _supabase = createSupabaseClient();
+	return Reflect.get(_supabase, prop, receiver);
+} });
+//#endregion
+export { supabase as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/cookie-policy-BSXrH-Z4.mjs ===
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/cookie-policy-BSXrH-Z4.js
+var import_jsx_runtime = require_jsx_runtime();
+function CookiePolicyPage() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto max-w-3xl px-5 pb-24 pt-32 sm:px-8",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[10px] font-extralight uppercase tracking-[0.4em] text-neutral-500",
+				children: "Νομικά"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-3 text-2xl font-extralight tracking-wide text-neutral-100 sm:text-3xl",
+				children: "Πολιτική Cookies"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-8 space-y-8 text-sm font-extralight leading-relaxed text-neutral-300",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-xs font-normal uppercase tracking-[0.3em] text-neutral-100",
+						children: "Τι είναι τα cookies"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3",
+						children: "Τα cookies είναι μικρά αρχεία κειμένου που αποθηκεύονται στη συσκευή σας όταν επισκέπτεστε έναν ιστότοπο, ώστε να θυμάται τις προτιμήσεις σας και να λειτουργεί σωστά."
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-xs font-normal uppercase tracking-[0.3em] text-neutral-100",
+						children: "Απολύτως απαραίτητα cookies"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3",
+						children: "Είναι απαραίτητα για τη λειτουργία της πλατφόρμας AURA και δεν μπορούν να απενεργοποιηθούν — π.χ. cookies σύνδεσης/ταυτοποίησης χρήστη και το cookie που θυμάται την επιλογή σας για αποδοχή ή απόρριψη cookies."
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-xs font-normal uppercase tracking-[0.3em] text-neutral-100",
+						children: "Λειτουργικά cookies"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3",
+						children: "Χρησιμοποιούνται π.χ. για την απομνημόνευση της γλώσσας που έχετε επιλέξει μέσω του εργαλείου μετάφρασης σελίδας."
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-xs font-normal uppercase tracking-[0.3em] text-neutral-100",
+						children: "Cookies στατιστικών"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3",
+						children: "Εφόσον τα αποδεχτείτε, ενδέχεται να χρησιμοποιηθούν για την κατανόηση του τρόπου χρήσης της πλατφόρμας. Με «Απόρριψη», αυτά δεν ενεργοποιούνται."
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "text-xs font-normal uppercase tracking-[0.3em] text-neutral-100",
+						children: "Αλλαγή της επιλογής σας"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3",
+						children: "Διαγράφοντας τα cookies του browser για αυτόν τον ιστότοπο, η καρτέλα επιλογής θα εμφανιστεί ξανά."
+					})] })
+				]
+			})
+		]
+	});
+}
+//#endregion
+export { CookiePolicyPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/courses._slug-C8Clr1O_.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/courses._slug-C8Clr1O_.js
+var $$splitComponentImporter = () => import("./courses._slug-CD77Lteh.mjs");
+var Route = createFileRoute("/courses/$slug")({
+	head: () => ({ meta: [{ title: "AURA — Video" }] }),
+	component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/createCsrfMiddleware-B2To0gPJ.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/createCsrfMiddleware-B2To0gPJ.js
+var createMiddleware = (options, __opts) => {
+	const resolvedOptions = {
+		type: "request",
+		...__opts || options
+	};
+	const setValidator = (validator) => {
+		return createMiddleware({}, Object.assign(resolvedOptions, {
+			validator,
+			inputValidator: validator
+		}));
+	};
+	return {
+		options: resolvedOptions,
+		middleware: (middleware) => {
+			return createMiddleware({}, Object.assign(resolvedOptions, { middleware }));
+		},
+		validator: setValidator,
+		inputValidator: setValidator,
+		client: (client) => {
+			return createMiddleware({}, Object.assign(resolvedOptions, { client }));
+		},
+		server: (server) => {
+			return createMiddleware({}, Object.assign(resolvedOptions, { server }));
+		}
+	};
+};
+var innerCreateCsrfMiddleware = (opts = {}) => {
+	return createMiddleware().server(async (ctx) => {
+		const csrfCtx = ctx;
+		if (opts.filter && !await opts.filter(csrfCtx)) return ctx.next();
+		if (await isCsrfRequestAllowed(opts, csrfCtx)) return ctx.next();
+		return getFailureResponse(opts, csrfCtx);
+	});
+};
+var createCsrfMiddleware = innerCreateCsrfMiddleware;
+async function isCsrfRequestAllowed(opts, ctx) {
+	const result = await getCsrfRequestValidationResult(opts, ctx);
+	return result === true || result === void 0 && opts.allowRequestsWithoutOriginCheck === true;
+}
+async function getCsrfRequestValidationResult(opts, ctx) {
+	const fetchSite = ctx.request.headers.get("Sec-Fetch-Site");
+	if (fetchSite !== null) return matchValue(opts.secFetchSite ?? "same-origin", fetchSite, ctx);
+	const origin = ctx.request.headers.get("Origin");
+	if (origin !== null) {
+		if (opts.origin) return matchValue(opts.origin, origin, ctx);
+		return origin === new URL(ctx.request.url).origin;
+	}
+	const referer = ctx.request.headers.get("Referer");
+	if (referer === null || opts.referer === false) return;
+	if (typeof opts.referer === "function") return opts.referer(referer, ctx);
+	if (opts.origin) {
+		const refererOrigin = getOriginFromUrl(referer);
+		return refererOrigin !== void 0 && matchValue(opts.origin, refererOrigin, ctx);
+	}
+	return isRefererSameOrigin(referer, new URL(ctx.request.url).origin);
+}
+async function matchValue(matcher, value, ctx) {
+	if (typeof matcher === "function") return matcher(value, ctx);
+	if (Array.isArray(matcher)) return matcher.includes(value);
+	return value === matcher;
+}
+function getOriginFromUrl(url) {
+	try {
+		return new URL(url).origin;
+	} catch {
+		return;
+	}
+}
+function isRefererSameOrigin(referer, requestOrigin) {
+	if (referer === requestOrigin) return true;
+	if (!referer.startsWith(requestOrigin)) return false;
+	if (referer.length === requestOrigin.length) return true;
+	const code = referer.charCodeAt(requestOrigin.length);
+	return code === 47 || code === 63 || code === 35;
+}
+async function getFailureResponse(opts, ctx) {
+	if (typeof opts.failureResponse === "function") return opts.failureResponse(ctx);
+	return opts.failureResponse?.clone() ?? new Response("Forbidden", { status: 403 });
+}
+//#endregion
+export { createMiddleware as n, createCsrfMiddleware as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/db-BETNILr1.mjs ===
+import { t as supabase } from "./client-DO3FmCD9.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/db-BETNILr1.js
+/**
+* The generated Database type comes from the previous Supabase project and may
+* not describe the AURA tables. We access those tables through a non-generic
+* client so the app compiles regardless, and type the *results* ourselves below.
+* (Runtime behaviour is identical — this only relaxes compile-time table names.)
+*/
+var db = supabase;
+//#endregion
+export { db as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/developer-BEywxc1M.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/developer-BEywxc1M.js
+var founder_default = "/assets/founder-BOjw_skh.jpg";
+var cofounder_default = "/assets/cofounder-Ca4r51v2.jpg";
+var developer_default = "/assets/developer-DDzBeS5w.jpg";
+//#endregion
+export { developer_default as n, founder_default as r, cofounder_default as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/empty-plugin-adapters-D9UWiqvJ.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/empty-plugin-adapters-D9UWiqvJ.js
+var pluginSerializationAdapters = [];
+var hasPluginAdapters = false;
+//#endregion
+export { hasPluginAdapters, pluginSerializationAdapters };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/gallery-B93qOO1b.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/gallery-B93qOO1b.js
+var p1_default$2 = "/assets/p1-CuASdWto.jpg";
+var p1_default$1 = "/assets/p1-Dfkg2gey.webp";
+var p10_default$1 = "/assets/p10-BTbe5U6i.webp";
+var p11_default$1 = "/assets/p11-BNyMRJFH.webp";
+var p12_default$1 = "/assets/p12-B2hr7co2.webp";
+var p13_default$1 = "/assets/p13-rdXs4SxX.webp";
+var p14_default$1 = "/assets/p14-BqgQc517.webp";
+var p15_default$1 = "/assets/p15-B8EnvdRF.webp";
+var p16_default$1 = "/assets/p16-CugGudcG.webp";
+var p17_default$1 = "/assets/p17-BLtCiSPP.webp";
+var p18_default$1 = "/assets/p18-Bl-wdZwf.webp";
+var p19_default$1 = "/assets/p19-DcmXDsSS.webp";
+var p2_default$2 = "/assets/p2-B50SlM7Q.webp";
+var p20_default$1 = "/assets/p20-DOWsGXAV.webp";
+var p21_default$1 = "/assets/p21-Aca6Y_5y.webp";
+var p22_default$1 = "/assets/p22-BvRFE_9Y.webp";
+var p23_default$1 = "/assets/p23-DBmPt2lk.webp";
+var p24_default$1 = "/assets/p24-CtdHCI96.webp";
+var p25_default$1 = "/assets/p25-CiIKAido.webp";
+var p26_default$1 = "/assets/p26-8vN_vTKD.webp";
+var p27_default$1 = "/assets/p27-AvkUMYKv.webp";
+var p28_default$1 = "/assets/p28-BdiN2J2C.webp";
+var p29_default$1 = "/assets/p29-DJ930M1h.webp";
+var p3_default$2 = "/assets/p3-CB_KgZkr.webp";
+var p30_default$1 = "/assets/p30-DpbLJVPm.webp";
+var p31_default$1 = "/assets/p31-xo04UaV0.webp";
+var p4_default$2 = "/assets/p4-jdMdyCuP.webp";
+var p5_default$2 = "/assets/p5-BjY4Jfcn.webp";
+var p6_default$2 = "/assets/p6-BO3ser_C.webp";
+var p7_default$2 = "/assets/p7-BZlZaIP0.webp";
+var p8_default$2 = "/assets/p8-cB675F2f.webp";
+var p9_default$1 = "/assets/p9-CMOgFHiX.webp";
+var p1_default = "/assets/p1-DxfqM1q8.webp";
+var p10_default = "/assets/p10-ct-OJJx2.webp";
+var p11_default = "/assets/p11-Bhl4Ttju.webp";
+var p12_default = "/assets/p12-C7JqYkYQ.webp";
+var p13_default = "/assets/p13-DwC5xpsl.webp";
+var p14_default = "/assets/p14-AvNLelO3.webp";
+var p15_default = "/assets/p15-Nh1sGefC.webp";
+var p16_default = "/assets/p16-B_4NP8hN.webp";
+var p17_default = "/assets/p17-BCBA4Tuv.webp";
+var p18_default = "/assets/p18-DeBPEMMK.webp";
+var p19_default = "/assets/p19-CQBqRCiW.webp";
+var p2_default$1 = "/assets/p2-BaZX45ej.webp";
+var p20_default = "/assets/p20-BrR1hrWx.webp";
+var p21_default = "/assets/p21-L3eD-xcP.webp";
+var p22_default = "/assets/p22-Bz4eavKF.webp";
+var p23_default = "/assets/p23-DFTzd9QH.webp";
+var p24_default = "/assets/p24-DIPoz_QP.webp";
+var p25_default = "/assets/p25-DtqXExwQ.webp";
+var p26_default = "/assets/p26-DEPI-mZL.webp";
+var p27_default = "/assets/p27-DBPrMm0I.webp";
+var p28_default = "/assets/p28-Dby70wL4.webp";
+var p29_default = "/assets/p29-D89Kx1XG.webp";
+var p3_default$1 = "/assets/p3-BherqmTG.webp";
+var p30_default = "/assets/p30-B0asaAQv.webp";
+var p31_default = "/assets/p31-DCFX-dDr.webp";
+var p4_default$1 = "/assets/p4-a09bsWEC.webp";
+var p5_default$1 = "/assets/p5-DZJVp3cp.webp";
+var p6_default$1 = "/assets/p6-C_8SG3oR.webp";
+var p7_default$1 = "/assets/p7-CNISI_iL.webp";
+var p8_default$1 = "/assets/p8-DwgghkDZ.webp";
+var p9_default = "/assets/p9-xkrxj3qW.webp";
+var p_default = "/assets/p-DlNFzDfP.mp4";
+var p2_default = "/assets/p2-n9pwelQO.mp4";
+var p3_default = "/assets/p3-Cak6Rrxv.mp4";
+var p4_default = "/assets/p4-BvYtXbTx.mp4";
+var p5_default = "/assets/p5-DnENrL9v.mp4";
+var p6_default = "/assets/p6-CI4R7qUV.mp4";
+var p7_default = "/assets/p7-CdVkApGO.mp4";
+var p8_default = "/assets/p8-ZQb0iD8J.mp4";
+var orig = /* #__PURE__ */ Object.assign({ "../assets/p1.jpg": p1_default$2 });
+var fulls = /* #__PURE__ */ Object.assign({
+	"../assets/gallery/full/p1.webp": p1_default$1,
+	"../assets/gallery/full/p10.webp": p10_default$1,
+	"../assets/gallery/full/p11.webp": p11_default$1,
+	"../assets/gallery/full/p12.webp": p12_default$1,
+	"../assets/gallery/full/p13.webp": p13_default$1,
+	"../assets/gallery/full/p14.webp": p14_default$1,
+	"../assets/gallery/full/p15.webp": p15_default$1,
+	"../assets/gallery/full/p16.webp": p16_default$1,
+	"../assets/gallery/full/p17.webp": p17_default$1,
+	"../assets/gallery/full/p18.webp": p18_default$1,
+	"../assets/gallery/full/p19.webp": p19_default$1,
+	"../assets/gallery/full/p2.webp": p2_default$2,
+	"../assets/gallery/full/p20.webp": p20_default$1,
+	"../assets/gallery/full/p21.webp": p21_default$1,
+	"../assets/gallery/full/p22.webp": p22_default$1,
+	"../assets/gallery/full/p23.webp": p23_default$1,
+	"../assets/gallery/full/p24.webp": p24_default$1,
+	"../assets/gallery/full/p25.webp": p25_default$1,
+	"../assets/gallery/full/p26.webp": p26_default$1,
+	"../assets/gallery/full/p27.webp": p27_default$1,
+	"../assets/gallery/full/p28.webp": p28_default$1,
+	"../assets/gallery/full/p29.webp": p29_default$1,
+	"../assets/gallery/full/p3.webp": p3_default$2,
+	"../assets/gallery/full/p30.webp": p30_default$1,
+	"../assets/gallery/full/p31.webp": p31_default$1,
+	"../assets/gallery/full/p4.webp": p4_default$2,
+	"../assets/gallery/full/p5.webp": p5_default$2,
+	"../assets/gallery/full/p6.webp": p6_default$2,
+	"../assets/gallery/full/p7.webp": p7_default$2,
+	"../assets/gallery/full/p8.webp": p8_default$2,
+	"../assets/gallery/full/p9.webp": p9_default$1
+});
+var thumbs = /* #__PURE__ */ Object.assign({
+	"../assets/gallery/thumbs/p1.webp": p1_default,
+	"../assets/gallery/thumbs/p10.webp": p10_default,
+	"../assets/gallery/thumbs/p11.webp": p11_default,
+	"../assets/gallery/thumbs/p12.webp": p12_default,
+	"../assets/gallery/thumbs/p13.webp": p13_default,
+	"../assets/gallery/thumbs/p14.webp": p14_default,
+	"../assets/gallery/thumbs/p15.webp": p15_default,
+	"../assets/gallery/thumbs/p16.webp": p16_default,
+	"../assets/gallery/thumbs/p17.webp": p17_default,
+	"../assets/gallery/thumbs/p18.webp": p18_default,
+	"../assets/gallery/thumbs/p19.webp": p19_default,
+	"../assets/gallery/thumbs/p2.webp": p2_default$1,
+	"../assets/gallery/thumbs/p20.webp": p20_default,
+	"../assets/gallery/thumbs/p21.webp": p21_default,
+	"../assets/gallery/thumbs/p22.webp": p22_default,
+	"../assets/gallery/thumbs/p23.webp": p23_default,
+	"../assets/gallery/thumbs/p24.webp": p24_default,
+	"../assets/gallery/thumbs/p25.webp": p25_default,
+	"../assets/gallery/thumbs/p26.webp": p26_default,
+	"../assets/gallery/thumbs/p27.webp": p27_default,
+	"../assets/gallery/thumbs/p28.webp": p28_default,
+	"../assets/gallery/thumbs/p29.webp": p29_default,
+	"../assets/gallery/thumbs/p3.webp": p3_default$1,
+	"../assets/gallery/thumbs/p30.webp": p30_default,
+	"../assets/gallery/thumbs/p31.webp": p31_default,
+	"../assets/gallery/thumbs/p4.webp": p4_default$1,
+	"../assets/gallery/thumbs/p5.webp": p5_default$1,
+	"../assets/gallery/thumbs/p6.webp": p6_default$1,
+	"../assets/gallery/thumbs/p7.webp": p7_default$1,
+	"../assets/gallery/thumbs/p8.webp": p8_default$1,
+	"../assets/gallery/thumbs/p9.webp": p9_default
+});
+var vids = /* #__PURE__ */ Object.assign({
+	"../assets/p.mp4": p_default,
+	"../assets/p2.mp4": p2_default,
+	"../assets/p3.mp4": p3_default,
+	"../assets/p4.mp4": p4_default,
+	"../assets/p5.mp4": p5_default,
+	"../assets/p6.mp4": p6_default,
+	"../assets/p7.mp4": p7_default,
+	"../assets/p8.mp4": p8_default
+});
+var TAGLINES = [
+	"Where barbers are made.",
+	"Craft first, always.",
+	"Precision, patience, pride.",
+	"Barbering is an art.",
+	"Built in the chair.",
+	"The AURA standard.",
+	"Sharp. Clean. Confident.",
+	"Passion you can see."
+];
+var byN = /* @__PURE__ */ new Map();
+function put(mods, key) {
+	for (const [path, src] of Object.entries(mods)) {
+		const m = path.match(/\/p(\d+)\.[^./]+$/);
+		if (!m) continue;
+		const n = Number(m[1]);
+		byN.set(n, {
+			...byN.get(n),
+			[key]: src
+		});
+	}
+}
+put(orig, "orig");
+put(fulls, "full");
+put(thumbs, "thumb");
+var photos = [...byN.entries()].sort((a, b) => a[0] - b[0]).map(([n, s]) => ({
+	id: `p${n}`,
+	type: "image",
+	src: s.full ?? s.orig ?? s.thumb,
+	thumb: s.thumb ?? s.full ?? s.orig,
+	title: "",
+	no: ""
+}));
+var videos = Object.entries(vids).map(([path, src]) => {
+	const m = path.match(/\/p(\d*)\.[^./]+$/);
+	return m ? {
+		n: m[1] ? Number(m[1]) : 1,
+		src
+	} : null;
+}).filter((x) => !!x).sort((a, b) => a.n - b.n).map(({ n, src }) => ({
+	id: `v${n}`,
+	type: "video",
+	src,
+	thumb: src,
+	title: "",
+	no: ""
+}));
+var p = [...photos];
+var v = [...videos];
+var GALLERY_BLOCKS = [];
+while (p.length >= 4 && (v.length > 0 || p.length >= 5)) {
+	const feature = v.shift() ?? p.shift();
+	GALLERY_BLOCKS.push({
+		feature,
+		side: GALLERY_BLOCKS.length % 2 === 0 ? "left" : "right",
+		smalls: p.splice(0, 4)
+	});
+}
+var GALLERY_FINALE = v.length && p.length ? [
+	p[0],
+	v[0],
+	...p.slice(1),
+	...v.slice(1)
+] : [...p, ...v];
+var GALLERY = [...GALLERY_BLOCKS.flatMap((b) => [b.feature, ...b.smalls]), ...GALLERY_FINALE];
+GALLERY.forEach((g, i) => {
+	g.title = TAGLINES[i % TAGLINES.length];
+	g.no = String(i + 1).padStart(2, "0");
+});
+var PHOTO_COUNT = photos.length;
+var VIDEO_COUNT = videos.length;
+//#endregion
+export { VIDEO_COUNT as a, PHOTO_COUNT as i, GALLERY_BLOCKS as n, GALLERY_FINALE as r, GALLERY as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/lesson._lessonId-DmU5YtvR.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/lesson._lessonId-DmU5YtvR.js
+var $$splitComponentImporter = () => import("./lesson._lessonId-CBILUxbG.mjs");
+var Route = createFileRoute("/lesson/$lessonId")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/login-DKszdqUF.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+import { r as isPlanId } from "./plans-sHsWJraA.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/login-DKszdqUF.js
+var $$splitComponentImporter = () => import("./login-LK40hlVC.mjs");
+var Route = createFileRoute("/login")({
+	validateSearch: (search) => ({
+		plan: isPlanId(search["plan"]) ? search["plan"] : void 0,
+		mode: search["mode"] === "reset" ? "reset" : void 0
+	}),
+	component: lazyRouteComponent($$splitComponentImporter, "component")
+});
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/logo-Q3fdx5bu.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/logo-Q3fdx5bu.js
+var logo_default = "/assets/logo-6MQltNE0.jpg";
+//#endregion
+export { logo_default as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/plans-sHsWJraA.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/plans-sHsWJraA.js
+var AURA_PLANS = [
+	{
+		id: "low",
+		name: "AURA BASIC",
+		slogan: "ENTER THE AURA SYSTEM.",
+		tagline: "Η πρώτη επαφή με την εκπαιδευτική φιλοσοφία και τη μεθοδολογία της AURA. Για barbers που θέλουν να αποκτήσουν πρόσβαση σε επαγγελματική γνώση και να ξεκινήσουν την εξέλιξή τους.",
+		priceLabel: "24,99€",
+		amountCents: 2499,
+		currency: "eur",
+		interval: "month",
+		stripePriceId: "price_1UYmcfLnBpuAzyZYjd8sJZmB",
+		features: [
+			"Μηνιαία εκπαιδευτικά videos",
+			"AURA Social Access",
+			"Πρόσβαση στο Review System",
+			"AURA Find Job – πρόσβαση σε επαγγελματικές ευκαιρίες",
+			"Δυνατότητα ακύρωσης ανά πάσα στιγμή"
+		],
+		highlight: false
+	},
+	{
+		id: "mid",
+		name: "AURA PRO",
+		slogan: "MASTER YOUR CRAFT.",
+		tagline: "Ένα ολοκληρωμένο εκπαιδευτικό επίπεδο για barbers που θέλουν να αναπτύξουν την τεχνική τους, να διευρύνουν τις γνώσεις τους και να εξελίξουν την επαγγελματική τους ταυτότητα.",
+		badge: "ΔΗΜΟΦΙΛΕΣ",
+		priceLabel: "49,99€",
+		amountCents: 4999,
+		currency: "eur",
+		interval: "month",
+		stripePriceId: "price_1UYmdKLnBpuAzyZYxr6UrDFH",
+		features: [
+			"Όλα τα προνόμια του AURA BASIC",
+			"Προχωρημένα εκπαιδευτικά videos κουρεμάτων",
+			"Πρόσβαση στο AURA Certification",
+			"50% έκπτωση στο AURA Professional Hair Method E-book",
+			"25% έκπτωση στο αυθεντικό φυσικό AURA Professional Hair Method Book με QR Codes",
+			"10% έκπτωση στα προϊόντα FORZA BRAVA",
+			"Δυνατότητα ακύρωσης ανά πάσα στιγμή"
+		],
+		highlight: true
+	},
+	{
+		id: "high",
+		name: "AURA ELITE",
+		slogan: "DON’T JUST LEARN. EVOLVE.",
+		tagline: "Το ανώτερο επίπεδο εκπαίδευσης της AURA. Μια αποκλειστική εμπειρία που συνδυάζει εξειδικευμένη εκπαίδευση, προσωπική καθοδήγηση, αξιολόγηση και επαγγελματική εξέλιξη.",
+		priceLabel: "79,99€",
+		amountCents: 7999,
+		currency: "eur",
+		interval: "month",
+		stripePriceId: "price_1UYmdqLnBpuAzyZYoFITGf2H",
+		features: [
+			"Όλα τα προνόμια του AURA PRO",
+			"Προσωπικό AURA Portfolio",
+			"Προσωπική αξιολόγηση κουρεμάτων από εκπαιδευτή AURA",
+			"Έως 4 προσωπικές αξιολογήσεις τον μήνα",
+			"Αναλυτικό feedback και προτάσεις βελτίωσης",
+			"AURA Personal Progress Tracking",
+			"Αποκλειστικά ELITE εκπαιδευτικά μαθήματα",
+			"AURA Elite Challenges – μηνιαίες εκπαιδευτικές προκλήσεις",
+			"Early Access – πρώτοι στα νέα εκπαιδευτικά videos πριν από τη δημοσίευσή τους",
+			"Αποκλειστική ιδιωτική κοινότητα AURA ELITE",
+			"VIP Community Status",
+			"Προτεραιότητα στο Support",
+			"Πρόσβαση δημοσίευσης εργασιών στην Ακαδημία",
+			"50% έκπτωση στο φυσικό AURA Professional Hair Method Book",
+			"25% έκπτωση στα AURA Online Seminars",
+			"10% έκπτωση στα προϊόντα FORZA BRAVA",
+			"Δυνατότητα ακύρωσης ανά πάσα στιγμή"
+		],
+		highlight: false
+	}
+];
+function isPlanId(value) {
+	return value === "low" || value === "mid" || value === "high";
+}
+function getPlan(id) {
+	if (!isPlanId(id)) return void 0;
+	return AURA_PLANS.find((plan) => plan.id === id);
+}
+//#endregion
+export { getPlan as n, isPlanId as r, AURA_PLANS as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/practice._assignmentId-7CMjLI7e.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/practice._assignmentId-7CMjLI7e.js
+var $$splitComponentImporter = () => import("./practice._assignmentId-D3dvw_7O.mjs");
+var Route = createFileRoute("/practice/$assignmentId")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/review._submissionId-C4gorqdL.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/review._submissionId-C4gorqdL.js
+var $$splitComponentImporter = () => import("./review._submissionId-EN64T7lL.mjs");
+var Route = createFileRoute("/review/$submissionId")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/roles-DmnR1ATT.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/roles-DmnR1ATT.js
+var ROLE_RANK = {
+	student: 10,
+	educator: 20,
+	senior_educator: 30,
+	content_manager: 30,
+	operations: 35,
+	admin: 40,
+	super_admin: 50
+};
+/** Ελάχιστος βαθμός για τα εργαλεία του team (Review Queue). */
+var STAFF_RANK = ROLE_RANK.educator;
+/** Ελάχιστος βαθμός για Admin Panel & Inbox. */
+var ADMIN_RANK = ROLE_RANK.admin;
+/** Άγνωστος, κενός ή null ρόλος → 0. Fail closed. */
+function roleRank(role) {
+	if (!role) return 0;
+	const key = role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+	return key in ROLE_RANK ? ROLE_RANK[key] : 0;
+}
+/** Educator και πάνω. */
+function isStaffRole(role) {
+	return roleRank(role) >= STAFF_RANK;
+}
+/** Admin και πάνω — Admin Panel και Inbox. */
+function isAdminRole(role) {
+	return roleRank(role) >= ADMIN_RANK;
+}
+/** Ρητό κατώφλι, όταν θέλεις κάτι ενδιάμεσο. */
+function hasAtLeastRole(role, minimum) {
+	return roleRank(role) >= ROLE_RANK[minimum];
+}
+var CONTENT_ROLES = [
+	"content_manager",
+	"operations",
+	"admin",
+	"super_admin"
+];
+function isContentRole(role) {
+	if (!role) return false;
+	const key = role.trim().toLowerCase().replace(/[\s-]+/g, "_");
+	return CONTENT_ROLES.includes(key);
+}
+//#endregion
+export { isStaffRole as i, isAdminRole as n, isContentRole as r, hasAtLeastRole as t };
+
+=== END FILE ===
+

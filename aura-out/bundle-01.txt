@@ -1,0 +1,986 @@
+=== FILE: supabase/functions/create-viva-checkout/index.ts ===
+// supabase/functions/create-viva-checkout/index.ts
+//
+// STAGE 2: starts a subscription payment on Viva.com (sandbox first).
+//
+//   browser -> this function -> Viva "create payment order" -> redirect URL
+//
+// Everything that matters is decided HERE, never in the browser:
+//   * who the user is           (verified JWT)
+//   * which provider they get   (public.aura_checkout_provider_for)
+//   * the plan and its price    (public.plans, edited in the admin panel)
+//   * whether they may subscribe (no active/trialing subscription yet)
+// The browser only sends { planId }.
+//
+// This function does NOT activate anything. A redirect back from Viva is not
+// proof of payment: activation is Stage 3 (verified webhook).
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  checkoutRedirectUrl,
+  createPaymentOrder,
+  loadVivaConfig,
+  VivaConfigError,
+} from "../_shared/viva.ts";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+type PlanId = "low" | "mid" | "high";
+function isPlanId(value: unknown): value is PlanId {
+  return value === "low" || value === "mid" || value === "high";
+}
+
+/** A pending order younger than this is reused instead of creating a second Viva order. */
+const REUSE_WINDOW_MS = 25 * 60 * 1000; // Viva order timeout is 30 min
+const EXPIRE_AFTER_MS = 35 * 60 * 1000;
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing Supabase environment configuration");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  let cfg;
+  try {
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (err) {
+    console.error("Viva configuration problem:", err instanceof VivaConfigError ? err.message : "unknown");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  // 1. Body: only the plan id is accepted from the browser.
+  let planId: unknown;
+  try {
+    planId = (JSON.parse(await req.text()) as { planId?: unknown })?.planId;
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  if (!isPlanId(planId)) return json({ error: "Unknown plan" }, 400);
+
+  // 2. Who is calling? (verified by Supabase Auth)
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user?.email) return json({ error: "Unauthorized" }, 401);
+
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  try {
+    // 3. Is this user allowed to use Viva right now? (feature flag / pilot)
+    const { data: provider, error: providerError } = await admin.rpc("aura_checkout_provider_for", {
+      p_user: user.id,
+    });
+    if (providerError) {
+      console.error("provider lookup failed:", providerError.message);
+      return json({ error: "Could not start the payment." }, 500);
+    }
+    if (provider !== "viva") return json({ error: "viva_not_enabled" }, 403);
+
+    // 4. The plan and its CURRENT price, from the database.
+    const { data: plan, error: planError } = await admin
+      .from("plans")
+      .select("id, name, price_cents, currency, active")
+      .eq("id", planId)
+      .maybeSingle();
+    if (planError) {
+      console.error("plans lookup failed:", planError.message);
+      return json({ error: "Could not load the plan." }, 500);
+    }
+    if (!plan || !plan.active) return json({ error: "Το πλάνο δεν είναι διαθέσιμο." }, 404);
+
+    const amountCents = Number(plan.price_cents);
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      console.error("Invalid price on plan", plan.id);
+      return json({ error: "Το πλάνο δεν έχει έγκυρη τιμή." }, 500);
+    }
+    if (String(plan.currency ?? "eur").toLowerCase() !== "eur") {
+      console.error("Unsupported currency on plan", plan.id);
+      return json({ error: "Το πλάνο δεν έχει έγκυρο νόμισμα." }, 500);
+    }
+
+    // 5. Already subscribed (with Stripe OR Viva)? No second subscription.
+    const { data: existing } = await admin
+      .from("subscriptions")
+      .select("id")
+      .eq("user_id", user.id)
+      .in("status", ["active", "trialing"])
+      .limit(1)
+      .maybeSingle();
+    if (existing) return json({ error: "Υπάρχει ήδη ενεργή συνδρομή." }, 409);
+
+    // 5b. The customer's personal details (asked in the checkout form). They are
+    //     required, kept for the admin, and copied onto the order for the record.
+    const { data: profile } = await admin
+      .from("billing_profiles")
+      .select("full_name, phone, address_line1, address_line2, city, postal_code, country, wants_invoice, company_name, vat_number, tax_office")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!profile) {
+      return json({ error: "Συμπλήρωσε πρώτα τα στοιχεία σου.", code: "billing_profile_required" }, 400);
+    }
+
+    // 6. Housekeeping + double-click protection.
+    const now = Date.now();
+    await admin
+      .from("billing_orders")
+      .update({ status: "expired" })
+      .eq("user_id", user.id)
+      .eq("provider", "viva")
+      .eq("kind", "initial")
+      .eq("status", "pending")
+      .lt("created_at", new Date(now - EXPIRE_AFTER_MS).toISOString());
+
+    const { data: reusable } = await admin
+      .from("billing_orders")
+      .select("id, viva_order_code")
+      .eq("user_id", user.id)
+      .eq("provider", "viva")
+      .eq("environment", cfg.env)
+      .eq("kind", "initial")
+      .eq("status", "pending")
+      .eq("plan_id", plan.id)
+      .eq("amount_cents", amountCents)
+      .not("viva_order_code", "is", null)
+      .gt("created_at", new Date(now - REUSE_WINDOW_MS).toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (reusable?.viva_order_code) {
+      return json({
+        redirectUrl: checkoutRedirectUrl(cfg, String(reusable.viva_order_code)),
+        orderId: reusable.id,
+        reused: true,
+      });
+    }
+
+    // 7. Record OUR order first. Its id travels to Viva as merchantTrns.
+    const { data: order, error: orderError } = await admin
+      .from("billing_orders")
+      .insert({
+        user_id: user.id,
+        provider: "viva",
+        kind: "initial",
+        plan_id: plan.id,
+        amount_cents: amountCents,
+        currency: "eur",
+        status: "pending",
+        environment: cfg.env,
+        customer: { ...profile, email: user.email },
+      })
+      .select("id")
+      .single();
+    if (orderError || !order) {
+      console.error("billing_orders insert failed:", orderError?.message);
+      return json({ error: "Could not start the payment." }, 500);
+    }
+
+    // 8. Ask Viva for a payment order (amount = the database price).
+    let orderCode: string;
+    try {
+      const created = await createPaymentOrder(cfg, {
+        amountCents,
+        merchantTrns: String(order.id),
+        customerTrns: `AURA ${String(plan.name)} - μηνιαία συνδρομή`,
+        customer: {
+          email: user.email,
+          fullName: (profile.full_name as string | null | undefined) ?? null,
+          phone: (profile.phone as string | null | undefined) ?? null,
+          requestLang: "el-GR",
+        },
+        allowRecurring: true,
+        tags: ["aura-subscription", String(plan.id)],
+      });
+      orderCode = created.orderCode;
+    } catch (err) {
+      console.error("Viva create order failed:", err instanceof Error ? err.message : "unknown");
+      await admin
+        .from("billing_orders")
+        .update({ status: "failed", failure_reason: "order_creation_failed" })
+        .eq("id", order.id);
+      return json({ error: "Δεν ήταν δυνατή η έναρξη της πληρωμής. Δοκίμασε ξανά σε λίγο." }, 502);
+    }
+
+    const { error: saveError } = await admin
+      .from("billing_orders")
+      .update({ viva_order_code: orderCode })
+      .eq("id", order.id);
+    if (saveError) {
+      // We could not remember Viva's order code, so a payment could not be matched. Do not send the customer.
+      console.error("saving viva_order_code failed:", saveError.message);
+      await admin
+        .from("billing_orders")
+        .update({ status: "failed", failure_reason: "order_code_not_saved" })
+        .eq("id", order.id);
+      return json({ error: "Could not start the payment." }, 500);
+    }
+
+    return json({ redirectUrl: checkoutRedirectUrl(cfg, orderCode), orderId: order.id, reused: false });
+  } catch (error) {
+    console.error("create-viva-checkout failed:", error instanceof Error ? error.message : "unknown");
+    return json({ error: "Could not start the payment." }, 500);
+  }
+});
+
+=== END FILE ===
+
+=== FILE: supabase/functions/verify-viva-payment/index.ts ===
+// supabase/functions/verify-viva-payment/index.ts
+//
+// Called by the checkout RETURN page. Viva sends the customer back with
+//   ?t=<transaction id>&s=<order code>&lang=..&eventId=..
+// (t is present ONLY when the payment went through; a refused or cancelled
+// payment comes back without it, with an eventId).
+//
+// This function does NOT trust the redirect. If a transaction id is present it
+// asks Viva directly (Retrieve Transaction, server to server) and applies the
+// result with the same idempotent code the webhook uses, so the subscription,
+// seminar or book order is completed even if the webhook is late or was never
+// registered. Calling it many times is harmless.
+//
+// It needs no login (seminar and book customers may be visitors) and answers only
+// non-personal facts: what kind of order it is, its status and a label.
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  isTransactionId,
+  loadVivaConfig,
+  retrieveTransaction,
+  VivaApiError,
+  VivaConfigError,
+  type VivaConfig,
+  type VivaTransaction,
+} from "../_shared/viva.ts";
+import { processFailed, processPaid, rpc, TransientError, type RpcClient } from "../_shared/viva-process.ts";
+
+const CORS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+}
+
+interface Lookup {
+  kind: string;
+  status: string;
+  label?: string | null;
+  amount_cents?: number | null;
+  reason?: string | null;
+  event_id?: number | null;
+}
+
+/** Our order statuses -> what the page shows. */
+function pageStatus(dbStatus: string): "paid" | "pending" | "failed" {
+  if (dbStatus === "paid" || dbStatus === "shipped" || dbStatus === "delivered") return "paid";
+  if (dbStatus === "failed" || dbStatus === "cancelled" || dbStatus === "expired") return "failed";
+  return "pending";
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  let cfg: VivaConfig;
+  try {
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (err) {
+    console.error("Viva configuration problem:", err instanceof VivaConfigError ? err.message : "unknown");
+    return json({ error: "misconfigured" }, 500);
+  }
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return json({ error: "misconfigured" }, 500);
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } }) as unknown as RpcClient;
+
+  // ---- Input: only what Viva puts in the return URL. ----
+  let input: { t?: unknown; s?: unknown; eventId?: unknown };
+  try {
+    input = JSON.parse(await req.text()) as typeof input;
+  } catch {
+    return json({ error: "invalid json" }, 400);
+  }
+  const t = typeof input.t === "string" && isTransactionId(input.t) ? input.t.toLowerCase() : null;
+  const s = typeof input.s === "string" && /^\d{6,20}$/.test(input.s) ? input.s : null;
+  const eventIdRaw = typeof input.eventId === "string" || typeof input.eventId === "number" ? Number(input.eventId) : NaN;
+  const eventId = Number.isInteger(eventIdRaw) && eventIdRaw >= 0 && eventIdRaw < 1_000_000 ? eventIdRaw : null;
+  if (!t && !s) return json({ error: "missing payment reference" }, 400);
+
+  try {
+    // ---- If Viva gave us a transaction id, ask Viva about it. ----
+    let tx: VivaTransaction | null = null;
+    let vivaUnreachable = false;
+    if (t) {
+      try {
+        tx = await retrieveTransaction(cfg, t);
+      } catch (err) {
+        if (!(err instanceof VivaApiError && (err.status === 404 || err.status === 400))) {
+          vivaUnreachable = true; // report "still checking"; the page will ask again
+          console.error("verify: could not reach Viva:", err instanceof Error ? err.message : "unknown");
+        }
+      }
+    }
+
+    const orderCode = tx?.orderCode ?? s;
+    if (tx && s && tx.orderCode !== null && tx.orderCode !== s) return json({ error: "reference mismatch" }, 400);
+    if (!orderCode) {
+      // A renewal-style transaction has no order code and is not for this page.
+      return json({ status: vivaUnreachable ? "pending" : "unknown" }, vivaUnreachable ? 200 : 404);
+    }
+
+    // Only orders that exist in OUR database are processed (this is not an open proxy to Viva).
+    const before = await rpc<Lookup | null>(admin, "viva_order_lookup", { p_environment: cfg.env, p_order_code: orderCode });
+    if (!before) return json({ status: "unknown" }, 404);
+
+    // ---- Apply what Viva confirmed (idempotent). ----
+    if (tx) {
+      try {
+        if (tx.statusId === "F") await processPaid(admin, cfg, tx);
+        else if (tx.statusId === "E") await processFailed(admin, cfg, tx);
+        // any other status: not final yet, report pending
+      } catch (err) {
+        if (!(err instanceof TransientError)) throw err;
+        console.error("verify: processing postponed:", err.message);
+      }
+    } else if (eventId !== null) {
+      // Back from Viva WITHOUT a transaction id: the payment was refused or abandoned. Record why.
+      await rpc(admin, "viva_note_checkout_failure", { p_environment: cfg.env, p_order_code: orderCode, p_event_id: eventId });
+    }
+
+    // ---- Report the truth from OUR database. ----
+    const after = (await rpc<Lookup | null>(admin, "viva_order_lookup", { p_environment: cfg.env, p_order_code: orderCode })) ?? before;
+    return json({
+      kind: after.kind,
+      status: vivaUnreachable && pageStatus(after.status) === "pending" ? "pending" : pageStatus(after.status),
+      label: after.label ?? null,
+      amountCents: after.amount_cents ?? null,
+      eventId: after.event_id ?? eventId,
+    });
+  } catch (err) {
+    console.error("verify-viva-payment failed:", err instanceof Error ? err.message : "unknown");
+    return json({ error: "temporary failure" }, 500);
+  }
+});
+
+=== END FILE ===
+
+=== FILE: supabase/functions/viva-webhook/index.ts ===
+// supabase/functions/viva-webhook/index.ts
+//
+// Receives Viva.com webhooks. A webhook body is only a HINT: nothing is
+// believed until Retrieve Transaction (server to server) confirms it, and the
+// result is applied by the shared, idempotent processing in _shared/viva-process.ts
+// (subscriptions, renewals, upgrades, online seminars and book orders).
+//
+// Viva retries on anything except 2xx (hourly, 24 times):
+//   * transient problems (Viva unreachable, database error, payment not final) -> 5xx (retry)
+//   * things a retry cannot fix (unknown payment, wrong amount)                  -> 200 + admin alert
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  isTransactionId,
+  isVivaWebhookIp,
+  loadVivaConfig,
+  retrieveTransaction,
+  VivaApiError,
+  VivaConfigError,
+  type VivaConfig,
+  type VivaTransaction,
+} from "../_shared/viva.ts";
+import {
+  alertAdmins,
+  processFailed,
+  processPaid,
+  processReversal,
+  rpc,
+  TransientError,
+  type Outcome,
+  type RpcClient,
+} from "../_shared/viva-process.ts";
+
+const EVENT_PAYMENT_CREATED = 1796;
+const EVENT_REVERSAL_CREATED = 1797;
+const EVENT_FAILED = 1798;
+const MAX_BODY_BYTES = 64 * 1024;
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+function clientIp(req: Request): string | null {
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) return (forwarded.split(",")[0] ?? "").trim() || null;
+  return req.headers.get("cf-connecting-ip");
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+/** Only non-sensitive fields are stored in provider_events (no email, name or card data). */
+function redact(body: Record<string, unknown>, data: Record<string, unknown>): Record<string, unknown> {
+  const pick = (v: unknown) => (typeof v === "string" || typeof v === "number" || typeof v === "boolean" ? v : null);
+  return {
+    EventTypeId: pick(body.EventTypeId),
+    MessageId: pick(body.MessageId),
+    CorrelationId: pick(body.CorrelationId),
+    TransactionId: pick(data.TransactionId),
+    ParentId: pick(data.ParentId),
+    OrderCode: pick(data.OrderCode),
+    StatusId: pick(data.StatusId),
+    Amount: pick(data.Amount),
+    MerchantTrns: pick(data.MerchantTrns),
+  };
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  let cfg: VivaConfig;
+  try {
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (err) {
+    console.error("Viva configuration problem:", err instanceof VivaConfigError ? err.message : "unknown");
+    return json({ error: "misconfigured" }, 500);
+  }
+
+  // ---- Viva's endpoint verification: print our key as-is. ----
+  if (req.method === "GET") {
+    if (!cfg.webhookKey) {
+      console.error("Webhook key secret is not set");
+      return json({ error: "misconfigured" }, 500);
+    }
+    return json({ Key: cfg.webhookKey });
+  }
+  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+
+  // ---- Optional source-address check (published Viva addresses). ----
+  const ipMode = (Deno.env.get("VIVA_WEBHOOK_IP_MODE") ?? "log").toLowerCase();
+  if (ipMode !== "off") {
+    const ip = clientIp(req);
+    if (!isVivaWebhookIp(ip, cfg.env)) {
+      console.warn(`webhook from a non-Viva address (${ip ?? "unknown"}), mode=${ipMode}`);
+      if (ipMode === "enforce") return json({ error: "forbidden" }, 403);
+    }
+  }
+
+  // ---- Parse (bounded). ----
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_BYTES) return json({ error: "payload too large" }, 413);
+  let body: Record<string, unknown>;
+  try {
+    const parsed = asRecord(JSON.parse(raw));
+    if (!parsed) throw new Error("not an object");
+    body = parsed;
+  } catch {
+    return json({ error: "invalid json" }, 400);
+  }
+
+  const eventType = Number(body.EventTypeId);
+  const data = asRecord(body.EventData) ?? {};
+
+  // Events we do not use are acknowledged and left alone (no database write).
+  if (![EVENT_PAYMENT_CREATED, EVENT_FAILED, EVENT_REVERSAL_CREATED].includes(eventType)) {
+    return json({ ok: true, ignored: "event type not used" });
+  }
+
+  // Payments created from an order carry an OrderCode; a renewal charge may not.
+  const rawOrderCode = data.OrderCode == null ? "" : String(data.OrderCode);
+  const eventOrderCode = rawOrderCode === "0" ? "" : rawOrderCode;
+  if (!isTransactionId(data.TransactionId) || (eventOrderCode !== "" && !/^\d{6,20}$/.test(eventOrderCode))) {
+    console.error("Relevant Viva event with a malformed payload, type", eventType);
+    return json({ error: "malformed event" }, 400);
+  }
+  // One canonical spelling everywhere (event key, Viva lookup, ledger).
+  const transactionId = data.TransactionId.toLowerCase();
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) {
+    console.error("Missing Supabase environment configuration");
+    return json({ error: "misconfigured" }, 500);
+  }
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } }) as unknown as RpcClient;
+
+  // ---- Claim the event (idempotency). ----
+  let eventId: string | null = null;
+  try {
+    const claim = await rpc<{ id: string; claimed: boolean }>(admin, "viva_claim_event", {
+      p_environment: cfg.env,
+      p_event_key: `viva:${eventType}:${transactionId}`,
+      p_event_type: String(eventType),
+      p_payload: redact(body, data),
+    });
+    if (!claim.claimed) return json({ ok: true, duplicate: true });
+    eventId = claim.id;
+  } catch (err) {
+    console.error("claim failed:", err instanceof Error ? err.message : "unknown");
+    return json({ error: "temporary failure" }, 500); // Viva will retry
+  }
+
+  const finish = async (status: "processed" | "ignored" | "failed", note: string | null) => {
+    try {
+      await rpc(admin, "viva_finish_event", { p_id: eventId, p_status: status, p_error: note });
+    } catch (err) {
+      console.error("finish failed:", err instanceof Error ? err.message : "unknown");
+    }
+  };
+
+  try {
+    // ---- Ask Viva what really happened. ----
+    let tx: VivaTransaction;
+    try {
+      tx = await retrieveTransaction(cfg, transactionId);
+    } catch (err) {
+      if (err instanceof VivaApiError && (err.status === 404 || err.status === 400)) {
+        // Viva has no such transaction: a forged or stale notification. Nothing to retry.
+        await finish("ignored", "transaction_not_found_at_viva");
+        return json({ ok: true, ignored: "unknown transaction" });
+      }
+      throw new TransientError(err instanceof Error ? err.message : "retrieve failed");
+    }
+
+    // The notification and Viva must agree on which order this is.
+    if (eventOrderCode !== "" && tx.orderCode !== null && tx.orderCode !== eventOrderCode) {
+      await finish("ignored", "order_code_differs_from_viva");
+      await alertAdmins(admin, "Πρόβλημα πληρωμής Viva", "Η ειδοποίηση δεν ταιριάζει με τα στοιχεία της Viva. Δεν έγινε ενεργοποίηση.", {
+        transaction_id: transactionId, kind: "order_code_mismatch",
+      });
+      return json({ ok: true, flagged: true });
+    }
+
+    let outcome: Outcome;
+    if (eventType === EVENT_PAYMENT_CREATED) {
+      outcome = await processPaid(admin, cfg, tx);
+    } else if (eventType === EVENT_FAILED) {
+      outcome = await processFailed(admin, cfg, tx);
+    } else {
+      if (!isTransactionId(data.ParentId)) {
+        outcome = { status: "ignored", result: "reversal_without_parent", kind: "unknown" };
+      } else {
+        outcome = await processReversal(admin, cfg, tx, data.ParentId.toLowerCase());
+      }
+    }
+
+    await finish(outcome.status, outcome.result);
+    return json({ ok: true, result: outcome.result });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "unknown";
+    console.error("viva-webhook processing failed:", message);
+    await finish("failed", message);
+    return json({ error: "temporary failure" }, 500); // Viva will retry (hourly, up to 24 times)
+  }
+});
+
+=== END FILE ===
+
+=== FILE: src/components/aura/admin/VivaAdminSection.tsx ===
+// src/components/aura/admin/VivaAdminSection.tsx
+//
+// Admin panel section for the Viva.com payments:
+//   * which provider new subscription checkouts use (Viva / Stripe)
+//   * a connection health check (secrets, Viva credentials, webhook activity)
+//   * the latest Viva payments of every kind (subscriptions, upgrades, seminars, books)
+//   * the personal details customers entered in the checkout (searchable, CSV export)
+// It uses the admin page's own styles (pu-*), so it must be rendered inside that page.
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Download, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { db } from "@/lib/db";
+import { formatEuro } from "@/lib/plans";
+
+type Provider = "viva" | "stripe";
+
+interface ActivityRow {
+  created_at: string;
+  kind: string;
+  status: string;
+  amount_cents: number;
+  label: string | null;
+  who: string | null;
+  email: string | null;
+  order_code: string | null;
+  failure_reason: string | null;
+  environment: string | null;
+}
+
+interface CustomerRow {
+  user_id: string;
+  email: string | null;
+  full_name: string;
+  phone: string;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  postal_code: string;
+  country: string;
+  wants_invoice: boolean;
+  company_name: string | null;
+  vat_number: string | null;
+  tax_office: string | null;
+  updated_at: string;
+}
+
+interface SubscriptionRow {
+  user_id: string;
+  provider: string | null;
+  status: string;
+  plan_id: string;
+}
+
+interface Health {
+  environment: string | null;
+  provider: string | null;
+  graceDays: number | null;
+  secrets: Record<string, boolean>;
+  missing: string[];
+  oauth: { ok: boolean; error?: string };
+  lastWebhookAt: string | null;
+  webhook24h: Record<string, number>;
+  pendingOrders24h: number;
+}
+
+const KIND_LABEL: Record<string, string> = {
+  subscription_initial: "Νέα συνδρομή",
+  subscription_renewal: "Ανανέωση",
+  subscription_upgrade: "Αναβάθμιση",
+  seminar: "Σεμινάριο",
+  book: "Βιβλίο",
+};
+
+const STATUS: Record<string, { label: string; cls: string }> = {
+  paid: { label: "Πληρώθηκε", cls: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" },
+  shipped: { label: "Στάλθηκε", cls: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" },
+  delivered: { label: "Παραδόθηκε", cls: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" },
+  pending: { label: "Εκκρεμεί", cls: "border-amber-400/30 bg-amber-500/10 text-amber-200" },
+  failed: { label: "Απέτυχε", cls: "border-red-400/30 bg-red-500/10 text-red-200" },
+  cancelled: { label: "Ακυρώθηκε", cls: "border-red-400/30 bg-red-500/10 text-red-200" },
+  expired: { label: "Έληξε", cls: "border-white/15 bg-white/[0.04] text-white/60" },
+  refunded: { label: "Επιστράφηκε", cls: "border-white/15 bg-white/[0.04] text-white/60" },
+};
+
+const SECRET_LABEL: Record<string, string> = {
+  VIVA_ENV: "VIVA_ENV (sandbox ή production)",
+  CLIENT_ID: "Smart Checkout Client ID",
+  CLIENT_SECRET: "[REDACTED]",
+  SOURCE_CODE: "Payment source code",
+  WEBHOOK_KEY: "Webhook key",
+  MERCHANT_ID: "Merchant ID (ανανεώσεις)",
+  API_KEY: "[REDACTED]",
+  CRON_SECRET: "[REDACTED]",
+};
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleString("el-GR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+function Pill({ cls, children }: { cls: string; children: ReactNode }) {
+  return <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${cls}`}>{children}</span>;
+}
+
+function csvCell(v: unknown): string {
+  const s = v === null || v === undefined ? "" : String(v);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+export default function VivaAdminSection() {
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [providerMsg, setProviderMsg] = useState<string | null>(null);
+  const [savingProvider, setSavingProvider] = useState(false);
+
+  const [health, setHealth] = useState<Health | null>(null);
+  const [healthBusy, setHealthBusy] = useState(false);
+  const [healthError, setHealthError] = useState<string | null>(null);
+
+  const [activity, setActivity] = useState<ActivityRow[] | null>(null);
+  const [customers, setCustomers] = useState<CustomerRow[] | null>(null);
+  const [subs, setSubs] = useState<SubscriptionRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [settings, act, prof, subscriptions] = await Promise.all([
+        db.from("billing_settings").select("active_provider").eq("id", true).maybeSingle(),
+        db.rpc("admin_viva_activity", { p_limit: 80 }),
+        db.rpc("admin_billing_profiles"),
+        db.from("subscriptions").select("user_id, provider, status, plan_id").in("status", ["active", "trialing"]),
+      ]);
+      const p = (settings.data as { active_provider?: string } | null)?.active_provider;
+      setProvider(p === "stripe" ? "stripe" : "viva");
+      if (act.error) throw new Error(act.error.message);
+      if (prof.error) throw new Error(prof.error.message);
+      setActivity((act.data ?? []) as ActivityRow[]);
+      setCustomers((prof.data ?? []) as CustomerRow[]);
+      setSubs((subscriptions.data ?? []) as SubscriptionRow[]);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Η φόρτωση απέτυχε.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function chooseProvider(next: Provider) {
+    if (next === provider || savingProvider) return;
+    setSavingProvider(true);
+    setProviderMsg(null);
+    const { error } = await db.from("billing_settings").update({ active_provider: next, viva_admin_only: false }).eq("id", true);
+    setSavingProvider(false);
+    if (error) {
+      setProviderMsg("Αποτυχία: " + error.message);
+      return;
+    }
+    setProvider(next);
+    setProviderMsg(next === "viva" ? "Οι νέες συνδρομές πληρώνονται πλέον με Viva." : "Οι νέες συνδρομές πληρώνονται πλέον με Stripe.");
+  }
+
+  async function runHealth() {
+    setHealthBusy(true);
+    setHealthError(null);
+    try {
+      const { data, error } = await db.functions.invoke<Health>("viva-health", { body: {} });
+      if (error) throw new Error(error.message);
+      setHealth(data ?? null);
+    } catch (err) {
+      setHealth(null);
+      setHealthError(err instanceof Error ? err.message : "Ο έλεγχος απέτυχε.");
+    } finally {
+      setHealthBusy(false);
+    }
+  }
+
+  const subByUser = useMemo(() => {
+    const m = new Map<string, SubscriptionRow>();
+    for (const s of subs) m.set(s.user_id, s);
+    return m;
+  }, [subs]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return customers ?? [];
+    return (customers ?? []).filter((c) =>
+      [c.full_name, c.email, c.phone, c.city, c.company_name, c.vat_number].some((v) => (v ?? "").toLowerCase().includes(q)),
+    );
+  }, [customers, query]);
+
+  const counts = useMemo(() => {
+    const out = { viva: 0, stripe: 0 };
+    for (const s of subs) {
+      if (s.provider === "viva") out.viva += 1;
+      else out.stripe += 1;
+    }
+    return out;
+  }, [subs]);
+
+  function exportCsv() {
+    const header = ["Ονοματεπώνυμο", "Email", "Τηλέφωνο", "Διεύθυνση", "Όροφος", "Πόλη", "Τ.Κ.", "Χώρα", "Τιμολόγιο", "Επωνυμία", "ΑΦΜ", "ΔΟΥ", "Πάροχος", "Πλάνο", "Ενημερώθηκε"];
+    const rows = filtered.map((c) => {
+      const s = subByUser.get(c.user_id);
+      return [c.full_name, c.email, c.phone, c.address_line1, c.address_line2, c.city, c.postal_code, c.country, c.wants_invoice ? "ΝΑΙ" : "ΟΧΙ", c.company_name, c.vat_number, c.tax_office, s?.provider ?? "", s?.plan_id ?? "", c.updated_at];
+    });
+    const csv = "\uFEFF" + [header, ...rows].map((r) => r.map(csvCell).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `aura-customers-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section className="space-y-8">
+      <div id="viva" className="flex scroll-mt-28 flex-wrap items-end justify-between gap-4">
+        <div>
+          <span className="pu-kicker">Payments</span>
+          <h2 className="pu-title mt-3 text-2xl font-bold tracking-tight sm:text-4xl">Viva & στοιχεία πελατών</h2>
+        </div>
+        <button type="button" onClick={() => void load()} disabled={loading} className="pu-btn">
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          Ανανέωση
+        </button>
+      </div>
+
+      {loadError && (
+        <p role="alert" className="rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {loadError} — έχεις τρέξει το SQL της Viva (viva_complete.sql);
+        </p>
+      )}
+
+      {/* ---- provider + health ---- */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="pu-panel space-y-4 p-6">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Πάροχος πληρωμών συνδρομών</h3>
+          <div className="flex flex-wrap gap-2">
+            {(["viva", "stripe"] as const).map((p) => (
+              <button key={p} type="button" disabled={savingProvider || provider === null} onClick={() => void chooseProvider(p)} className={`pu-chip ${provider === p ? "pu-chip-on" : ""}`}>
+                {p === "viva" ? "Viva.com" : "Stripe"}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs leading-relaxed text-white/50">
+            Αφορά ΜΟΝΟ τις νέες συνδρομές. Τα μέλη που ήδη πληρώνουν συνεχίζουν με τον πάροχό τους. Σεμινάρια και βιβλίο πληρώνονται πάντα με Viva.
+          </p>
+          <p className="text-xs text-white/60">
+            Ενεργές συνδρομές: <strong className="text-white">{counts.viva}</strong> Viva · <strong className="text-white">{counts.stripe}</strong> Stripe
+          </p>
+          {providerMsg && <p role="status" className="text-xs text-emerald-300">{providerMsg}</p>}
+        </div>
+
+        <div className="pu-panel space-y-4 p-6">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Σύνδεση με Viva</h3>
+            <button type="button" onClick={() => void runHealth()} disabled={healthBusy} className="pu-btn">
+              {healthBusy ? <Loader2 className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+              Έλεγχος
+            </button>
+          </div>
+          {healthError && <p role="alert" className="text-xs text-red-300">{healthError}</p>}
+          {!health && !healthError && <p className="text-xs text-white/50">Πάτα «Έλεγχος» για να δεις αν η Viva είναι σωστά συνδεδεμένη.</p>}
+          {health && (
+            <div className="space-y-3 text-xs">
+              <p className="text-white/70">
+                Περιβάλλον: <strong className="text-white">{health.environment === "production" ? "ΠΑΡΑΓΩΓΗ (πραγματικές πληρωμές)" : health.environment === "sandbox" ? "SANDBOX (δοκιμαστικό)" : "—"}</strong>
+              </p>
+              <p className={health.oauth.ok ? "text-emerald-300" : "text-red-300"}>
+                {health.oauth.ok ? "✓ Η Viva δέχεται τα διαπιστευτήρια" : `✗ ${health.oauth.error ?? "Η Viva δεν δέχεται τα διαπιστευτήρια"}`}
+              </p>
+              <ul className="grid gap-1 sm:grid-cols-2">
+                {Object.entries(health.secrets).map(([k, ok]) => (
+                  <li key={k} className={ok ? "text-emerald-300/90" : "text-red-300"}>
+                    {ok ? "✓" : "✗"} {SECRET_LABEL[k] ?? k}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-white/60">
+                Τελευταίο webhook: <strong className="text-white">{health.lastWebhookAt ? fmtDate(health.lastWebhookAt) : "κανένα ακόμη"}</strong>
+                {!health.lastWebhookAt && " — έχεις καταχωρήσει το webhook στη Viva;"}
+              </p>
+              <p className="text-white/60">
+                24 ώρες: {health.webhook24h["processed"] ?? 0} επιτυχή · {health.webhook24h["ignored"] ?? 0} αγνοήθηκαν · {health.webhook24h["failed"] ?? 0} απέτυχαν · {health.pendingOrders24h} εκκρεμείς παραγγελίες
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ---- Viva activity ---- */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Τελευταίες πληρωμές Viva</h3>
+        <div className="pu-panel overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left text-sm">
+            <thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-white/45">
+              <tr>
+                {["Ημερομηνία", "Τύπος", "Κατάσταση", "Ποσό", "Αντικείμενο", "Πελάτης", "Order code", "Σημείωση"].map((h) => (
+                  <th key={h} className="p-3 font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {(activity ?? []).map((r, i) => {
+                const st = STATUS[r.status] ?? { label: r.status, cls: "border-white/15 bg-white/[0.04] text-white/60" };
+                return (
+                  <tr key={`${r.order_code ?? "x"}-${i}`} className="align-top hover:bg-white/[0.02]">
+                    <td className="whitespace-nowrap p-3 text-white/70">{fmtDate(r.created_at)}</td>
+                    <td className="p-3 text-white/85">{KIND_LABEL[r.kind] ?? r.kind}</td>
+                    <td className="p-3"><Pill cls={st.cls}>{st.label}</Pill></td>
+                    <td className="whitespace-nowrap p-3 font-semibold text-white">{formatEuro(r.amount_cents)}</td>
+                    <td className="p-3 text-white/70">{r.label ?? "—"}</td>
+                    <td className="p-3 text-white/70">{r.who || "—"}{r.email ? <span className="block font-mono text-[11px] text-white/45">{r.email}</span> : null}</td>
+                    <td className="p-3 font-mono text-[11px] text-white/45">{r.order_code ?? "—"}{r.environment ? <span className="block">{r.environment}</span> : null}</td>
+                    <td className="p-3 text-[11px] text-red-300/80">{r.failure_reason ?? ""}</td>
+                  </tr>
+                );
+              })}
+              {activity && activity.length === 0 && (
+                <tr><td colSpan={8} className="p-8 text-center text-white/40">Δεν υπάρχουν πληρωμές Viva ακόμη.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ---- customer details ---- */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">Στοιχεία πελατών ({filtered.length})</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <input className="pu-input w-64" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Αναζήτηση: όνομα, email, τηλέφωνο, ΑΦΜ…" aria-label="Αναζήτηση πελατών" />
+            <button type="button" onClick={exportCsv} disabled={filtered.length === 0} className="pu-btn">
+              <Download className="size-4" /> CSV
+            </button>
+          </div>
+        </div>
+        <div className="pu-panel overflow-x-auto">
+          <table className="w-full min-w-[1000px] text-left text-sm">
+            <thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-white/45">
+              <tr>
+                {["Πελάτης", "Επικοινωνία", "Διεύθυνση", "Τιμολόγιο", "Συνδρομή", "Ενημερώθηκε"].map((h) => (
+                  <th key={h} className="p-3 font-semibold">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filtered.map((c) => {
+                const s = subByUser.get(c.user_id);
+                return (
+                  <tr key={c.user_id} className="align-top hover:bg-white/[0.02]">
+                    <td className="p-3 font-medium text-white/90">{c.full_name}</td>
+                    <td className="p-3 text-white/70">
+                      <a href={`tel:${c.phone}`} className="hover:text-white">{c.phone}</a>
+                      <span className="block font-mono text-[11px] text-white/45">{c.email ?? ""}</span>
+                    </td>
+                    <td className="p-3 text-white/70">
+                      {c.address_line1}{c.address_line2 ? `, ${c.address_line2}` : ""}
+                      <span className="block text-[11px] text-white/45">{c.postal_code} {c.city}, {c.country}</span>
+                    </td>
+                    <td className="p-3 text-white/70">
+                      {c.wants_invoice ? (
+                        <>
+                          {c.company_name}
+                          <span className="block font-mono text-[11px] text-white/45">ΑΦΜ {c.vat_number} · ΔΟΥ {c.tax_office}</span>
+                        </>
+                      ) : <span className="text-white/35">Απόδειξη</span>}
+                    </td>
+                    <td className="p-3 text-white/70">
+                      {s ? (<><span className="uppercase">{s.plan_id}</span><span className="block text-[11px] text-white/45">{s.provider === "viva" ? "Viva" : "Stripe"}</span></>) : <span className="text-white/35">—</span>}
+                    </td>
+                    <td className="whitespace-nowrap p-3 text-[11px] text-white/45">{fmtDate(c.updated_at)}</td>
+                  </tr>
+                );
+              })}
+              {customers && filtered.length === 0 && (
+                <tr><td colSpan={6} className="p-8 text-center text-white/40">{query ? "Κανένα αποτέλεσμα." : "Κανένας πελάτης δεν έχει συμπληρώσει στοιχεία ακόμη."}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+=== END FILE ===
+

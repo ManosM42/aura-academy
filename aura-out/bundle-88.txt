@@ -1,0 +1,417 @@
+=== FILE: src/lib/useAuthUser.ts ===
+// src/lib/useAuthUser.ts
+// Tiny hook: the signed-in Supabase user. If you already have one (useAuth etc.), use yours instead.
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+
+export function useAuthUser(): { user: User | null; loading: boolean } {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    db.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setUser(data.session?.user ?? null);
+      setLoading(false);
+    });
+    const { data: sub } = db.auth.onAuthStateChange((_e, session) => {
+      if (active) setUser(session?.user ?? null);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  return { user, loading };
+}
+=== END FILE ===
+
+=== FILE: src/lib/useContentProtection.ts ===
+// src/lib/useContentProtection.ts
+import { useEffect, useState } from "react";
+
+/**
+ * Deterrents only. Cannot stop OS-level screenshots or screen recorders.
+ * Returns `shielded`: true while the content should be hidden (tab hidden,
+ * window unfocused, PrintScreen pressed).
+ */
+export function useContentProtection(enabled: boolean, hideOnBlur = true) {
+  const [shielded, setShielded] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      setShielded(false);
+      return;
+    }
+
+    const block = (e: Event) => e.preventDefault();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey;
+      if (
+        k === "f12" ||
+        (mod && ["s", "p", "u"].includes(k)) ||
+        (mod && e.shiftKey && ["i", "j", "c"].includes(k))
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    // PrintScreen only fires keyup on most browsers.
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "PrintScreen") {
+        navigator.clipboard?.writeText("").catch(() => {});
+        setShielded(true);
+        window.setTimeout(() => setShielded(document.hidden), 1500);
+      }
+    };
+
+    const onVisibility = () => setShielded(document.hidden);
+    const onBlur = () => hideOnBlur && setShielded(true);
+    const onFocus = () => setShielded(document.hidden);
+
+    document.addEventListener("contextmenu", block);
+    document.addEventListener("dragstart", block);
+    document.addEventListener("copy", block);
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("keyup", onKeyUp);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("blur", onBlur);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      document.removeEventListener("contextmenu", block);
+      document.removeEventListener("dragstart", block);
+      document.removeEventListener("copy", block);
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("keyup", onKeyUp);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [enabled, hideOnBlur]);
+
+  return shielded;
+}
+=== END FILE ===
+
+=== FILE: supabase/functions/course-file-delete/index.ts ===
+// supabase/functions/course-file-delete/index.ts
+//
+// Two request shapes:
+//   { fileId }               — course_files-tracked asset (thumbnail/doc/image/resource)
+//   { objectKey, courseId }  — lesson video (tracked in course_steps.video_path, not
+//                               course_files — see 20260907090000_b2_course_video_metadata.sql)
+//
+// Auth: content roles only. Deleting an already-missing object is treated
+// as success (idempotent) rather than an error — a retry or a double
+// click must never leave the admin stuck.
+import { DeleteObjectCommand } from "npm:@aws-sdk/client-s3@^3";
+import { json, preflight } from "../_shared/cors.ts";
+import { authenticateCaller, requireContentRole } from "../_shared/auth.ts";
+import { b2Client, isUuid, loadB2Config } from "../_shared/b2.ts";
+
+interface DeleteBody {
+  fileId?: unknown;
+  objectKey?: unknown;
+  courseId?: unknown;
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  const pf = preflight(req);
+  if (pf) return pf;
+  const origin = req.headers.get("Origin");
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405, origin);
+
+  const b2Config = loadB2Config();
+  if (!b2Config) {
+    console.error("Missing B2 environment configuration");
+    return json({ error: "Server misconfigured" }, 500, origin);
+  }
+
+  const auth = await authenticateCaller(req);
+  if (!auth.ok) return json({ error: auth.error }, auth.status, origin);
+  const roleError = requireContentRole(auth);
+  if (roleError) return json({ error: roleError.error }, roleError.status, origin);
+
+  let body: DeleteBody;
+  try {
+    body = JSON.parse(await req.text());
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400, origin);
+  }
+
+  const s3 = b2Client(b2Config);
+
+  // --- Shape 1: course_files row -------------------------------------
+  if (body.fileId !== undefined) {
+    if (!isUuid(body.fileId)) return json({ error: "Invalid fileId" }, 400, origin);
+
+    const { data: row, error: rowError } = await auth.admin
+      .from("course_files")
+      .select("id, b2_object_key")
+      .eq("id", body.fileId)
+      .maybeSingle();
+    if (rowError) {
+      console.error("course_files lookup failed", rowError);
+      return json({ error: "Could not load file record" }, 500, origin);
+    }
+    if (!row) return json({ ok: true }, 200, origin); // already gone
+
+    const record = row as { id: string; b2_object_key: string };
+
+    try {
+      await s3.send(
+        new DeleteObjectCommand({ Bucket: b2Config.bucket, Key: record.b2_object_key }),
+      );
+    } catch (err) {
+      console.error("B2 delete failed", err);
+      return json({ error: "Could not delete file from storage" }, 502, origin);
+    }
+
+    const { error: deleteError } = await auth.admin
+      .from("course_files")
+      .delete()
+      .eq("id", record.id);
+    if (deleteError) {
+      console.error("Could not delete course_files row", deleteError);
+      return json({ error: "Deleted from storage but could not update database" }, 500, origin);
+    }
+
+    return json({ ok: true }, 200, origin);
+  }
+
+  // --- Shape 2: raw video object key (course_steps.video_path) -------
+  const { objectKey, courseId } = body;
+  if (typeof objectKey !== "string" || objectKey.length === 0) {
+    return json({ error: "Missing fileId or objectKey" }, 400, origin);
+  }
+  if (!isUuid(courseId)) return json({ error: "Invalid courseId" }, 400, origin);
+
+  // Sanity check: the key must genuinely belong to this course. Content
+  // roles can manage every course in this app, so this isn't a privilege
+  // boundary — it's a guard against a malformed/forged key silently
+  // deleting an unrelated object.
+  const expectedPrefix = `courses/${courseId}/`;
+  if (!objectKey.startsWith(expectedPrefix)) {
+    return json({ error: "Object key does not belong to this course" }, 400, origin);
+  }
+  // Legacy Supabase Storage paths never start with "courses/" (see
+  // course_files migration comment) — this function only ever deletes B2
+  // objects, so a legacy path reaching here would be a client bug.
+  if (!objectKey.startsWith("courses/")) {
+    return json({ error: "Not a Backblaze B2 object key" }, 400, origin);
+  }
+
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: b2Config.bucket, Key: objectKey }));
+  } catch (err) {
+    console.error("B2 delete failed", err);
+    return json({ error: "Could not delete file from storage" }, 502, origin);
+  }
+
+  return json({ ok: true }, 200, origin);
+});
+=== END FILE ===
+
+=== FILE: .output/nitro.json ===
+{
+  "date": "2026-11-06T20:56:58.567Z",
+  "preset": "node-server",
+  "framework": {
+    "name": "nitro",
+    "version": "3.0.260603-beta"
+  },
+  "versions": {
+    "nitro": "3.0.260603-beta"
+  },
+  "serverEntry": "server/index.mjs",
+  "publicDir": "public",
+  "commands": {
+    "preview": "node ./server/index.mjs"
+  },
+  "config": {}
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/_haircutId-B6elcldG.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/_haircutId-D4GsTO_E.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/useNavigate-BR9bgUfC.js","assets/queries-B7Arqryn.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/roles-D-HGCJsI.js","assets/arrow-left-Brxe6F5I.js","assets/createLucideIcon-Dz5w4CtK.js","assets/award-DqqZqsrp.js","assets/circle-alert-Bs1x-kqg.js","assets/circle-check-DcupJV4n.js","assets/scissors-CHiVLmLi.js","assets/shield-alert-B8o1doM_.js","assets/useAsync-CZJ1G06G.js","assets/States-BulpY35p.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";var r=e(`/review/haircuts/$haircutId`)({component:t(()=>n(()=>import(`./_haircutId-D4GsTO_E.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17])),`component`)});export{r as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/academy._slug-snKSkque.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/academy._slug-CNuNeyi7.js","assets/jsx-runtime-BkSabwWG.js","assets/link-BhBo0Yh6.js","assets/useRouter-C8taXhX3.js","assets/use-reduced-motion-CNAPwhZE.js","assets/proxy-ftrNcNdG.js","assets/react-D9fOyxUn.js","assets/queries-B7Arqryn.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/arrow-left-Brxe6F5I.js","assets/createLucideIcon-Dz5w4CtK.js","assets/arrow-right-D_t5sPRj.js","assets/clock-CqoNLjzH.js","assets/layers-Cp6xWl69.js","assets/users-mt-IxESh.js","assets/useAsync-CZJ1G06G.js","assets/States-BulpY35p.js","assets/chrome-DYZby3h2.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";var r=e(`/academy/$slug`)({component:t(()=>n(()=>import(`./academy._slug-CNuNeyi7.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18])),`component`)});export{r as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/admin.courses._courseId-BB4tbnNk.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/admin.courses._courseId-D6ODeYd6.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/useNavigate-BR9bgUfC.js","assets/queries-B7Arqryn.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/roles-D-HGCJsI.js","assets/useAsync-CZJ1G06G.js","assets/courses-LEqLhg7m.js","assets/plans-BkcWWgXs.js","assets/db-DXn9ZPwL.js","assets/VideoEntryForm-CRQira0Y.js","assets/AnimatePresence-ClHpx5iG.js","assets/proxy-ftrNcNdG.js","assets/react-D9fOyxUn.js","assets/ChromeButton-CdfVnEPs.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";var r=e(`/admin/courses/$courseId`)({head:()=>({meta:[{title:`AURA — Επεξεργασία Video`}]}),component:t(()=>n(()=>import(`./admin.courses._courseId-D6ODeYd6.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17])),`component`)});export{r as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/admin.courses._courseId-D6ODeYd6.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./useNavigate-BR9bgUfC.js";import{y as a}from"./queries-B7Arqryn.js";import{r as o}from"./roles-D-HGCJsI.js";import{t as s}from"./admin.courses._courseId-BB4tbnNk.js";import{t as c}from"./useAsync-CZJ1G06G.js";import{g as l,h as u,i as d,o as f,s as p}from"./courses-LEqLhg7m.js";import{t as m}from"./VideoEntryForm-CRQira0Y.js";var h=e(n()),g=t();function _(){let{courseId:e}=s.useParams(),t=i(),[n,_]=(0,h.useState)(0),v=(0,h.useCallback)(async()=>{let t=await a();if(!o(t.role))throw Error(`Η επεξεργασία video απαιτεί ρόλο content manager και πάνω.`);return p(e)},[e]),{data:y,error:b,loading:x}=c(v,[e,n]),[S,C]=(0,h.useState)(!1),[w,T]=(0,h.useState)(null),[E,D]=(0,h.useState)(null),O=(0,h.useCallback)(async t=>{if(y){C(!0),T(null),D(null);try{await l(e,t,y.course.slug,y.course.status),D(`Αποθηκεύτηκε.`),_(e=>e+1)}catch(e){T(e instanceof Error?e.message:`Η αποθήκευση απέτυχε.`)}finally{C(!1)}}},[e,y]),k=(0,h.useCallback)(async(t,n,r)=>{T(null);try{await u(e,{path:t,durationSeconds:n,storageProvider:r.storageProvider,sizeBytes:r.sizeBytes,mimeType:r.mimeType,originalFilename:r.originalFilename,uploadedAt:r.uploadedAt}),D(`Το βίντεο αποθηκεύτηκε.`),_(e=>e+1)}catch(e){T(e instanceof Error?e.message:`Η αποθήκευση του βίντεο απέτυχε.`)}},[e]),A=(0,h.useCallback)(async()=>{T(null);try{await d(e),_(e=>e+1)}catch(e){T(e instanceof Error?e.message:`Η διαγραφή του βίντεο απέτυχε.`)}},[e]),j=(0,h.useCallback)(async()=>{if(!(typeof window<`u`&&!window.confirm(`Το video θα διαγραφεί οριστικά. Συνέχεια;`))){C(!0),T(null);try{await f(e),await t({to:`/admin/courses`,replace:!0})}catch(e){T(e instanceof Error?e.message:`Η διαγραφή απέτυχε.`),C(!1)}}},[e,t]);return x?(0,g.jsxs)(`main`,{className:`mx-auto max-w-3xl px-5 pb-28 pt-32`,children:[(0,g.jsx)(`div`,{className:`h-8 w-56 animate-pulse rounded bg-white/10`}),(0,g.jsx)(`div`,{className:`mt-10 h-64 animate-pulse rounded-2xl bg-white/[0.04]`})]}):b||!y?(0,g.jsxs)(`main`,{className:`mx-auto max-w-lg px-5 pb-28 pt-32 text-center`,children:[(0,g.jsx)(`h1`,{className:`text-2xl font-semibold text-neutral-100`,children:`Δεν φορτώθηκε`}),(0,g.jsx)(`p`,{className:`mt-4 text-sm text-red-400`,role:`alert`,children:b instanceof Error?b.message:`Άγνωστο σφάλμα.`}),(0,g.jsx)(r,{to:`/admin/courses`,className:`mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200`,children:`← VIDEOS`})]}):(0,g.jsxs)(`main`,{className:`mx-auto max-w-3xl px-5 pb-28 pt-28 sm:pt-32`,children:[(0,g.jsx)(r,{to:`/admin/courses`,className:`text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200`,children:`← VIDEOS`}),(0,g.jsx)(`h1`,{className:`mt-3 text-3xl font-semibold tracking-tight text-neutral-100`,children:y.course.title}),(0,g.jsxs)(`p`,{className:`mt-2 text-[10px] uppercase tracking-[0.3em] text-neutral-500`,children:[`/courses/`,y.course.slug]}),(0,g.jsx)(`div`,{className:`mt-12`,children:(0,g.jsx)(m,{course:y.course,saving:S,error:w,notice:E,onSave:O,onDelete:j,onVideoUploaded:k,onVideoCleared:A,videoPath:y.course.video_path,courseId:y.course.id},`${y.course.id}-${n}`)})]})}export{_ as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/admin.courses.new-CcCAsjca.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./useNavigate-BR9bgUfC.js";import{y as a}from"./queries-B7Arqryn.js";import{r as o}from"./roles-D-HGCJsI.js";import{t as s}from"./useAsync-CZJ1G06G.js";import{a as c,h as l}from"./courses-LEqLhg7m.js";import{t as u}from"./VideoEntryForm-CRQira0Y.js";var d=e(n()),f=t();function p(){let e=i(),{data:t,error:n,loading:p}=s(a,[]),[m,h]=(0,d.useState)(!1),[g,_]=(0,d.useState)(null),[v,y]=(0,d.useState)(null),[b,x]=(0,d.useState)(null),S=(0,d.useCallback)(async e=>{h(!0),_(null);try{let t=await c(e);y(t.id),h(!1)}catch(e){_(e instanceof Error?e.message:`Η αποθήκευση απέτυχε.`),h(!1)}},[]),C=(0,d.useCallback)(async(t,n,r)=>{if(x(t),v)try{await l(v,{path:t,durationSeconds:n,storageProvider:r.storageProvider,sizeBytes:r.sizeBytes,mimeType:r.mimeType,originalFilename:r.originalFilename,uploadedAt:r.uploadedAt}),await e({to:`/admin/courses/$courseId`,params:{courseId:v},replace:!0})}catch(e){_(e instanceof Error?e.message:`Η αποθήκευση του βίντεο απέτυχε.`)}},[v,e]);return p?(0,f.jsx)(`main`,{className:`mx-auto max-w-3xl px-5 pb-28 pt-32`,children:(0,f.jsx)(`div`,{className:`h-8 w-56 animate-pulse rounded bg-white/10`})}):n||!t||!o(t.role)?(0,f.jsxs)(`main`,{className:`mx-auto max-w-lg px-5 pb-28 pt-32 text-center`,children:[(0,f.jsx)(`h1`,{className:`text-2xl font-semibold text-neutral-100`,children:`Χωρίς πρόσβαση`}),(0,f.jsx)(`p`,{className:`mt-4 text-sm text-neutral-400`,children:`Η δημιουργία video απαιτεί ρόλο content manager και πάνω.`}),(0,f.jsx)(r,{to:`/dashboard`,className:`mt-8 inline-block text-[10px] uppercase tracking-[0.4em] text-neutral-500 hover:text-neutral-200`,children:`← DASHBOARD`})]}):(0,f.jsxs)(`main`,{className:`mx-auto max-w-3xl px-5 pb-28 pt-28 sm:pt-32`,children:[(0,f.jsx)(r,{to:`/admin/courses`,className:`text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200`,children:`← VIDEOS`}),(0,f.jsx)(`h1`,{className:`mt-3 text-3xl font-semibold tracking-tight text-neutral-100`,children:`Νέο video`}),(0,f.jsx)(`div`,{className:`mt-12`,children:(0,f.jsx)(u,{course:null,saving:m,error:g,notice:v&&!b?`Το video δημιουργήθηκε — ανέβασε τώρα το αρχείο βίντεο.`:null,onSave:S,onVideoUploaded:C,onVideoCleared:()=>x(null),videoPath:b,courseId:v})})]})}export{p as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/AnimatePresence-ClHpx5iG.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{J as r,X as i,Y as a,n as o,q as s,r as c,v as l}from"./proxy-ftrNcNdG.js";var u=t(),d=e(n(),1);function f(e,t){if(typeof e==`function`)return e(t);e!=null&&(e.current=t)}function p(...e){return t=>{let n=!1,r=e.map(e=>{let r=f(e,t);return!n&&typeof r==`function`&&(n=!0),r});if(n)return()=>{for(let t=0;t<r.length;t++){let n=r[t];typeof n==`function`?n():f(e[t],null)}}}}function m(...e){return d.useCallback(p(...e),e)}var h=class extends d.Component{getSnapshotBeforeUpdate(e){let t=this.props.childRef.current;if(l(t)&&e.isPresent&&!this.props.isPresent&&this.props.pop!==!1){let e=t.offsetParent,n=l(e)&&e.offsetWidth||0,r=l(e)&&e.offsetHeight||0,i=getComputedStyle(t),a=this.props.sizeRef.current;a.height=parseFloat(i.height),a.width=parseFloat(i.width),a.top=t.offsetTop,a.left=t.offsetLeft,a.right=n-a.width-a.left,a.bottom=r-a.height-a.top,a.direction=i.direction}return null}componentDidUpdate(){}render(){return this.props.children}};function g({children:e,isPresent:t,anchorX:n,anchorY:r,root:i,pop:a}){let o=(0,d.useId)(),s=(0,d.useRef)(null),l=(0,d.useRef)({width:0,height:0,top:0,left:0,right:0,bottom:0,direction:`ltr`}),{nonce:f}=(0,d.useContext)(c),p=m(s,a===!1?void 0:e.props?.ref??e?.ref);return(0,d.useInsertionEffect)(()=>{let{width:e,height:c,top:u,left:d,right:p,bottom:m,direction:h}=l.current;if(t||a===!1||!s.current||!e||!c)return;let g=h===`rtl`,_=n===`left`?g?`right: ${p}`:`left: ${d}`:g?`left: ${d}`:`right: ${p}`,v=r===`bottom`?`bottom: ${m}`:`top: ${u}`;s.current.dataset.motionPopId=o;let y=document.createElement(`style`);f&&(y.nonce=f);let b=i??document.head;return b.appendChild(y),y.sheet&&y.sheet.insertRule(`
+          [data-motion-pop-id="${o}"] {
+            position: absolute !important;
+            width: ${e}px !important;
+            height: ${c}px !important;
+            ${_}px !important;
+            ${v}px !important;
+          }
+        `),()=>{s.current?.removeAttribute(`data-motion-pop-id`),b.contains(y)&&b.removeChild(y)}},[t]),(0,u.jsx)(h,{isPresent:t,childRef:s,sizeRef:l,pop:a,children:a===!1?e:d.cloneElement(e,{ref:p})})}var _=({children:e,initial:t,isPresent:n,onExitComplete:i,custom:o,presenceAffectsLayout:c,mode:l,anchorX:f,anchorY:p,root:m})=>{let h=a(v),_=(0,d.useId)(),y=(0,d.useRef)(n),b=(0,d.useRef)(i);r(()=>{y.current=n,b.current=i});let x=!0,S=(0,d.useMemo)(()=>(x=!1,{id:_,initial:t,isPresent:n,custom:o,onExitComplete:e=>{h.set(e,!0);for(let e of h.values())if(!e)return;i&&i()},register:e=>(h.set(e,!1),()=>{h.delete(e),!y.current&&!h.size&&b.current?.()})}),[n,h,i]);return c&&x&&(S={...S}),(0,d.useMemo)(()=>{h.forEach((e,t)=>h.set(t,!1))},[n]),d.useEffect(()=>{!n&&!h.size&&i&&i()},[n]),e=(0,u.jsx)(g,{pop:l===`popLayout`,isPresent:n,anchorX:f,anchorY:p,root:m,children:e}),(0,u.jsx)(s.Provider,{value:S,children:e})};function v(){return new Map}var y=e=>e.key||``;function b(e){let t=[];return d.Children.forEach(e,e=>{(0,d.isValidElement)(e)&&t.push(e)}),t}var x=({children:e,custom:t,initial:n=!0,onExitComplete:s,presenceAffectsLayout:c=!0,mode:l=`sync`,propagate:f=!1,anchorX:p=`left`,anchorY:m=`top`,root:h})=>{let[g,v]=o(f),x=(0,d.useMemo)(()=>b(e),[e]),S=f&&!g?[]:x.map(y),C=(0,d.useRef)(!0),w=(0,d.useRef)(x),T=a(()=>new Map),E=(0,d.useRef)(new Set),[D,O]=(0,d.useState)(x),[k,A]=(0,d.useState)(x);r(()=>{f&&!g&&!k.length&&v?.()},[g,f,k.length,v]),r(()=>{C.current=!1,w.current=x;for(let e=0;e<k.length;e++){let t=y(k[e]);S.includes(t)?(T.delete(t),E.current.delete(t)):T.get(t)!==!0&&T.set(t,!1)}},[k,S.length,S.join(`-`)]);let j=[];if(x!==D){let e=[...x],t=0;for(let n of k){let r=S.indexOf(y(n));r===-1?(e.splice(t++,0,n),j.push(n)):t=r+j.length+1}return l===`wait`&&j.length&&(e=j),A(b(e)),O(x),null}let{forceRender:M}=(0,d.useContext)(i);return(0,u.jsx)(u.Fragment,{children:k.map(e=>{let r=y(e),i=f&&!g?!1:x===k||S.includes(r);return(0,u.jsx)(_,{isPresent:i,initial:!C.current||n?void 0:!1,custom:t,presenceAffectsLayout:c,mode:l,root:h,onExitComplete:i?void 0:()=>{if(E.current.has(r))return;if(T.has(r))E.current.add(r),T.set(r,!0);else return;let e=!0;T.forEach(t=>{t||(e=!1)}),e&&(M?.(),A(w.current),f&&v?.(),s&&s())},anchorX:p,anchorY:m,children:e},r)})})};export{x as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/arrow-left-Brxe6F5I.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`arrow-left`,[[`path`,{d:`m12 19-7-7 7-7`,key:`1l729n`}],[`path`,{d:`M19 12H5`,key:`x3x0zl`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/arrow-right-D_t5sPRj.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`arrow-right`,[[`path`,{d:`M5 12h14`,key:`1ays0h`}],[`path`,{d:`m12 5 7 7-7 7`,key:`xquz4c`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/aura-DdP8jhxG.js ===
+var e=`/assets/aura-CtJu3i2Z.jpg`;export{e as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/AuraMark-BT6lLCpe.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./aura-DdP8jhxG.js";var n=e(),r={sm:`aura-mark-sm`,md:``,lg:`aura-mark-lg`};function i({size:e=`md`,className:i=``}){return(0,n.jsxs)(`span`,{className:`aura-mark ${r[e]} ${i}`,role:`img`,"aria-label":`AURA`,children:[(0,n.jsx)(`img`,{src:t,alt:``,className:`aura-mark-img`,draggable:!1}),(0,n.jsx)(`span`,{className:`aura-mark-sweep`,"aria-hidden":!0})]})}export{i as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/award-DqqZqsrp.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`award`,[[`path`,{d:`m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526`,key:`1yiouv`}],[`circle`,{cx:`12`,cy:`8`,r:`6`,key:`1vp47v`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/book-DfGxqo-T.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`compass`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`path`,{d:`m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z`,key:`9ktpf1`}]]),n=e(`ruler`,[[`path`,{d:`M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z`,key:`icamh8`}],[`path`,{d:`m14.5 12.5 2-2`,key:`inckbg`}],[`path`,{d:`m11.5 9.5 2-2`,key:`fmmyf7`}],[`path`,{d:`m8.5 6.5 2-2`,key:`vc6u1g`}],[`path`,{d:`m17.5 15.5 2-2`,key:`wo5hmg`}]]),r=`/assets/book-yOoDu1sO.png`;export{n,t as r,r as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/book-open-l6w5YLVR.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`book-open`,[[`path`,{d:`M12 7v14`,key:`1akyts`}],[`path`,{d:`M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z`,key:`ruj8y`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/calendar-NogZYPsc.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`calendar`,[[`path`,{d:`M8 2v4`,key:`1cmpym`}],[`path`,{d:`M16 2v4`,key:`4m81vk`}],[`rect`,{width:`18`,height:`18`,x:`3`,y:`4`,rx:`2`,key:`1hopcy`}],[`path`,{d:`M3 10h18`,key:`8toen8`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/check-l8y3aT-v.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`check`,[[`path`,{d:`M20 6 9 17l-5-5`,key:`1gmf2c`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/chevron-down-CMzGfsmT.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`chevron-down`,[[`path`,{d:`m6 9 6 6 6-6`,key:`qrunsl`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/chevron-left-eEe2n3pc.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`chevron-left`,[[`path`,{d:`m15 18-6-6 6-6`,key:`1wnfg3`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/chevron-right-LS5pF-bM.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`chevron-right`,[[`path`,{d:`m9 18 6-6-6-6`,key:`mthhwq`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/ChromeCursor-Bd--RrJo.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";var r=e(n(),1),i=t();function a(){let e=(0,r.useRef)(null);return(0,r.useEffect)(()=>{let t=e.current;if(!t)return;let n=window.matchMedia(`(prefers-reduced-motion: reduce)`).matches,r=window.matchMedia(`(pointer: coarse)`).matches;if(n||r)return;let i=0,a=window.innerWidth/2,o=window.innerHeight/2,s=()=>{t.style.transform=`translate3d(${a-300}px, ${o-300}px, 0)`,i=requestAnimationFrame(s)},c=e=>{a=e.clientX,o=e.clientY};return window.addEventListener(`pointermove`,c,{passive:!0}),i=requestAnimationFrame(s),()=>{window.removeEventListener(`pointermove`,c),cancelAnimationFrame(i)}},[]),(0,i.jsx)(`div`,{ref:e,"aria-hidden":`true`,className:`pointer-events-none fixed left-0 top-0 z-[2] h-[600px] w-[600px] rounded-full`,style:{background:`radial-gradient(circle, rgba(255,255,255,0.045) 0%, rgba(191,192,194,0.02) 35%, transparent 62%)`}})}export{a as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/circle-alert-Bs1x-kqg.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`circle-alert`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`line`,{x1:`12`,x2:`12`,y1:`8`,y2:`12`,key:`1pkeuh`}],[`line`,{x1:`12`,x2:`12.01`,y1:`16`,y2:`16`,key:`4dfq90`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/circle-check-DcupJV4n.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`circle-check`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`path`,{d:`m9 12 2 2 4-4`,key:`dzmm74`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/circle-CSxX3fzC.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`circle`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/clock-CqoNLjzH.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`clock`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`path`,{d:`M12 6v6l4 2`,key:`mmk7yg`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/cookie-policy-BNWqltRU.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";var t=e();function n(){return(0,t.jsxs)(`main`,{className:`mx-auto max-w-3xl px-5 pb-24 pt-32 sm:px-8`,children:[(0,t.jsx)(`p`,{className:`text-[10px] font-extralight uppercase tracking-[0.4em] text-neutral-500`,children:`Νομικά`}),(0,t.jsx)(`h1`,{className:`mt-3 text-2xl font-extralight tracking-wide text-neutral-100 sm:text-3xl`,children:`Πολιτική Cookies`}),(0,t.jsxs)(`div`,{className:`mt-8 space-y-8 text-sm font-extralight leading-relaxed text-neutral-300`,children:[(0,t.jsxs)(`section`,{children:[(0,t.jsx)(`h2`,{className:`text-xs font-normal uppercase tracking-[0.3em] text-neutral-100`,children:`Τι είναι τα cookies`}),(0,t.jsx)(`p`,{className:`mt-3`,children:`Τα cookies είναι μικρά αρχεία κειμένου που αποθηκεύονται στη συσκευή σας όταν επισκέπτεστε έναν ιστότοπο, ώστε να θυμάται τις προτιμήσεις σας και να λειτουργεί σωστά.`})]}),(0,t.jsxs)(`section`,{children:[(0,t.jsx)(`h2`,{className:`text-xs font-normal uppercase tracking-[0.3em] text-neutral-100`,children:`Απολύτως απαραίτητα cookies`}),(0,t.jsx)(`p`,{className:`mt-3`,children:`Είναι απαραίτητα για τη λειτουργία της πλατφόρμας AURA και δεν μπορούν να απενεργοποιηθούν — π.χ. cookies σύνδεσης/ταυτοποίησης χρήστη και το cookie που θυμάται την επιλογή σας για αποδοχή ή απόρριψη cookies.`})]}),(0,t.jsxs)(`section`,{children:[(0,t.jsx)(`h2`,{className:`text-xs font-normal uppercase tracking-[0.3em] text-neutral-100`,children:`Λειτουργικά cookies`}),(0,t.jsx)(`p`,{className:`mt-3`,children:`Χρησιμοποιούνται π.χ. για την απομνημόνευση της γλώσσας που έχετε επιλέξει μέσω του εργαλείου μετάφρασης σελίδας.`})]}),(0,t.jsxs)(`section`,{children:[(0,t.jsx)(`h2`,{className:`text-xs font-normal uppercase tracking-[0.3em] text-neutral-100`,children:`Cookies στατιστικών`}),(0,t.jsx)(`p`,{className:`mt-3`,children:`Εφόσον τα αποδεχτείτε, ενδέχεται να χρησιμοποιηθούν για την κατανόηση του τρόπου χρήσης της πλατφόρμας. Με «Απόρριψη», αυτά δεν ενεργοποιούνται.`})]}),(0,t.jsxs)(`section`,{children:[(0,t.jsx)(`h2`,{className:`text-xs font-normal uppercase tracking-[0.3em] text-neutral-100`,children:`Αλλαγή της επιλογής σας`}),(0,t.jsx)(`p`,{className:`mt-3`,children:`Διαγράφοντας τα cookies του browser για αυτόν τον ιστότοπο, η καρτέλα επιλογής θα εμφανιστεί ξανά.`})]})]})]})}export{n as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/copy-CMIpwlCB.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`copy`,[[`rect`,{width:`14`,height:`14`,x:`8`,y:`8`,rx:`2`,ry:`2`,key:`17jyea`}],[`path`,{d:`M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2`,key:`zix9uf`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/courses._slug-CYu-mVBG.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/courses._slug-Bi8l0Fjl.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/use-reduced-motion-CNAPwhZE.js","assets/proxy-ftrNcNdG.js","assets/react-D9fOyxUn.js","assets/arrow-left-Brxe6F5I.js","assets/createLucideIcon-Dz5w4CtK.js","assets/lock-DHD2dW60.js","assets/play-BfnBKg7d.js","assets/sparkles-gf6_8K8H.js","assets/plans-BkcWWgXs.js","assets/useAsync-CZJ1G06G.js","assets/courses-LEqLhg7m.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/roles-D-HGCJsI.js","assets/db-DXn9ZPwL.js","assets/ChromeButton-CdfVnEPs.js","assets/ChromeCursor-Bd--RrJo.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";var r=e(`/courses/$slug`)({head:()=>({meta:[{title:`AURA — Video`}]}),component:t(()=>n(()=>import(`./courses._slug-Bi8l0Fjl.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20])),`component`)});export{r as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/createLucideIcon-Dz5w4CtK.js ===
+import{r as e}from"./jsx-runtime-BkSabwWG.js";import{r as t}from"./useRouter-C8taXhX3.js";var n=e(t()),r=(...e)=>e.filter((e,t,n)=>!!e&&e.trim()!==``&&n.indexOf(e)===t).join(` `).trim(),i=e=>e.replace(/([a-z0-9])([A-Z])/g,`$1-$2`).toLowerCase(),a=e=>e.replace(/^([A-Z])|[\s-_]+(\w)/g,(e,t,n)=>n?n.toUpperCase():t.toLowerCase()),o=e=>{let t=a(e);return t.charAt(0).toUpperCase()+t.slice(1)},s={xmlns:`http://www.w3.org/2000/svg`,width:24,height:24,viewBox:`0 0 24 24`,fill:`none`,stroke:`currentColor`,strokeWidth:2,strokeLinecap:`round`,strokeLinejoin:`round`},c=e=>{for(let t in e)if(t.startsWith(`aria-`)||t===`role`||t===`title`)return!0;return!1},l=(0,n.forwardRef)(({color:e=`currentColor`,size:t=24,strokeWidth:i=2,absoluteStrokeWidth:a,className:o=``,children:l,iconNode:u,...d},f)=>(0,n.createElement)(`svg`,{ref:f,...s,width:t,height:t,stroke:e,strokeWidth:a?Number(i)*24/Number(t):i,className:r(`lucide`,o),...!l&&!c(d)&&{"aria-hidden":`true`},...d},[...u.map(([e,t])=>(0,n.createElement)(e,t)),...Array.isArray(l)?l:[l]])),u=(e,t)=>{let a=(0,n.forwardRef)(({className:a,...s},c)=>(0,n.createElement)(l,{ref:c,iconNode:t,className:r(`lucide-${i(o(e))}`,`lucide-${e}`,a),...s}));return a.displayName=o(e),a};export{u as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/crown-QxIH2HsF.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`crown`,[[`path`,{d:`M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z`,key:`1vdc57`}],[`path`,{d:`M5 21h14`,key:`11awu3`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/db-DXn9ZPwL.js ===
+import{t as e}from"./client-CKVMbL1z.js";var t=e;export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/developer-BD9wcHX1.js ===
+var e=`/assets/founder-BOjw_skh.jpg`,t=`/assets/cofounder-Ca4r51v2.jpg`,n=`/assets/developer-DDzBeS5w.jpg`;export{t as n,e as r,n as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/eye-8YoOALhG.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`eye`,[[`path`,{d:`M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0`,key:`1nclc0`}],[`circle`,{cx:`12`,cy:`12`,r:`3`,key:`1v7zrd`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/file-text-DWpyfNHk.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`file-text`,[[`path`,{d:`M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z`,key:`1oefj6`}],[`path`,{d:`M14 2v5a1 1 0 0 0 1 1h5`,key:`wfsgrz`}],[`path`,{d:`M10 9H8`,key:`b1mrlr`}],[`path`,{d:`M16 13H8`,key:`t4e002`}],[`path`,{d:`M16 17H8`,key:`z1uh3a`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/gallery-Dk-eIjdF.js ===
+var e=`/assets/p1-CuASdWto.jpg`,t=`/assets/p1-Dfkg2gey.webp`,n=`/assets/p10-BTbe5U6i.webp`,r=`/assets/p11-BNyMRJFH.webp`,i=`/assets/p12-B2hr7co2.webp`,ee=`/assets/p13-rdXs4SxX.webp`,te=`/assets/p14-BqgQc517.webp`,ne=`/assets/p15-B8EnvdRF.webp`,re=`/assets/p16-CugGudcG.webp`,ie=`/assets/p17-BLtCiSPP.webp`,ae=`/assets/p18-Bl-wdZwf.webp`,oe=`/assets/p19-DcmXDsSS.webp`,se=`/assets/p2-B50SlM7Q.webp`,ce=`/assets/p20-DOWsGXAV.webp`,le=`/assets/p21-Aca6Y_5y.webp`,ue=`/assets/p22-BvRFE_9Y.webp`,a=`/assets/p23-DBmPt2lk.webp`,o=`/assets/p24-CtdHCI96.webp`,s=`/assets/p25-CiIKAido.webp`,c=`/assets/p26-8vN_vTKD.webp`,l=`/assets/p27-AvkUMYKv.webp`,u=`/assets/p28-BdiN2J2C.webp`,d=`/assets/p29-DJ930M1h.webp`,f=`/assets/p3-CB_KgZkr.webp`,p=`/assets/p30-DpbLJVPm.webp`,m=`/assets/p31-xo04UaV0.webp`,h=`/assets/p4-jdMdyCuP.webp`,g=`/assets/p5-BjY4Jfcn.webp`,_=`/assets/p6-BO3ser_C.webp`,v=`/assets/p7-BZlZaIP0.webp`,y=`/assets/p8-cB675F2f.webp`,b=`/assets/p9-CMOgFHiX.webp`,x=`/assets/p1-DxfqM1q8.webp`,S=`/assets/p10-ct-OJJx2.webp`,C=`/assets/p11-Bhl4Ttju.webp`,w=`/assets/p12-C7JqYkYQ.webp`,T=`/assets/p13-DwC5xpsl.webp`,E=`/assets/p14-AvNLelO3.webp`,D=`/assets/p15-Nh1sGefC.webp`,O=`/assets/p16-B_4NP8hN.webp`,k=`/assets/p17-BCBA4Tuv.webp`,A=`/assets/p18-DeBPEMMK.webp`,j=`/assets/p19-CQBqRCiW.webp`,M=`/assets/p2-BaZX45ej.webp`,N=`/assets/p20-BrR1hrWx.webp`,P=`/assets/p21-L3eD-xcP.webp`,F=`/assets/p22-Bz4eavKF.webp`,I=`/assets/p23-DFTzd9QH.webp`,L=`/assets/p24-DIPoz_QP.webp`,R=`/assets/p25-DtqXExwQ.webp`,z=`/assets/p26-DEPI-mZL.webp`,B=`/assets/p27-DBPrMm0I.webp`,de=`/assets/p28-Dby70wL4.webp`,V=`/assets/p29-D89Kx1XG.webp`,H=`/assets/p3-BherqmTG.webp`,fe=`/assets/p30-B0asaAQv.webp`,pe=`/assets/p31-DCFX-dDr.webp`,me=`/assets/p4-a09bsWEC.webp`,he=`/assets/p5-DZJVp3cp.webp`,ge=`/assets/p6-C_8SG3oR.webp`,_e=`/assets/p7-CNISI_iL.webp`,ve=`/assets/p8-DwgghkDZ.webp`,ye=`/assets/p9-xkrxj3qW.webp`,be=`/assets/p-DlNFzDfP.mp4`,xe=`/assets/p2-n9pwelQO.mp4`,Se=`/assets/p3-Cak6Rrxv.mp4`,Ce=`/assets/p4-BvYtXbTx.mp4`,we=`/assets/p5-DnENrL9v.mp4`,Te=`/assets/p6-CI4R7qUV.mp4`,Ee=`/assets/p7-CdVkApGO.mp4`,De=`/assets/p8-ZQb0iD8J.mp4`,Oe=Object.assign({"../assets/p1.jpg":e}),ke=Object.assign({"../assets/gallery/full/p1.webp":t,"../assets/gallery/full/p10.webp":n,"../assets/gallery/full/p11.webp":r,"../assets/gallery/full/p12.webp":i,"../assets/gallery/full/p13.webp":ee,"../assets/gallery/full/p14.webp":te,"../assets/gallery/full/p15.webp":ne,"../assets/gallery/full/p16.webp":re,"../assets/gallery/full/p17.webp":ie,"../assets/gallery/full/p18.webp":ae,"../assets/gallery/full/p19.webp":oe,"../assets/gallery/full/p2.webp":se,"../assets/gallery/full/p20.webp":ce,"../assets/gallery/full/p21.webp":le,"../assets/gallery/full/p22.webp":ue,"../assets/gallery/full/p23.webp":a,"../assets/gallery/full/p24.webp":o,"../assets/gallery/full/p25.webp":s,"../assets/gallery/full/p26.webp":c,"../assets/gallery/full/p27.webp":l,"../assets/gallery/full/p28.webp":u,"../assets/gallery/full/p29.webp":d,"../assets/gallery/full/p3.webp":f,"../assets/gallery/full/p30.webp":p,"../assets/gallery/full/p31.webp":m,"../assets/gallery/full/p4.webp":h,"../assets/gallery/full/p5.webp":g,"../assets/gallery/full/p6.webp":_,"../assets/gallery/full/p7.webp":v,"../assets/gallery/full/p8.webp":y,"../assets/gallery/full/p9.webp":b}),Ae=Object.assign({"../assets/gallery/thumbs/p1.webp":x,"../assets/gallery/thumbs/p10.webp":S,"../assets/gallery/thumbs/p11.webp":C,"../assets/gallery/thumbs/p12.webp":w,"../assets/gallery/thumbs/p13.webp":T,"../assets/gallery/thumbs/p14.webp":E,"../assets/gallery/thumbs/p15.webp":D,"../assets/gallery/thumbs/p16.webp":O,"../assets/gallery/thumbs/p17.webp":k,"../assets/gallery/thumbs/p18.webp":A,"../assets/gallery/thumbs/p19.webp":j,"../assets/gallery/thumbs/p2.webp":M,"../assets/gallery/thumbs/p20.webp":N,"../assets/gallery/thumbs/p21.webp":P,"../assets/gallery/thumbs/p22.webp":F,"../assets/gallery/thumbs/p23.webp":I,"../assets/gallery/thumbs/p24.webp":L,"../assets/gallery/thumbs/p25.webp":R,"../assets/gallery/thumbs/p26.webp":z,"../assets/gallery/thumbs/p27.webp":B,"../assets/gallery/thumbs/p28.webp":de,"../assets/gallery/thumbs/p29.webp":V,"../assets/gallery/thumbs/p3.webp":H,"../assets/gallery/thumbs/p30.webp":fe,"../assets/gallery/thumbs/p31.webp":pe,"../assets/gallery/thumbs/p4.webp":me,"../assets/gallery/thumbs/p5.webp":he,"../assets/gallery/thumbs/p6.webp":ge,"../assets/gallery/thumbs/p7.webp":_e,"../assets/gallery/thumbs/p8.webp":ve,"../assets/gallery/thumbs/p9.webp":ye}),U=Object.assign({"../assets/p.mp4":be,"../assets/p2.mp4":xe,"../assets/p3.mp4":Se,"../assets/p4.mp4":Ce,"../assets/p5.mp4":we,"../assets/p6.mp4":Te,"../assets/p7.mp4":Ee,"../assets/p8.mp4":De}),W=[`Where barbers are made.`,`Craft first, always.`,`Precision, patience, pride.`,`Barbering is an art.`,`Built in the chair.`,`The AURA standard.`,`Sharp. Clean. Confident.`,`Passion you can see.`],G=new Map;function K(e,t){for(let[n,r]of Object.entries(e)){let e=n.match(/\/p(\d+)\.[^./]+$/);if(!e)continue;let i=Number(e[1]);G.set(i,{...G.get(i),[t]:r})}}K(Oe,`orig`),K(ke,`full`),K(Ae,`thumb`);for(var q=[...G.entries()].sort((e,t)=>e[0]-t[0]).map(([e,t])=>({id:`p${e}`,type:`image`,src:t.full??t.orig??t.thumb,thumb:t.thumb??t.full??t.orig,title:``,no:``})),J=Object.entries(U).map(([e,t])=>{let n=e.match(/\/p(\d*)\.[^./]+$/);return n?{n:n[1]?Number(n[1]):1,src:t}:null}).filter(e=>!!e).sort((e,t)=>e.n-t.n).map(({n:e,src:t})=>({id:`v${e}`,type:`video`,src:t,thumb:t,title:``,no:``})),Y=[...q],X=[...J],Z=[];Y.length>=4&&(X.length>0||Y.length>=5);){let e=X.shift()??Y.shift();Z.push({feature:e,side:Z.length%2==0?`left`:`right`,smalls:Y.splice(0,4)})}var Q=X.length&&Y.length?[Y[0],X[0],...Y.slice(1),...X.slice(1)]:[...Y,...X],$=[...Z.flatMap(e=>[e.feature,...e.smalls]),...Q];$.forEach((e,t)=>{e.title=W[t%W.length],e.no=String(t+1).padStart(2,`0`)});var je=q.length,Me=J.length;export{Me as a,je as i,Z as n,Q as r,$ as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/gem-CdTGHu1B.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`gem`,[[`path`,{d:`M10.5 3 8 9l4 13 4-13-2.5-6`,key:`b3dvk1`}],[`path`,{d:`M17 3a2 2 0 0 1 1.6.8l3 4a2 2 0 0 1 .013 2.382l-7.99 10.986a2 2 0 0 1-3.247 0l-7.99-10.986A2 2 0 0 1 2.4 7.8l2.998-3.997A2 2 0 0 1 7 3z`,key:`7w4byz`}],[`path`,{d:`M2 9h20`,key:`16fsjt`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/graduation-cap-KbC_XaK8.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`graduation-cap`,[[`path`,{d:`M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z`,key:`j76jl0`}],[`path`,{d:`M22 10v6`,key:`1lu8f3`}],[`path`,{d:`M6 12.5V16a6 3 0 0 0 12 0v-3.5`,key:`1r8lef`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/images-BKsLEZPR.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`images`,[[`path`,{d:`m22 11-1.296-1.296a2.4 2.4 0 0 0-3.408 0L11 16`,key:`9kzy35`}],[`path`,{d:`M4 8a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2`,key:`1t0f0t`}],[`circle`,{cx:`13`,cy:`7`,r:`1`,fill:`currentColor`,key:`1obus6`}],[`rect`,{x:`8`,y:`2`,width:`14`,height:`14`,rx:`2`,key:`1gvhby`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/instagram-DKDIOVOj.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`instagram`,[[`rect`,{width:`20`,height:`20`,x:`2`,y:`2`,rx:`5`,ry:`5`,key:`2e1cvw`}],[`path`,{d:`M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z`,key:`9exkf1`}],[`line`,{x1:`17.5`,x2:`17.51`,y1:`6.5`,y2:`6.5`,key:`r4j83e`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/jsx-runtime-BkSabwWG.js ===
+var e=Object.create,t=Object.defineProperty,n=Object.getOwnPropertyDescriptor,r=Object.getOwnPropertyNames,i=Object.getPrototypeOf,a=Object.prototype.hasOwnProperty,o=(e,t)=>()=>(t||(e((t={exports:{}}).exports,t),e=null),t.exports),s=(e,i,o,s)=>{if(i&&typeof i==`object`||typeof i==`function`)for(var c=r(i),l=0,u=c.length,d;l<u;l++)d=c[l],!a.call(e,d)&&d!==o&&t(e,d,{get:(e=>i[e]).bind(null,d),enumerable:!(s=n(i,d))||s.enumerable});return e},c=(n,r,o)=>(o=n==null?{}:e(i(n)),s(r||!n||!n.__esModule||!a.call(n,`default`)?t(o,`default`,{value:n,enumerable:!0}):o,n)),l=o((e=>{var t=Symbol.for(`react.transitional.element`),n=Symbol.for(`react.fragment`);function r(e,n,r){var i=null;if(r!==void 0&&(i=``+r),n.key!==void 0&&(i=``+n.key),`key`in n)for(var a in r={},n)a!==`key`&&(r[a]=n[a]);else r=n;return n=r.ref,{$$typeof:t,type:e,key:i,ref:n===void 0?null:n,props:r}}e.Fragment=n,e.jsx=r,e.jsxs=r})),u=o(((e,t)=>{t.exports=l()}));export{o as n,c as r,u as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/layers-Cp6xWl69.js ===
+import{t as e}from"./createLucideIcon-Dz5w4CtK.js";var t=e(`layers`,[[`path`,{d:`M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z`,key:`zw3jo`}],[`path`,{d:`M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12`,key:`1wduqc`}],[`path`,{d:`M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17`,key:`kqbvx6`}]]);export{t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/lazyRouteComponent-CNoRSiag.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n,t as r}from"./useRouter-C8taXhX3.js";import{C as i,P as a,R as o,a as s,d as c,h as l,m as u,n as d,t as f}from"./link-BhBo0Yh6.js";import{t as p}from"./useNavigate-BR9bgUfC.js";var m=`__root__`;function h(e){if(e.statusCode=e.statusCode||e.code||307,!e._builtLocation&&!e.reloadDocument&&typeof e.href==`string`)try{new URL(e.href),e.reloadDocument=!0}catch{}let t=new Headers(e.headers);e.href&&t.get(`Location`)===null&&t.set(`Location`,e.href);let n=new Response(null,{status:e.statusCode,headers:t});if(n.options=e,e.throw)throw n;return n}function g(e){return e instanceof Response&&!!e.options}function _(e){if(typeof e==`object`&&e&&e.isSerializedRedirect)return h(e)}var v=class{get to(){return this._to}get id(){return this._id}get path(){return this._path}get fullPath(){return this._fullPath}constructor(e){if(this.init=e=>{this.originalIndex=e.originalIndex;let t=this.options,n=!t?.path&&!t?.id;this.parentRoute=this.options.getParentRoute?.(),n?this._path=m:this.parentRoute||i();let r=n?m:t?.path;r&&r!==`/`&&(r=u(r));let a=t?.id||r,o=n?m:c([this.parentRoute.id===`__root__`?``:this.parentRoute.id,a]);r===`__root__`&&(r=`/`),o!==`__root__`&&(o=c([`/`,o]));let s=o===`__root__`?`/`:c([this.parentRoute.fullPath,r]);this._path=r,this._id=o,this._fullPath=s,this._to=l(s)},this.addChildren=e=>this._addFileChildren(e),this._addFileChildren=e=>(Array.isArray(e)&&(this.children=e),typeof e==`object`&&e&&(this.children=Object.values(e)),this),this._addFileTypes=()=>this,this.updateLoader=e=>(Object.assign(this.options,e),this),this.update=e=>(Object.assign(this.options,e),this),this.lazy=e=>(this.lazyFn=e,this),this.redirect=e=>h({from:this.fullPath,...e}),this.options=e||{},this.isRoot=!e?.getParentRoute,e?.id&&e?.path)throw Error(`Route cannot have both an 'id' and a 'path' option.`)}},y=class extends v{constructor(e){super(e)}},b=e(n(),1),x=b.createContext(void 0),S=b.createContext(void 0),C={get(){},subscribe(){return{unsubscribe(){}}}};function w(e,t){let n=b.useRef();return r=>{let i=e?.select?e.select(r):r;return e?.structuralSharing??t.options.defaultStructuralSharing?n.current=o(n.current,i):i}}function T(e){let t=r(),n=b.useContext(e.from?S:x),a=e.from?t.stores.getRouteMatchStore(e.from):t.stores.matchStores.get(n),o=w(e,t),s=d(a??C,e=>e?o(e):C);if(s!==C)return s;(e.shouldThrow??!0)&&i()}function E(e){return T({from:e.from,strict:e.strict,structuralSharing:e.structuralSharing,select:t=>e.select?e.select(t.loaderData):t.loaderData})}function D(e){let{select:t,...n}=e;return T({...n,select:e=>t?t(e.loaderDeps):e.loaderDeps})}function O(e){return T({from:e.from,shouldThrow:e.shouldThrow,structuralSharing:e.structuralSharing,strict:e.strict,select:t=>{let n=e.strict===!1?t.params:t._strictParams;return e.select?e.select(n):n}})}function k(e){return T({from:e.from,strict:e.strict,shouldThrow:e.shouldThrow,structuralSharing:e.structuralSharing,select:t=>e.select?e.select(t.search):t.search})}function A(e){return T({...e,select:t=>e.select?e.select(t.context):t.context})}var j=t(),M=class extends v{constructor(e){super(e),this.useMatch=e=>T({select:e?.select,from:this.id,structuralSharing:e?.structuralSharing}),this.useRouteContext=e=>A({...e,from:this.id}),this.useSearch=e=>k({select:e?.select,structuralSharing:e?.structuralSharing,from:this.id}),this.useParams=e=>O({select:e?.select,structuralSharing:e?.structuralSharing,from:this.id}),this.useLoaderDeps=e=>D({...e,from:this.id}),this.useLoaderData=e=>E({...e,from:this.id}),this.useNavigate=()=>p({from:this.fullPath}),this.Link=b.forwardRef((e,t)=>(0,j.jsx)(f,{ref:t,from:this.fullPath,...e}))}};function N(e){return new M(e)}function P(){return e=>I(e)}var F=class extends y{constructor(e){super(e),this.useMatch=e=>T({select:e?.select,from:this.id,structuralSharing:e?.structuralSharing}),this.useRouteContext=e=>A({...e,from:this.id}),this.useSearch=e=>k({select:e?.select,structuralSharing:e?.structuralSharing,from:this.id}),this.useParams=e=>O({select:e?.select,structuralSharing:e?.structuralSharing,from:this.id}),this.useLoaderDeps=e=>D({...e,from:this.id}),this.useLoaderData=e=>E({...e,from:this.id}),this.useNavigate=()=>p({from:this.fullPath}),this.Link=b.forwardRef((e,t)=>(0,j.jsx)(f,{ref:t,from:this.fullPath,...e}))}};function I(e){return new F(e)}function L(e){return new R(e,{silent:!0}).createRoute}var R=class{constructor(e,t){this.path=e,this.createRoute=e=>{let t=N(e);return t.isRoot=!1,t},this.silent=t?.silent}};function z(e,t){let n,r,i,o,c=()=>(n||=e().then(e=>{n=void 0,r=e[t??`default`]}).catch(e=>{if(i=e,a(i)&&i instanceof Error&&typeof window<`u`&&typeof sessionStorage<`u`){let e=`tanstack_router_reload:${i.message}`;sessionStorage.getItem(e)||(sessionStorage.setItem(e,`1`),o=!0)}}),n),l=function(e){if(o)throw window.location.reload(),new Promise(()=>{});if(i)throw i;if(!r)if(s)s(c());else throw c();return b.createElement(r,e)};return l.preload=c,l}export{x as a,h as c,w as i,m as l,L as n,g as o,P as r,_ as s,z as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/lesson._lessonId-BYxe1JmO.js ===
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/lesson._lessonId-DUxPKgcw.js","assets/jsx-runtime-BkSabwWG.js","assets/useRouter-C8taXhX3.js","assets/link-BhBo0Yh6.js","assets/queries-B7Arqryn.js","assets/supabase-DXn9ZPwL.js","assets/client-CKVMbL1z.js","assets/useAsync-CZJ1G06G.js","assets/States-BulpY35p.js"])))=>i.map(i=>d[i]);
+import{n as e,t}from"./lazyRouteComponent-CNoRSiag.js";import{t as n}from"./preload-helper-Czpn1I53.js";var r=e(`/lesson/$lessonId`)({component:t(()=>n(()=>import(`./lesson._lessonId-DUxPKgcw.js`),__vite__mapDeps([0,1,2,3,4,5,6,7,8])),`component`)});export{r as t};
+=== END FILE ===
+

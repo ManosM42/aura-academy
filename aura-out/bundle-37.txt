@@ -1,0 +1,1588 @@
+=== FILE: src/routes/seminars.tsx ===
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  AnimatePresence,
+  motion,
+  useMotionTemplate,
+  useMotionValue,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+} from "motion/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Calendar as CalendarIcon,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Mail,
+  MapPin,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+  User,
+  Users,
+  Video,
+} from "lucide-react";
+import {
+  GROUP_CAPACITY,
+  MIN_GROUP,
+  type AvailabilityIndex,
+  type Experience,
+  type SeminarFormat,
+  createSeminarBooking,
+  fromISO,
+  getAvailability,
+  getDayAvailability,
+  getDayStatus,
+  indexAvailability,
+  startOfMonth,
+  toISO,
+} from "@/lib/seminars";
+
+export const Route = createFileRoute("/seminars")({ component: SeminarsBookingRoute });
+
+/* ------------------------------------------------------------------ */
+/* Theme tokens                                                       */
+/* ------------------------------------------------------------------ */
+
+const chromeText =
+  "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+
+const MONTHS_EL = [
+  "Ιανουάριος", "Φεβρουάριος", "Μάρτιος", "Απρίλιος", "Μάιος", "Ιούνιος",
+  "Ιούλιος", "Αύγουστος", "Σεπτέμβριος", "Οκτώβριος", "Νοέμβριος", "Δεκέμβριος",
+];
+const WEEKDAYS_EL = ["Δ", "Τ", "Τ", "Π", "Π", "Σ", "Κ"];
+
+const EXPERIENCE_OPTIONS: { value: Experience; label: string }[] = [
+  { value: "beginner", label: "Αρχάριος" },
+  { value: "intermediate", label: "Μέτριο επίπεδο" },
+  { value: "professional", label: "Επαγγελματίας" },
+];
+
+type Step = "format" | "date" | "details" | "done";
+
+/* ------------------------------------------------------------------ */
+/* Root                                                                */
+/* ------------------------------------------------------------------ */
+
+function SeminarsBookingRoute() {
+  const reduce = useReducedMotion();
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+  const glowY = useTransform(scrollYProgress, [0, 1], [-60, 120]);
+  const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 60]);
+
+  const [step, setStep] = useState<Step>("format");
+  const [format, setFormat] = useState<SeminarFormat | null>(null);
+  const [date, setDate] = useState<string | null>(null);
+  const [participants, setParticipants] = useState(2);
+  const [reference, setReference] = useState<string | null>(null);
+
+  const [avail, setAvail] = useState<AvailabilityIndex>(new Map());
+  const [loadingAvail, setLoadingAvail] = useState(false);
+  const [month, setMonth] = useState(() => startOfMonth(new Date()));
+
+  async function loadMonth(target: Date) {
+    setLoadingAvail(true);
+    try {
+      const first = startOfMonth(target);
+      const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+      const rows = await getAvailability(toISO(first), toISO(last));
+      setAvail(indexAvailability(rows));
+    } catch {
+      setAvail(new Map());
+    } finally {
+      setLoadingAvail(false);
+    }
+  }
+
+  useEffect(() => {
+    loadMonth(month);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [month]);
+
+  function pickFormat(f: SeminarFormat) {
+    setFormat(f);
+    setParticipants(f === "private" ? 1 : MIN_GROUP);
+    setDate(null);
+    setStep("date");
+  }
+
+  function pickDate(d: string) {
+    setDate(d);
+    setStep("details");
+  }
+
+  function onBooked(ref: string) {
+    setReference(ref);
+    setStep("done");
+    loadMonth(month);
+  }
+
+  function restart() {
+    setStep("format");
+    setFormat(null);
+    setDate(null);
+    setReference(null);
+  }
+
+  return (
+    <main
+      ref={sectionRef}
+      className="relative min-h-screen overflow-hidden bg-black pb-24 pt-28 text-white selection:bg-white selection:text-black"
+    >
+      {/* Ambient chrome background */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
+      />
+      <motion.div
+        aria-hidden
+        style={{ y: glowY }}
+        className="pointer-events-none absolute -right-40 top-20 -z-10 h-[520px] w-[520px] rounded-full bg-white/[0.06] blur-[140px]"
+      />
+      <motion.div
+        aria-hidden
+        style={{ rotate: ringRotate }}
+        className="pointer-events-none absolute -left-44 top-64 -z-10 h-[480px] w-[480px] rounded-full border border-dashed border-white/10"
+      />
+      <div
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent"
+      />
+
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 md:px-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        >
+          <div className="mb-4 flex items-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50">
+            <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
+            Κράτηση σεμιναρίου
+          </div>
+          <h1
+            className={`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl ${chromeText}`}
+          >
+            Κλείσε τη θέση σου στο AURA.
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-relaxed text-zinc-400 sm:text-lg">
+            Επίλεξε group ή private, μια διαθέσιμη ημερομηνία, και άφησε τα
+            στοιχεία σου. Θα επικοινωνήσουμε μαζί σου για επιβεβαίωση.
+          </p>
+        </motion.div>
+        <Link
+  to="/online-seminars"
+  className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-5 py-2.5 text-sm font-medium text-zinc-200 transition hover:border-white/50 hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+>
+  <Video className="size-4" /> Online σεμινάρια <ArrowRight className="size-4" />
+</Link>
+
+        {/* Progress rail */}
+        <StepRail step={step} format={format} />
+
+        {/* Steps */}
+        <div className="relative mt-10 overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-zinc-900/80 via-black to-zinc-950 shadow-[0_0_90px_-30px_rgba(255,255,255,0.18)]">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-white/[0.06] blur-[90px]"
+          />
+          <AnimatePresence mode="wait">
+            {step === "format" && (
+              <StepWrap key="format">
+                <FormatStep onPick={pickFormat} reduce={!!reduce} />
+              </StepWrap>
+            )}
+
+            {step === "date" && format && (
+              <StepWrap key="date">
+                <DateStep
+                  format={format}
+                  participants={participants}
+                  setParticipants={setParticipants}
+                  month={month}
+                  setMonth={setMonth}
+                  avail={avail}
+                  loading={loadingAvail}
+                  onPickDate={pickDate}
+                  onBack={() => setStep("format")}
+                />
+              </StepWrap>
+            )}
+
+            {step === "details" && format && date && (
+              <StepWrap key="details">
+                <DetailsStep
+                  format={format}
+                  date={date}
+                  participants={participants}
+                  onBack={() => setStep("date")}
+                  onBooked={onBooked}
+                />
+              </StepWrap>
+            )}
+
+            {step === "done" && reference && format && date && (
+              <StepWrap key="done">
+                <DoneStep
+                  reference={reference}
+                  format={format}
+                  date={date}
+                  participants={participants}
+                  onRestart={restart}
+                />
+              </StepWrap>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function StepWrap({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -24 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="relative p-6 sm:p-10"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Progress rail                                                      */
+/* ------------------------------------------------------------------ */
+
+function StepRail({ step, format }: { step: Step; format: SeminarFormat | null }) {
+  const steps: { key: Step; label: string }[] = [
+    { key: "format", label: "Format" },
+    { key: "date", label: "Ημερομηνία" },
+    { key: "details", label: "Στοιχεία" },
+    { key: "done", label: "Επιβεβαίωση" },
+  ];
+  const idx = steps.findIndex((s) => s.key === step);
+
+  return (
+    <div className="mt-10 flex items-center gap-2 sm:gap-3">
+      {steps.map((s, i) => (
+        <div key={s.key} className="flex flex-1 items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2">
+            <div
+              className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold transition-colors duration-300 ${
+                i < idx
+                  ? "border-white/60 bg-white text-black"
+                  : i === idx
+                    ? "border-white/70 bg-white/10 text-white shadow-[0_0_18px_rgba(255,255,255,0.3)]"
+                    : "border-white/15 bg-black/60 text-zinc-500"
+              }`}
+            >
+              {i < idx ? <Check className="size-3.5" /> : i + 1}
+            </div>
+            <span
+              className={`hidden text-xs font-medium sm:block ${
+                i <= idx ? "text-zinc-200" : "text-zinc-600"
+              }`}
+            >
+              {s.label}
+              {s.key === "format" && format && i < idx && (
+                <span className="ml-1 text-zinc-500">
+                  ({format === "group" ? "Group" : "Private"})
+                </span>
+              )}
+            </span>
+          </div>
+          {i < steps.length - 1 && (
+            <div className="h-px flex-1 bg-gradient-to-r from-white/20 to-white/5" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Step 1: Format                                                     */
+/* ------------------------------------------------------------------ */
+
+function FormatStep({
+  onPick,
+  reduce,
+}: {
+  onPick: (f: SeminarFormat) => void;
+  reduce: boolean;
+}) {
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-white sm:text-2xl">
+        Πώς θέλεις να παρακολουθήσεις;
+      </h2>
+      <p className="mt-2 text-sm text-zinc-400">
+        Και τα δύο formats καλύπτουν τεχνική, cutting geometry, fades και
+        client experience.
+      </p>
+
+      <div className="mt-8 grid gap-5 sm:grid-cols-2">
+        <FormatCard
+          icon={Users}
+          title="Group"
+          desc="Εκπαίδευση μαζί με άλλους barbers, 2 έως 8 άτομα ανά σεμινάριο."
+          bullets={["Ανταλλαγή τεχνικών με άλλους", "Οικονομικότερη επιλογή", "Ζωντανή ενέργεια ομάδας"]}
+          reduce={reduce}
+          onClick={() => onPick("group")}
+        />
+        <FormatCard
+          icon={User}
+          title="Private"
+          desc="1-προς-1 εκπαίδευση, πλήρως προσαρμοσμένη στο επίπεδο και τους στόχους σου."
+          bullets={["100% προσοχή στον educator", "Ευελιξία στο πρόγραμμα", "Βαθιά εξατομίκευση"]}
+          reduce={reduce}
+          onClick={() => onPick("private")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function FormatCard({
+  icon: Icon,
+  title,
+  desc,
+  bullets,
+  reduce,
+  onClick,
+}: {
+  icon: typeof Users;
+  title: string;
+  desc: string;
+  bullets: string[];
+  reduce: boolean;
+  onClick: () => void;
+}) {
+  const x = useMotionValue(-300);
+  const y = useMotionValue(-300);
+  const rx = useSpring(0, { stiffness: 160, damping: 18 });
+  const ry = useSpring(0, { stiffness: 160, damping: 18 });
+  const spot = useMotionTemplate`radial-gradient(260px circle at ${x}px ${y}px, rgba(255,255,255,0.14), transparent 70%)`;
+
+  function onMove(e: React.PointerEvent<HTMLButtonElement>) {
+    const r = e.currentTarget.getBoundingClientRect();
+    const px = e.clientX - r.left;
+    const py = e.clientY - r.top;
+    x.set(px);
+    y.set(py);
+    if (!reduce) {
+      ry.set((px / r.width - 0.5) * 8);
+      rx.set(-(py / r.height - 0.5) * 8);
+    }
+  }
+  function onLeave() {
+    rx.set(0);
+    ry.set(0);
+  }
+
+  return (
+    <div style={{ perspective: 1000 }}>
+      <motion.button
+        type="button"
+        onClick={onClick}
+        onPointerMove={onMove}
+        onPointerLeave={onLeave}
+        style={{ rotateX: rx, rotateY: ry }}
+        whileHover={{ y: -4 }}
+        whileTap={{ scale: 0.98 }}
+        transition={{ type: "spring", stiffness: 300, damping: 22 }}
+        className="group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-zinc-900/80 to-black/90 p-6 text-left shadow-[0_24px_60px_-28px_rgba(0,0,0,0.95)] transition-colors duration-300 hover:border-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+      >
+        <motion.div
+          aria-hidden
+          style={{ background: spot }}
+          className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        />
+        <div className="relative">
+          <div className="flex size-12 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:-rotate-6 group-hover:scale-110 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+            <Icon className="size-6" />
+          </div>
+          <h3 className={`mt-5 text-2xl font-bold ${chromeText}`}>{title}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-zinc-400">{desc}</p>
+          <ul className="mt-5 space-y-2">
+            {bullets.map((b) => (
+              <li key={b} className="flex items-center gap-2 text-xs text-zinc-400">
+                <Sparkles className="size-3.5 shrink-0 text-zinc-500" />
+                {b}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-zinc-200">
+            Επιλογή {title}
+            <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />
+          </div>
+        </div>
+      </motion.button>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Step 2: Date calendar                                              */
+/* ------------------------------------------------------------------ */
+
+function DateStep({
+  format,
+  participants,
+  setParticipants,
+  month,
+  setMonth,
+  avail,
+  loading,
+  onPickDate,
+  onBack,
+}: {
+  format: SeminarFormat;
+  participants: number;
+  setParticipants: (n: number) => void;
+  month: Date;
+  setMonth: (d: Date) => void;
+  avail: AvailabilityIndex;
+  loading: boolean;
+  onPickDate: (date: string) => void;
+  onBack: () => void;
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
+
+  const cells = useMemo(() => buildMonthGrid(month), [month]);
+  const isPastMonth =
+    month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth();
+
+  const selectedAvail = selected
+    ? getDayAvailability(avail.get(selected), format, participants)
+    : null;
+  const selectedUnavailable =
+    selectedAvail?.status === "blocked" || selectedAvail?.status === "full";
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white"
+          >
+            <ArrowLeft className="size-3.5" /> Αλλαγή format
+          </button>
+          <h2 className="mt-2 text-xl font-semibold text-white sm:text-2xl">
+            Επίλεξε ημερομηνία
+          </h2>
+          <p className="mt-1 text-sm text-zinc-400">
+            {format === "group" ? "Group seminar" : "Private seminar"} ·{" "}
+            {format === "group" ? `${participants} άτομα` : "1-προς-1"}
+          </p>
+        </div>
+
+        {format === "group" && (
+          <div className="flex items-center gap-3 rounded-full border border-white/15 bg-black/60 px-4 py-2">
+            <Users className="size-4 text-zinc-400" />
+            <span className="text-xs text-zinc-400">Άτομα</span>
+            <div className="flex items-center gap-2">
+              <StepperBtn
+                onClick={() => setParticipants(Math.max(MIN_GROUP, participants - 1))}
+                label="−"
+              />
+              <span className="w-5 text-center text-sm font-semibold text-white">
+                {participants}
+              </span>
+              <StepperBtn
+                onClick={() => setParticipants(Math.min(GROUP_CAPACITY, participants + 1))}
+                label="+"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Calendar */}
+      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_320px]">
+        <div className="rounded-2xl border border-white/10 bg-black/50 p-4 sm:p-6">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              disabled={isPastMonth}
+              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+              className="flex size-8 items-center justify-center rounded-full border border-white/15 text-zinc-300 transition hover:border-white/40 hover:text-white disabled:opacity-25"
+            >
+              <ChevronLeft className="size-4" />
+            </button>
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-200">
+              {MONTHS_EL[month.getMonth()]} {month.getFullYear()}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+              className="flex size-8 items-center justify-center rounded-full border border-white/15 text-zinc-300 transition hover:border-white/40 hover:text-white"
+            >
+              <ChevronRight className="size-4" />
+            </button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wider text-zinc-600">
+            {WEEKDAYS_EL.map((w, i) => (
+              <div key={`${w}-${i}`}>{w}</div>
+            ))}
+          </div>
+
+          <div className="relative mt-2 grid grid-cols-7 gap-1.5">
+            {loading && (
+              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-black/50 backdrop-blur-sm">
+                <Loader2 className="size-5 animate-spin text-zinc-400" />
+              </div>
+            )}
+            {cells.map((cell, i) => {
+              if (!cell) return <div key={i} />;
+              const iso = toISO(cell);
+              const isPast = cell < today;
+              const dayAvail = isPast
+                ? { status: "blocked" as const, remaining: 0 }
+                : getDayAvailability(avail.get(iso), format, participants);
+              const status = dayAvail.status;
+              const isSelected = selected === iso;
+
+              return (
+                <button
+                  key={iso}
+                  type="button"
+                  disabled={isPast || status === "blocked" || status === "full"}
+                  onClick={() => setSelected(iso)}
+                  className={`relative flex aspect-square flex-col items-center justify-center rounded-lg border text-xs font-medium transition-all duration-200 ${
+                    isSelected
+                      ? "border-white bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)]"
+                      : status === "blocked" || isPast
+                        ? "border-transparent text-zinc-700 cursor-not-allowed"
+                        : status === "full"
+                          ? "border-transparent text-zinc-700 line-through cursor-not-allowed"
+                          : status === "few"
+                            ? "border-amber-400/25 bg-amber-400/[0.06] text-zinc-200 hover:border-amber-400/50"
+                            : "border-white/10 bg-white/[0.02] text-zinc-200 hover:border-white/40 hover:bg-white/[0.06]"
+                  }`}
+                >
+                  {cell.getDate()}
+                  {!isPast && status !== "blocked" && (
+                    <span
+                      className={`mt-0.5 size-1 rounded-full ${
+                        isSelected
+                          ? "bg-black"
+                          : status === "full"
+                            ? "bg-transparent"
+                            : status === "few"
+                              ? "bg-amber-400"
+                              : "bg-emerald-400"
+                      }`}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-4 text-[11px] text-zinc-500">
+            <Legend color="bg-emerald-400" label="Διαθέσιμο" />
+            <Legend color="bg-amber-400" label="Λίγες θέσεις" />
+            <Legend color="bg-zinc-700" label="Γεμάτο / κλειστό" />
+          </div>
+        </div>
+
+        {/* Selected date */}
+        <div className="h-fit rounded-2xl border border-white/10 bg-black/50 p-5">
+          <h4 className="flex items-center gap-2 text-sm font-semibold text-white">
+            <CalendarIcon className="size-4 text-zinc-400" />
+            Επιλεγμένη ημερομηνία
+          </h4>
+
+          {!selected || !selectedAvail ? (
+            <p className="mt-4 text-sm text-zinc-500">
+              Επίλεξε μια ημερομηνία στο ημερολόγιο για να συνεχίσεις.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-4">
+              <p className="text-base font-medium text-white">
+                {fromISO(selected).toLocaleDateString("el-GR", {
+                  weekday: "long",
+                  day: "numeric",
+                  month: "long",
+                })}
+              </p>
+
+              <p
+                className={`text-[11px] uppercase tracking-wider ${
+                  selectedUnavailable
+                    ? "text-zinc-600"
+                    : selectedAvail.status === "few"
+                      ? "text-amber-400"
+                      : "text-emerald-400"
+                }`}
+              >
+                {selectedAvail.status === "blocked"
+                  ? "Μη διαθέσιμη"
+                  : selectedAvail.status === "full"
+                    ? "Γεμάτη"
+                    : format === "group"
+                      ? `${selectedAvail.remaining} θέσεις διαθέσιμες`
+                      : "Διαθέσιμη"}
+              </p>
+
+              <button
+                type="button"
+                disabled={selectedUnavailable}
+                onClick={() => onPickDate(selected)}
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-6 py-3 text-sm font-semibold text-black shadow-[0_0_24px_rgba(255,255,255,0.2)] transition-all duration-300 enabled:hover:shadow-[0_0_40px_rgba(255,255,255,0.4)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Συνέχεια
+                <ArrowRight className="size-4 transition-transform duration-300 group-enabled:group-hover:translate-x-1" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepperBtn({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex size-6 items-center justify-center rounded-full border border-white/20 text-sm text-zinc-300 transition hover:border-white/50 hover:text-white"
+    >
+      {label}
+    </button>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={`size-1.5 rounded-full ${color}`} />
+      {label}
+    </span>
+  );
+}
+
+function buildMonthGrid(month: Date): (Date | null)[] {
+  const first = startOfMonth(month);
+  const firstWeekday = (first.getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const cells: (Date | null)[] = Array(firstWeekday).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(new Date(month.getFullYear(), month.getMonth(), d));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+/* ------------------------------------------------------------------ */
+/* Step 3: Details form (dynamic per format) + terms                  */
+/* ------------------------------------------------------------------ */
+
+function DetailsStep({
+  format,
+  date,
+  participants,
+  onBack,
+  onBooked,
+}: {
+  format: SeminarFormat;
+  date: string;
+  participants: number;
+  onBack: () => void;
+  onBooked: (ref: string) => void;
+}) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [city, setCity] = useState("");
+  const [experience, setExperience] = useState<Experience>("intermediate");
+  const [groupName, setGroupName] = useState("");
+  const [participantNames, setParticipantNames] = useState("");
+  const [goals, setGoals] = useState("");
+  const [notes, setNotes] = useState("");
+  const [terms, setTerms] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const valid =
+    fullName.trim().length >= 2 &&
+    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) &&
+    phone.trim().length >= 6 &&
+    city.trim().length >= 2 &&
+    terms;
+
+  async function submit() {
+    if (!valid || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const ref = await createSeminarBooking({
+        format,
+        date,
+        participants,
+        fullName,
+        email,
+        phone,
+        city,
+        experience,
+        groupName,
+        participantNames,
+        goals,
+        notes,
+        terms,
+      });
+      onBooked(ref);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "unknown";
+      setError(
+        msg.includes("slot_unavailable")
+          ? "Δυστυχώς αυτή η ημερομηνία μόλις έγινε μη διαθέσιμη. Διάλεξε άλλη ημερομηνία."
+          : "Κάτι πήγε στραβά. Δοκίμασε ξανά σε λίγο.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 transition hover:text-white"
+      >
+        <ArrowLeft className="size-3.5" /> Αλλαγή ημερομηνίας
+      </button>
+
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold text-white sm:text-2xl">Τα στοιχεία σου</h2>
+        <SummaryPill format={format} date={date} participants={participants} />
+      </div>
+
+      <div className="mt-8 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
+        <div className="space-y-5">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field
+              icon={User}
+              label={format === "group" ? "Υπεύθυνος επικοινωνίας" : "Ονοματεπώνυμο"}
+              value={fullName}
+              onChange={setFullName}
+              placeholder="Ονοματεπώνυμο"
+              autoComplete="name"
+            />
+            <Field
+              icon={Mail}
+              label="Email"
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+            <Field
+              icon={Phone}
+              label="Τηλέφωνο"
+              type="tel"
+              value={phone}
+              onChange={setPhone}
+              placeholder="69xxxxxxxx"
+              autoComplete="tel"
+            />
+            <Field
+              icon={MapPin}
+              label="Πόλη"
+              value={city}
+              onChange={setCity}
+              placeholder="π.χ. Ηράκλειο"
+              autoComplete="address-level2"
+            />
+          </div>
+
+          <SelectField
+            label="Επίπεδο εμπειρίας"
+            value={experience}
+            onChange={(v) => setExperience(v as Experience)}
+            options={EXPERIENCE_OPTIONS}
+          />
+
+          {/* Dynamic section: group vs private */}
+          <AnimatePresence mode="wait">
+            {format === "group" ? (
+              <motion.div
+                key="group-fields"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-5"
+              >
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                  <Users className="size-3.5" /> Στοιχεία ομάδας · {participants} άτομα
+                </p>
+                <Field
+                  label="Όνομα ομάδας / κομμωτηρίου (προαιρετικό)"
+                  value={groupName}
+                  onChange={setGroupName}
+                  placeholder="π.χ. AURA Team"
+                />
+                <TextAreaField
+                  label="Ονόματα συμμετεχόντων (προαιρετικό)"
+                  value={participantNames}
+                  onChange={setParticipantNames}
+                  placeholder={"Ένα όνομα ανά γραμμή…"}
+                  rows={3}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="private-fields"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-5 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-5"
+              >
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-zinc-400">
+                  <User className="size-3.5" /> Private εκπαίδευση
+                </p>
+                <TextAreaField
+                  label="Σε τι θέλεις να εστιάσουμε;"
+                  value={goals}
+                  onChange={setGoals}
+                  placeholder="π.χ. fades, θεωρία γεωμετρίας, στυλ…"
+                  rows={3}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <TextAreaField
+            label="Σημειώσεις (προαιρετικό)"
+            value={notes}
+            onChange={setNotes}
+            placeholder="Οτιδήποτε άλλο θέλεις να μας πεις…"
+            rows={2}
+          />
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+            <input
+              type="checkbox"
+              checked={terms}
+              onChange={(e) => setTerms(e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 rounded border-white/30 bg-black accent-white"
+            />
+            <span className="text-sm leading-relaxed text-zinc-400">
+              Διάβασα και αποδέχομαι τους{" "}
+              <Link
+                to="/terms"
+                target="_blank"
+                className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white"
+              >
+                όρους χρήσης
+              </Link>{" "}
+              και την πολιτική ακύρωσης του σεμιναρίου.
+            </span>
+          </label>
+
+          {error && (
+            <p className="rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+
+          <motion.button
+            type="button"
+            disabled={!valid || submitting}
+            onClick={submit}
+            whileHover={valid ? { scale: 1.02 } : undefined}
+            whileTap={valid ? { scale: 0.98 } : undefined}
+            className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-8 py-4 text-base font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-opacity duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 enabled:hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] enabled:hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto"
+          >
+            {submitting ? (
+              <Loader2 className="relative size-5 animate-spin" />
+            ) : (
+              <>
+                <span className="relative">Επιβεβαίωση κράτησης</span>
+                <ArrowRight className="relative size-5 transition-transform duration-300 group-enabled:group-hover:translate-x-1" />
+              </>
+            )}
+          </motion.button>
+        </div>
+
+        {/* Live summary card */}
+        <BookingSummaryCard
+          format={format}
+          date={date}
+          participants={participants}
+          fullName={fullName}
+          city={city}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SummaryPill({
+  format,
+  date,
+  participants,
+}: {
+  format: SeminarFormat;
+  date: string;
+  participants: number;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-white/15 bg-black/60 px-4 py-1.5 text-xs text-zinc-300">
+      <CalendarIcon className="size-3.5 text-zinc-500" />
+      {fromISO(date).toLocaleDateString("el-GR", { day: "numeric", month: "short" })}
+      <span className="h-3 w-px bg-white/15" />
+      {format === "group" ? `Group · ${participants}` : "Private"}
+    </div>
+  );
+}
+
+function BookingSummaryCard({
+  format,
+  date,
+  participants,
+  fullName,
+  city,
+}: {
+  format: SeminarFormat;
+  date: string;
+  participants: number;
+  fullName: string;
+  city: string;
+}) {
+  return (
+    <div className="relative h-fit overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-zinc-900/90 to-black p-6">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-white/[0.08] blur-[70px]"
+      />
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-zinc-500">
+        Σύνοψη
+      </p>
+      <h3 className={`mt-2 text-xl font-bold ${chromeText}`}>
+        {format === "group" ? "Group seminar" : "Private seminar"}
+      </h3>
+      <ul className="mt-5 space-y-3 text-sm text-zinc-300">
+        <SummaryRow
+          icon={CalendarIcon}
+          label="Ημερομηνία"
+          value={fromISO(date).toLocaleDateString("el-GR", {
+            weekday: "short",
+            day: "numeric",
+            month: "long",
+          })}
+        />
+        <SummaryRow
+          icon={format === "group" ? Users : User}
+          label="Συμμετέχοντες"
+          value={format === "group" ? `${participants} άτομα` : "1 άτομο"}
+        />
+        {fullName && <SummaryRow icon={User} label="Όνομα" value={fullName} />}
+        {city && <SummaryRow icon={MapPin} label="Πόλη" value={city} />}
+      </ul>
+    </div>
+  );
+}
+
+function SummaryRow({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof CalendarIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 border-b border-white/5 pb-3 last:border-0 last:pb-0">
+      <span className="flex items-center gap-2 text-zinc-500">
+        <Icon className="size-3.5" /> {label}
+      </span>
+      <span className="text-right font-medium text-zinc-200">{value}</span>
+    </li>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Form primitives                                                    */
+/* ------------------------------------------------------------------ */
+
+function Field({
+  icon: Icon,
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  autoComplete,
+}: {
+  icon?: typeof User;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: string;
+  autoComplete?: string;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+        {label}
+      </span>
+      <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 transition-colors duration-200 focus-within:border-white/40 focus-within:ring-2 focus-within:ring-white/10">
+        {Icon && <Icon className="size-4 shrink-0 text-zinc-500" />}
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          className="w-full bg-transparent text-sm text-white placeholder:text-zinc-600 focus:outline-none"
+        />
+      </div>
+    </label>
+  );
+}
+
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-zinc-500">
+        {label}
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full resize-none rounded-xl border border-white/15 bg-black/60 px-3.5 py-2.5 text-sm text-white placeholder:text-zinc-600 transition-colors duration-200 focus:border-white/40 focus:outline-none focus:ring-2 focus:ring-white/10"
+      />
+    </label>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: str
+[TRUNCATED: file is 44094 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: supabase/functions/change-plan/index.ts ===
+// supabase/functions/change-plan/index.ts
+//
+// UPGRADES the calling user's ACTIVE subscription to a higher plan.
+//
+//   * The billing day does NOT change. The renewal date stays exactly where it is.
+//   * Today the customer pays the NEW plan's monthly price for the days that are left in the
+//     current billing period:   newPrice x remainingDays / daysInBillingPeriod
+//     (e.g. PRO 49,99 with 13 of 31 days left = 20,96).
+//   * At the next renewal the customer pays the FULL price of the new plan.
+//   * If the payment fails, NOTHING changes. If the plan switch fails after a successful
+//     payment, the payment is refunded automatically.
+//
+// Flow: draft invoice + one invoice item -> finalize -> pay -> swap the subscription price
+// (proration_behavior "none", billing cycle untouched) -> sync the database.
+//
+// Body:  { planId: "mid" | "high", preview?: boolean }
+//   preview: true  -> only returns the numbers, changes nothing.
+//
+// Deploy WITH JWT verification (the default).
+import Stripe from "npm:stripe@^18";
+import { loadVivaConfig, VivaConfigError } from "../_shared/viva.ts";
+import { runVivaUpgrade } from "../_shared/viva-upgrade.ts";
+import type { RpcClient } from "../_shared/viva-process.ts";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import { invoicePaymentIntentId, recordInvoice, syncSubscription } from "../_shared/billing.ts";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+type PlanId = "low" | "mid" | "high";
+
+const RANK: Record<PlanId, number> = { low: 1, mid: 2, high: 3 };
+
+function isPlanId(value: unknown): value is PlanId {
+  return value === "low" || value === "mid" || value === "high";
+}
+
+/** Stripe refuses charges below roughly 0,50 EUR. */
+const MIN_CHARGE_CENTS = 50;
+
+/**
+ * false (as requested): the customer pays the new price for the remaining days and gets NO
+ *   credit for the unused days of the old plan they already paid for.
+ * true: standard proration, the unused part of the old plan is deducted from the charge.
+ */
+const CREDIT_UNUSED_OLD_PLAN = false;
+
+const DAY_MS = 86_400_000;
+
+/** The card that will be charged (best effort, never throws). */
+async function getCardOnFile(
+  stripe: Stripe,
+  sub: Stripe.Subscription,
+  customerId: string,
+): Promise<{ card: { brand: string; last4: string } | null; paymentMethodId: string | null }> {
+  const idOf = (ref: unknown): string | null => {
+    if (typeof ref === "string") return ref;
+    if (ref && typeof ref === "object" && "id" in ref) return String((ref as { id: unknown }).id);
+    return null;
+  };
+  try {
+    let pmId = idOf(sub.default_payment_method);
+    if (!pmId) {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!("deleted" in customer && customer.deleted)) {
+        pmId = idOf(customer.invoice_settings?.default_payment_method);
+      }
+    }
+    if (!pmId) return { card: null, paymentMethodId: null };
+    const pm = await stripe.paymentMethods.retrieve(pmId);
+    return {
+      card: pm.card ? { brand: pm.card.brand, last4: pm.card.last4 } : null,
+      paymentMethodId: pmId,
+    };
+  } catch (err) {
+    console.error("could not read the card on file", err);
+    return { card: null, paymentMethodId: null };
+  }
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing environment configuration");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  // ---- 1. validate input + caller ---------------------------------------
+  let body: { planId?: unknown; preview?: unknown };
+  try {
+    body = JSON.parse(await req.text());
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+  if (!isPlanId(body.planId)) return json({ error: "Unknown plan" }, 400);
+  const targetPlanId: PlanId = body.planId;
+  const previewOnly = body.preview === true;
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user) return json({ error: "Unauthorized" }, 401);
+
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  // Only the Stripe path needs the key (checked right before it is used).
+  const stripe = new Stripe(stripeKey ?? "sk_not_configured");
+
+  let invoiceId: string | null = null;
+  let paymentTaken = false;
+
+  try {
+    // ---- 2. the user's current ACTIVE subscription -------------------------
+    const { data: subRow, error: subError } = await admin
+      .from("subscriptions")
+      .select("stripe_subscription_id, plan_id, status, provider, current_period_end")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (subError) {
+      console.error("subscription lookup failed", subError.message);
+      return json({ error: "Your subscription could not be loaded." }, 500);
+    }
+    if (!subRow || (!subRow.stripe_subscription_id && subRow.provider !== "viva")) {
+      return json({ error: "No active subscription found to upgrade." }, 404);
+    }
+
+    const currentPlanId = subRow.plan_id;
+    if (!isPlanId(currentPlanId)) {
+      console.error("Unknown current plan_id", currentPlanId);
+      return json({ error: "Unknown current plan." }, 500);
+    }
+    if (RANK[targetPlanId] <= RANK[currentPlanId]) {
+      return json({ error: "You can only upgrade to a higher plan." }, 400);
+    }
+
+    // ---- 3. plans (names + target price) from the database ------------------
+    const { data: planRows, error: plansError } = await admin
+      .from("plans")
+      .select("id, name, price_cents, currency, active, stripe_product_id")
+      .in("id", [currentPlanId, targetPlanId]);
+    if (plansError) {
+      console.error("plans lookup failed", plansError.message);
+      return json({ error: "Could not load the plans." }, 500);
+    }
+    const currentPlan = planRows?.find((p) => p.id === currentPlanId);
+    const targetPlan = planRows?.find((p) => p.id === targetPlanId);
+    if (!targetPlan || !targetPlan.active) {
+      return json({ error: "This plan is not available." }, 404);
+    }
+
+    const newAmount = Number(targetPlan.price_cents);
+    if (!Number.isInteger(newAmount) || newAmount < MIN_CHARGE_CENTS) {
+      return json({ error: "This plan has no valid price." }, 500);
+    }
+    const currency = String(targetPlan.currency ?? "eur").toLowerCase();
+    const targetName = String(targetPlan.name);
+    const currentName = String(currentPlan?.name ?? currentPlanId);
+
+    // ---- 3b. Viva subscription: same rules, charged to the saved card --------
+    if (subRow.provider === "viva") {
+      let vivaCfg;
+      try {
+        vivaCfg = loadVivaConfig((name) => Deno.env.get(name));
+      } catch (err) {
+        console.error("Viva configuration problem:", err instanceof VivaConfigError ? err.message : "unknown");
+        return json({ error: "Server misconfigured" }, 500);
+      }
+      if (!subRow.current_period_end) return json({ error: "Your billing period could not be read. Please contact us." }, 409);
+      const currentAmountViva = Number(currentPlan?.price_cents);
+      if (!Number.isInteger(currentAmountViva)) return json({ error: "The current price of your subscription was not found." }, 409);
+
+      const result = await runVivaUpgrade({
+        client: admin as unknown as RpcClient,
+        cfg: vivaCfg,
+        userId: user.id,
+        currentPlanId,
+        targetPlanId,
+        currentPlanName: currentName,
+        targetPlanName: targetName,
+        currentAmountCents: currentAmountViva,
+        newAmountCents: newAmount,
+        periodEnd: String(subRow.current_period_end),
+        previewOnly,
+      });
+      return json(result.body, result.status);
+    }
+
+    if (!stripeKey) {
+      console.error("STRIPE_SECRET_KEY is not set");
+      return json({ error: "Server misconfigured" }, 500);
+    }
+
+    // ---- 4. the live Stripe subscription ------------------------------------
+    const sub = await stripe.subscriptions.retrieve(String(subRow.stripe_subscription_id), {
+      expand: ["items.data.price"],
+    });
+
+    if (sub.status !== "active") {
+      return json({ error: "Your subscription is not active right now. Fix your payment first." }, 409);
+    }
+    if (sub.items.data.length !== 1) {
+      console.error("Unexpected subscription items", sub.id, sub.items.data.length);
+      return json({ error: "Your subscription has an unexpected shape. Please contact us." }, 409);
+    }
+    const item = sub.items.data[0];
+    if (!item) return json({ error: "Your subscription has no product." }, 409);
+    if ((item.quantity ?? 1) !== 1) {
+      return json({ error: "Your subscription has an unexpected quantity. Please contact us." }, 409);
+    }
+
+    // What the customer ACTUALLY pays today (may differ from today's list price).
+    const currentAmount = item.price.unit_amount;
+    if (typeof currentAmount !== "number") {
+      return json({ error: "The current price of your subscription was not found." }, 409);
+    }
+    if (String(item.price.currency).toLowerCase() !== currency) {
+      return json({ error: "The two plans use different currencies. Please contact us." }, 409);
+    }
+
+    // ---- 5. the days left in the CURRENT billing period ---------------------
+    const period = (sub as unknown as { current_period_start?: number; current_period_end?: number });
+    const itemPeriod = item as unknown as { current_period_start?: number; current_period_end?: number };
+    const startSec = period.current_period_start ?? itemPeriod.current_period_start;
+    const endSec = period.current_period_end ?? itemPeriod.current_period_end;
+    if (!startSec || !endSec) {
+      console.error("Subscription without period dates", sub.id);
+      return json({ error: "Your billing period could not be read. Please contact us." }, 409);
+    }
+    const startMs = startSec * 1000;
+    const endMs = endSec * 1000;
+    const nowMs = Date.now();
+    if (endMs <= nowMs) {
+      return json({ error: "Your subscription is renewing right now. Try again in a few minutes." }, 409);
+    }
+
+    const periodDays = Math.max(1, Math.round((endMs - startMs) / DAY_MS));
+    // Part of a day counts as a full day, so the charge is never zero.
+    const remainingDays = Math.min(periodDays, Math.max(1, Math.ceil((endMs - nowMs) / DAY_MS)));
+
+    const proratedNew = Math.round((newAmount * remainingDays) / periodDays);
+    const creditCents = CREDIT_UNUSED_OLD_PLAN
+      ? Math.round((currentAmount * remainingDays) / periodDays)
+      : 0;
+    const dueToday = Math.max(proratedNew - creditCents, MIN_CHARGE_CENTS);
+
+    const renewalDate = new Date(endMs).toISOString();
+    const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+    const method = await getCardOnFile(stripe, sub, customerId);
+
+    // ---- 6. preview: numbers only, nothing is changed ----------------------
+    if (previewOnly) {
+      return json({
+        currentPlanId,
+        targetPlanId,
+        currentPlanName: currentName,
+        targetPlanName: targetName,
+        currency,
+        currentAmountCents: currentAmount,
+        newAmountCents: newAmount,
+        periodDays,
+        remainingDays,
+        creditCents,
+        dueTodayCents: dueToday,
+        renewalDate,
+        card: method.card,
+      });
+    }
+
+    // ---- 7. the Stripe product of the target plan --------------------------
+    let productId: string | null = (targetPlan.stripe_product_id as string | null) ?? null;
+    if (productId) {
+      try {
+        await stripe.products.update(productId, { name: targetName });
+      } catch (err) {
+        console.error("Stored product unusable, creating a new one", err);
+        productId = null;
+      }
+    }
+    if (!productId) {
+      const product = await stripe.products.create({
+        name: targetName,
+        metadata: { plan_id: String(targetPlan.id) },
+      });
+      productId = product.id;
+      const { error: saveError } = await admin
+        .from("plans")
+        .update({ stripe_product_id: productId })
+        .eq("id", targetPlan.id);
+      if (saveError) console.error("Could not store stripe_product_id", saveError.message);
+    }
+
+    // ---- 8. take the payment FIRST (if it fails, nothing has changed) -------
+    const draft = await stripe.invoices.create({
+      customer: customerId,
+      currency,
+      collection_method: "charge_automatically",
+      auto_advance: false,
+      pending_invoice_items_behavior: "exclude",
+      description: `Upgrade to ${targetName}`,
+      metadata: {
+        kind: "plan_upgrade",
+        supabase_user_id: user.id,
+        plan_id: targetPlanId,
+        subscription_id: sub.id,
+      },
+    });
+    invoiceId = draft.id;
+
+    await stripe.invoiceItems.create({
+      customer: customerId,
+      invoice: draft.id,
+      amount: dueToday,
+      currency,
+      description:
+        `${targetName}: ${remainingDays} of ${periodDays} days until ${renewalDate.slice(0, 10)}` +
+        (creditCents > 0 ? " (minus unused days of the previous plan)" : ""),
+    });
+
+    await stripe.invoices.finalizeInvoice(draft.id, { auto_advance: false });
+    await stripe.invoices.pay(
+      draft.id,
+      method.paymentMethodId ? { payment_method: method.paymentMethodId } : {},
+    );
+    paymentTaken = true;
+
+    const paidInvoice = await stripe.invoices.retrieve(draft.id, { expand: ["payments"] });
+
+    // ---- 9. switch the plan; the billing day stays EXACTLY the same ---------
+    let updated: Stripe.Subscription | null = null;
+    try {
+      updated = await stripe.subscriptions.update(sub.id, {
+        items: [
+          {
+            id: item.id,
+            price_data: {
+              currency,
+              product: productId,
+              unit_amount: newAmount,
+              recurring: { interval: "month" },
+            },
+          },
+        ],
+        proration_behavior: "none", // we already charged the remaining days ourselves
+        cancel_at_period_end: false, // upgrading means staying
+        metadata: { plan_id: targetPlanId, supabase_user_id: user.id },
+      });
+    } catch (swapError) {
+      console.error(`change-plan ${user.id}: plan switch FAILED after payment`, swapError);
+      const pi = invoicePaymentIntentId(paidInvoice);
+      let refunded = false;
+      if (pi) {
+        try {
+          await stripe.refunds.create({
+            payment_intent: pi,
+            reason: "requested_by_customer",
+            metadata: { kind: "plan_upgrade_failed", supabase_user_id: user.id },
+          });
+          refunded = true;
+        } catch (refundError) {
+          console.error(`CRITICAL change-plan ${user.id}: refund failed for ${pi}`, refundError);
+        }
+      } else {
+        console.error(`CRITICAL change-plan ${user.id}: no payment intent to refund on ${paidInvoice.id}`);
+      }
+      return json(
+        {
+          error: refunded
+            ? "We couldn’t switch your plan, so your payment was refunded automatically. Nothing changed."
+            : "We couldn’t switch your plan after the payment. Please contact us and we’ll fix it right away.",
+        },
+        500,
+      );
+    }
+    if (!updated) return json({ error: "The plan switch failed." }, 500);
+
+    console.log(
+      `change-plan ${user.id}: ${currentPlanId} -> ${targetPlanId}, charged ${paidInvoice.amount_paid} ${currency} (${remainingDays}/${periodDays} days)`,
+    );
+
+    // ---- 10. bookkeeping (the webhook does the same, this just makes it instant) ----
+    try {
+      await recordInvoice(admin, paidInvoice, { userId: user.id, planId: targetPlanId });
+    } catch (err) {
+      console.error("recordInvoice failed (the webhook will record it)", err);
+    }
+
+    try {
+      const fresh = await stripe.subscriptions.retrieve(sub.id, { expand: ["items.data.price"] });
+      const result = await syncSubscription(admin, fresh, { planId: targetPlanId });
+      if (!result) throw new Error("syncSubscription returned nothing");
+    } catch (err) {
+      console.error("immediate sync failed, falling back to plan_id update", err);
+      const { error: fallbackError } = await admin
+        .from("subscriptions")
+        .update({ plan_id: targetPlanId })
+        .eq("stripe_subscription_id", sub.id);
+      if (fallbackError) console.error("fallback plan_id update failed", fallbackError.message);
+    }
+
+    return json({
+      ok: true,
+      planId: targetPlanId,
+      chargedCents: paidInvoice.amount_paid ?? dueToday,
+      nextRenewal: renewalDate,
+      card: method.card,
+      invoiceUrl: paidInvoice.hosted_invoice_url ?? null,
+      invoiceNumber: paidInvoice.number ?? null,
+    });
+  } catch (error) {
+    // The payment did not go through: remove the unpaid invoice so nothing is left behind.
+    if (invoiceId && !paymentTaken) {
+      try {
+        const inv = await stripe.invoices.retrieve(invoiceId);
+        if (inv.status === "draft") await stripe.invoices.del(invoiceId);
+        else if (inv.status === "open") await stripe.invoices.voidInvoice(invoiceId);
+      } catch (cleanupErr) {
+        console.error("could not clean up invoice", invoiceId, cleanupErr);
+      }
+    }
+
+    console.error("change-plan failed", error);
+    const e = error as { type?: string; code?: string; message?: string };
+    if (
+      e?.type === "StripeCardError" ||
+      e?.code === "invoice_payment_intent_requires_action" ||
+      e?.code === "authentication_required"
+    ) {
+      return json(
+        {
+          error:
+            "The payment didn’t go through and your subscription was not changed. Check your card or try another one.",
+          detail: e.message,
+        },
+        402,
+      );
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `The upgrade failed: ${message}` }, 500);
+  }
+});
+=== END FILE ===
+

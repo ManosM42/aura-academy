@@ -1,0 +1,1618 @@
+=== FILE: .output/server/_ssr/server-CbXVDlKq.mjs ===
+import "../_runtime.mjs";
+import { n as toResponse, t as H3Event } from "../_libs/h3-v2+rou3+srvx.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { C as getScriptPreloadAttrs, D as executeRewriteInput, E as resolveManifestCssLink, M as isNotFound, O as isRedirect, P as invariant, T as resolveManifestAssetLink, a as replaceSsrResponse, i as normalizeSsrResponse, j as rootRouteId, k as isResolvedRedirect, n as defineHandlerCallback, o as stripSsrResponseBody, r as isSsrResponse, t as renderRouterToStream, u as RouterProvider, w as getStylesheetHref } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as createMemoryHistory } from "../_libs/tanstack__history.mjs";
+import { a as defaultSerovalPlugins, c as makeSerovalPlugin, d as toCrossJSONStream, i as getOrigin, l as fromJSON, n as attachRouterServerSsrUtils, o as createRawStreamRPCPlugin, r as getNormalizedURL, s as createSerializationAdapter, t as mergeHeaders, u as toCrossJSONAsync } from "../_libs/@tanstack/router-core+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as createCsrfMiddleware } from "./createCsrfMiddleware-B2To0gPJ.mjs";
+import { AsyncLocalStorage } from "node:async_hooks";
+require_react();
+var import_jsx_runtime = require_jsx_runtime();
+function StartServer(props) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(RouterProvider, { router: props.router });
+}
+var defaultStreamHandler = defineHandlerCallback(({ request, router, responseHeaders }) => renderRouterToStream({
+	request,
+	router,
+	responseHeaders,
+	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StartServer, { router })
+}));
+var GLOBAL_EVENT_STORAGE_KEY = Symbol.for("tanstack-start:event-storage");
+var globalObj$1 = globalThis;
+if (!globalObj$1[GLOBAL_EVENT_STORAGE_KEY]) globalObj$1[GLOBAL_EVENT_STORAGE_KEY] = new AsyncLocalStorage();
+var eventStorage = globalObj$1[GLOBAL_EVENT_STORAGE_KEY];
+function isPromiseLike(value) {
+	return typeof value.then === "function";
+}
+function getSetCookieValues(headers) {
+	const headersWithSetCookie = headers;
+	if (typeof headersWithSetCookie.getSetCookie === "function") return headersWithSetCookie.getSetCookie();
+	const value = headers.get("set-cookie");
+	return value ? [value] : [];
+}
+function mergeEventResponseHeaders(response, event) {
+	if (response.ok) return;
+	const eventSetCookies = getSetCookieValues(event.res.headers);
+	if (eventSetCookies.length === 0) return;
+	const responseSetCookies = getSetCookieValues(response.headers);
+	response.headers.delete("set-cookie");
+	for (const cookie of responseSetCookies) response.headers.append("set-cookie", cookie);
+	for (const cookie of eventSetCookies) response.headers.append("set-cookie", cookie);
+}
+function attachResponseHeaders(value, event) {
+	if (isPromiseLike(value)) return value.then((resolved) => {
+		if (resolved instanceof Response) mergeEventResponseHeaders(resolved, event);
+		return resolved;
+	});
+	if (value instanceof Response) mergeEventResponseHeaders(value, event);
+	return value;
+}
+function requestHandler(handler) {
+	return (request, requestOpts) => {
+		let h3Event;
+		try {
+			h3Event = new H3Event(request);
+		} catch (error) {
+			if (error instanceof URIError) return new Response(null, {
+				status: 400,
+				statusText: "Bad Request"
+			});
+			throw error;
+		}
+		return toResponse(attachResponseHeaders(eventStorage.run({ h3Event }, () => handler(request, requestOpts)), h3Event), h3Event);
+	};
+}
+function getH3Event() {
+	const event = eventStorage.getStore();
+	if (!event) throw new Error(`No StartEvent found in AsyncLocalStorage. Make sure you are using the function within the server runtime.`);
+	return event.h3Event;
+}
+function getResponse() {
+	return getH3Event().res;
+}
+var HEADERS = { TSS_SHELL: "X-TSS_SHELL" };
+/**
+* @description Returns the router manifest data that should be sent to the client.
+* This includes only the assets and preloads for the current route and any
+* special assets that are needed for the client. It does not include relationships
+* between routes or any other data that is not needed for the client.
+*
+* @param matchedRoutes - In dev mode, the matched routes are used to build
+* the dev styles URL for route-scoped CSS collection.
+*/
+async function getStartManifest(matchedRoutes) {
+	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-CUIgUNEG.mjs");
+	const startManifest = tsrStartManifest();
+	let routes = startManifest.routes;
+	routes[rootRouteId];
+	const manifestRoutes = {};
+	for (const k in routes) {
+		const v = routes[k];
+		const result = {};
+		if (v.preloads && v.preloads.length > 0) result.preloads = v.preloads;
+		if (v.scripts && v.scripts.length > 0) result.scripts = v.scripts;
+		if (v.css?.length) result.css = v.css;
+		if (result.preloads || result.scripts || result.css) manifestRoutes[k] = result;
+	}
+	return {
+		...startManifest.scriptFormat ? { scriptFormat: startManifest.scriptFormat } : {},
+		...startManifest.inlineCss ? { inlineCss: startManifest.inlineCss } : {},
+		routes: manifestRoutes
+	};
+}
+var manifest = {};
+async function getServerFnById(id, access) {
+	const serverFnInfo = manifest[id];
+	if (!serverFnInfo) throw new Error("Server function info not found for " + id);
+	const fnModule = serverFnInfo.module ?? await serverFnInfo.importer();
+	if (!fnModule) throw new Error("Server function module not resolved for " + id);
+	const action = fnModule[serverFnInfo.functionName];
+	if (!action) throw new Error("Server function module export not resolved for serverFn ID: " + id);
+	return action;
+}
+var TSS_FORMDATA_CONTEXT = "__TSS_CONTEXT";
+var TSS_SERVER_FUNCTION = Symbol.for("TSS_SERVER_FUNCTION");
+var X_TSS_SERIALIZED = "x-tss-serialized";
+var X_TSS_RAW_RESPONSE = "x-tss-raw";
+/** Content-Type for multiplexed framed responses (RawStream support) */
+var TSS_CONTENT_TYPE_FRAMED = "application/x-tss-framed";
+/**
+* Frame types for binary multiplexing protocol.
+*/
+var FrameType = {
+	/** Seroval JSON chunk (NDJSON line) */
+	JSON: 0,
+	/** Raw stream data chunk */
+	CHUNK: 1,
+	/** Raw stream end (EOF) */
+	END: 2,
+	/** Raw stream error */
+	ERROR: 3
+};
+/** Full Content-Type header value with version parameter */
+var TSS_CONTENT_TYPE_FRAMED_VERSIONED = `${TSS_CONTENT_TYPE_FRAMED}; v=1`;
+function isSafeKey(key) {
+	return key !== "__proto__" && key !== "constructor" && key !== "prototype";
+}
+/**
+* Merge target and source into a new null-proto object, filtering dangerous keys.
+*/
+function safeObjectMerge(target, source) {
+	const result = Object.create(null);
+	if (target) {
+		for (const key of Object.keys(target)) if (isSafeKey(key)) result[key] = target[key];
+	}
+	if (source && typeof source === "object") {
+		for (const key of Object.keys(source)) if (isSafeKey(key)) result[key] = source[key];
+	}
+	return result;
+}
+/**
+* Create a null-prototype object, optionally copying from source.
+*/
+function createNullProtoObject(source) {
+	if (!source) return Object.create(null);
+	const obj = Object.create(null);
+	for (const key of Object.keys(source)) if (isSafeKey(key)) obj[key] = source[key];
+	return obj;
+}
+var GLOBAL_STORAGE_KEY = Symbol.for("tanstack-start:start-storage-context");
+var globalObj = globalThis;
+if (!globalObj[GLOBAL_STORAGE_KEY]) globalObj[GLOBAL_STORAGE_KEY] = new AsyncLocalStorage();
+var startStorage = globalObj[GLOBAL_STORAGE_KEY];
+async function runWithStartContext(context, fn) {
+	return startStorage.run(context, fn);
+}
+function getStartContext(opts) {
+	const context = startStorage.getStore();
+	if (!context && opts?.throwIfNotFound !== false) throw new Error(`No Start context found in AsyncLocalStorage. Make sure you are using the function within the server runtime.`);
+	return context;
+}
+var getStartOptions = () => getStartContext().startOptions;
+function flattenMiddlewares(middlewares, maxDepth = 100) {
+	const seen = /* @__PURE__ */ new Set();
+	const flattened = [];
+	const recurse = (middleware, depth) => {
+		if (depth > maxDepth) throw new Error(`Middleware nesting depth exceeded maximum of ${maxDepth}. Check for circular references.`);
+		middleware.forEach((m) => {
+			if (m.options.middleware) recurse(m.options.middleware, depth + 1);
+			if (!seen.has(m)) {
+				seen.add(m);
+				flattened.push(m);
+			}
+		});
+	};
+	recurse(middlewares, 0);
+	return flattened;
+}
+function getDefaultSerovalPlugins() {
+	return [...(getStartOptions()?.serializationAdapters)?.map(makeSerovalPlugin) ?? [], ...defaultSerovalPlugins];
+}
+/**
+* Binary frame protocol for multiplexing JSON and raw streams over HTTP.
+*
+* Frame format: [type:1][streamId:4][length:4][payload:length]
+* - type: 1 byte - frame type (JSON, CHUNK, END, ERROR)
+* - streamId: 4 bytes big-endian uint32 - stream identifier
+* - length: 4 bytes big-endian uint32 - payload length
+* - payload: variable length bytes
+*/
+/** Cached TextEncoder for frame encoding */
+var textEncoder = new TextEncoder();
+/** Shared empty payload for END frames - avoids allocation per call */
+var EMPTY_PAYLOAD = /* @__PURE__ */ new Uint8Array(0);
+/**
+* Encodes a single frame with header and payload.
+*/
+function encodeFrame(type, streamId, payload) {
+	const frame = new Uint8Array(9 + payload.length);
+	frame[0] = type;
+	frame[1] = streamId >>> 24 & 255;
+	frame[2] = streamId >>> 16 & 255;
+	frame[3] = streamId >>> 8 & 255;
+	frame[4] = streamId & 255;
+	frame[5] = payload.length >>> 24 & 255;
+	frame[6] = payload.length >>> 16 & 255;
+	frame[7] = payload.length >>> 8 & 255;
+	frame[8] = payload.length & 255;
+	frame.set(payload, 9);
+	return frame;
+}
+/**
+* Encodes a JSON frame (type 0, streamId 0).
+*/
+function encodeJSONFrame(json) {
+	return encodeFrame(FrameType.JSON, 0, textEncoder.encode(json));
+}
+/**
+* Encodes a raw stream chunk frame.
+*/
+function encodeChunkFrame(streamId, chunk) {
+	return encodeFrame(FrameType.CHUNK, streamId, chunk);
+}
+/**
+* Encodes a raw stream end frame.
+*/
+function encodeEndFrame(streamId) {
+	return encodeFrame(FrameType.END, streamId, EMPTY_PAYLOAD);
+}
+/**
+* Encodes a raw stream error frame.
+*/
+function encodeErrorFrame(streamId, error) {
+	const message = error instanceof Error ? error.message : String(error ?? "Unknown error");
+	return encodeFrame(FrameType.ERROR, streamId, textEncoder.encode(message));
+}
+/**
+* Creates a multiplexed ReadableStream from JSON stream and raw streams.
+*
+* The JSON stream emits NDJSON lines (from seroval's toCrossJSONStream).
+* Raw streams are pumped concurrently, interleaved with JSON frames.
+*
+* Supports late stream registration for RawStreams discovered after initial
+* serialization (e.g., from resolved Promises).
+*
+* @param jsonStream Stream of JSON strings (each string is one NDJSON line)
+* @param rawStreams Map of stream IDs to raw binary streams (known at start)
+* @param lateStreamSource Optional stream of late registrations for streams discovered later
+*/
+function createMultiplexedStream(jsonStream, rawStreams, lateStreamSource) {
+	let controller;
+	let cancelled = false;
+	const readers = [];
+	const enqueue = (frame) => {
+		if (cancelled) return false;
+		try {
+			controller.enqueue(frame);
+			return true;
+		} catch {
+			return false;
+		}
+	};
+	const errorOutput = (error) => {
+		if (cancelled) return;
+		cancelled = true;
+		try {
+			controller.error(error);
+		} catch {}
+		for (const reader of readers) reader.cancel().catch(() => {});
+	};
+	async function pumpRawStream(streamId, stream) {
+		const reader = stream.getReader();
+		readers.push(reader);
+		try {
+			while (!cancelled) {
+				const { done, value } = await reader.read();
+				if (done) {
+					enqueue(encodeEndFrame(streamId));
+					return;
+				}
+				if (!enqueue(encodeChunkFrame(streamId, value))) return;
+			}
+		} catch (error) {
+			enqueue(encodeErrorFrame(streamId, error));
+		} finally {
+			reader.releaseLock();
+		}
+	}
+	async function pumpJSON() {
+		const reader = jsonStream.getReader();
+		readers.push(reader);
+		try {
+			while (!cancelled) {
+				const { done, value } = await reader.read();
+				if (done) return;
+				if (!enqueue(encodeJSONFrame(value))) return;
+			}
+		} catch (error) {
+			errorOutput(error);
+			throw error;
+		} finally {
+			reader.releaseLock();
+		}
+	}
+	async function pumpLateStreams() {
+		if (!lateStreamSource) return [];
+		const lateStreamPumps = [];
+		const reader = lateStreamSource.getReader();
+		readers.push(reader);
+		try {
+			while (!cancelled) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				lateStreamPumps.push(pumpRawStream(value.id, value.stream));
+			}
+		} finally {
+			reader.releaseLock();
+		}
+		return lateStreamPumps;
+	}
+	return new ReadableStream({
+		async start(ctrl) {
+			controller = ctrl;
+			const pumps = [pumpJSON()];
+			for (const [streamId, stream] of rawStreams) pumps.push(pumpRawStream(streamId, stream));
+			if (lateStreamSource) pumps.push(pumpLateStreams());
+			try {
+				const latePumps = (await Promise.all(pumps)).find(Array.isArray);
+				if (latePumps && latePumps.length > 0) await Promise.all(latePumps);
+				if (!cancelled) try {
+					controller.close();
+				} catch {}
+			} catch {}
+		},
+		cancel() {
+			cancelled = true;
+			for (const reader of readers) reader.cancel().catch(() => {});
+			readers.length = 0;
+		}
+	});
+}
+var serovalPlugins = void 0;
+var FORM_DATA_CONTENT_TYPES = ["multipart/form-data", "application/x-www-form-urlencoded"];
+var MAX_PAYLOAD_SIZE = 1e6;
+var handleServerAction = async ({ request, context, serverFnId }) => {
+	const methodUpper = request.method.toUpperCase();
+	const url = new URL(request.url);
+	const action = await getServerFnById(serverFnId, { origin: "client" });
+	if (action.method && methodUpper !== action.method) return new Response(`expected ${action.method} method. Got ${methodUpper}`, {
+		status: 405,
+		headers: { Allow: action.method }
+	});
+	const isServerFn = request.headers.get("x-tsr-serverFn") === "true";
+	if (!serovalPlugins) serovalPlugins = getDefaultSerovalPlugins();
+	const contentType = request.headers.get("Content-Type");
+	function parsePayload(payload) {
+		return fromJSON(payload, { plugins: serovalPlugins });
+	}
+	return await (async () => {
+		try {
+			let res = await (async () => {
+				if (FORM_DATA_CONTENT_TYPES.some((type) => contentType && contentType.includes(type))) {
+					if (methodUpper === "GET") invariant();
+					const formData = await request.formData();
+					const serializedContext = formData.get(TSS_FORMDATA_CONTEXT);
+					formData.delete(TSS_FORMDATA_CONTEXT);
+					const params = {
+						context,
+						data: formData,
+						method: methodUpper
+					};
+					if (typeof serializedContext === "string") try {
+						const deserializedContext = fromJSON(JSON.parse(serializedContext), { plugins: serovalPlugins });
+						if (typeof deserializedContext === "object" && deserializedContext) params.context = safeObjectMerge(deserializedContext, context);
+					} catch (e) {}
+					return await action(params);
+				}
+				if (methodUpper === "GET") {
+					const payloadParam = url.searchParams.get("payload");
+					if (payloadParam && payloadParam.length > MAX_PAYLOAD_SIZE) throw new Error("Payload too large");
+					const payload = payloadParam ? parsePayload(JSON.parse(payloadParam)) : {};
+					payload.context = safeObjectMerge(payload.context, context);
+					payload.method = methodUpper;
+					return await action(payload);
+				}
+				let jsonPayload;
+				if (contentType?.includes("application/json")) jsonPayload = await request.json();
+				const payload = jsonPayload ? parsePayload(jsonPayload) : {};
+				payload.context = safeObjectMerge(payload.context, context);
+				payload.method = methodUpper;
+				return await action(payload);
+			})();
+			const unwrapped = res.result || res.error;
+			if (isNotFound(res)) res = isNotFoundResponse(res);
+			if (!isServerFn) return unwrapped;
+			if (unwrapped instanceof Response) {
+				if (isRedirect(unwrapped)) return unwrapped;
+				unwrapped.headers.set(X_TSS_RAW_RESPONSE, "true");
+				return unwrapped;
+			}
+			return serializeResult(res);
+			function serializeResult(res) {
+				let nonStreamingBody = void 0;
+				const alsResponse = getResponse();
+				if (res !== void 0) {
+					const rawStreams = /* @__PURE__ */ new Map();
+					let initialPhase = true;
+					let lateStreamWriter;
+					let lateStreamReadable = void 0;
+					const pendingLateStreams = [];
+					const plugins = [createRawStreamRPCPlugin((id, stream) => {
+						if (initialPhase) {
+							rawStreams.set(id, stream);
+							return;
+						}
+						if (lateStreamWriter) {
+							lateStreamWriter.write({
+								id,
+								stream
+							}).catch(() => {});
+							return;
+						}
+						pendingLateStreams.push({
+							id,
+							stream
+						});
+					}), ...serovalPlugins || []];
+					let done = false;
+					const callbacks = {
+						onParse: (value) => {
+							nonStreamingBody = value;
+						},
+						onDone: () => {
+							done = true;
+						},
+						onError: (error) => {
+							throw error;
+						}
+					};
+					toCrossJSONStream(res, {
+						refs: /* @__PURE__ */ new Map(),
+						plugins,
+						onParse(value) {
+							callbacks.onParse(value);
+						},
+						onDone() {
+							callbacks.onDone();
+						},
+						onError: (error) => {
+							callbacks.onError(error);
+						}
+					});
+					initialPhase = false;
+					if (done && rawStreams.size === 0) return new Response(nonStreamingBody ? JSON.stringify(nonStreamingBody) : void 0, {
+						status: alsResponse.status,
+						statusText: alsResponse.statusText,
+						headers: {
+							"Content-Type": "application/json",
+							[X_TSS_SERIALIZED]: "true"
+						}
+					});
+					const { readable, writable } = new TransformStream();
+					lateStreamReadable = readable;
+					lateStreamWriter = writable.getWriter();
+					for (const registration of pendingLateStreams) lateStreamWriter.write(registration).catch(() => {});
+					pendingLateStreams.length = 0;
+					const multiplexedStream = createMultiplexedStream(new ReadableStream({
+						start(controller) {
+							callbacks.onParse = (value) => {
+								controller.enqueue(JSON.stringify(value) + "\n");
+							};
+							callbacks.onDone = () => {
+								try {
+									controller.close();
+								} catch {}
+								lateStreamWriter?.close().catch(() => {}).finally(() => {
+									lateStreamWriter = void 0;
+								});
+							};
+							callbacks.onError = (error) => {
+								controller.error(error);
+								lateStreamWriter?.abort(error).catch(() => {}).finally(() => {
+									lateStreamWriter = void 0;
+								});
+							};
+							if (nonStreamingBody !== void 0) callbacks.onParse(nonStreamingBody);
+							if (done) callbacks.onDone();
+						},
+						cancel() {
+							lateStreamWriter?.abort().catch(() => {});
+							lateStreamWriter = void 0;
+						}
+					}), rawStreams, lateStreamReadable);
+					return new Response(multiplexedStream, {
+						status: alsResponse.status,
+						statusText: alsResponse.statusText,
+						headers: {
+							"Content-Type": TSS_CONTENT_TYPE_FRAMED_VERSIONED,
+							[X_TSS_SERIALIZED]: "true"
+						}
+					});
+				}
+				return new Response(void 0, {
+					status: alsResponse.status,
+					statusText: alsResponse.statusText
+				});
+			}
+		} catch (error) {
+			if (error instanceof Response) return error;
+			if (isNotFound(error)) return isNotFoundResponse(error);
+			console.info();
+			console.info("Server Fn Error!");
+			console.info();
+			console.error(error);
+			console.info();
+			const serializedError = JSON.stringify(await Promise.resolve(toCrossJSONAsync(error, {
+				refs: /* @__PURE__ */ new Map(),
+				plugins: serovalPlugins
+			})));
+			const response = getResponse();
+			return new Response(serializedError, {
+				status: response.status ?? 500,
+				statusText: response.statusText,
+				headers: {
+					"Content-Type": "application/json",
+					[X_TSS_SERIALIZED]: "true"
+				}
+			});
+		}
+	})();
+};
+function isNotFoundResponse(error) {
+	const { headers, ...rest } = error;
+	return new Response(JSON.stringify(rest), {
+		status: 404,
+		headers: {
+			"Content-Type": "application/json",
+			...headers || {}
+		}
+	});
+}
+var LINK_PARAM_TOKEN_RE = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+var PRELOAD_AS_VALUES = /* @__PURE__ */ new Set([
+	"fetch",
+	"font",
+	"image",
+	"script",
+	"style",
+	"track"
+]);
+function buildLinkParam(name, value) {
+	if (value === void 0) return name;
+	if (LINK_PARAM_TOKEN_RE.test(value)) return `${name}=${value}`;
+	return `${name}=${JSON.stringify(value)}`;
+}
+function serializeEarlyHint(hint) {
+	const parts = [`<${hint.href}>`, buildLinkParam("rel", hint.rel)];
+	if (hint.as) parts.push(buildLinkParam("as", hint.as));
+	if (hint.crossOrigin !== void 0) parts.push(buildLinkParam("crossorigin", hint.crossOrigin || void 0));
+	if (hint.type) parts.push(buildLinkParam("type", hint.type));
+	if (hint.integrity) parts.push(buildLinkParam("integrity", hint.integrity));
+	if (hint.referrerPolicy) parts.push(buildLinkParam("referrerpolicy", hint.referrerPolicy));
+	if (hint.fetchPriority) parts.push(buildLinkParam("fetchpriority", hint.fetchPriority));
+	return parts.join("; ");
+}
+function getStringAttr(attrs, name, fallbackName) {
+	const value = attrs?.[name] ?? (fallbackName ? attrs?.[fallbackName] : void 0);
+	return typeof value === "string" ? value : void 0;
+}
+function getPreloadAs(attrs) {
+	const as = getStringAttr(attrs, "as");
+	return as && PRELOAD_AS_VALUES.has(as) ? as : void 0;
+}
+function addEarlyHintFetchAttrs(hint, attrs) {
+	const crossOrigin = getStringAttr(attrs, "crossOrigin", "crossorigin");
+	const type = getStringAttr(attrs, "type");
+	const integrity = getStringAttr(attrs, "integrity");
+	const referrerPolicy = getStringAttr(attrs, "referrerPolicy", "referrerpolicy");
+	const fetchPriority = getStringAttr(attrs, "fetchPriority", "fetchpriority");
+	if (crossOrigin !== void 0) hint.crossOrigin = crossOrigin;
+	if (type) hint.type = type;
+	if (integrity) hint.integrity = integrity;
+	if (referrerPolicy) hint.referrerPolicy = referrerPolicy;
+	if (fetchPriority) hint.fetchPriority = fetchPriority;
+}
+function linkAttrsToEarlyHint(attrs) {
+	const href = getStringAttr(attrs, "href");
+	const rel = getStringAttr(attrs, "rel");
+	if (!href || !rel) return void 0;
+	const relTokens = rel.split(/\s+/);
+	let hintRel;
+	let hintAs;
+	if (relTokens.includes("modulepreload")) {
+		hintRel = "modulepreload";
+		hintAs = "script";
+	} else if (relTokens.includes("stylesheet")) {
+		hintRel = "preload";
+		hintAs = "style";
+	} else if (relTokens.includes("preload")) {
+		hintAs = getPreloadAs(attrs);
+		if (!hintAs) return void 0;
+		hintRel = "preload";
+	} else if (relTokens.includes("preconnect")) {
+		hintRel = "preconnect";
+		hintAs = void 0;
+	} else if (relTokens.includes("dns-prefetch")) {
+		hintRel = "dns-prefetch";
+		hintAs = void 0;
+	}
+	if (!hintRel) return void 0;
+	const hint = {
+		href,
+		rel: hintRel
+	};
+	if (hintAs) hint.as = hintAs;
+	addEarlyHintFetchAttrs(hint, attrs);
+	return hint;
+}
+function collectStaticHintsFromManifest(manifest, matchedRoutes) {
+	const hints = [];
+	for (const route of matchedRoutes) {
+		const routeManifest = manifest.routes[route.id];
+		if (!routeManifest) continue;
+		for (const link of routeManifest.preloads ?? []) {
+			const attrs = getScriptPreloadAttrs(manifest, link);
+			const hint = {
+				href: attrs.href,
+				rel: attrs.rel,
+				as: "script"
+			};
+			if (attrs.crossOrigin !== void 0) hint.crossOrigin = attrs.crossOrigin;
+			hints.push(hint);
+		}
+		for (const link of routeManifest.css ?? []) {
+			const stylesheetHref = getStylesheetHref(link);
+			if (manifest.inlineCss?.styles[stylesheetHref] !== void 0) continue;
+			const resolvedLink = resolveManifestCssLink(link);
+			const hint = {
+				href: stylesheetHref,
+				rel: "preload",
+				as: "style"
+			};
+			if (resolvedLink.crossOrigin !== void 0) hint.crossOrigin = resolvedLink.crossOrigin;
+			hints.push(hint);
+		}
+	}
+	return hints;
+}
+function collectDynamicHintsFromMatches(matches) {
+	const hints = [];
+	for (const match of matches) {
+		const links = match.links;
+		if (!Array.isArray(links)) continue;
+		for (const link of links) {
+			const hint = linkAttrsToEarlyHint(link);
+			if (hint) hints.push(hint);
+		}
+	}
+	return hints;
+}
+function createEarlyHintsEvent(opts) {
+	const nextHints = [];
+	const nextLinks = [];
+	for (const hint of opts.hints) {
+		const link = serializeEarlyHint(hint);
+		if (opts.sentLinks.has(link)) continue;
+		opts.sentLinks.add(link);
+		opts.sentHints.push(hint);
+		nextHints.push(hint);
+		nextLinks.push(link);
+	}
+	if (!nextHints.length && opts.phase !== "dynamic") return void 0;
+	return {
+		phase: opts.phase,
+		hints: nextHints,
+		links: nextLinks,
+		allHints: opts.sentHints.slice(),
+		allLinks: Array.from(opts.sentLinks)
+	};
+}
+function createResponseLinkHeaderEntries(opts) {
+	for (const hint of opts.hints) {
+		const link = serializeEarlyHint(hint);
+		if (opts.sentLinks.has(link)) continue;
+		opts.sentLinks.add(link);
+		opts.entries.push({
+			phase: opts.phase,
+			hint,
+			link
+		});
+	}
+}
+function getResponseLinkHeaderEntries(opts) {
+	if (!opts.filter) return opts.entries.map((entry) => entry.link);
+	try {
+		const links = [];
+		for (const entry of opts.entries) if (opts.filter(entry)) links.push(entry.link);
+		return links;
+	} catch (err) {
+		console.error("Error filtering response Link headers:", err);
+		return [];
+	}
+}
+function notifyEarlyHints(phase, event, onEarlyHints) {
+	try {
+		const result = onEarlyHints(event);
+		if (result) Promise.resolve(result).catch((err) => {
+			console.error(`Error sending ${phase} early hints:`, err);
+		});
+	} catch (err) {
+		console.error(`Error sending ${phase} early hints:`, err);
+	}
+}
+function getResponseLinkHeaderFilter(responseLinkHeader) {
+	if (typeof responseLinkHeader !== "object") return;
+	return responseLinkHeader.filter;
+}
+function appendResponseLinkHeaders(opts) {
+	for (const link of getResponseLinkHeaderEntries(opts)) opts.responseHeaders.append("Link", link);
+}
+function collectResponseLinkHeaderEntries(opts) {
+	for (let index = 0; index < opts.event.hints.length; index++) opts.entries.push({
+		phase: opts.phase,
+		hint: opts.event.hints[index],
+		link: opts.event.links[index]
+	});
+}
+function collectEarlyHintsPhase(opts) {
+	const event = opts.onEarlyHints ? createEarlyHintsEvent({
+		phase: opts.phase,
+		hints: opts.hints,
+		sentLinks: opts.sentLinks,
+		sentHints: opts.sentHints
+	}) : void 0;
+	if (event) notifyEarlyHints(opts.phase, event, opts.onEarlyHints);
+	if (!opts.responseLinkHeaderEntries) return;
+	if (event) {
+		collectResponseLinkHeaderEntries({
+			phase: opts.phase,
+			event,
+			entries: opts.responseLinkHeaderEntries
+		});
+		return;
+	}
+	createResponseLinkHeaderEntries({
+		phase: opts.phase,
+		hints: opts.hints,
+		sentLinks: opts.sentLinks,
+		entries: opts.responseLinkHeaderEntries
+	});
+}
+function createEarlyHintsCollector(opts) {
+	if (!opts?.onEarlyHints && !opts?.responseLinkHeader) return;
+	const sentLinks = /* @__PURE__ */ new Set();
+	const sentHints = opts.onEarlyHints ? new Array() : void 0;
+	const responseLinkHeaderEntries = opts.responseLinkHeader ? new Array() : void 0;
+	const responseLinkHeaderFilter = getResponseLinkHeaderFilter(opts.responseLinkHeader);
+	return {
+		collectStatic: ({ manifest, matchedRoutes }) => {
+			if (!matchedRoutes?.length) return;
+			collectEarlyHintsPhase({
+				phase: "static",
+				hints: collectStaticHintsFromManifest(manifest, matchedRoutes),
+				sentLinks,
+				sentHints,
+				onEarlyHints: opts.onEarlyHints,
+				responseLinkHeaderEntries
+			});
+		},
+		collectDynamic: (matches) => {
+			collectEarlyHintsPhase({
+				phase: "dynamic",
+				hints: collectDynamicHintsFromMatches(matches),
+				sentLinks,
+				sentHints,
+				onEarlyHints: opts.onEarlyHints,
+				responseLinkHeaderEntries
+			});
+		},
+		appendResponseHeaders: (headers) => {
+			if (!responseLinkHeaderEntries?.length) return;
+			appendResponseLinkHeaders({
+				responseHeaders: headers,
+				entries: responseLinkHeaderEntries,
+				filter: responseLinkHeaderFilter
+			});
+		}
+	};
+}
+function normalizeTransformAssetResult(result) {
+	if (typeof result === "string") return { href: result };
+	return result;
+}
+function escapeCssString(value) {
+	return value.replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/\n/g, "\\a ").replace(/\r/g, "\\d ").replace(/\f/g, "\\c ");
+}
+async function transformInlineCssTemplate(options) {
+	const { strings, urls } = options.template;
+	if (strings.length !== urls.length + 1) throw new Error(`TanStack Start inlineCss template for ${options.stylesheetHref} is invalid`);
+	let css = strings[0];
+	for (let index = 0; index < urls.length; index++) {
+		const transformed = normalizeTransformAssetResult(await options.transformFn({
+			kind: "css-url",
+			url: urls[index],
+			stylesheetHref: options.stylesheetHref
+		}));
+		css += escapeCssString(transformed.href) + strings[index + 1];
+	}
+	return css;
+}
+async function transformInlineCssStyles(inlineCss, transformFn) {
+	const transformedStyles = {};
+	const transformedEntries = await Promise.all(Object.entries(inlineCss.styles).map(async ([stylesheetHref, css]) => {
+		const template = inlineCss.templates?.[stylesheetHref];
+		return [stylesheetHref, template ? await transformInlineCssTemplate({
+			stylesheetHref,
+			template,
+			transformFn
+		}) : css];
+	}));
+	for (const [stylesheetHref, css] of transformedEntries) transformedStyles[stylesheetHref] = css;
+	return {
+		styles: transformedStyles,
+		...inlineCss.templates ? { templates: inlineCss.templates } : {}
+	};
+}
+function resolveTransformAssetsCrossOrigin(config, kind) {
+	if (!config) return void 0;
+	if (typeof config === "string") return config;
+	return config[kind];
+}
+function isObjectShorthand(transform) {
+	return "prefix" in transform;
+}
+function resolveTransformAssetsConfig(transform) {
+	if (typeof transform === "string") {
+		const prefix = transform;
+		return {
+			type: "transform",
+			transformFn: ({ url }) => ({ href: `${prefix}${url}` }),
+			cache: true
+		};
+	}
+	if (typeof transform === "function") return {
+		type: "transform",
+		transformFn: transform,
+		cache: true
+	};
+	if (isObjectShorthand(transform)) {
+		const { prefix, crossOrigin } = transform;
+		return {
+			type: "transform",
+			transformFn: ({ url, kind }) => {
+				const href = `${prefix}${url}`;
+				if (kind === "css-url") return { href };
+				const co = resolveTransformAssetsCrossOrigin(crossOrigin, kind);
+				return co ? {
+					href,
+					crossOrigin: co
+				} : { href };
+			},
+			cache: true
+		};
+	}
+	if ("createTransform" in transform && transform.createTransform) return {
+		type: "createTransform",
+		createTransform: transform.createTransform,
+		cache: transform.cache !== false
+	};
+	return {
+		type: "transform",
+		transformFn: typeof transform.transform === "string" ? (({ url }) => ({ href: `${transform.transform}${url}` })) : transform.transform,
+		cache: transform.cache !== false
+	};
+}
+function assignManifestLink(link, next) {
+	if (typeof link === "string") return next.crossOrigin ? next : next.href;
+	const nextLink = {
+		...link,
+		href: next.href
+	};
+	if (next.crossOrigin) nextLink.crossOrigin = next.crossOrigin;
+	else delete nextLink.crossOrigin;
+	return nextLink;
+}
+async function transformManifestAssets(source, transformFn, _opts) {
+	const manifest = structuredClone(source);
+	const inlineCssEnabled = _opts?.inlineCss !== false;
+	const scriptTransforms = /* @__PURE__ */ new Map();
+	const transformScript = (url) => {
+		const cached = scriptTransforms.get(url);
+		if (cached) return cached;
+		const transformed = Promise.resolve(transformFn({
+			url,
+			kind: "script"
+		})).then(normalizeTransformAssetResult);
+		scriptTransforms.set(url, transformed);
+		return transformed;
+	};
+	if (!inlineCssEnabled) delete manifest.inlineCss;
+	else if (manifest.inlineCss) manifest.inlineCss = await transformInlineCssStyles(manifest.inlineCss, transformFn);
+	for (const route of Object.values(manifest.routes)) {
+		if (route.preloads?.length) route.preloads = await Promise.all(route.preloads.map(async (link) => {
+			const result = await transformScript(resolveManifestAssetLink(link).href);
+			return assignManifestLink(link, {
+				href: result.href,
+				crossOrigin: result.crossOrigin
+			});
+		}));
+		if (route.css?.length && !manifest.inlineCss) route.css = await Promise.all(route.css.map(async (link) => {
+			const result = normalizeTransformAssetResult(await transformFn({
+				url: resolveManifestCssLink(link).href,
+				kind: "stylesheet"
+			}));
+			return assignManifestLink(link, {
+				href: result.href,
+				crossOrigin: result.crossOrigin
+			});
+		}));
+		if (route.scripts?.length) for (const script of route.scripts) {
+			const src = script.attrs?.src;
+			if (typeof src !== "string") continue;
+			const result = await transformScript(src);
+			script.attrs = {
+				...script.attrs,
+				src: result.href
+			};
+			if (result.crossOrigin) script.attrs.crossOrigin = result.crossOrigin;
+			else delete script.attrs.crossOrigin;
+		}
+	}
+	return manifest;
+}
+/**
+* Builds a final ServerManifest without URL transforms. Used when no
+* transformAssets option is provided.
+*
+* Returns a new manifest object so the cached base manifest is never mutated.
+*/
+function buildManifest(source, opts) {
+	return {
+		...source.scriptFormat ? { scriptFormat: source.scriptFormat } : {},
+		...opts?.inlineCss !== false && source.inlineCss ? { inlineCss: structuredClone(source.inlineCss) } : {},
+		routes: { ...source.routes }
+	};
+}
+function getStaticHandlerInlineCssDefault(handlerInlineCss) {
+	if (typeof handlerInlineCss === "function") return;
+	return handlerInlineCss ?? true;
+}
+async function resolveInlineCssForRequest(opts) {
+	if (opts.requestInlineCss !== void 0) return opts.requestInlineCss;
+	if (typeof opts.handlerInlineCss === "function") return await opts.handlerInlineCss({ request: opts.request });
+	return opts.handlerInlineCss ?? true;
+}
+function createCachedBaseManifestLoader(loadBaseManifest) {
+	let baseManifestPromise;
+	return () => {
+		if (!baseManifestPromise) baseManifestPromise = loadBaseManifest().catch((error) => {
+			baseManifestPromise = void 0;
+			throw error;
+		});
+		return baseManifestPromise;
+	};
+}
+function createFinalManifestTransformResolver(transformAssets, opts) {
+	const transformConfig = transformAssets !== void 0 ? resolveTransformAssetsConfig(transformAssets) : void 0;
+	const cache = transformConfig ? transformConfig.cache : true;
+	const warmup = !!transformAssets && typeof transformAssets === "object" && "warmup" in transformAssets && transformAssets.warmup === true;
+	let cachedCreateTransformPromise;
+	const clearCachedCreateTransform = () => {
+		cachedCreateTransformPromise = void 0;
+	};
+	return {
+		cache,
+		warmup,
+		clearCachedCreateTransform,
+		getTransformFn: async (ctx) => {
+			if (!transformConfig) return void 0;
+			if (transformConfig.type !== "createTransform") return transformConfig.transformFn;
+			if (!cache || !opts.cacheCreateTransform) return transformConfig.createTransform(ctx);
+			if (!cachedCreateTransformPromise) cachedCreateTransformPromise = Promise.resolve(transformConfig.createTransform(ctx)).catch((error) => {
+				clearCachedCreateTransform();
+				throw error;
+			});
+			return cachedCreateTransformPromise;
+		}
+	};
+}
+function createFinalManifestResolver(opts) {
+	const finalManifestCache = /* @__PURE__ */ new Map();
+	const transformResolver = createFinalManifestTransformResolver(opts.transformAssets, { cacheCreateTransform: opts.cacheCreateTransform });
+	const handlerDefaultInlineCss = getStaticHandlerInlineCssDefault(opts.inlineCss);
+	const getRequestManifestOptions = async (requestOpts) => {
+		const transformFn = await transformResolver.getTransformFn({
+			warmup: false,
+			request: requestOpts.request
+		});
+		const inlineCss = await resolveInlineCssForRequest({
+			request: requestOpts.request,
+			handlerInlineCss: opts.inlineCss,
+			requestInlineCss: requestOpts.requestInlineCss
+		});
+		return {
+			getBaseManifest: requestOpts.getBaseManifest,
+			transformFn,
+			cache: transformResolver.cache,
+			inlineCss
+		};
+	};
+	const resolveRequest = async (requestOpts, cache) => {
+		return resolveFinalManifest({
+			...await getRequestManifestOptions(requestOpts),
+			finalManifestCache: cache
+		});
+	};
+	return {
+		warmup: ({ getBaseManifest }) => warmupFinalManifest({
+			enabled: transformResolver.warmup,
+			handlerDefaultInlineCss,
+			cache: transformResolver.cache,
+			finalManifestCache,
+			getBaseManifest,
+			getTransformFn: () => transformResolver.getTransformFn({ warmup: true }),
+			onError: transformResolver.clearCachedCreateTransform
+		}),
+		resolveCached: (requestOpts) => resolveRequest(requestOpts, finalManifestCache),
+		resolveUncached: (requestOpts) => resolveRequest(requestOpts, void 0)
+	};
+}
+function getFinalManifestCacheKey(inlineCss) {
+	return inlineCss ? "inline-css" : "linked-css";
+}
+function cacheFinalManifestPromise(cachedFinalManifestPromises, cacheKey, promise) {
+	const cachedFinalManifestPromise = promise.catch((error) => {
+		if (cachedFinalManifestPromises.get(cacheKey) === cachedFinalManifestPromise) cachedFinalManifestPromises.delete(cacheKey);
+		throw error;
+	});
+	cachedFinalManifestPromises.set(cacheKey, cachedFinalManifestPromise);
+	return cachedFinalManifestPromise;
+}
+function getOrCreateCachedFinalManifestPromise(cachedFinalManifestPromises, cacheKey, computeFinalManifest) {
+	const cachedFinalManifestPromise = cachedFinalManifestPromises.get(cacheKey);
+	if (cachedFinalManifestPromise) return cachedFinalManifestPromise;
+	return cacheFinalManifestPromise(cachedFinalManifestPromises, cacheKey, Promise.resolve().then(computeFinalManifest));
+}
+async function buildFinalManifest(opts) {
+	return opts.transformFn ? await transformManifestAssets(opts.base, opts.transformFn, { inlineCss: opts.inlineCss }) : buildManifest(opts.base, { inlineCss: opts.inlineCss });
+}
+async function resolveFinalManifest(opts) {
+	const computeFinalManifest = async () => {
+		return buildFinalManifest({
+			base: await opts.getBaseManifest(),
+			transformFn: opts.transformFn,
+			inlineCss: opts.inlineCss
+		});
+	};
+	if (opts.finalManifestCache && (!opts.transformFn || opts.cache)) return getOrCreateCachedFinalManifestPromise(opts.finalManifestCache, getFinalManifestCacheKey(opts.inlineCss), computeFinalManifest);
+	return computeFinalManifest();
+}
+function warmupFinalManifest(opts) {
+	if (!opts.enabled || opts.handlerDefaultInlineCss === void 0 || !opts.cache) return;
+	const inlineCss = opts.handlerDefaultInlineCss;
+	const warmupPromise = getOrCreateCachedFinalManifestPromise(opts.finalManifestCache, getFinalManifestCacheKey(inlineCss), async () => {
+		const [base, transformFn] = await Promise.all([opts.getBaseManifest(), opts.getTransformFn()]);
+		return buildFinalManifest({
+			base,
+			transformFn,
+			inlineCss
+		});
+	});
+	if (opts.onError) warmupPromise.catch(opts.onError);
+	return warmupPromise;
+}
+var ServerFunctionSerializationAdapter = createSerializationAdapter({
+	key: "$TSS/serverfn",
+	test: (v) => {
+		if (typeof v !== "function") return false;
+		if (!(TSS_SERVER_FUNCTION in v)) return false;
+		return !!v[TSS_SERVER_FUNCTION];
+	},
+	toSerializable: ({ serverFnMeta }) => ({ functionId: serverFnMeta.id }),
+	fromSerializable: ({ functionId }) => {
+		const fn = async (opts, signal) => {
+			return (await (await getServerFnById(functionId, { origin: "client" }))(opts ?? {}, signal)).result;
+		};
+		return fn;
+	}
+});
+function getStartResponseHeaders(opts) {
+	return mergeHeaders({ "Content-Type": "text/html; charset=utf-8" }, ...opts.router.stores.matches.get().map((match) => {
+		return match.headers;
+	}));
+}
+var entriesPromise;
+var defaultCsrfMiddleware = createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === "serverFn" });
+var getCachedBaseManifest = createCachedBaseManifestLoader(() => getStartManifest());
+var getProdBaseManifest = () => getCachedBaseManifest();
+var getBaseManifest = getProdBaseManifest;
+var createEarlyHintsForRequest = createEarlyHintsCollector;
+async function loadEntries() {
+	const [routerEntry, startEntry, pluginAdapters] = await Promise.all([
+		import("./router-DsL1uqBD.mjs"),
+		import("./start-CSteC2wo.mjs"),
+		import("./empty-plugin-adapters-D9UWiqvJ.mjs")
+	]);
+	return {
+		routerEntry,
+		startEntry,
+		pluginAdapters
+	};
+}
+function getEntries() {
+	if (!entriesPromise) entriesPromise = loadEntries();
+	return entriesPromise;
+}
+var ROUTER_BASEPATH = "/";
+var SERVER_FN_BASE = "/_serverFn/";
+var IS_PRERENDERING = process.env.TSS_PRERENDERING === "true";
+var IS_SHELL_ENV = process.env.TSS_SHELL === "true";
+var IS_DEV = false;
+var ERR_NO_RESPONSE = IS_DEV ? `It looks like you forgot to return a response from your server route handler. If you want to defer to the app router, make sure to have a component set in this route.` : "Internal Server Error";
+var ERR_NO_DEFER = IS_DEV ? `You cannot defer to the app router if there is no component defined on this route.` : "Internal Server Error";
+function throwRouteHandlerError() {
+	throw new Error(ERR_NO_RESPONSE);
+}
+function throwIfMayNotDefer() {
+	throw new Error(ERR_NO_DEFER);
+}
+/**
+* Check if a value is a special response (Response or Redirect)
+*/
+function isSpecialResponse(value) {
+	return value instanceof Response || isRedirect(value);
+}
+/**
+* Normalize middleware result to context shape
+*/
+funct
+[TRUNCATED: file is 54777 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/start-CSteC2wo.mjs ===
+import { t as supabase } from "./client-DO3FmCD9.mjs";
+import { n as createMiddleware, t as createCsrfMiddleware } from "./createCsrfMiddleware-B2To0gPJ.mjs";
+import { t as renderErrorPage } from "./ssr.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/start-CSteC2wo.js
+function dedupeSerializationAdapters(deduped, serializationAdapters) {
+	for (let i = 0, len = serializationAdapters.length; i < len; i++) {
+		const current = serializationAdapters[i];
+		if (!deduped.has(current)) {
+			deduped.add(current);
+			if (current.extends) dedupeSerializationAdapters(deduped, current.extends);
+		}
+	}
+}
+var createStart = (getOptions) => {
+	return {
+		getOptions: async () => {
+			const options = await getOptions();
+			if (options.serializationAdapters) {
+				const deduped = /* @__PURE__ */ new Set();
+				dedupeSerializationAdapters(deduped, options.serializationAdapters);
+				options.serializationAdapters = Array.from(deduped);
+			}
+			return options;
+		},
+		createMiddleware
+	};
+};
+var attachSupabaseAuth = createMiddleware({ type: "function" }).client(async ({ next }) => {
+	const { data } = await supabase.auth.getSession();
+	const token = data.session?.access_token;
+	return next({ headers: token ? { Authorization: `[REDACTED]` } : {} });
+});
+var errorMiddleware = createMiddleware().server(async ({ next }) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (error != null && typeof error === "object" && "statusCode" in error) throw error;
+		console.error(error);
+		return new Response(renderErrorPage(), {
+			status: 500,
+			headers: { "content-type": "text/html; charset=utf-8" }
+		});
+	}
+});
+var csrfMiddleware = createCsrfMiddleware({ filter: (ctx) => ctx.handlerType === "serverFn" });
+var startInstance = createStart(() => ({
+	functionMiddleware: [attachSupabaseAuth],
+	requestMiddleware: [errorMiddleware, csrfMiddleware]
+}));
+//#endregion
+export { startInstance };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/useAsync-6CgggUJk.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/useAsync-6CgggUJk.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+function useAsync(fn, deps) {
+	const [state, setState] = (0, import_react.useState)({ loading: true });
+	(0, import_react.useEffect)(() => {
+		let active = true;
+		setState({ loading: true });
+		fn().then((data) => active && setState({
+			data,
+			loading: false
+		})).catch((e) => active && setState({
+			error: e?.message ?? String(e),
+			loading: false
+		}));
+		return () => {
+			active = false;
+		};
+	}, deps);
+	return state;
+}
+//#endregion
+export { useAsync as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/verify._id-Cej-TZ9r.mjs ===
+import { m as createFileRoute, p as lazyRouteComponent } from "../_libs/@tanstack/react-router+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/verify._id-Cej-TZ9r.js
+var $$splitComponentImporter = () => import("./verify._id-hU6nPR20.mjs");
+var Route = createFileRoute("/verify/$id")({ component: lazyRouteComponent($$splitComponentImporter, "component") });
+//#endregion
+export { Route as t };
+
+=== END FILE ===
+
+=== FILE: AGENTS.md ===
+<!-- LOVABLE:BEGIN -->
+> [!IMPORTANT]
+> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
+> published git history — force pushing, or rebasing/amending/squashing commits
+> that are already pushed — as it rewrites history on Lovable's side and the
+> user will likely lose their project history.
+>
+> Commits you push to the connected branch sync back to Lovable and show up in
+> the editor, so keep the branch in a working state.
+<!-- LOVABLE:END -->
+
+=== END FILE ===
+
+=== FILE: components.json ===
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "css": "src/styles.css",
+    "baseColor": "slate",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "rtl": false,
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "registries": {}
+}
+
+=== END FILE ===
+
+=== FILE: eslint.config.js ===
+import js from "@eslint/js";
+import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
+import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+import reactRefresh from "eslint-plugin-react-refresh";
+import tseslint from "typescript-eslint";
+
+export default tseslint.config(
+  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: globals.browser,
+    },
+    plugins: {
+      "react-hooks": reactHooks,
+      "react-refresh": reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "server-only",
+              message:
+                "TanStack Start does not use the Next.js `server-only` package. Rename the module to `*.server.ts` or mark it with `@tanstack/react-start/server-only`.",
+            },
+          ],
+        },
+      ],
+      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "@typescript-eslint/no-unused-vars": "off",
+    },
+  },
+  eslintPluginPrettier,
+);
+
+=== END FILE ===
+
+=== FILE: scripts/optimize-gallery.mjs ===
+// Usage:  npm i -D sharp   then   node scripts/optimize-gallery.mjs
+// Reads src/assets/p1.jpg ... p31.jpg and writes small WebP copies:
+//   src/assets/gallery/thumbs/pN.webp  (grid, 800px)
+//   src/assets/gallery/full/pN.webp    (full-screen viewer, 1800px)
+import sharp from "sharp";
+import fs from "node:fs";
+import path from "node:path";
+
+const dir = "src/assets";
+const thumbs = path.join(dir, "gallery", "thumbs");
+const full = path.join(dir, "gallery", "full");
+fs.mkdirSync(thumbs, { recursive: true });
+fs.mkdirSync(full, { recursive: true });
+
+const files = fs.readdirSync(dir).filter((f) => /^p\d+\.(jpe?g|png|webp)$/i.test(f));
+for (const f of files) {
+  const name = f.replace(/\.[^.]+$/, "");
+  const input = path.join(dir, f);
+  await sharp(input).rotate().resize({ width: 1800, withoutEnlargement: true }).webp({ quality: 80 }).toFile(path.join(full, `${name}.webp`));
+  await sharp(input).rotate().resize({ width: 800, withoutEnlargement: true }).webp({ quality: 74 }).toFile(path.join(thumbs, `${name}.webp`));
+  console.log("ok", f);
+}
+console.log(`Done: ${files.length} images. Now move the originals out of src/assets.`);
+
+=== END FILE ===
+
+=== FILE: src/components/aura/AuraFace.tsx ===
+import { useEffect, useRef, useState } from "react";
+import type { Viseme } from "@/lib/visemes";
+import { BlinkController, buildEye, renderEye, type EyeRuntime } from "./eyeBlink";
+import { buildMouth, renderMouth, type MouthRuntime } from "./mouthWarp";
+import { EYES, FACE_ASPECT, FACE_FOCUS, FACE_SRC, MOUTH } from "./faceSpec";
+
+// Πολύ διακριτική «αναπνοή»: κινείται ολόκληρη η εικόνα, άρα στόμα και μάτια μένουν ευθυγραμμισμένα
+const BREATHE_CSS = `
+@keyframes aura-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-1px) scale(1.0035); }
+}
+.aura-breathe { transform-origin: 50% 88%; animation: aura-breathe 5.8s ease-in-out infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .aura-breathe { animation: none; } }
+`;
+
+type Props = {
+  getViseme: (now: number) => Viseme;
+  src?: string;
+  /** Το στοιχείο γεμίζει τον γονέα του. Δώσε του μέγεθος από έξω (π.χ. h-full w-full). */
+  className?: string;
+  /** "contain": όλη η εικόνα. "cover": γεμίζει το κουτί και κόβεται γύρω από το πρόσωπο (κινητό). */
+  fit?: "contain" | "cover";
+  /** Μαλακό σβήσιμο στο κάτω μέρος (χρήσιμο όταν η εικόνα κόβεται στο cover) */
+  fadeBottom?: boolean;
+  /** Η εικόνα έχει μαύρο φόντο: το «screen» το κάνει διάφανο πάνω στη σελίδα (default: true) */
+  blend?: boolean;
+  debug?: boolean;
+  /** Φυσικό ανοιγοκλείσιμο ματιών, συνεχώς όσο η σελίδα είναι ανοιχτή (default: true) */
+  blink?: boolean;
+  /** Διακριτική κίνηση «αναπνοής» (default: true) */
+  breathe?: boolean;
+};
+
+export default function AuraFace({
+  getViseme,
+  src = FACE_SRC,
+  className = "h-full w-full",
+  fit = "contain",
+  fadeBottom = false,
+  blend = true,
+  debug = false,
+  blink = true,
+  breathe = true,
+}: Props) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const dbgRef = useRef<HTMLCanvasElement>(null);
+  const getRef = useRef(getViseme);
+  getRef.current = getViseme;
+  const debugRef = useRef(debug);
+  debugRef.current = debug;
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  useEffect(() => {
+    const canvas = ref.current!;
+    const ctx = canvas.getContext("2d")!;
+    const img = new Image();
+    let raf = 0;
+    let alive = true;
+    setStatus("loading");
+
+    const blinkCtl = new BlinkController();
+    // Debug: πάτα το «B» για να δεις αμέσως ένα βλεφάρισμα
+    const onKey = (ev: KeyboardEvent) => {
+      if (debugRef.current && ev.key.toLowerCase() === "b") blinkCtl.trigger(performance.now());
+    };
+    window.addEventListener("keydown", onKey);
+
+    img.onerror = () => alive && setStatus("error");
+    img.onload = () => {
+      if (!alive) return;
+      const W = (canvas.width = img.naturalWidth);
+      const H = (canvas.height = img.naturalHeight);
+      ctx.drawImage(img, 0, 0);
+      setStatus("ready");
+
+      const aspectOk = Math.abs(W / H - FACE_ASPECT) < 0.02;
+      if (!aspectOk) {
+        console.warn("AuraFace: η εικόνα δεν έχει την αναλογία που περιμένει το faceSpec.ts, οι κινήσεις απενεργοποιήθηκαν.");
+      }
+
+      // ── Προετοιμασία ματιών και στόματος ────────────────────────────────
+      const getRegion = (x: number, y: number, w: number, h: number) => ctx.getImageData(x, y, w, h).data;
+      let eyes: { e: EyeRuntime; buf: ImageData }[] = [];
+      let mouth: { m: MouthRuntime; buf: ImageData } | null = null;
+      if (aspectOk) {
+        try {
+          const m = buildMouth(MOUTH, W, H, getRegion);
+          mouth = { m, buf: ctx.createImageData(m.w, m.h) };
+          if (blink) {
+            eyes = EYES.map((spec) => {
+              const e = buildEye(spec, W, H, getRegion);
+              return { e, buf: ctx.createImageData(e.w, e.h) };
+            });
+          }
+        } catch (err) {
+          console.warn("AuraFace: οι κινήσεις απενεργοποιήθηκαν", err);
+          mouth = null;
+          eyes = [];
+        }
+      }
+
+      let eyesDirty = false;
+      let mouthDirty = false;
+      let wasTalking = false;
+      let open = 0;
+      let width = 1;
+
+      // Προσαρμοστική απόδοση: σε αργές συσκευές το στόμα ανανεώνεται κάθε δεύτερο frame
+      let avgMs = 0;
+      let throttled = false;
+      let tick = 0;
+
+      const frame = (now: number) => {
+        if (!alive) return;
+        const v = getRef.current(now);
+        open += (v.open - open) * 0.35;
+        width += (v.width - width) * 0.35;
+
+        // ── Μάτια: τρέχουν σε κάθε frame, ανεξάρτητα από το αν μιλά ─────────
+        if (eyes.length) {
+          const talking = open * (mouth ? mouth.m.maxOpen : 1) > 0.4;
+          if (talking && !wasTalking) blinkCtl.nudge(now);
+          wasTalking = talking;
+          const c = blinkCtl.update(now, talking);
+          if (c > 0.002) {
+            for (const { e, buf } of eyes) {
+              renderEye(e, c, buf.data);
+              ctx.putImageData(buf, e.rx, e.ry);
+            }
+            eyesDirty = true;
+          } else if (eyesDirty) {
+            for (const { e, buf } of eyes) {
+              buf.data.set(e.orig);
+              ctx.putImageData(buf, e.rx, e.ry);
+            }
+            eyesDirty = false;
+          }
+        }
+
+        // ── Στόμα ───────────────────────────────────────────────────────────
+        if (mouth) {
+          tick++;
+          if (!(throttled && tick % 2 === 1)) {
+            const t0 = performance.now();
+            const drawn = renderMouth(mouth.m, open, width, mouth.buf.data);
+            if (drawn) {
+              ctx.putImageData(mouth.buf, mouth.m.rx, mouth.m.ry);
+              mouthDirty = true;
+              const dt = performance.now() - t0;
+              avgMs = avgMs * 0.9 + dt * 0.1;
+              if (avgMs > 9) throttled = true;
+              else if (avgMs < 5.5) throttled = false;
+            } else if (mouthDirty) {
+              mouth.buf.data.set(mouth.m.orig);
+              ctx.putImageData(mouth.buf, mouth.m.rx, mouth.m.ry);
+              mouthDirty = false;
+            }
+          }
+        }
+
+        raf = requestAnimationFrame(frame);
+      };
+      raf = requestAnimationFrame(frame);
+    };
+    img.src = src;
+
+    return () => {
+      alive = false;
+      cancelAnimationFrame(raf);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [src, blink]);
+
+  // ── Debug: γραμμές βαθμονόμησης πάνω στο πρόσωπο (δεύτερος καμβάς, ίδια τοποθέτηση με την εικόνα) ──
+  useEffect(() => {
+    const main = ref.current;
+    const dbg = dbgRef.current;
+    if (!dbg || !main || status !== "ready") return;
+    const W = (dbg.width = main.width);
+    const H = (dbg.height = main.height);
+    const d = dbg.getContext("2d")!;
+    d.clearRect(0, 0, W, H);
+    if (!debug) return;
+
+    const line = (x0: number, y0: number, x1: number, y1: number, color: string) => {
+      d.strokeStyle = color;
+      d.lineWidth = Math.max(1, W / 900);
+      d.beginPath();
+      d.moveTo(x0, y0);
+      d.lineTo(x1, y1);
+      d.stroke();
+    };
+    const mx = MOUTH.x * W;
+    const my = MOUTH.y * H;
+    const hw = MOUTH.halfW * W;
+    line(mx - hw, my, mx + hw, my, "#4da6ff");
+    line(mx - hw, my - MOUTH.lip * H, mx + hw, my - MOUTH.lip * H, "#ffe04d");
+    line(mx - hw, my + MOUTH.jaw * H, mx + hw, my + MOUTH.jaw * H, "#4dff9a");
+    d.fillStyle = "#ff3b3b";
+    d.beginPath();
+    d.arc(mx, my, Math.max(2, W / 300), 0, Math.PI * 2);
+    d.fill();
+    for (const eye of EYES) {
+      for (const [pts, color] of [[eye.up, "#ff4d4d"], [eye.lo, "#4da6ff"]] as const) {
+        d.strokeStyle = color;
+        d.lineWidth = Math.max(1, W / 900);
+        d.beginPath();
+        pts.forEach((p, i) => (i === 0 ? d.moveTo(p[0] * W, p[1] * H) : d.lineTo(p[0] * W, p[1] * H)));
+        d.stroke();
+      }
+    }
+  }, [debug, status]);
+
+  const fitStyle = {
+    objectFit: fit,
+    objectPosition: `${FACE_FOCUS.x * 100}% ${FACE_FOCUS.y * 100}%`,
+  } as const;
+  const mask = fadeBottom
+    ? {
+        maskImage: "linear-gradient(to bottom, #000 70%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, #000 70%, transparent 100%)",
+      }
+    : undefined;
+
+  return (
+    <div className={`relative ${className}`} style={{ mixBlendMode: blend ? "screen" : undefined }}>
+      <style>{BREATHE_CSS}</style>
+
+      <div className={`relative h-full w-full ${breathe && status === "ready" ? "aura-breathe" : ""}`} style={mask}>
+        <canvas ref={ref} className={status === "ready" ? "block h-full w-full" : "hidden"} style={fitStyle} />
+        <canvas
+          ref={dbgRef}
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ ...fitStyle, display: debug && status === "ready" ? "block" : "none" }}
+        />
+      </div>
+
+      {status !== "ready" && (
+        <div
+          className={
+            status === "loading"
+              ? "aai-skeleton h-full w-full"
+              : "flex h-full w-full items-center justify-center p-6 text-center text-sm text-slate-300"
+          }
+        >
+          {status === "error" && (
+            <span>
+              Δεν βρέθηκε η εικόνα.
+              <br />
+              Βάλ' την στο <code className="text-white">public/aura-chrome.jpg</code>
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+=== END FILE ===
+

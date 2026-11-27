@@ -1,0 +1,1441 @@
+=== FILE: supabase/functions/_shared/viva.ts ===
+// supabase/functions/_shared/viva.ts
+//
+// Thin, provider-isolated client for Viva.com (Smart Checkout). No Supabase
+// code in here, so it can be unit-tested and replaced independently.
+//
+// Environments are completely separate: pick ONE with VIVA_ENV and only the
+// secrets of that environment are ever read.
+//
+//   VIVA_ENV                      sandbox | production      (required)
+//   VIVA_SANDBOX_CLIENT_ID        Smart Checkout client id        (demo)
+//   VIVA_SANDBOX_CLIENT_SECRET    Smart Checkout client secret    (demo)
+//   VIVA_SANDBOX_SOURCE_CODE      payment source code             (demo)
+//   VIVA_SANDBOX_WEBHOOK_KEY      verification key for the webhook (demo, Stage 3)
+//   VIVA_SANDBOX_MERCHANT_ID      Merchant ID  } Basic auth, used ONLY for the
+//   VIVA_SANDBOX_API_KEY          API key      } recurring charge (Stage 4)
+//   VIVA_PRODUCTION_CLIENT_ID / _CLIENT_SECRET / _SOURCE_CODE / _WEBHOOK_KEY /
+//   _MERCHANT_ID / _API_KEY                                                  (live)
+//
+// Endpoints below are the ones documented at developer.viva.com:
+//   token    POST {accounts}/connect/token         (OAuth2 client credentials)
+//   order    POST {api}/checkout/v2/orders         (amount in cents)
+//   redirect {checkout}?ref={orderCode}
+
+export type VivaEnv = "sandbox" | "production";
+
+export interface VivaConfig {
+  env: VivaEnv;
+  clientId: string;
+  clientSecret: string;
+  sourceCode: string;
+  /** Only needed by the webhook endpoint (answers Viva's verification request). */
+  webhookKey: string | null;
+  /** Basic-auth credentials: only needed to charge renewals (Stage 4). */
+  merchantId: string | null;
+  apiKey: string | null;
+  apiBase: string;
+  /** Host of the older /api/transactions endpoints (recurring charges). */
+  legacyBase: string;
+  accountsBase: string;
+  checkoutBase: string;
+}
+
+const URLS: Record<VivaEnv, { apiBase: string; legacyBase: string; accountsBase: string; checkoutBase: string }> = {
+  sandbox: {
+    apiBase: "https://demo-api.vivapayments.com",
+    legacyBase: "https://demo.vivapayments.com",
+    accountsBase: "https://demo-accounts.vivapayments.com",
+    checkoutBase: "https://demo.vivapayments.com/web/checkout",
+  },
+  production: {
+    apiBase: "https://api.vivapayments.com",
+    legacyBase: "https://www.vivapayments.com",
+    accountsBase: "https://accounts.vivapayments.com",
+    checkoutBase: "https://www.vivapayments.com/web/checkout",
+  },
+};
+
+/** Hosts the browser is allowed to be redirected to (checked again in the frontend). */
+export const VIVA_CHECKOUT_PREFIXES = [URLS.sandbox.checkoutBase, URLS.production.checkoutBase];
+
+export class VivaConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "VivaConfigError";
+  }
+}
+
+export class VivaApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "VivaApiError";
+    this.status = status;
+  }
+}
+
+/** Reads ONLY the selected environment's secrets. Throws if anything is missing. */
+export function loadVivaConfig(getEnv: (name: string) => string | undefined): VivaConfig {
+  const env = getEnv("VIVA_ENV");
+  if (env !== "sandbox" && env !== "production") {
+    throw new VivaConfigError("VIVA_ENV must be 'sandbox' or 'production'");
+  }
+  const prefix = env === "sandbox" ? "VIVA_SANDBOX_" : "VIVA_PRODUCTION_";
+  const clientId = getEnv(`${prefix}CLIENT_ID`);
+  const clientSecret = getEnv(`${prefix}CLIENT_SECRET`);
+  const sourceCode = getEnv(`${prefix}SOURCE_CODE`);
+  const missing = [
+    !clientId && `${prefix}CLIENT_ID`,
+    !clientSecret && `${prefix}CLIENT_SECRET`,
+    !sourceCode && `${prefix}SOURCE_CODE`,
+  ].filter(Boolean);
+  if (missing.length > 0 || !clientId || !clientSecret || !sourceCode) {
+    throw new VivaConfigError(`Missing Viva secrets: ${missing.join(", ")}`);
+  }
+  const webhookKey = getEnv(`${prefix}WEBHOOK_KEY`) || null;
+  const merchantId = getEnv(`${prefix}MERCHANT_ID`) || null;
+  const apiKey = getEnv(`${prefix}API_KEY`) || null;
+  return { env, clientId, clientSecret, sourceCode, webhookKey, merchantId, apiKey, ...URLS[env] };
+}
+
+type FetchFn = typeof fetch;
+
+async function timedFetch(fetchFn: FetchFn, url: string, init: RequestInit, ms = 15000): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetchFn(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Never put secrets in logs: this keeps only a short, trimmed slice of the body. */
+function shortBody(text: string): string {
+  return text.replace(/\s+/g, " ").slice(0, 300);
+}
+
+/* ---------------------------- OAuth2 token ---------------------------- */
+
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+export async function getAccessToken(cfg: VivaConfig, fetchFn: FetchFn = fetch): Promise<string> {
+  const cacheKey = `${cfg.env}:${cfg.clientId}`;
+  const cached = tokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + 30_000) return cached.token;
+
+  const basic = btoa(`${cfg.clientId}:${cfg.clientSecret}`);
+  const res = await timedFetch(fetchFn, `${cfg.accountsBase}/connect/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `[REDACTED]`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: "grant_type=client_credentials",
+  });
+
+  const text = await res.text();
+  if (!res.ok) throw new VivaApiError(`token request failed: ${shortBody(text)}`, res.status);
+
+  let parsed: { access_token?: unknown; expires_in?: unknown };
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new VivaApiError("token response was not JSON", 502);
+  }
+  if (typeof parsed.access_token !== "string" || parsed.access_token.length === 0) {
+    throw new VivaApiError("token response had no access_token", 502);
+  }
+  const ttl = typeof parsed.expires_in === "number" && parsed.expires_in > 0 ? parsed.expires_in : 300;
+  tokenCache.set(cacheKey, { token: parsed.access_token, expiresAt: Date.now() + ttl * 1000 });
+  return parsed.access_token;
+}
+
+/** Test helper. */
+export function clearVivaTokenCache(): void {
+  tokenCache.clear();
+}
+
+/* ------------------------------ Orders ------------------------------- */
+
+export interface CreateOrderInput {
+  /** Amount in CENTS (integer). Always computed on the server from public.plans. */
+  amountCents: number;
+  /** Our billing_orders.id: how a payment is matched back to what we decided. */
+  merchantTrns: string;
+  /** Shown to the customer on Viva's page. */
+  customerTrns: string;
+  customer: { email: string; fullName?: string | null; phone?: string | null; requestLang?: string };
+  /** First payment of a subscription: asks for consent to later merchant-initiated charges. */
+  allowRecurring: boolean;
+  paymentTimeoutSeconds?: number;
+  tags?: string[];
+}
+
+export async function createPaymentOrder(
+  cfg: VivaConfig,
+  input: CreateOrderInput,
+  fetchFn: FetchFn = fetch,
+): Promise<{ orderCode: string }> {
+  if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+    throw new VivaApiError("amountCents must be a positive integer", 400);
+  }
+
+  const token = await getAccessToken(cfg, fetchFn);
+
+  const body = {
+    amount: input.amountCents,
+    customerTrns: input.customerTrns,
+    customer: {
+      email: input.customer.email,
+      ...(input.customer.fullName ? { fullName: input.customer.fullName } : {}),
+      ...(input.customer.phone ? { phone: input.customer.phone } : {}),
+      requestLang: input.customer.requestLang ?? "el-GR",
+    },
+    paymentTimeout: input.paymentTimeoutSeconds ?? 1800,
+    allowRecurring: input.allowRecurring,
+    sourceCode: cfg.sourceCode,
+    merchantTrns: input.merchantTrns,
+    ...(input.tags && input.tags.length > 0 ? { tags: input.tags } : {}),
+  };
+
+  const res = await timedFetch(fetchFn, `${cfg.apiBase}/checkout/v2/orders`, {
+    method: "POST",
+    headers: { Authorization: `[REDACTED]`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  if (!res.ok) throw new VivaApiError(`create order failed: ${shortBody(text)}`, res.status);
+
+  // The order code is a 16-digit integer. Read it from the raw text so it can
+  // never lose precision by passing through a JavaScript number.
+  const match = /"orderCode"\s*:\s*"?(\d{6,20})"?/.exec(text);
+  if (!match || !match[1]) throw new VivaApiError("create order: no orderCode in response", 502);
+  return { orderCode: match[1] };
+}
+
+/** Where the customer pays. Smart Checkout must be a full redirect, never an iframe. */
+export function checkoutRedirectUrl(cfg: VivaConfig, orderCode: string): string {
+  if (!/^\d{6,20}$/.test(orderCode)) throw new VivaApiError("invalid order code", 400);
+  return `${cfg.checkoutBase}?ref=${orderCode}`;
+}
+
+/* --------------------------- Retrieve transaction --------------------------- */
+
+export interface VivaTransaction {
+  transactionId: string;
+  /** 'F' = finished/successful. Other letters are not final (see Viva response codes). */
+  statusId: string;
+  /** Null for a transaction that was not created from a payment order (e.g. a renewal). */
+  orderCode: string | null;
+  /** Viva returns the amount in EUROS (e.g. 49.99). Converted here to cents. */
+  amountCents: number;
+  currencyCode: string | null;
+  merchantTrns: string | null;
+  recurringSupport: boolean;
+  insDate: string | null;
+}
+
+const TRANSACTION_ID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+export function isTransactionId(value: unknown): value is string {
+  return typeof value === "string" && TRANSACTION_ID_RE.test(value);
+}
+
+/**
+ * Asks Viva for the truth about a transaction (GET /checkout/v2/transactions/{id}).
+ * A webhook body is only a hint: nothing is believed until Viva confirms it here.
+ * Throws VivaApiError (status 404 = Viva has no such transaction).
+ */
+export async function retrieveTransaction(
+  cfg: VivaConfig,
+  transactionId: string,
+  fetchFn: FetchFn = fetch,
+): Promise<VivaTransaction> {
+  if (!isTransactionId(transactionId)) throw new VivaApiError("invalid transaction id", 400);
+  transactionId = transactionId.toLowerCase();
+
+  const token = await getAccessToken(cfg, fetchFn);
+  const res = await timedFetch(fetchFn, `${cfg.apiBase}/checkout/v2/transactions/${transactionId}`, {
+    method: "GET",
+    headers: { Authorization: `[REDACTED]` },
+  });
+  const text = await res.text();
+  if (!res.ok) throw new VivaApiError(`retrieve transaction failed: ${shortBody(text)}`, res.status);
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    throw new VivaApiError("retrieve transaction: response was not JSON", 502);
+  }
+
+  const orderMatch = /"orderCode"\s*:\s*"?(\d{6,20})"?/.exec(text);
+  const amount = Number(parsed.amount);
+  if (typeof parsed.statusId !== "string" || !Number.isFinite(amount)) {
+    throw new VivaApiError("retrieve transaction: unexpected response shape", 502);
+  }
+
+  // Euros with at most 2 decimals. Anything else is not a real amount: refuse
+  // it instead of rounding it into something that might match.
+  const cents = Math.round(amount * 100);
+  if (Math.abs(amount * 100 - cents) > 0.0001) {
+    throw new VivaApiError("retrieve transaction: amount has fractional cents", 502);
+  }
+
+  return {
+    transactionId,
+    statusId: parsed.statusId,
+    orderCode: orderMatch && orderMatch[1] ? orderMatch[1] : null,
+    amountCents: cents,
+    currencyCode: parsed.currencyCode == null ? null : String(parsed.currencyCode),
+    merchantTrns: typeof parsed.merchantTrns === "string" ? parsed.merchantTrns : null,
+    recurringSupport: parsed.recurringSupport === true,
+    insDate: typeof parsed.insDate === "string" ? parsed.insDate : null,
+  };
+}
+
+/* ------------------------- Webhook source addresses ------------------------- */
+
+// Published by Viva (developer.viva.com/webhooks-for-payments). Used as an
+// extra layer only; the real protection is retrieveTransaction() above.
+const WEBHOOK_SOURCES: Record<VivaEnv, string[]> = {
+  production: [
+    "51.138.37.238", "40.127.253.112/28", "51.105.129.192/28",
+    "20.54.89.16", "4.223.76.50", "51.12.157.0/28",
+  ],
+  sandbox: [
+    "20.50.240.57", "40.74.20.78", "195.167.87.181",
+    "195.167.87.180", "20.13.195.185", "135.225.16.50",
+  ],
+};
+
+function ipv4ToInt(ip: string): number | null {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return null;
+  let n = 0;
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return null;
+    const octet = Number(part);
+    if (octet > 255) return null;
+    n = n * 256 + octet;
+  }
+  return n;
+}
+
+/** True if `ip` (IPv4) is one of the addresses Viva publishes for that environment. */
+export function isVivaWebhookIp(ip: string | null | undefined, env: VivaEnv): boolean {
+  if (!ip) return false;
+  const addr = ipv4ToInt(ip.trim());
+  if (addr === null) return false;
+  for (const entry of WEBHOOK_SOURCES[env]) {
+    const [base, bitsText] = entry.split("/");
+    const baseInt = ipv4ToInt(base ?? "");
+    if (baseInt === null) continue;
+    const bits = bitsText === undefined ? 32 : Number(bitsText);
+    const size = 2 ** (32 - bits);
+    if (Math.floor(addr / size) === Math.floor(baseInt / size)) return true;
+  }
+  return false;
+}
+
+/* ------------------------------ Recurring charge ------------------------------ */
+
+export type RecurringChargeResult =
+  /** Viva answered with a transaction id. Not trusted yet: confirm with retrieveTransaction(). */
+  | { kind: "transaction"; transactionId: string; statusId: string | null; success: boolean }
+  /** The charge was refused by the bank / Viva (declined, insufficient funds...). Nothing moved. */
+  | { kind: "declined"; errorCode: number | null; errorText: string | null }
+  /** OUR request was refused (bad credentials, bad request). Nothing moved, not the customer's fault. */
+  | { kind: "rejected"; status: number }
+  /** Network cut, timeout, 5xx or unreadable answer: we do NOT know whether money moved. */
+  | { kind: "unknown"; reason: string };
+
+/**
+ * Charges a renewal against the customer's saved payment method:
+ *   POST {legacy}/api/transactions/{initialTransactionId}   (Basic auth)
+ * No customer interaction. The amount is in CENTS in the request. The caller
+ * must treat "unknown" as "money may have moved" and never blindly retry it.
+ */
+export async function chargeRecurring(
+  cfg: VivaConfig,
+  initialTransactionId: string,
+  input: { amountCents: number; customerTrns: string; merchantTrns: string },
+  fetchFn: FetchFn = fetch,
+): Promise<RecurringChargeResult> {
+  if (!cfg.merchantId || !cfg.apiKey) {
+    throw new VivaConfigError(`Missing Viva secrets: VIVA_${cfg.env === "sandbox" ? "SANDBOX" : "PRODUCTION"}_MERCHANT_ID / _API_KEY`);
+  }
+  if (!isTransactionId(initialTransactionId)) throw new VivaApiError("invalid initial transaction id", 400);
+  if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+    throw new VivaApiError("amountCents must be a positive integer", 400);
+  }
+
+  const basic = btoa(`${cfg.merchantId}:${cfg.apiKey}`);
+  let res: Response;
+  let text: string;
+  try {
+    res = await timedFetch(
+      fetchFn,
+      `${cfg.legacyBase}/api/transactions/${initialTransactionId.toLowerCase()}`,
+      {
+        method: "POST",
+        headers: { Authorization: `[REDACTED]`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: input.amountCents,
+          customerTrns: input.customerTrns,
+          // Same source as the first payment, or Viva charges the default source.
+          sourceCode: cfg.sourceCode,
+          merchantTrns: input.merchantTrns,
+          tipAmount: 0,
+          currencyCode: "978",
+        }),
+      },
+      30000,
+    );
+    text = await res.text();
+  } catch (err) {
+    return { kind: "unknown", reason: err instanceof Error ? err.name : "network" };
+  }
+
+  if (res.status === 401 || res.status === 403) return { kind: "rejected", status: res.status };
+  if (res.status >= 500) return { kind: "unknown", reason: `http_${res.status}` };
+
+  let body: Record<string, unknown> | null = null;
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed as Record<string, unknown>;
+  } catch {
+    body = null;
+  }
+  if (!body) return res.ok ? { kind: "unknown", reason: "unreadable_response" } : { kind: "rejected", status: res.status };
+
+  const txId = body.TransactionId;
+  if (isTransactionId(txId)) {
+    return {
+      kind: "transaction",
+      transactionId: txId.toLowerCase(),
+      statusId: typeof body.StatusId === "string" ? body.StatusId : null,
+      success: body.Success === true,
+    };
+  }
+
+  const errorCode = typeof body.ErrorCode === "number" ? body.ErrorCode : null;
+  // A refusal can arrive as HTTP 200 or as HTTP 4xx: either way the bank said no.
+  if (body.Success === false || (errorCode !== null && errorCode !== 0)) {
+    return {
+      kind: "declined",
+      errorCode,
+      errorText: typeof body.ErrorText === "string" ? body.ErrorText.slice(0, 120) : null,
+    };
+  }
+  return res.ok ? { kind: "unknown", reason: "unrecognised_response" } : { kind: "rejected", status: res.status };
+}
+
+=== END FILE ===
+
+=== FILE: supabase/functions/admin-billing-sync/index.ts ===
+// supabase/functions/admin-billing-sync/index.ts
+//
+// Admin-only. Pulls the truth from Stripe into the database:
+//   1. every subscription  -> public.subscriptions (status, period end, cancel flag)
+//   2. every PAID invoice  -> public.payments      (income, last payment, renewals)
+//   3. refunds             -> payments.amount_refunded_cents
+// Safe to run any time (everything is an idempotent upsert).
+import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import { recordInvoice, refId, syncSubscription, UserDeletedError } from "../_shared/billing.ts";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+const MAX_ERRORS_REPORTED = 10;
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing environment configuration");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user) return json({ error: "Unauthorized" }, 401);
+
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+  // Admin check (same rule as public.is_admin_user()).
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("role, status")
+    .eq("id", user.id)
+    .maybeSingle();
+  const isAdmin =
+    Boolean(profile) &&
+    ["admin", "super_admin"].includes(String(profile?.role)) &&
+    String(profile?.status ?? "active") === "active";
+  if (!isAdmin) return json({ error: "Forbidden" }, 403);
+
+  const stripe = new Stripe(stripeKey);
+  const result = {
+    subscriptions: 0,
+    skippedSubscriptions: 0,
+    payments: 0,
+    refunds: 0,
+    errors: [] as string[],
+  };
+  const note = (msg: string) => {
+    console.error(msg);
+    if (result.errors.length < MAX_ERRORS_REPORTED) result.errors.push(msg);
+  };
+
+  try {
+    // 1. Subscriptions
+    for await (const sub of stripe.subscriptions.list({ status: "all", limit: 100 })) {
+      try {
+        const synced = await syncSubscription(admin, sub);
+        if (synced) result.subscriptions += 1;
+        else result.skippedSubscriptions += 1;
+      } catch (err) {
+        if (err instanceof UserDeletedError) {
+          result.skippedSubscriptions += 1; // belongs to a deleted account
+          continue;
+        }
+        note(`subscription ${sub.id}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+
+    // 2. Paid invoices (try to expand the payment intent for refunds)
+    const sweepInvoices = async (expandPayments: boolean) => {
+      const params: Stripe.InvoiceListParams = { status: "paid", limit: 100 };
+      if (expandPayments) params.expand = ["data.payments"];
+      for await (const inv of stripe.invoices.list(params)) {
+        try {
+          if (await recordInvoice(admin, inv)) result.payments += 1;
+        } catch (err) {
+          note(`invoice ${inv.id}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    };
+    try {
+      await sweepInvoices(true);
+    } catch (err) {
+      note(`invoice expand failed, retrying plain: ${err instanceof Error ? err.message : String(err)}`);
+      result.payments = 0;
+      await sweepInvoices(false);
+    }
+
+    // 3. Refunds (best effort)
+    try {
+      const refunded = new Map<string, number>();
+      for await (const refund of stripe.refunds.list({ limit: 100 })) {
+        if (refund.status !== "succeeded") continue;
+        const pi = refId(refund.payment_intent);
+        if (!pi) continue;
+        refunded.set(pi, (refunded.get(pi) ?? 0) + (refund.amount ?? 0));
+      }
+      for (const [pi, cents] of refunded) {
+        const { error } = await admin
+          .from("payments")
+          .update({ amount_refunded_cents: cents })
+          .eq("stripe_payment_intent_id", pi);
+        if (error) note(`refund ${pi}: ${error.message}`);
+        else result.refunds += 1;
+      }
+    } catch (err) {
+      note(`refunds: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    return json({ ok: true, ...result });
+  } catch (error) {
+    console.error("admin-billing-sync failed", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `Ο συγχρονισμός απέτυχε: ${message}`, ...result }, 500);
+  }
+});
+=== END FILE ===
+
+=== FILE: supabase/functions/create-book-checkout/index.ts ===
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { quoteForCaller } from "../_shared/discount.ts";
+import {
+  loadVivaConfig,
+  createPaymentOrder,
+  checkoutRedirectUrl,
+  VivaConfigError,
+  VivaApiError,
+} from "../_shared/viva.ts";
+
+// Deploy:
+// supabase functions deploy create-book-checkout --no-verify-jwt
+//
+// Required secrets:
+// VIVA_ENV=sandbox
+// VIVA_SANDBOX_CLIENT_ID
+// VIVA_SANDBOX_CLIENT_SECRET
+// VIVA_SANDBOX_SOURCE_CODE
+// SUPABASE_URL
+// SUPABASE_SERVICE_ROLE_KEY
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage",
+  "Access-Control-Max-Age": "86400",
+};
+
+const reply = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+
+const str = (v: unknown, max = 200) =>
+  typeof v === "string" ? v.trim().slice(0, max) : "";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: CORS });
+  }
+
+  if (req.method !== "POST") {
+    return reply({ error: "method_not_allowed" }, 405);
+  }
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!url || !serviceKey) {
+    return reply({ error: "supabase_env_missing" }, 500);
+  }
+
+  let cfg;
+
+  try {
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (error) {
+    console.error(
+      "Viva configuration error:",
+      error instanceof VivaConfigError ? error.message : "unknown",
+    );
+    return reply({ error: "viva_configuration_error" }, 500);
+  }
+
+  const db = createClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
+
+  let orderId: string | null = null;
+
+  try {
+    const body = await req.json();
+
+    const quantity = Math.floor(Number(body.quantity));
+    const fullName = str(body.fullName);
+    const email = str(body.email, 254);
+    const phone = str(body.phone, 40);
+    const addressLine1 = str(body.addressLine1);
+    const addressLine2 = str(body.addressLine2);
+    const city = str(body.city, 100);
+    const region = str(body.region, 100);
+    const postalCode = str(body.postalCode, 20);
+    const country = str(body.country, 100);
+    const notes = str(body.notes, 500);
+
+    if (
+      !Number.isFinite(quantity) ||
+      quantity < 1 ||
+      quantity > 10 ||
+      !fullName ||
+      !phone ||
+      !addressLine1 ||
+      !city ||
+      !postalCode ||
+      !country ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)
+    ) {
+      return reply({ error: "invalid_input" }, 400);
+    }
+
+    // 1. Read the authoritative book price from Supabase.
+    const { data: settings, error: settingsError } = await db
+      .from("book_settings")
+      .select("*")
+      .eq("id", 1)
+      .single();
+
+    if (settingsError || !settings || !settings.is_active) {
+      return reply({ error: "book_unavailable" }, 409);
+    }
+
+    const listPrice = Number(settings.price_cents);
+    const shipping = Number(settings.shipping_cents ?? 0);
+    const currency = String(settings.currency ?? "eur").toLowerCase();
+
+    if (
+      !Number.isSafeInteger(listPrice) ||
+      listPrice <= 0 ||
+      !Number.isSafeInteger(shipping) ||
+      shipping < 0 ||
+      currency !== "eur"
+    ) {
+      console.error("Invalid book settings");
+      return reply({ error: "invalid_book_configuration" }, 500);
+    }
+
+    if (
+      settings.stock !== null &&
+      Number(settings.stock) < quantity
+    ) {
+      return reply({ error: "sold_out" }, 409);
+    }
+
+    // 2. Apply the existing server-side member discount.
+    // Shipping is deliberately NOT discounted.
+    const quote = await quoteForCaller(
+      req,
+      db,
+      "book",
+      listPrice,
+    );
+
+    const unit = quote.finalCents;
+    const total = unit * quantity + shipping;
+
+    if (
+      !Number.isSafeInteger(unit) ||
+      unit <= 0 ||
+      !Number.isSafeInteger(total) ||
+      total <= 0
+    ) {
+      return reply({ error: "invalid_payment_amount" }, 500);
+    }
+
+    // 3. Create our internal order FIRST.
+    // Its UUID is sent to Viva as merchantTrns.
+    orderId = crypto.randomUUID();
+
+    const { error: insertError } = await db
+      .from("book_orders")
+      .insert({
+        id: orderId,
+        quantity,
+        unit_price_cents: unit,
+        list_unit_price_cents: quote.listCents,
+        discount_percent: quote.percent,
+        user_id: quote.userId,
+        shipping_cents: shipping,
+        total_cents: total,
+        currency,
+        full_name: fullName,
+        email,
+        phone,
+        address_line1: addressLine1,
+        address_line2: addressLine2 || null,
+        city,
+        region: region || null,
+        postal_code: postalCode,
+        country,
+        notes: notes || null,
+        status: "pending",
+        payment_provider: "viva",
+        payment_environment: cfg.env,
+        viva_order_code: null,
+        stripe_session_id: null,
+      });
+
+    if (insertError) {
+      console.error("Book order insert failed:", insertError.message);
+      return reply({ error: "could_not_create_book_order" }, 500);
+    }
+
+    // 4. Create the Viva Smart Checkout order.
+    // Amount is calculated entirely on the server.
+    let vivaOrderCode: string;
+
+    try {
+      const created = await createPaymentOrder(cfg, {
+        amountCents: total,
+        merchantTrns: orderId,
+        customerTrns: `AURA Academy - ${String(settings.title)} x${quantity}`,
+        customer: {
+          email,
+          fullName,
+          requestLang: "el-GR",
+        },
+        allowRecurring: false,
+        paymentTimeoutSeconds: 1800,
+        tags: [
+          "aura-book",
+          `order-${orderId}`,
+          `quantity-${quantity}`,
+        ],
+      });
+
+      vivaOrderCode = created.orderCode;
+    } catch (error) {
+      console.error(
+        "Viva order creation failed:",
+        error instanceof VivaApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "unknown",
+      );
+
+      await db
+        .from("book_orders")
+        .update({
+          status: "cancelled",
+        })
+        .eq("id", orderId)
+        .eq("status", "pending");
+
+      return reply({ error: "viva_order_creation_failed" }, 502);
+    }
+
+    // 5. Persist Viva's order code BEFORE redirecting the customer.
+    const { error: updateError } = await db
+      .from("book_orders")
+      .update({
+        viva_order_code: vivaOrderCode,
+      })
+      .eq("id", orderId)
+      .eq("status", "pending");
+
+    if (updateError) {
+      console.error("Could not save Viva order code:", updateError.message);
+
+      await db
+        .from("book_orders")
+        .update({ status: "cancelled" })
+        .eq("id", orderId);
+
+      // Never redirect if we cannot match the payment to our order.
+      return reply({ error: "could_not_save_payment_reference" }, 500);
+    }
+
+    // 6. Return the secure Viva redirect URL.
+    return reply({
+      redirectUrl: checkoutRedirectUrl(cfg, vivaOrderCode),
+      orderId,
+      totalCents: total,
+      unitPriceCents: unit,
+      shippingCents: shipping,
+      discountPercent: quote.percent,
+      currency: "EUR",
+      provider: "viva",
+    });
+  } catch (error) {
+    console.error(
+      "create-book-checkout failed:",
+      error instanceof Error ? error.message : "unknown",
+    );
+
+    if (orderId) {
+      await db
+        .from("book_orders")
+        .update({ status: "cancelled" })
+        .eq("id", orderId)
+        .eq("status", "pending");
+    }
+
+    return reply({ error: "server_error" }, 500);
+  }
+});
+
+=== END FILE ===
+
+=== FILE: supabase/functions/create-online-checkout/index.ts ===
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { quoteForCaller } from "../_shared/discount.ts";
+import {
+  loadVivaConfig,
+  createPaymentOrder,
+  checkoutRedirectUrl,
+  VivaConfigError,
+  VivaApiError,
+} from "../_shared/viva.ts";
+
+// Deploy:
+// supabase functions deploy create-online-checkout --no-verify-jwt
+//
+// Secrets:
+// VIVA_ENV=sandbox
+// VIVA_SANDBOX_CLIENT_ID
+// VIVA_SANDBOX_CLIENT_SECRET
+// VIVA_SANDBOX_SOURCE_CODE
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Max-Age": "86400",
+};
+
+const reply = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+
+const str = (v: unknown, max = 200) =>
+  typeof v === "string" ? v.trim().slice(0, max) : "";
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: CORS });
+  }
+
+  if (req.method !== "POST") {
+    return reply({ error: "method_not_allowed" }, 405);
+  }
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!url || !serviceKey) {
+    return reply({ error: "supabase_env_missing" }, 500);
+  }
+
+  let cfg;
+
+  try {
+    cfg = loadVivaConfig((name) => Deno.env.get(name));
+  } catch (error) {
+    console.error(
+      "Viva configuration error:",
+      error instanceof VivaConfigError ? error.message : "unknown",
+    );
+    return reply({ error: "viva_configuration_error" }, 500);
+  }
+
+  const db = createClient(url, serviceKey, {
+    auth: { persistSession: false },
+  });
+
+  let bookingId: string | null = null;
+
+  try {
+    const body = await req.json();
+
+    const seminarId = str(body.seminarId, 100);
+    const fullName = str(body.fullName);
+    const email = str(body.email, 254).toLowerCase();
+    const phone = str(body.phone, 40);
+
+    if (
+      !seminarId ||
+      !fullName ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ||
+      !phone
+    ) {
+      return reply({ error: "invalid_input" }, 400);
+    }
+
+    // 1. Read the seminar and its price from Supabase.
+    const { data: seminar, error: seminarError } = await db
+      .from("online_seminars")
+      .select("*")
+      .eq("id", seminarId)
+      .eq("published", true)
+      .single();
+
+    if (seminarError || !seminar) {
+      return reply({ error: "not_found" }, 404);
+    }
+
+    const listPrice = Number(seminar.price_cents);
+    const currency = String(seminar.currency ?? "eur").toLowerCase();
+
+    if (
+      !Number.isSafeInteger(listPrice) ||
+      listPrice <= 0 ||
+      currency !== "eur"
+    ) {
+      console.error("Invalid seminar price or currency");
+      return reply({ error: "invalid_seminar_configuration" }, 500);
+    }
+
+    // 2. Check seminar capacity.
+    if (seminar.capacity !== null && seminar.capacity !== undefined) {
+      const { count, error: countError } = await db
+        .from("online_seminar_bookings")
+        .select("id", { count: "exact", head: true })
+        .eq("seminar_id", seminarId)
+        .in("status", ["pending", "paid"]);
+
+      if (countError) throw countError;
+
+      if ((count ?? 0) >= Number(seminar.capacity)) {
+        return reply({ error: "sold_out" }, 409);
+      }
+    }
+
+    // 3. Calculate the member discount server-side.
+    const quote = await quoteForCaller(
+      req,
+      db,
+      "online_seminar",
+      listPrice,
+    );
+
+    const amountCents = quote.finalCents;
+
+    if (
+      !Number.isSafeInteger(amountCents) ||
+      amountCents <= 0
+    ) {
+      return reply({ error: "invalid_payment_amount" }, 500);
+    }
+
+    // 4. Create the internal booking first.
+    bookingId = crypto.randomUUID();
+
+    const { error: insertError } = await db
+      .from("online_seminar_bookings")
+      .insert({
+        id: bookingId,
+        seminar_id: seminarId,
+        full_name: fullName,
+        email,
+        phone,
+        amount_cents: amountCents,
+        list_price_cents: quote.listCents,
+        discount_percent: quote.percent,
+        user_id: quote.userId,
+        status: "pending",
+        paid_at: null,
+        stripe_session_id: null,
+        payment_provider: "viva",
+        payment_environment: cfg.env,
+        viva_order_code: null,
+      });
+
+    if (insertError) {
+      console.error("Booking insert failed:", insertError.message);
+      return reply({ error: "booking_creation_failed" }, 500);
+    }
+
+    // 5. Create the Viva Smart Checkout order.
+    // merchantTrns links the payment to our internal booking.
+    let vivaOrderCode: string;
+
+    try {
+      const created = await createPaymentOrder(cfg, {
+        amountCents,
+        merchantTrns: bookingId,
+        customerTrns: `AURA Online Seminar - ${seminar.title}`,
+        customer: {
+          email,
+          fullName,
+          requestLang: "el-GR",
+        },
+        allowRecurring: false,
+        paymentTimeoutSeconds: 1800,
+        tags: [
+          "aura-online-seminar",
+          `booking-${bookingId}`,
+          `seminar-${seminarId}`,
+        ],
+      });
+
+      vivaOrderCode = created.orderCode;
+    } catch (error) {
+      console.error(
+        "Viva order creation failed:",
+        error instanceof VivaApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : "unknown",
+      );
+
+      await db
+        .from("online_seminar_bookings")
+        .update({ status: "failed" })
+        .eq("id", bookingId)
+        .eq("status", "pending");
+
+      return reply({ error: "viva_order_creation_failed" }, 502);
+    }
+
+    // 6. Persist the Viva order reference before redirecting.
+    const { error: updateError } = await db
+      .from("online_seminar_bookings")
+      .update({ viva_order_code: vivaOrderCode })
+      .eq("id", bookingId)
+      .eq("status", "pending");
+
+    if (updateError) {
+      console.error("Could not save Viva order code:", updateError.message);
+
+      await db
+        .from("online_seminar_bookings")
+        .update({ status: "failed" })
+        .eq("id", bookingId);
+
+      return reply({ error: "could_not_save_payment_reference" }, 500);
+    }
+
+    // 7. Return Viva's secure hosted checkout URL.
+    return reply({
+      redirectUrl: checkoutRedirectUrl(cfg, vivaOrderCode),
+      bookingId,
+      amountCents,
+      listPriceCents: quote.listCents,
+      discountPercent: quote.percent,
+      currency: "EUR",
+      provider: "viva",
+    });
+
+  } catch (error) {
+    console.error(
+      "create-online-checkout failed:",
+      error instanceof Error ? error.message : "unknown",
+    );
+
+    if (bookingId) {
+      await db
+        .from("online_seminar_bookings")
+        .update({ status: "failed" })
+        .eq("id", bookingId)
+        .eq("status", "pending");
+    }
+
+    return reply({ error: "server_error" }, 500);
+  }
+});
+
+=== END FILE ===
+
+=== FILE: supabase/functions/stripe-webhook/index.ts ===
+// supabase/functions/stripe-webhook/index.ts
+// ΠΡΟΣΟΧΗ: πρέπει να τρέχει ΧΩΡΙΣ JWT verification (verify_jwt = false),
+// γιατί το καλεί το Stripe. Η ασφάλεια βασίζεται στην υπογραφή.
+import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  invoiceSubscriptionId,
+  recordInvoice,
+  refId,
+  syncSubscription,
+  UserDeletedError,
+} from "../_shared/billing.ts";
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!stripeKey || !webhookSecret || !supabaseUrl || !serviceKey) {
+    console.error("Missing environment configuration");
+    return new Response("Server misconfigured", { status: 500 });
+  }
+
+  const signature = req.headers.get("stripe-signature");
+  if (!signature) return new Response("Missing signature", { status: 400 });
+
+  const stripe = new Stripe(stripeKey);
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const rawBody = await req.text();
+
+  let event: Stripe.Event;
+  try {
+    event = await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
+  } catch (error) {
+    console.error("Signature verification failed", error);
+    return new Response("Invalid signature", { status: 400 });
+  }
+
+  /** Fetches the subscription and mirrors it into public.subscriptions. */
+  async function syncById(subscriptionId: string, planHint?: unknown): Promise<void> {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ["items.data.price"],
+    });
+    const result = await syncSubscription(admin, subscription, { planId: planHint });
+    if (!result) {
+      // 500 → Stripe retries; usually the user mapping was not written yet.
+      throw new Error(`Could not map subscription ${subscriptionId}`);
+    }
+  }
+
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const subscriptionId = refId(session.subscription);
+        if (!subscriptionId) break;
+        await syncById(subscriptionId, session.metadata?.plan_id);
+        break;
+      }
+
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+      case "customer.subscription.deleted":
+      case "customer.subscription.paused":
+      case "customer.subscription.resumed": {
+        const sub = event.data.object as Stripe.Subscription;
+        const result = await syncSubscription(admin, sub);
+        if (!result) throw new Error(`Could not map subscription ${sub.id}`);
+        break;
+      }
+
+      // A monthly charge succeeded: this is what feeds the income tables.
+      case "invoice.paid":
+      case "invoice.payment_succeeded": {
+        const inv = event.data.object as Stripe.Invoice;
+
+        const subId = invoiceSubscriptionId(inv);
+        if (subId) await syncById(subId);
+
+        let full: Stripe.Invoice = inv;
+        try {
+          full = await stripe.invoices.retrieve(inv.id as string, { expand: ["payments"] });
+        } catch {
+          /* the payment intent id is optional (only needed for refunds) */
+        }
+        await recordInvoice(admin, full);
+        break;
+      }
+
+      // A renewal failed: Stripe moves the subscription to past_due.
+      case "invoice.payment_failed": {
+        const inv = event.data.object as Stripe.Invoice;
+        const subId = invoiceSubscriptionId(inv);
+        if (subId) await syncById(subId);
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const pi = refId(charge.payment_intent);
+        if (pi) {
+          const { error } = await admin
+            .from("payments")
+            .update({ amount_refunded_cents: charge.amount_refunded ?? 0 })
+            .eq("stripe_payment_intent_id", pi);
+          if (error) throw new Error(`refund update failed: ${error.message}`);
+        }
+        break;
+      }
+
+      default:
+        // Τα υπόλοιπα events τα αγνοούμε σκόπιμα.
+        break;
+    }
+  } catch (error) {
+    // The account was deleted: nothing to record. Answer 200 so Stripe does not retry for days.
+    if (error instanceof UserDeletedError) {
+      console.log(`Ignoring ${event.type}: ${error.message}`);
+      return new Response(JSON.stringify({ received: true, ignored: "account_deleted" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    // 500 → το Stripe κάνει retry.
+    console.error(`Handler failed for ${event.type}`, error);
+    return new Response("Handler error", { status: 500 });
+  }
+
+  return new Response(JSON.stringify({ received: true }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+});
+=== END FILE ===
+
+=== FILE: supabase/functions/verify-checkout-session/index.ts ===
+// supabase/functions/verify-checkout-session/index.ts
+import Stripe from "npm:stripe@^18";
+import { createClient } from "npm:@supabase/supabase-js@^2";
+import {
+  ACCESS_STATUSES,
+  recordInvoice,
+  refId,
+  syncSubscription,
+} from "../_shared/billing.ts";
+
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+  });
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+  if (!stripeKey || !supabaseUrl || !anonKey || !serviceKey) {
+    console.error("Missing environment configuration");
+    return json({ error: "Server misconfigured" }, 500);
+  }
+
+  let sessionId: unknown;
+  try {
+    const parsed = JSON.parse(await req.text()) as { sessionId?: unknown };
+    sessionId = parsed?.sessionId;
+  } catch {
+    return json({ error: "Invalid JSON body" }, 400);
+  }
+
+  if (typeof sessionId !== "string" || !sessionId.startsWith("cs_")) {
+    return json({ error: "Μη έγκυρο session πληρωμής." }, 400);
+  }
+
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { persistSession: false },
+  });
+
+  const { data: userData, error: userError } = await userClient.auth.getUser();
+  const user = userData?.user;
+  if (userError || !user) {
+    console.error("getUser failed", userError?.message ?? "no user");
+    return json({ error: "Unauthorized" }, 401);
+  }
+
+  const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const stripe = new Stripe(stripeKey);
+
+  try {
+    const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["subscription", "subscription.items.data.price"],
+    });
+
+    const ownerId =
+      checkoutSession.client_reference_id ?? checkoutSession.metadata?.supabase_user_id ?? null;
+
+    if (ownerId !== user.id) {
+      console.error("Session ownership mismatch", { sessionId, ownerId, caller: user.id });
+      return json({ error: "Το session δεν ανήκει σε αυτόν τον χρήστη." }, 403);
+    }
+
+    if (checkoutSession.status !== "complete") {
+      return json({
+        state: "pending",
+        hasAccess: false,
+        subscription: null,
+        sessionStatus: checkoutSession.status,
+        paymentStatus: checkoutSession.payment_status,
+      });
+    }
+
+    const subRef = checkoutSession.subscription;
+    if (!subRef) {
+      console.error("Completed session without subscription", sessionId);
+      return json({ error: "Η πληρωμή δεν δημιούργησε συνδρομή." }, 502);
+    }
+
+    const subscription: Stripe.Subscription =
+      typeof subRef === "string"
+        ? await stripe.subscriptions.retrieve(subRef, { expand: ["items.data.price"] })
+        : subRef;
+
+    const customerId = refId(subscription.customer);
+    if (customerId) {
+      const { error: customerError } = await admin
+        .from("stripe_customers")
+        .upsert({ user_id: user.id, stripe_customer_id: customerId }, { onConflict: "user_id" });
+      if (customerError) console.error("stripe_customers upsert failed", customerError.message);
+    }
+
+    const synced = await syncSubscription(admin, subscription, {
+      planId: checkoutSession.metadata?.plan_id,
+      userId: user.id,
+    });
+
+    if (!synced) {
+      return json({ error: "Δεν αναγνωρίστηκε το πακέτο." }, 502);
+    }
+
+    // Record the first payment right away, so income shows up even before
+    // the webhook arrives. Never block the user's access on this.
+    try {
+      const invoiceId = refId(subscription.latest_invoice);
+      if (invoiceId) {
+        let invoice: Stripe.Invoice;
+        try {
+          invoice = await stripe.invoices.retrieve(invoiceId, { expand: ["payments"] });
+        } catch {
+          invoice = await stripe.invoices.retrieve(invoiceId);
+        }
+        await recordInvoice(admin, invoice, { userId: user.id, planId: synced.planId });
+      }
+    } catch (err) {
+      console.error("Could not record the first payment (webhook will)", err);
+    }
+
+    const hasAccess = ACCESS_STATUSES.includes(subscription.status);
+    const { data: stored } = await admin
+      .from("subscriptions")
+      .select("current_period_end, cancel_at_period_end")
+      .eq("stripe_subscription_id", subscription.id)
+      .maybeSingle();
+
+    return json({
+      state: hasAccess ? "active" : "pending",
+      hasAccess,
+      subscription: {
+        planId: synced.planId,
+        status: subscription.status,
+        currentPeriodEnd: stored?.current_period_end ?? null,
+        cancelAtPeriodEnd: stored?.cancel_at_period_end ?? false,
+      },
+    });
+  } catch (error) {
+    console.error("verify-checkout-session failed", error);
+    const message = error instanceof Error ? error.message : String(error);
+    return json({ error: `Η επιβεβαίωση απέτυχε: ${message}` }, 500);
+  }
+});
+=== END FILE ===
+

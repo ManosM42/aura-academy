@@ -1,0 +1,1029 @@
+=== FILE: .output/server/_ssr/dashboard-CcEmJkMy.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { C as ShieldCheck, Ct as CircleCheckBig, Mt as BookOpen, Y as Lock, _ as Star, ct as Gem, gt as Crown, u as UserCheck, x as Shield, y as Sparkles, zt as ArrowRight } from "../_libs/lucide-react.mjs";
+import { C as getSkillAssignments, D as isStaffRole, b as getMySkills, m as getDashboard } from "./queries-DCA4yifx.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { r as useReducedMotion, u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/dashboard-CcEmJkMy.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var EASE$1 = [
+	.22,
+	1,
+	.36,
+	1
+];
+var CATEGORY_ORDER = [
+	"foundation",
+	"technical",
+	"analysis",
+	"design",
+	"business",
+	"educator"
+];
+var CATEGORY_LABEL$1 = {
+	foundation: "Foundation",
+	technical: "Technical",
+	analysis: "Analysis",
+	design: "Design",
+	business: "Business",
+	educator: "Educator"
+};
+var STATE_LABEL = {
+	mastered: "Mastered",
+	verified: "Verified",
+	practicing: "Practicing",
+	learning: "Learning",
+	locked: "Locked"
+};
+var MAX_COLS = 4;
+var COL_W = 118;
+var PAD_TOP = 14;
+var PAD_BOTTOM = 14;
+var LABEL_BAND = 34;
+var ROW_H = 96;
+var NODE_Y = 28;
+var R = 20;
+var MIN_WIDTH = 340;
+var isAchieved$1 = (s) => s === "verified" || s === "mastered";
+function layout(skills) {
+	const byCategory = /* @__PURE__ */ new Map();
+	for (const s of skills) {
+		const list = byCategory.get(s.category) ?? [];
+		list.push(s);
+		byCategory.set(s.category, list);
+	}
+	for (const list of byCategory.values()) list.sort((a, b) => a.sort_order - b.sort_order);
+	const cats = CATEGORY_ORDER.filter((c) => (byCategory.get(c) ?? []).length > 0);
+	const maxCols = Math.min(MAX_COLS, Math.max(1, ...cats.map((c) => byCategory.get(c).length)));
+	const width = Math.max(MIN_WIDTH, 112 + (maxCols - 1) * COL_W);
+	const nodes = [];
+	const byId = /* @__PURE__ */ new Map();
+	const titles = [];
+	let cursor = PAD_TOP;
+	for (const cat of cats) {
+		titles.push({
+			cat,
+			y: cursor
+		});
+		cursor += LABEL_BAND;
+		const list = byCategory.get(cat);
+		for (let start = 0; start < list.length; start += MAX_COLS) {
+			const chunk = list.slice(start, start + MAX_COLS);
+			const startX = width / 2 - (chunk.length - 1) * COL_W / 2;
+			chunk.forEach((skill, i) => {
+				const node = {
+					skill,
+					state: skill.userSkill?.state ?? "locked",
+					x: startX + i * COL_W,
+					y: cursor + NODE_Y
+				};
+				nodes.push(node);
+				byId.set(skill.id, node);
+			});
+			cursor += ROW_H;
+		}
+		cursor += 6;
+	}
+	const height = cursor + PAD_BOTTOM;
+	const edges = [];
+	for (const node of nodes) for (const prereqId of node.skill.prerequisites ?? []) {
+		const from = byId.get(prereqId);
+		if (from) edges.push([from, node]);
+	}
+	return {
+		nodes,
+		edges,
+		titles,
+		width,
+		height
+	};
+}
+function wrap(name, max = 13) {
+	const words = name.split(/\s+/);
+	let lines = [];
+	let cur = "";
+	for (const w of words) if (cur && (cur + " " + w).length > max) {
+		lines.push(cur);
+		cur = w;
+	} else cur = cur ? cur + " " + w : w;
+	if (cur) lines.push(cur);
+	if (lines.length > 2) {
+		const rest = lines.slice(1).join(" ");
+		lines = [lines[0], rest.length > max ? rest.slice(0, max - 1) + "…" : rest];
+	}
+	return lines;
+}
+function starPoints(cx, cy, outer, inner) {
+	const pts = [];
+	for (let i = 0; i < 10; i++) {
+		const r = i % 2 === 0 ? outer : inner;
+		const a = (-90 + i * 36) * (Math.PI / 180);
+		pts.push(`${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`);
+	}
+	return pts.join(" ");
+}
+function edgePath(a, b) {
+	if (Math.abs(a.y - b.y) < 1) return `M${a.x} ${a.y} L${b.x} ${b.y}`;
+	const my = (a.y + b.y) / 2;
+	return `M${a.x} ${a.y} C${a.x} ${my}, ${b.x} ${my}, ${b.x} ${b.y}`;
+}
+function SkillTreeGraph({ skills }) {
+	const reduce = useReducedMotion();
+	const { nodes, edges, titles, width, height } = (0, import_react.useMemo)(() => layout(skills), [skills]);
+	const defaultId = (0, import_react.useMemo)(() => {
+		return (nodes.find((n) => n.state === "practicing") ?? nodes.find((n) => n.state === "learning") ?? nodes.find((n) => n.state !== "locked") ?? nodes[0])?.skill.id ?? null;
+	}, [nodes]);
+	const [selectedId, setSelectedId] = (0, import_react.useState)(null);
+	if (skills.length === 0 || nodes.length === 0) return null;
+	const sel = nodes.find((n) => n.skill.id === (selectedId ?? defaultId)) ?? nodes[0];
+	const prereqNames = (sel.skill.prerequisites ?? []).map((id) => skills.find((s) => s.id === id)?.name).filter(Boolean);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "relative mx-auto w-full max-w-md",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative w-full overflow-hidden rounded-xl",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					"aria-hidden": true,
+					className: "pointer-events-none absolute inset-0 opacity-30",
+					style: {
+						backgroundImage: "radial-gradient(rgba(255,255,255,0.12) 1px, transparent 1px)",
+						backgroundSize: "22px 22px",
+						maskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)",
+						WebkitMaskImage: "radial-gradient(ellipse at center, black 30%, transparent 80%)"
+					}
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+					viewBox: `0 0 ${width} ${height}`,
+					className: "relative block h-auto w-full select-none",
+					role: "group",
+					"aria-label": "Skill progression tree",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("defs", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("linearGradient", {
+								id: "stg-edge",
+								gradientUnits: "userSpaceOnUse",
+								x1: "0",
+								y1: "0",
+								x2: width,
+								y2: height,
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+										offset: "0%",
+										stopColor: "#ffffff",
+										stopOpacity: "0.95"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+										offset: "50%",
+										stopColor: "#9aa0a8",
+										stopOpacity: "0.6"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+										offset: "100%",
+										stopColor: "#ffffff",
+										stopOpacity: "0.95"
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("linearGradient", {
+								id: "stg-rule",
+								x1: "0",
+								y1: "0",
+								x2: "1",
+								y2: "0",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+									offset: "0%",
+									stopColor: "#ffffff",
+									stopOpacity: "0.3"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+									offset: "100%",
+									stopColor: "#ffffff",
+									stopOpacity: "0"
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("radialGradient", {
+								id: "stg-chrome",
+								cx: "35%",
+								cy: "30%",
+								r: "80%",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+										offset: "0%",
+										stopColor: "#ffffff"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+										offset: "45%",
+										stopColor: "#c9ced4"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+										offset: "100%",
+										stopColor: "#6c7279"
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("radialGradient", {
+								id: "stg-dark",
+								cx: "35%",
+								cy: "30%",
+								r: "90%",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+									offset: "0%",
+									stopColor: "#2a2d31"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("stop", {
+									offset: "100%",
+									stopColor: "#0c0d0e"
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("filter", {
+								id: "stg-glow",
+								x: "-100%",
+								y: "-100%",
+								width: "300%",
+								height: "300%",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("feGaussianBlur", {
+									stdDeviation: "3",
+									result: "b"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("feMerge", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("feMergeNode", { in: "b" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("feMergeNode", { in: "SourceGraphic" })] })]
+							})
+						] }),
+						titles.map(({ cat, y }) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+							x: 16,
+							y: y + 14,
+							className: "font-aura",
+							fill: "rgba(255,255,255,0.65)",
+							fontSize: "11",
+							fontWeight: "600",
+							letterSpacing: "2.5",
+							children: CATEGORY_LABEL$1[cat].toUpperCase()
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", {
+							x1: 16,
+							y1: y + 22,
+							x2: width - 16,
+							y2: y + 22,
+							stroke: "url(#stg-rule)",
+							strokeWidth: "1"
+						})] }, cat)),
+						edges.map(([from, to], i) => {
+							const lit = isAchieved$1(from.state) && to.state !== "locked";
+							const soft = !lit && from.state !== "locked" && to.state !== "locked";
+							const d = edgePath(from, to);
+							return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.path, {
+								d,
+								fill: "none",
+								stroke: lit ? "url(#stg-edge)" : soft ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.12)",
+								strokeWidth: lit ? 2 : 1.3,
+								strokeLinecap: "round",
+								strokeDasharray: !lit && !soft ? "2 6" : void 0,
+								filter: lit ? "url(#stg-glow)" : void 0,
+								initial: {
+									pathLength: 0,
+									opacity: 0
+								},
+								animate: {
+									pathLength: 1,
+									opacity: 1
+								},
+								transition: {
+									duration: 1,
+									ease: "easeInOut",
+									delay: .1 + i * .04
+								}
+							}), lit && !reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.path, {
+								d,
+								fill: "none",
+								stroke: "#ffffff",
+								strokeWidth: "2",
+								strokeLinecap: "round",
+								strokeDasharray: "5 40",
+								animate: { strokeDashoffset: [0, -45] },
+								transition: {
+									duration: 1.8,
+									repeat: Infinity,
+									ease: "linear"
+								},
+								style: { filter: "drop-shadow(0 0 4px #fff)" }
+							})] }, `${from.skill.id}-${to.skill.id}`);
+						}),
+						nodes.map((n, i) => {
+							const isSel = n.skill.id === sel.skill.id;
+							const lines = wrap(n.skill.name);
+							const achieved = isAchieved$1(n.state);
+							const locked = n.state === "locked";
+							return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.g, {
+								role: "button",
+								tabIndex: 0,
+								"aria-label": `${n.skill.name}, ${STATE_LABEL[n.state]}`,
+								"aria-pressed": isSel,
+								onClick: () => setSelectedId(n.skill.id),
+								onKeyDown: (e) => (e.key === "Enter" || e.key === " ") && setSelectedId(n.skill.id),
+								initial: { opacity: 0 },
+								animate: { opacity: 1 },
+								transition: {
+									duration: .6,
+									ease: EASE$1,
+									delay: .25 + i * .05
+								},
+								style: {
+									cursor: "pointer",
+									outline: "none"
+								},
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										cx: n.x,
+										cy: n.y,
+										r: 34,
+										fill: "rgba(0,0,0,0.001)"
+									}),
+									isSel && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										cx: n.x,
+										cy: n.y,
+										r: 30,
+										fill: "none",
+										stroke: "rgba(255,255,255,0.6)",
+										strokeWidth: "1",
+										strokeDasharray: "2 5"
+									}),
+									n.state === "mastered" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										cx: n.x,
+										cy: n.y,
+										r: 25,
+										fill: "none",
+										stroke: "rgba(255,255,255,0.55)",
+										strokeWidth: "1.2",
+										style: { filter: "drop-shadow(0 0 6px #fff)" }
+									}),
+									(achieved || n.state === "practicing") && !reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.circle, {
+										cx: n.x,
+										cy: n.y,
+										r: R,
+										fill: "none",
+										stroke: "#ffffff",
+										strokeWidth: "1.3",
+										style: {
+											transformBox: "fill-box",
+											transformOrigin: "center"
+										},
+										animate: {
+											scale: [1, 1.8],
+											opacity: [achieved ? .4 : .7, 0]
+										},
+										transition: {
+											duration: achieved ? 3.2 : 2,
+											repeat: Infinity,
+											ease: "easeOut",
+											delay: i % 5 * .35
+										}
+									}),
+									(n.state === "practicing" || n.state === "learning") && !reduce && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.circle, {
+										cx: n.x,
+										cy: n.y,
+										r: 25,
+										fill: "none",
+										stroke: n.state === "practicing" ? "#d4d8dd" : "rgba(212,216,221,0.65)",
+										strokeWidth: "1.6",
+										strokeLinecap: "round",
+										strokeDasharray: n.state === "practicing" ? "26 98" : "2.5 8.5",
+										style: {
+											transformBox: "fill-box",
+											transformOrigin: "center",
+											filter: "drop-shadow(0 0 3px rgba(255,255,255,0.8))"
+										},
+										animate: { rotate: 360 },
+										transition: {
+											duration: n.state === "practicing" ? 3.2 : 12,
+											repeat: Infinity,
+											ease: "linear"
+										}
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+										cx: n.x,
+										cy: n.y,
+										r: R,
+										fill: achieved ? "url(#stg-chrome)" : "url(#stg-dark)",
+										stroke: achieved ? "#ffffff" : locked ? "rgba(255,255,255,0.16)" : "#BFC0C2",
+										strokeWidth: "1.6",
+										style: achieved ? { filter: "drop-shadow(0 0 10px rgba(255,255,255,0.65))" } : void 0
+									}),
+									n.state === "verified" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+										d: `M${n.x - 6.5} ${n.y} L${n.x - 1.5} ${n.y + 5} L${n.x + 7} ${n.y - 5.5}`,
+										fill: "none",
+										stroke: "#0a0a0a",
+										strokeWidth: "2.6",
+										strokeLinecap: "round",
+										strokeLinejoin: "round"
+									}),
+									n.state === "mastered" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("polygon", {
+										points: starPoints(n.x, n.y + 1, 10, 4),
+										fill: "#0a0a0a"
+									}),
+									n.state === "practicing" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", {
+										stroke: "#d4d8dd",
+										strokeWidth: "1.7",
+										strokeLinecap: "round",
+										fill: "none",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+											cx: n.x,
+											cy: n.y,
+											r: "7.5"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: `M${n.x} ${n.y - 4} V${n.y} L${n.x + 3} ${n.y + 2.5}` })]
+									}),
+									n.state === "learning" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+										d: `M${n.x} ${n.y - 7.5} L${n.x + 6} ${n.y} L${n.x} ${n.y + 7.5} L${n.x - 6} ${n.y} Z`,
+										fill: "none",
+										stroke: "#d4d8dd",
+										strokeWidth: "1.7",
+										strokeLinejoin: "round"
+									}),
+									locked && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("g", {
+										stroke: "rgba(255,255,255,0.38)",
+										strokeWidth: "1.7",
+										fill: "none",
+										strokeLinecap: "round",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+											x: n.x - 6,
+											y: n.y - 2,
+											width: "12",
+											height: "8.5",
+											rx: "1.8"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: `M${n.x - 3.5} ${n.y - 2} V${n.y - 5} a3.5 3.5 0 0 1 7 0 V${n.y - 2}` })]
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("text", {
+										x: n.x,
+										y: n.y + R + 15,
+										textAnchor: "middle",
+										className: "font-aura",
+										fill: locked ? "#6F6F6F" : isSel ? "#ffffff" : "#E4E4E4",
+										fontSize: "12",
+										fontWeight: isSel ? 700 : 500,
+										style: isSel ? { filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))" } : void 0,
+										children: lines.map((l, li) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("tspan", {
+											x: n.x,
+											dy: li === 0 ? 0 : 14,
+											children: l
+										}, li))
+									})
+								]
+							}, n.skill.id);
+						})
+					]
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-3 flex min-h-[64px] items-center rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+					mode: "wait",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						initial: {
+							opacity: 0,
+							y: 6
+						},
+						animate: {
+							opacity: 1,
+							y: 0
+						},
+						exit: {
+							opacity: 0,
+							y: -6
+						},
+						transition: {
+							duration: .3,
+							ease: EASE$1
+						},
+						className: "flex w-full min-w-0 items-center justify-between gap-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "min-w-0",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+									className: "font-aura truncate text-sm font-bold text-white",
+									children: sel.skill.name
+								}),
+								sel.skill.definition && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-aura mt-0.5 line-clamp-2 text-xs leading-relaxed text-white/55",
+									children: sel.skill.definition
+								}),
+								sel.state === "locked" && prereqNames.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+									className: "font-aura mt-0.5 text-[11px] text-white/40",
+									children: ["Χρειάζεται πρώτα: ", prereqNames.join(", ")]
+								})
+							]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "font-aura shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider",
+							style: {
+								borderColor: sel.state === "locked" ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.6)",
+								color: sel.state === "mastered" ? "#0a0a0a" : sel.state === "locked" ? "rgba(255,255,255,0.4)" : "#fff",
+								background: sel.state === "mastered" ? "#fff" : "transparent",
+								boxShadow: sel.state === "locked" ? "none" : "0 0 14px rgba(255,255,255,0.25)"
+							},
+							children: STATE_LABEL[sel.state]
+						})]
+					}, sel.skill.id)
+				})
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "font-aura mt-4 flex flex-wrap justify-center gap-x-5 gap-y-2 text-[11px] text-white/55",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "flex items-center gap-1.5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", {
+							className: "inline-block size-2.5 rounded-full",
+							style: {
+								background: "radial-gradient(circle at 35% 30%, #fff, #8a9098)",
+								boxShadow: "0 0 6px rgba(255,255,255,0.7)"
+							}
+						}), "Verified / Mastered"]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "flex items-center gap-1.5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "inline-block size-2.5 rounded-full border border-[#d4d8dd] bg-[#161718]" }), "Practicing"]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "flex items-center gap-1.5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "inline-block size-2.5 rounded-full border border-dashed border-[#d4d8dd]/70 bg-[#161718]" }), "Learning"]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "flex items-center gap-1.5",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("i", { className: "inline-block size-2.5 rounded-full border border-white/15 bg-[#0a0a0a]" }), "Locked"]
+					})
+				]
+			})
+		]
+	});
+}
+var EASE = [
+	.22,
+	1,
+	.36,
+	1
+];
+var CHROME_TEXT = "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+var CHROME_FILL = "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)";
+var FRAME_BORDER = "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))";
+function ChromeText({ children, className = "" }) {
+	const reduce = useReducedMotion();
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
+		initial: { backgroundPosition: "0% 50%" },
+		animate: reduce ? void 0 : { backgroundPosition: "100% 50%" },
+		transition: {
+			duration: 4,
+			repeat: Infinity,
+			repeatType: "reverse",
+			ease: "easeInOut"
+		},
+		style: {
+			backgroundImage: CHROME_TEXT,
+			backgroundSize: "300% auto",
+			WebkitBackgroundClip: "text",
+			backgroundClip: "text",
+			WebkitTextFillColor: "transparent"
+		},
+		className: `inline-block drop-shadow-[0_0_28px_rgba(255,255,255,0.45)] ${className}`,
+		children
+	});
+}
+/** 1px chrome gradient border around a dark surface. */
+function Frame({ children, className = "", inner = "p-5 sm:p-6" }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		className: `relative rounded-2xl p-px ${className}`,
+		style: {
+			background: FRAME_BORDER,
+			boxShadow: "0 0 50px rgba(0,0,0,0.85)"
+		},
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: `relative h-full overflow-hidden rounded-[15px] bg-[#0a0a0b] ${inner}`,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute inset-x-0 top-0 h-20",
+				style: { background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "relative",
+				children
+			})]
+		})
+	});
+}
+function Sheen() {
+	if (useReducedMotion()) return null;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.span, {
+		"aria-hidden": true,
+		className: "pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/70 to-transparent",
+		animate: { x: ["-160%", "420%"] },
+		transition: {
+			duration: 1.8,
+			repeat: Infinity,
+			repeatDelay: 3.2,
+			ease: "easeInOut"
+		},
+		style: { skewX: -18 }
+	});
+}
+/** Animated chrome link-button. `solid` = filled chrome, otherwise glass outline. */
+function ChromeLink({ to, params, label, icon, solid = false }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+		whileHover: {
+			y: -2,
+			scale: 1.03
+		},
+		whileTap: { scale: .97 },
+		className: "inline-block",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+			to,
+			params,
+			className: `group relative inline-flex items-center gap-2.5 overflow-hidden rounded-full px-6 py-3 text-sm font-semibold outline-none transition-shadow duration-300 focus-visible:ring-2 focus-visible:ring-white/70 ${solid ? "text-neutral-950 shadow-[0_0_30px_rgba(255,255,255,0.18)] hover:shadow-[0_0_46px_rgba(255,255,255,0.4)]" : "border border-white/25 bg-white/[0.04] text-white hover:border-white/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.14)]"}`,
+			style: solid ? {
+				backgroundImage: CHROME_FILL,
+				boxShadow: "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4)"
+			} : void 0,
+			children: [
+				solid && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sheen, {}),
+				icon,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "relative",
+					children: label
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "relative size-4 transition-transform duration-300 group-hover:translate-x-1" })
+			]
+		})
+	});
+}
+var RANKS = [
+	{
+		key: "initiate",
+		label: "Initiate",
+		min: 0,
+		Icon: Shield
+	},
+	{
+		key: "apprentice",
+		label: "Apprentice",
+		min: 100,
+		Icon: Star
+	},
+	{
+		key: "artisan",
+		label: "Artisan",
+		min: 300,
+		Icon: Gem
+	},
+	{
+		key: "master",
+		label: "Master",
+		min: 700,
+		Icon: Crown
+	},
+	{
+		key: "legend",
+		label: "Legend",
+		min: 1500,
+		Icon: Sparkles
+	}
+];
+function getRankForPoints(points) {
+	let rank = RANKS[0];
+	for (const r of RANKS) if (points >= r.min) rank = r;
+	return rank;
+}
+var CATEGORY_LABEL = {
+	foundation: "Foundation",
+	technical: "Technical",
+	analysis: "Analysis",
+	design: "Design",
+	business: "Business",
+	educator: "Educator"
+};
+var STATE_CLASS = {
+	locked: "border-white/10 bg-white/[0.03] text-white/35",
+	learning: "border-white/20 bg-white/[0.07] text-white/65",
+	practicing: "border-white/35 bg-white/[0.12] text-white/85",
+	verified: "border-white/70 bg-white/[0.18] text-white shadow-[0_0_16px_rgba(255,255,255,0.35)]",
+	mastered: "border-white bg-white text-neutral-950 shadow-[0_0_22px_rgba(255,255,255,0.6)]"
+};
+var ACHIEVED_STATES = ["verified", "mastered"];
+function isAchieved(skill) {
+	return ACHIEVED_STATES.includes(skill.userSkill?.state ?? "locked");
+}
+function isUnlocked(skill, all) {
+	if (!skill.prerequisites || skill.prerequisites.length === 0) return true;
+	return skill.prerequisites.every((prereqId) => {
+		const prereq = all.find((s) => s.id === prereqId);
+		return prereq ? isAchieved(prereq) : false;
+	});
+}
+/** Maps a review decision to the label students see (no numeric scores). */
+function decisionLabel(decision) {
+	if (!decision) return null;
+	if (decision === "passed") return {
+		text: "Verified",
+		ok: true
+	};
+	if (decision === "needs_revision") return {
+		text: "Needs revision",
+		ok: false
+	};
+	return {
+		text: "Not passed",
+		ok: false
+	};
+}
+function DecisionBadge({ decision }) {
+	const d = decisionLabel(decision);
+	if (!d) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+		className: "text-white/40",
+		children: "—"
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+		className: `inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${d.ok ? "border-white bg-white text-neutral-950 shadow-[0_0_24px_rgba(255,255,255,0.55)]" : "border-white/25 bg-white/[0.06] text-white/75"}`,
+		children: [d.ok && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "size-3.5" }), d.text]
+	});
+}
+var container = {
+	hidden: {},
+	show: { transition: { staggerChildren: .09 } }
+};
+var item = {
+	hidden: {
+		opacity: 0,
+		y: 18
+	},
+	show: {
+		opacity: 1,
+		y: 0,
+		transition: {
+			duration: .7,
+			ease: EASE
+		}
+	}
+};
+function DashboardPage() {
+	const reduce = useReducedMotion();
+	const { data, error, loading } = useAsync(getDashboard, []);
+	const staff = data ? isStaffRole(data.profile.role) : false;
+	const skills = useAsync(getMySkills, []);
+	const assignments = useAsync(getSkillAssignments, []);
+	(0, import_react.useMemo)(() => getRankForPoints(data?.profile?.points ?? 0), [data?.profile]);
+	const nextSkill = (0, import_react.useMemo)(() => {
+		if (!skills.data) return null;
+		return skills.data.find((s) => !isAchieved(s) && isUnlocked(s, skills.data)) ?? null;
+	}, [skills.data]);
+	const nextAssignmentId = nextSkill ? assignments.data?.[nextSkill.id] : null;
+	const groupedSkills = (0, import_react.useMemo)(() => {
+		if (!skills.data) return {};
+		return skills.data.reduce((acc, s) => {
+			(acc[s.category] ??= []).push(s);
+			return acc;
+		}, {});
+	}, [skills.data]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "relative min-h-screen w-full overflow-x-hidden bg-[#070707] px-4 py-12 text-white selection:bg-white selection:text-black sm:px-6 md:px-10",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				"aria-hidden": true,
+				className: "pointer-events-none absolute left-1/2 top-0 aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full",
+				style: { background: "radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)" },
+				animate: reduce ? void 0 : { opacity: [
+					.4,
+					1,
+					.4
+				] },
+				transition: {
+					duration: 8,
+					repeat: Infinity,
+					ease: "easeInOut"
+				}
+			}),
+			loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "relative mx-auto max-w-5xl",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 3 })
+			}),
+			error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "relative mx-auto max-w-5xl",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: error })
+			}),
+			data && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				variants: container,
+				initial: "hidden",
+				animate: "show",
+				className: "relative mx-auto max-w-6xl space-y-10",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.header, {
+						variants: item,
+						className: "flex flex-col gap-5 border-b border-white/10 pb-8 md:flex-row md:items-center md:justify-between",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-px w-10 bg-gradient-to-r from-white/70 to-transparent" }), "AURA Command Center"]
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+							className: "text-3xl font-extrabold uppercase tracking-tight sm:text-5xl",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(ChromeText, { children: [
+								"Καλωσήρθες",
+								data.profile.full_name ? `, ${data.profile.full_name}` : "",
+								"."
+							] })
+						})] })
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						variants: item,
+						className: "grid gap-5 sm:grid-cols-3",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(StatCard, {
+								label: "Verified skills",
+								icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "size-5" }),
+								value: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+									className: "text-4xl font-extrabold tracking-tight text-white",
+									children: [data.verifiedSkills, /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+										className: "text-white/35",
+										children: [" / ", data.totalSkills]
+									})]
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(StatCard, {
+								label: "Ανοιχτές υποβολές",
+								icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleCheckBig, { className: "size-5" }),
+								value: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "text-4xl font-extrabold tracking-tight text-white",
+									children: data.openSubmissions
+								})
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(StatCard, {
+								label: "Τελευταίο αποτέλεσμα",
+								icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Sparkles, { className: "size-5" }),
+								value: data.latestReview ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DecisionBadge, { decision: data.latestReview.decision }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "text-4xl font-extrabold text-white/40",
+									children: "—"
+								})
+							})
+						]
+					}),
+					skills.data && skills.data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						variants: item,
+						className: "space-y-4",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionTitle, { children: "Skill Progression Tree" }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "-mt-2 px-1 text-xs leading-relaxed text-white/50",
+								children: "Locked → Learning → Practicing → Verified → Mastered. Για να ξεκλειδώσεις ένα skill πρέπει πρώτα να έχεις verified όλα τα προαπαιτούμενά του."
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Frame, {
+								className: "w-full",
+								inner: "p-4 sm:p-6",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SkillTreeGraph, { skills: skills.data })
+							})
+						]
+					}),
+					skills.data && skills.data.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						variants: item,
+						className: "space-y-6",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SectionTitle, { children: "Αναλυτική Λίστα Skills" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+							className: "space-y-9",
+							children: Object.keys(groupedSkills).map((cat) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+								className: "space-y-3",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h3", {
+									className: "flex items-center gap-3 px-1 text-xs font-medium uppercase tracking-[0.3em] text-white/45",
+									children: [CATEGORY_LABEL[cat] ?? cat, /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-px flex-1 bg-gradient-to-r from-white/15 to-transparent" })]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "grid gap-4 sm:grid-cols-2",
+									children: groupedSkills[cat].map((s, i) => {
+										const state = s.userSkill?.state ?? "locked";
+										const achieved = isAchieved(s);
+										const unlocked = isUnlocked(s, skills.data);
+										const assignmentId = assignments.data?.[s.id];
+										const missingPrereqs = (s.prerequisites ?? []).map((id) => skills.data.find((sk) => sk.id === id)).filter((sk) => sk && !isAchieved(sk));
+										return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+											initial: {
+												opacity: 0,
+												y: 16
+											},
+											whileInView: {
+												opacity: 1,
+												y: 0
+											},
+											viewport: {
+												once: true,
+												margin: "-40px"
+											},
+											transition: {
+												duration: .6,
+												ease: EASE,
+												delay: i % 4 * .06
+											},
+											whileHover: { y: -4 },
+											className: "group relative",
+											children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Frame, {
+												inner: "p-5",
+												children: [
+													/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+														className: "flex items-start justify-between gap-3",
+														children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h4", {
+															className: "text-sm font-semibold text-white",
+															children: s.name
+														}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+															className: `shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${STATE_CLASS[state]}`,
+															children: state
+														})]
+													}),
+													s.definition && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+														className: "mt-2 line-clamp-2 text-xs leading-relaxed text-white/50",
+														children: s.definition
+													}),
+													s.userSkill?.verified_at && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+														className: "mt-3 text-xs text-white/40",
+														children: ["Verified ", new Date(s.userSkill.verified_at).toLocaleDateString("el-GR")]
+													}),
+													/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+														className: "mt-4 border-t border-white/[0.07] pt-4",
+														children: achieved ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+															className: "flex items-center gap-2 text-xs font-semibold text-white",
+															children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ShieldCheck, { className: "size-4" }), " Ολοκληρώθηκε"]
+														}) : unlocked ? assignmentId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeLink, {
+															to: "/practice/$assignmentId",
+															params: { assignmentId },
+															label: "Ανέβασε φωτογραφία κουρέματος"
+														}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+															className: "text-xs text-white/35",
+															children: "Δεν έχει οριστεί assignment ακόμη."
+														}) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+															className: "flex items-center gap-2 text-xs text-white/40",
+															children: [
+																/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Lock, { className: "size-3.5 shrink-0" }),
+																"Χρειάζεται πρώτα: ",
+																missingPrereqs.map((p) => p.name).join(", ")
+															]
+														})
+													})
+												]
+											})
+										}, s.id);
+									})
+								})]
+							}, cat))
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+						variants: item,
+						className: "grid gap-8 md:grid-cols-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, {
+							title: "Continue learning",
+							children: data.continueLesson ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+								whileHover: { y: -3 },
+								whileTap: { scale: .99 },
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+									to: "/lesson/$lessonId",
+									params: { lessonId: data.continueLesson.id },
+									className: "group block outline-none focus-visible:ring-2 focus-visible:ring-white/60 rounded-2xl",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Frame, {
+										inner: "p-5",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+											className: "flex items-center justify-between gap-3",
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+												className: "flex min-w-0 items-center gap-4",
+												children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+													className: "flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/[0.06] text-white transition-shadow duration-300 group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]",
+													children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(BookOpen, { className: "size-5" })
+												}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+													className: "truncate text-sm font-semibold text-white",
+													children: data.continueLesson.title
+												})]
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+												className: "flex size-9 shrink-0 items-center justify-center rounded-full text-neutral-950 transition-transform duration-300 group-hover:translate-x-1",
+												style: { backgroundImage: CHROME_FILL },
+												children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ArrowRight, { className: "size-4" })
+											})]
+										})
+									})
+								})
+							}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Frame, {
+								inner: "p-5",
+								children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+									className: "text-sm text-white/60",
+									children: [
+										"Δεν υπάρχει μάθημα σε εξέλιξη.",
+										" ",
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+											to: "/academy",
+											className: "text-white underline underline-offset-4 hover:text-white/80",
+											children: "Πήγαινε στην Academy"
+										}),
+										"."
+									]
+								})
+							})
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Panel, {
+							title: "Recent feedback",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Frame, {
+								inner: "p-5",
+								children: data.latestReview ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+									className: "space-y-3",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+										className: "flex items-center justify-between",
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+											className: "text-xs uppercase tracking-[0.25em] text-white/45",
+											children: "Evaluation"
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(DecisionBadge, { decision: data.latestReview.decision })]
+									}), data.latestReview.next_actions && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+										className: "border-t border-white/10 pt-3 text-sm leading-relaxed text-white/75",
+										children: data.latestReview.next_a
+[TRUNCATED: file is 45950 bytes, first 40960 included]
+=== END FILE ===
+

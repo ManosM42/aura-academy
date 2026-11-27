@@ -1,0 +1,1312 @@
+=== FILE: src/routes/__root.tsx ===
+// src/routes/__root.tsx
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  HeadContent,
+  Scripts,
+} from "@tanstack/react-router";
+import { useEffect, type ReactNode } from "react";
+
+import appCss from "../styles.css?url";
+import { reportLovableError } from "../lib/lovable-error-reporting";
+import {
+  SITE_URL,
+  SITE_NAME,
+  DEFAULT_TITLE,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+} from "@/lib/seo";
+import AuraIntro from "@/components/aura/AuraIntro";
+import { Navbar } from "@/components/aura/Navbar";
+import MessageNotifications from "@/components/aura/MessageNotifications";
+import { CallProvider } from "@/components/aura/CallProvider";
+import { I18nProvider } from "@/lib/i18n";
+import { CookieConsentProvider } from "@/lib/cookieConsent";
+import { CookieConsentBanner } from "@/components/aura/CookieConsentBanner";
+import AccessGate from "@/components/aura/AccessGate";
+import { readVivaReturnParams } from "@/lib/viva-return";
+import AuraWidget from "@/components/aura/AuraWidget";
+
+/* ------------------------------------------------------------------ */
+/* Structured data (JSON-LD)                                           */
+/* ------------------------------------------------------------------ */
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "EducationalOrganization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      alternateName: "AURA",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: `${SITE_URL}/logo.png`,
+      },
+      image: DEFAULT_OG_IMAGE,
+      description: DEFAULT_DESCRIPTION,
+      founder: { "@id": `${SITE_URL}/#founder` },
+      knowsAbout: [
+        "Barbering",
+        "Haircutting",
+        "Fades",
+        "Barber education",
+        "Barber seminars",
+      ],
+      // Add your real profiles when you have them, e.g.:
+      // sameAs: ["https://www.instagram.com/...", "https://www.youtube.com/@..."],
+    },
+    {
+      "@type": "Person",
+      "@id": `${SITE_URL}/#founder`,
+      name: "Theopistos",
+      jobTitle: "Founder & Barber Educator",
+      worksFor: { "@id": `${SITE_URL}/#organization` },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
+      name: SITE_NAME,
+      inLanguage: "en",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+    },
+  ],
+};
+
+/* ------------------------------------------------------------------ */
+/* 404 + error boundaries                                              */
+/* ------------------------------------------------------------------ */
+
+function NotFoundComponent() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-7xl font-bold text-foreground">404</h1>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <div className="mt-6">
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Go home
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  console.error(error);
+  const router = useRouter();
+  useEffect(() => {
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+  }, [error]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          This page didn't load
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Something went wrong on our end. You can try refreshing or head back home.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          <button
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Try again
+          </button>
+          <a
+            href="/"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            Go home
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Route                                                               */
+/* ------------------------------------------------------------------ */
+
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  head: () => ({
+    meta: [
+      { charSet: "utf-8" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
+
+      // Defaults. Page routes override these through seo() in src/lib/seo.ts.
+      { title: DEFAULT_TITLE },
+      { name: "description", content: DEFAULT_DESCRIPTION },
+      {
+        name: "robots",
+        content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1",
+      },
+      { name: "author", content: SITE_NAME },
+      { name: "application-name", content: SITE_NAME },
+      { name: "theme-color", content: "#000000" },
+      { name: "color-scheme", content: "dark" },
+
+      // Open Graph defaults
+      { property: "og:site_name", content: SITE_NAME },
+      { property: "og:locale", content: "en_US" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: DEFAULT_TITLE },
+      { property: "og:description", content: DEFAULT_DESCRIPTION },
+      { property: "og:image", content: DEFAULT_OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: "AURA Academy: professional barber education" },
+
+      // Twitter / X defaults
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: DEFAULT_TITLE },
+      { name: "twitter:description", content: DEFAULT_DESCRIPTION },
+      { name: "twitter:image", content: DEFAULT_OG_IMAGE },
+      // { name: "twitter:site", content: "@youraccount" }, // add when you have one
+    ],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap",
+      },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/site.webmanifest" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(structuredData),
+      },
+    ],
+  }),
+  shellComponent: RootShell,
+  component: RootComponent,
+  notFoundComponent: NotFoundComponent,
+  errorComponent: ErrorComponent,
+});
+
+function RootShell({ children }: { children: ReactNode }) {
+  return (
+    // lang="en" keeps Chrome from offering its own translation bar
+    <html lang="en">
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        {children}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
+
+function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
+
+  // Viva sends customers back to the "Success" / "Failure" URL set in the Viva
+  // dashboard (it may be /pricing or any other page) with ?t=..&s=..&eventId=..
+  // Wherever they land, forward them to the page that confirms the payment.
+  useEffect(() => {
+    const here = window.location;
+    if (here.pathname.startsWith("/checkout/return")) return;
+    if (readVivaReturnParams(here.search)) {
+      window.location.replace(`/checkout/return${here.search}`);
+    }
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <CookieConsentProvider>
+        <AuraWidget />
+          <CallProvider>
+            <AuraIntro />
+
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-black"
+            >
+              Skip to content
+            </a>
+
+            <Navbar />
+            <MessageNotifications />
+
+            <main id="main-content" tabIndex={-1} className="outline-none">
+              {/* Members-only pages show the lock screen when the user has no active plan. */}
+              <AccessGate>
+                <Outlet />
+              </AccessGate>
+            </main>
+
+            <CookieConsentBanner />
+          </CallProvider>
+        </CookieConsentProvider>
+      </I18nProvider>
+    </QueryClientProvider>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/lesson._lessonId-DUxPKgcw.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{_ as i,k as a,v as o}from"./queries-B7Arqryn.js";import{t as s}from"./lesson._lessonId-BYxe1JmO.js";import{t as c}from"./useAsync-CZJ1G06G.js";import{n as l,r as u}from"./States-BulpY35p.js";var d=e(n()),f=t();function p(){let{lessonId:e}=s.useParams(),t=c(()=>i(e),[e]),n=c(()=>o(e),[e]),[p,m]=(0,d.useState)(``),[h,g]=(0,d.useState)(!1),[_,v]=(0,d.useState)(!1),[y,b]=(0,d.useState)(null);(0,d.useEffect)(()=>{n.data&&(m(n.data.notes??``),g(n.data.completed))},[n.data]);async function x(t){v(!0);try{await a(e,{notes:p,completed:t||h}),t&&g(!0),b(new Date().toLocaleTimeString(`el-GR`))}catch(e){alert(`Αποτυχία αποθήκευσης: `+e.message)}finally{v(!1)}}return(0,f.jsxs)(`main`,{className:`mx-auto min-h-screen max-w-4xl px-6 py-12 text-white`,children:[t.loading&&(0,f.jsx)(u,{rows:3}),t.error&&(0,f.jsx)(l,{message:t.error}),t.data&&(0,f.jsxs)(f.Fragment,{children:[(0,f.jsxs)(`header`,{className:`mb-6`,children:[(0,f.jsx)(`p`,{className:`text-xs uppercase tracking-[0.3em] text-white/40`,children:t.data.type}),(0,f.jsx)(`h1`,{className:`mt-2 text-2xl font-semibold`,children:t.data.title}),t.data.objective&&(0,f.jsx)(`p`,{className:`mt-2 text-sm text-white/60`,children:t.data.objective})]}),t.data.video_url?(0,f.jsx)(`div`,{className:`aspect-video w-full overflow-hidden rounded-xl bg-black`,children:(0,f.jsx)(`video`,{src:t.data.video_url,controls:!0,className:`h-full w-full`})}):(0,f.jsx)(`div`,{className:`rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/50`,children:`Δεν υπάρχει βίντεο για αυτό το μάθημα.`}),t.data.resources.length>0&&(0,f.jsxs)(`section`,{className:`mt-6`,children:[(0,f.jsx)(`h2`,{className:`mb-2 text-sm font-medium text-white/70`,children:`Resources`}),(0,f.jsx)(`ul`,{className:`space-y-1`,children:t.data.resources.map((e,t)=>(0,f.jsx)(`li`,{children:(0,f.jsx)(`a`,{href:e.url,target:`_blank`,rel:`noreferrer`,className:`text-sm text-white/80 underline decoration-white/30 underline-offset-4 hover:text-white`,children:e.label})},t))})]}),t.data.transcript&&(0,f.jsxs)(`details`,{className:`mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-5`,children:[(0,f.jsx)(`summary`,{className:`cursor-pointer text-sm font-medium text-white/70`,children:`Transcript`}),(0,f.jsx)(`p`,{className:`mt-3 whitespace-pre-wrap text-sm text-white/60`,children:t.data.transcript})]}),(0,f.jsxs)(`section`,{className:`mt-6`,children:[(0,f.jsx)(`h2`,{className:`mb-2 text-sm font-medium text-white/70`,children:`Οι σημειώσεις μου`}),(0,f.jsx)(`textarea`,{value:p,onChange:e=>m(e.target.value),rows:4,placeholder:`Κράτα σημειώσεις για αυτό το μάθημα…`,className:`w-full rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white/90 outline-none focus:border-white/30`})]}),(0,f.jsxs)(`div`,{className:`mt-4 flex flex-wrap items-center gap-3`,children:[(0,f.jsx)(`button`,{onClick:()=>x(!1),disabled:_,className:`rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40`,children:_?`Αποθήκευση…`:`Αποθήκευση σημειώσεων`}),(0,f.jsx)(`button`,{onClick:()=>x(!0),disabled:_||h,className:`rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40`,children:h?`✓ Ολοκληρωμένο`:`Σήμανση ως ολοκληρωμένο`}),y&&(0,f.jsxs)(`span`,{className:`text-xs text-white/40`,children:[`Αποθηκεύτηκε `,y]})]}),(0,f.jsx)(`div`,{className:`mt-10`,children:(0,f.jsx)(r,{to:`/dashboard`,className:`text-xs text-white/50 transition hover:text-white/80`,children:`← Πίσω στο Dashboard`})})]})]})}export{p as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/seminars-JQUi2JVQ.js ===
+import{t as e}from"./supabase-DXn9ZPwL.js";var t=`10:00`,n=e=>String(e).padStart(2,`0`);function r(e){return`${e.getFullYear()}-${n(e.getMonth()+1)}-${n(e.getDate())}`}function i(e){let[t,n,r]=e.split(`-`).map(Number);return new Date(t,n-1,r)}function a(e){return new Date(e.getFullYear(),e.getMonth(),1)}function o(e){let t=new Map;for(let n of e){let e=t.get(n.seminar_date)??{dayBlocked:!1,people:0,priv:!1};n.blocked&&(e.dayBlocked=!0),e.people+=n.group_people,e.priv=e.priv||n.has_private,t.set(n.seminar_date,e)}return t}function s(e,t){let n=[];for(let t of e)t.status!==`cancelled`&&n.push({seminar_date:t.seminar_date,slot:t.slot,group_people:t.format===`group`?t.participants:0,has_private:t.format===`private`,blocked:!1});for(let e of t)n.push({seminar_date:e.blocked_date,slot:e.slot,group_people:0,has_private:!1,blocked:!0});return n}function c(e,t,n){if(e?.dayBlocked)return{status:`blocked`,remaining:0};let r=e?.priv?8:e?.people??0,i=Math.max(0,8-r);return t===`private`?r>0?{status:`full`,remaining:0}:{status:`open`,remaining:8}:i<n?{status:`full`,remaining:i}:{status:i<=3?`few`:`open`,remaining:i}}function l(e,t,n){let{status:r}=c(e,t,n);return r===`few`?`open`:r}async function u(t,n){let{data:r,error:i}=await e.rpc(`get_seminar_availability`,{p_from:t,p_to:n});if(i)throw Error(i.message);return r??[]}async function d(n){let{data:r,error:i}=await e.rpc(`create_seminar_booking`,{p_format:n.format,p_date:n.date,p_slot:t,p_participants:n.participants,p_full_name:n.fullName,p_email:n.email,p_phone:n.phone,p_city:n.city,p_experience:n.experience,p_group_name:n.groupName,p_participant_names:n.participantNames,p_goals:n.goals,p_notes:n.notes,p_terms:n.terms});if(i)throw Error(i.message);return r}async function f(){let{data:t,error:n}=await e.from(`seminar_bookings`).select(`*`).order(`created_at`,{ascending:!1});if(n)throw Error(n.message);return t??[]}async function p(){let{data:t,error:n}=await e.from(`seminar_blocked_dates`).select(`*`).order(`blocked_date`,{ascending:!0});if(n)throw Error(n.message);return t??[]}async function m(t,n){let{error:r}=await e.from(`seminar_bookings`).update({status:n}).eq(`id`,t);if(r)throw Error(r.message)}async function h(t,n,r){let{error:i}=await e.from(`seminar_blocked_dates`).insert({blocked_date:t,slot:null,reason:n.trim()||null,created_by:r});if(i)throw Error(i.message)}async function g(t){let{error:n}=await e.from(`seminar_blocked_dates`).delete().eq(`id`,t);if(n)throw Error(n.message)}export{g as a,u as c,o as d,s as f,m as i,c as l,r as m,p as n,d as o,a as p,f as r,i as s,h as t,l as u};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/auth.callback-ZUUfT7wT.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { n as Route, r as useI18n } from "./auth.callback-Zz2bFf7m.mjs";
+import { t as useAuth } from "./useAuth-CbY7IiR3.mjs";
+import { n as consumeCheckoutIntent, t as clearCheckoutIntent } from "./checkout-intent-Cw-r21JH.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/auth.callback-ZUUfT7wT.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var TIMEOUT_MS = 12e3;
+function AuthCallbackPage() {
+	const navigate = useNavigate();
+	const { user, loading } = useAuth();
+	const { plan: searchPlan } = Route.useSearch();
+	const { t } = useI18n();
+	const [failure, setFailure] = (0, import_react.useState)(null);
+	const [timedOut, setTimedOut] = (0, import_react.useState)(false);
+	(0, import_react.useEffect)(() => {
+		if (typeof window === "undefined") return;
+		const search = new URLSearchParams(window.location.search);
+		const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+		const description = search.get("error_description") ?? hash.get("error_description") ?? search.get("error") ?? hash.get("error");
+		if (description) setFailure(description.replace(/\+/g, " "));
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (failure || loading || !user) return;
+		const plan = searchPlan ?? consumeCheckoutIntent();
+		if (searchPlan) clearCheckoutIntent();
+		if (plan) navigate({
+			to: "/checkout",
+			search: { plan },
+			replace: true
+		});
+		else navigate({
+			to: "/dashboard",
+			replace: true
+		});
+	}, [
+		failure,
+		loading,
+		user,
+		searchPlan,
+		navigate
+	]);
+	(0, import_react.useEffect)(() => {
+		if (failure || user) return;
+		const timer = window.setTimeout(() => setTimedOut(true), TIMEOUT_MS);
+		return () => window.clearTimeout(timer);
+	}, [failure, user]);
+	const blocked = failure !== null || timedOut;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40",
+		"aria-busy": !blocked,
+		children: blocked ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: failure ? t("auth.errorKicker") : t("auth.timeoutKicker")
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: failure ? t("auth.errorTitle") : t("auth.timeoutTitle")
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 text-sm leading-relaxed text-neutral-400",
+				role: "alert",
+				children: failure ?? t("auth.timeoutBody")
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/login",
+					search: searchPlan ? { plan: searchPlan } : {},
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						children: t("auth.backToLogin")
+					})
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "button",
+						variant: "secondary",
+						children: t("auth.goHome")
+					})
+				})]
+			})
+		] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-600",
+				children: t("auth.finishingKicker")
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+				className: "mt-5 text-3xl font-semibold tracking-tight text-neutral-100",
+				children: t("auth.finishingTitle")
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mx-auto mt-8 h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none",
+				role: "status",
+				"aria-label": t("auth.finishingTitle")
+			})
+		] })
+	});
+}
+//#endregion
+export { AuthCallbackPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/lesson._lessonId-CBILUxbG.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { _ as getLesson, k as saveLessonProgress, v as getLessonProgress } from "./queries-DCA4yifx.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { t as Route } from "./lesson._lessonId-DmU5YtvR.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/lesson._lessonId-CBILUxbG.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+function LessonPage() {
+	const { lessonId } = Route.useParams();
+	const lesson = useAsync(() => getLesson(lessonId), [lessonId]);
+	const progress = useAsync(() => getLessonProgress(lessonId), [lessonId]);
+	const [notes, setNotes] = (0, import_react.useState)("");
+	const [completed, setCompleted] = (0, import_react.useState)(false);
+	const [saving, setSaving] = (0, import_react.useState)(false);
+	const [savedAt, setSavedAt] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		if (progress.data) {
+			setNotes(progress.data.notes ?? "");
+			setCompleted(progress.data.completed);
+		}
+	}, [progress.data]);
+	async function handleSave(markComplete) {
+		setSaving(true);
+		try {
+			await saveLessonProgress(lessonId, {
+				notes,
+				completed: markComplete || completed
+			});
+			if (markComplete) setCompleted(true);
+			setSavedAt((/* @__PURE__ */ new Date()).toLocaleTimeString("el-GR"));
+		} catch (e) {
+			alert("Αποτυχία αποθήκευσης: " + e.message);
+		} finally {
+			setSaving(false);
+		}
+	}
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto min-h-screen max-w-4xl px-6 py-12 text-white",
+		children: [
+			lesson.loading && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 3 }),
+			lesson.error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: lesson.error }),
+			lesson.data && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+					className: "mb-6",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "text-xs uppercase tracking-[0.3em] text-white/40",
+							children: lesson.data.type
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+							className: "mt-2 text-2xl font-semibold",
+							children: lesson.data.title
+						}),
+						lesson.data.objective && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "mt-2 text-sm text-white/60",
+							children: lesson.data.objective
+						})
+					]
+				}),
+				lesson.data.video_url ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "aspect-video w-full overflow-hidden rounded-xl bg-black",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("video", {
+						src: lesson.data.video_url,
+						controls: true,
+						className: "h-full w-full"
+					})
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/50",
+					children: "Δεν υπάρχει βίντεο για αυτό το μάθημα."
+				}),
+				lesson.data.resources.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					className: "mt-6",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "mb-2 text-sm font-medium text-white/70",
+						children: "Resources"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+						className: "space-y-1",
+						children: lesson.data.resources.map((r, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("a", {
+							href: r.url,
+							target: "_blank",
+							rel: "noreferrer",
+							className: "text-sm text-white/80 underline decoration-white/30 underline-offset-4 hover:text-white",
+							children: r.label
+						}) }, i))
+					})]
+				}),
+				lesson.data.transcript && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("details", {
+					className: "mt-6 rounded-xl border border-white/10 bg-white/[0.02] p-5",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("summary", {
+						className: "cursor-pointer text-sm font-medium text-white/70",
+						children: "Transcript"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-3 whitespace-pre-wrap text-sm text-white/60",
+						children: lesson.data.transcript
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+					className: "mt-6",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "mb-2 text-sm font-medium text-white/70",
+						children: "Οι σημειώσεις μου"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+						value: notes,
+						onChange: (e) => setNotes(e.target.value),
+						rows: 4,
+						placeholder: "Κράτα σημειώσεις για αυτό το μάθημα…",
+						className: "w-full rounded-xl border border-white/10 bg-black/40 p-4 text-sm text-white/90 outline-none focus:border-white/30"
+					})]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "mt-4 flex flex-wrap items-center gap-3",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: () => handleSave(false),
+							disabled: saving,
+							className: "rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+							children: saving ? "Αποθήκευση…" : "Αποθήκευση σημειώσεων"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+							onClick: () => handleSave(true),
+							disabled: saving || completed,
+							className: "rounded-lg bg-white px-4 py-2 text-sm font-medium text-black transition hover:bg-white/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+							children: completed ? "✓ Ολοκληρωμένο" : "Σήμανση ως ολοκληρωμένο"
+						}),
+						savedAt && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+							className: "text-xs text-white/40",
+							children: ["Αποθηκεύτηκε ", savedAt]
+						})
+					]
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "mt-10",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/dashboard",
+						className: "text-xs text-white/50 transition hover:text-white/80",
+						children: "← Πίσω στο Dashboard"
+					})
+				})
+			] })
+		]
+	});
+}
+//#endregion
+export { LessonPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/seminars-C-eiLJy4.mjs ===
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/seminars-C-eiLJy4.js
+/**
+* Δεν υπάρχει πια επιλογή ώρας. Η στήλη `slot` στη βάση είναι ακόμα NOT NULL,
+* οπότε κάθε νέα κράτηση γράφεται με αυτή τη σταθερή τιμή και δεν εμφανίζεται
+* πουθενά στο UI. Έτσι η χωρητικότητα (8 άτομα) ελέγχεται ανά ημέρα και από τον server.
+*/
+var BOOKING_SLOT = "10:00";
+var p2 = (n) => String(n).padStart(2, "0");
+function toISO(d) {
+	return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+function fromISO(s) {
+	const [y, m, d] = s.split("-").map(Number);
+	return new Date(y, m - 1, d);
+}
+function startOfMonth(d) {
+	return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function indexAvailability(rows) {
+	const map = /* @__PURE__ */ new Map();
+	for (const r of rows) {
+		const day = map.get(r.seminar_date) ?? {
+			dayBlocked: false,
+			people: 0,
+			priv: false
+		};
+		if (r.blocked) day.dayBlocked = true;
+		day.people += r.group_people;
+		day.priv = day.priv || r.has_private;
+		map.set(r.seminar_date, day);
+	}
+	return map;
+}
+/** Χρησιμοποιείται από το admin: χτίζει το ίδιο index από τα πραγματικά rows. */
+function rowsFromBookings(bookings, blocked) {
+	const rows = [];
+	for (const b of bookings) {
+		if (b.status === "cancelled") continue;
+		rows.push({
+			seminar_date: b.seminar_date,
+			slot: b.slot,
+			group_people: b.format === "group" ? b.participants : 0,
+			has_private: b.format === "private",
+			blocked: false
+		});
+	}
+	for (const d of blocked) rows.push({
+		seminar_date: d.blocked_date,
+		slot: d.slot,
+		group_people: 0,
+		has_private: false,
+		blocked: true
+	});
+	return rows;
+}
+function getDayAvailability(day, format, participants) {
+	if (day?.dayBlocked) return {
+		status: "blocked",
+		remaining: 0
+	};
+	const taken = day?.priv ? 8 : day?.people ?? 0;
+	const remaining = Math.max(0, 8 - taken);
+	if (format === "private") return taken > 0 ? {
+		status: "full",
+		remaining: 0
+	} : {
+		status: "open",
+		remaining: 8
+	};
+	if (remaining < participants) return {
+		status: "full",
+		remaining
+	};
+	return {
+		status: remaining <= 3 ? "few" : "open",
+		remaining
+	};
+}
+/** Η μέρα κλείνει αυτόματα όταν δεν χωράνε άλλοι. Ίδια υπογραφή με πριν. */
+function getDayStatus(day, format, participants) {
+	const { status } = getDayAvailability(day, format, participants);
+	return status === "few" ? "open" : status;
+}
+async function getAvailability(from, to) {
+	const { data, error } = await supabase.rpc("get_seminar_availability", {
+		p_from: from,
+		p_to: to
+	});
+	if (error) throw new Error(error.message);
+	return data ?? [];
+}
+async function createSeminarBooking(b) {
+	const { data, error } = await supabase.rpc("create_seminar_booking", {
+		p_format: b.format,
+		p_date: b.date,
+		p_slot: BOOKING_SLOT,
+		p_participants: b.participants,
+		p_full_name: b.fullName,
+		p_email: b.email,
+		p_phone: b.phone,
+		p_city: b.city,
+		p_experience: b.experience,
+		p_group_name: b.groupName,
+		p_participant_names: b.participantNames,
+		p_goals: b.goals,
+		p_notes: b.notes,
+		p_terms: b.terms
+	});
+	if (error) throw new Error(error.message);
+	return data;
+}
+async function adminGetBookings() {
+	const { data, error } = await supabase.from("seminar_bookings").select("*").order("created_at", { ascending: false });
+	if (error) throw new Error(error.message);
+	return data ?? [];
+}
+async function adminGetBlocked() {
+	const { data, error } = await supabase.from("seminar_blocked_dates").select("*").order("blocked_date", { ascending: true });
+	if (error) throw new Error(error.message);
+	return data ?? [];
+}
+async function adminSetBookingStatus(id, status) {
+	const { error } = await supabase.from("seminar_bookings").update({ status }).eq("id", id);
+	if (error) throw new Error(error.message);
+}
+/** Μπλοκάρει ολόκληρη την ημέρα. */
+async function adminBlockDate(date, reason, adminId) {
+	const { error } = await supabase.from("seminar_blocked_dates").insert({
+		blocked_date: date,
+		slot: null,
+		reason: reason.trim() || null,
+		created_by: adminId
+	});
+	if (error) throw new Error(error.message);
+}
+async function adminUnblock(id) {
+	const { error } = await supabase.from("seminar_blocked_dates").delete().eq("id", id);
+	if (error) throw new Error(error.message);
+}
+//#endregion
+export { adminUnblock as a, getAvailability as c, indexAvailability as d, rowsFromBookings as f, adminSetBookingStatus as i, getDayAvailability as l, toISO as m, adminGetBlocked as n, createSeminarBooking as o, startOfMonth as p, adminGetBookings as r, fromISO as s, adminBlockDate as t, getDayStatus as u };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/chrome.tsx ===
+// src/components/aura/chrome.tsx
+// Shared chrome-silver building blocks for the book pages.
+import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowRight } from "lucide-react";
+
+export const EASE = [0.22, 1, 0.36, 1] as const;
+
+export const CHROME_TEXT =
+  "linear-gradient(90deg, #595959 0%, #b3b3b3 25%, #ffffff 50%, #b3b3b3 75%, #595959 100%)";
+export const CHROME_FILL =
+  "linear-gradient(180deg, #ffffff 0%, #e6e6ea 30%, #b4b4bc 48%, #8a8a92 52%, #bdbdc4 74%, #f4f4f6 100%)";
+export const FRAME_BORDER =
+  "linear-gradient(135deg, rgba(255,255,255,0.45), rgba(255,255,255,0.06) 35%, rgba(255,255,255,0.06) 65%, rgba(255,255,255,0.4))";
+
+export const fieldClass =
+  "w-full rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-sm text-white/90 outline-none transition-all duration-300 placeholder:text-white/25 focus:border-white/50 focus:bg-black/80 focus:shadow-[0_0_26px_rgba(255,255,255,0.1)] focus:ring-2 focus:ring-white/15 disabled:opacity-50";
+
+/** Animated chrome gradient text. */
+export function ChromeText({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      initial={{ backgroundPosition: "0% 50%" }}
+      animate={reduce ? undefined : { backgroundPosition: "100% 50%" }}
+      transition={{ duration: 4, repeat: Infinity, repeatType: "reverse", ease: "easeInOut" }}
+      style={{
+        backgroundImage: CHROME_TEXT,
+        backgroundSize: "300% auto",
+        WebkitBackgroundClip: "text",
+        backgroundClip: "text",
+        WebkitTextFillColor: "transparent",
+      }}
+      className={`inline-block drop-shadow-[0_0_28px_rgba(255,255,255,0.45)] ${className}`}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+/** 1px chrome gradient border around a dark surface. */
+export function Frame({
+  children,
+  className = "",
+  inner = "p-6",
+}: {
+  children: ReactNode;
+  className?: string;
+  inner?: string;
+}) {
+  return (
+    <div
+      className={`relative rounded-3xl p-px ${className}`}
+      style={{ background: FRAME_BORDER, boxShadow: "0 0 60px rgba(0,0,0,0.9)" }}
+    >
+      <div className={`relative h-full overflow-hidden rounded-[23px] bg-[#0a0a0b] ${inner}`}>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-24"
+          style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.05), transparent)" }}
+        />
+        <div className="relative">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function Sheen() {
+  const reduce = useReducedMotion();
+  if (reduce) return null;
+  return (
+    <motion.span
+      aria-hidden
+      className="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/80 to-transparent"
+      animate={{ x: ["-160%", "420%"] }}
+      transition={{ duration: 1.8, repeat: Infinity, repeatDelay: 3.2, ease: "easeInOut" }}
+      style={{ skewX: -18 }}
+    />
+  );
+}
+
+const solidStyle = {
+  backgroundImage: CHROME_FILL,
+  boxShadow:
+    "inset 0 1px 0 rgba(255,255,255,0.95), inset 0 -1px 0 rgba(0,0,0,0.4), 0 0 30px rgba(255,255,255,0.18)",
+};
+
+const baseBtn =
+  "group relative inline-flex items-center justify-center gap-2.5 overflow-hidden rounded-full px-8 py-3.5 text-sm font-bold outline-none transition-shadow duration-300 focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black disabled:pointer-events-none disabled:opacity-40";
+const solidCls = "text-neutral-950 hover:shadow-[0_0_50px_rgba(255,255,255,0.4)]";
+const ghostCls =
+  "border border-white/25 bg-white/[0.04] text-white hover:border-white/60 hover:bg-white/[0.09] hover:shadow-[0_0_30px_rgba(255,255,255,0.14)]";
+
+/** Animated chrome button. */
+export function ChromeCTA({
+  children,
+  solid = true,
+  className = "",
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { solid?: boolean }) {
+  return (
+    <motion.div
+      whileHover={rest.disabled ? undefined : { y: -2, scale: 1.03 }}
+      whileTap={rest.disabled ? undefined : { scale: 0.97 }}
+      className={`inline-block ${className}`}
+    >
+      <button
+        {...rest}
+        className={`${baseBtn} ${solid ? solidCls : ghostCls} w-full`}
+        style={solid ? solidStyle : undefined}
+      >
+        {solid && <Sheen />}
+        <span className="relative inline-flex items-center gap-2.5">{children}</span>
+      </button>
+    </motion.div>
+  );
+}
+
+/** Animated chrome link-button. */
+export function ChromeCTALink({
+  to,
+  children,
+  solid = true,
+  arrow = true,
+  className = "",
+}: {
+  to: string;
+  children: ReactNode;
+  solid?: boolean;
+  arrow?: boolean;
+  className?: string;
+}) {
+  return (
+    <motion.div whileHover={{ y: -2, scale: 1.03 }} whileTap={{ scale: 0.97 }} className={`inline-block ${className}`}>
+      <Link
+        to={to as never}
+        className={`${baseBtn} ${solid ? solidCls : ghostCls}`}
+        style={solid ? solidStyle : undefined}
+      >
+        {solid && <Sheen />}
+        <span className="relative inline-flex items-center gap-2.5">
+          {children}
+          {arrow && <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-1" />}
+        </span>
+      </Link>
+    </motion.div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/elite/EliteLocked.tsx ===
+// src/components/aura/elite/EliteLocked.tsx
+import { Link } from "@tanstack/react-router";
+import { Check, Crown, Gem, Lock } from "lucide-react";
+import { getPlan } from "@/lib/plans";
+
+// Change these paths if your routes are named differently.
+const UPGRADE_PATH = "/pricing";
+const LOGIN_PATH = "/login";
+const BACK_PATH = "/academy";
+
+export default function EliteLocked({ signedOut = false }: { signedOut?: boolean }) {
+  const elite = getPlan("high");
+  // Skip "all PRO perks" (first line) and show the Elite-only highlights.
+  const perks = elite?.features.slice(1, 5) ?? [];
+
+  return (
+    <div className="el-root">
+      <style>{css}</style>
+
+      <div className="el-card">
+        <span className="el-crown">
+          <Crown className="size-8" aria-hidden />
+        </span>
+
+        <p className="el-eyebrow">
+          <Gem className="size-3.5" aria-hidden /> ELITE EXCLUSIVE
+        </p>
+
+        <h1 className="el-title">{signedOut ? "SIGN IN TO JOIN" : "UPGRADE TO ELITE TO JOIN"}</h1>
+        <span className="el-rule" aria-hidden />
+
+        <p className="el-text">
+          This private community is reserved for AURA Elite members.
+          {signedOut ? " Sign in with your Elite account to enter." : " Upgrade your plan to unlock the group."}
+        </p>
+
+        {elite && !signedOut && (
+          <div className="el-plan">
+            <div className="el-plan-head">
+              <span className="el-plan-name">{elite.name}</span>
+              <span className="el-plan-price">
+                {elite.priceLabel}
+                <small> / month</small>
+              </span>
+            </div>
+            <ul className="el-perks">
+              {perks.map((f) => (
+                <li key={f}>
+                  <Check className="size-4 shrink-0" aria-hidden />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <Link to={signedOut ? LOGIN_PATH : UPGRADE_PATH} className="el-cta">
+          <Lock className="size-4" aria-hidden />
+          {signedOut ? "Sign in" : "Upgrade to Elite"}
+        </Link>
+        <Link to={BACK_PATH} className="el-back">
+          Back to Academy
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+const css = `
+.el-root{
+  position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:24px; overflow-y:auto;
+  color:#f3f4f6;
+  background:
+    radial-gradient(110% 70% at 50% -10%,rgba(255,255,255,.08),transparent 60%),
+    linear-gradient(180deg,#0b0b0b,#050505);
+}
+.el-card{
+  width:min(100%,460px); margin:auto; padding:40px 28px 32px; text-align:center; border-radius:1.6rem;
+  display:flex; flex-direction:column; align-items:center;
+  border:1px solid transparent;
+  background:linear-gradient(180deg,rgba(18,18,19,.94),rgba(7,7,8,.96)) padding-box,
+             linear-gradient(145deg,rgba(255,255,255,.6),rgba(255,255,255,.06) 35%,rgba(232,236,242,.4) 70%,rgba(255,255,255,.1)) border-box;
+  box-shadow:0 30px 70px -30px #000, 0 0 70px -34px rgba(232,236,242,.5);
+  animation: el-in .5s cubic-bezier(.22,1,.36,1);
+}
+@keyframes el-in{ from{opacity:0; transform:translateY(16px) scale(.98)} to{opacity:1; transform:none} }
+
+.el-crown{
+  display:grid; place-items:center; width:72px; height:72px; border-radius:9999px; color:#eef1f5; margin-bottom:18px;
+  border:1px solid rgba(232,236,242,.45);
+  background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.25),rgba(255,255,255,.03) 70%);
+  box-shadow:0 0 36px -6px rgba(232,236,242,.6), inset 0 1px 0 rgba(255,255,255,.3);
+}
+.el-eyebrow{ display:inline-flex; align-items:center; gap:8px; font-size:11px; letter-spacing:.35em; color:rgba(255,255,255,.55); }
+.el-title{
+  margin-top:14px; font-family:"Cormorant Garamond",Georgia,serif; font-size:clamp(1.6rem,6vw,2.1rem);
+  line-height:1.15; letter-spacing:.08em; font-weight:500;
+  background:linear-gradient(115deg,#8b93a1 0%,#fff 28%,#aeb4bf 48%,#fff 62%,#8b93a1 82%,#f1f5f9 100%);
+  background-size:260% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
+  animation: el-shimmer 8s linear infinite;
+}
+@keyframes el-shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.el-rule{ width:60%; height:1px; margin:18px 0; background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent); }
+.el-text{ font-size:14px; line-height:1.6; color:rgba(255,255,255,.55); max-width:330px; }
+
+.el-plan{
+  width:100%; margin-top:22px; padding:16px 16px 12px; text-align:left; border-radius:1.1rem;
+  border:1px solid rgba(232,236,242,.22);
+  background:radial-gradient(90% 100% at 50% 0%,rgba(232,236,242,.1),transparent 70%),rgba(255,255,255,.02);
+}
+.el-plan-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.el-plan-name{ font-size:12px; font-weight:600; letter-spacing:.25em; color:#e8ecf2; }
+.el-plan-price{ font-family:"Cormorant Garamond",Georgia,serif; font-size:1.5rem; color:#fff; }
+.el-plan-price small{ font-family:inherit; font-size:11px; letter-spacing:.1em; color:rgba(255,255,255,.45); }
+.el-perks{ display:flex; flex-direction:column; gap:9px; }
+.el-perks li{ display:flex; align-items:flex-start; gap:10px; font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.65); }
+.el-perks svg{ margin-top:2px; color:#e8ecf2; }
+
+.el-cta{
+  margin-top:26px; display:inline-flex; align-items:center; gap:10px; padding:.95rem 2rem; border-radius:9999px;
+  font-size:13px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; color:#101012;
+  background:radial-gradient(circle at 32% 22%,#fff 0%,#e0e4ea 22%,#98a0ab 60%,#5a606a 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.95) inset, 0 -6px 12px rgba(0,0,0,.3) inset, 0 12px 22px rgba(0,0,0,.7), 0 0 30px -6px rgba(232,236,242,.6);
+  transition:transform .15s, filter .2s;
+}
+.el-cta:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+.el-cta:active{ transform:translateY(2px) scale(.97); }
+.el-back{ margin-top:16px; font-size:12px; letter-spacing:.15em; color:rgba(255,255,255,.4); transition:color .2s; }
+.el-back:hover{ color:#fff; }
+.el-cta:focus-visible,.el-back:focus-visible{ outline:2px solid rgba(232,236,242,.8); outline-offset:3px; }
+
+@media (prefers-reduced-motion: reduce){
+  .el-card,.el-title{ animation:none !important; }
+}
+`;
+
+=== END FILE ===
+
+=== FILE: src/components/aura/GalleryTeaser.tsx ===
+import { useRef } from "react";
+import { Link } from "@tanstack/react-router";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { ArrowRight, Images, Play } from "lucide-react";
+import { GALLERY } from "@/lib/gallery";
+
+const chromeText = "bg-gradient-to-b from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent";
+const glow = "bg-[radial-gradient(circle,rgba(255,255,255,0.09),transparent_68%)]";
+
+// Same collage on every screen: widths are percentages, so it scales instead of overflowing.
+const FRAMES = [
+  { w: "w-[34%]", ratio: "aspect-[3/4.4]", mt: "mt-0", rot: -4 },
+  { w: "w-[31%]", ratio: "aspect-[3/4]", mt: "mt-[10%]", rot: 3 },
+  { w: "w-[29%]", ratio: "aspect-[3/3.8]", mt: "mt-[4%]", rot: -2 },
+];
+
+export default function GalleryTeaser() {
+  const ref = useRef<HTMLElement>(null);
+  const reduce = !!useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+
+  const yA = useTransform(scrollYProgress, [0, 1], [40, -40]);
+  const yB = useTransform(scrollYProgress, [0, 1], [-20, 55]);
+  const yC = useTransform(scrollYProgress, [0, 1], [60, -60]);
+  const ringRotate = useTransform(scrollYProgress, [0, 1], [0, 90]);
+  const ys = [yA, yB, yC];
+
+  const photos = GALLERY.filter((g) => g.type === "image");
+  const video = GALLERY.find((g) => g.type === "video");
+  const items = [photos[0], video ?? photos[1], photos[2] ?? photos[1]].filter(Boolean);
+
+  return (
+    <section ref={ref} id="gallery" className="relative isolate overflow-hidden py-20 sm:py-32">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-50 [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:48px_48px] sm:[background-size:64px_64px]"
+      />
+      <motion.div aria-hidden style={{ rotate: reduce ? 0 : ringRotate }} className="pointer-events-none absolute -right-48 top-10 -z-10 h-[420px] w-[420px] rounded-full border border-dashed border-white/10 sm:-right-40 sm:h-[520px] sm:w-[520px]" />
+      <div aria-hidden className={`pointer-events-none absolute -left-40 top-1/4 -z-10 h-[600px] w-[600px] rounded-full ${glow}`} />
+      <div aria-hidden className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-10">
+        <div className="grid items-center gap-14 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="text-center lg:text-left"
+          >
+            <div className="mb-4 flex items-center justify-center gap-3 text-xs uppercase tracking-[0.3em] text-white/50 lg:justify-start">
+              <span className="h-px w-10 bg-gradient-to-r from-white/60 to-transparent" />
+              Portfolio
+            </div>
+            <h2 className={`text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl ${chromeText}`}>
+              See the craft up close.
+            </h2>
+            <p className="mx-auto mt-6 max-w-lg text-base leading-relaxed text-zinc-400 sm:text-lg lg:mx-0">
+              The people, the work and the moments behind AURA. Browse the Barbers' Gallery and open any piece
+              full screen.
+            </p>
+
+            <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.98 }} className="mt-9 inline-block">
+              <Link
+                to="/gallery"
+                className="group relative inline-flex items-center gap-3 overflow-hidden rounded-full bg-gradient-to-b from-zinc-100 via-zinc-300 to-zinc-400 px-7 py-3.5 text-base font-semibold text-black shadow-[0_0_30px_rgba(255,255,255,0.25)] outline-none transition-shadow duration-300 before:absolute before:inset-y-0 before:-left-1/2 before:w-1/2 before:-skew-x-12 before:bg-white/70 before:blur-md before:transition-transform before:duration-700 hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] hover:before:translate-x-[300%] focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black sm:px-8 sm:py-4"
+              >
+                <Images className="relative size-5" />
+                <span className="relative">View our Gallery</span>
+                <ArrowRight className="relative size-5 transition-transform duration-300 group-hover:translate-x-1" />
+              </Link>
+            </motion.div>
+          </motion.div>
+
+          <div className="relative mx-auto flex w-full max-w-[560px] items-start justify-center gap-2 pb-[6%] sm:gap-5">
+            <div aria-hidden className={`pointer-events-none absolute left-1/2 top-1/2 size-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full ${glow}`} />
+            {items.map((f, i) => {
+              const fr = FRAMES[i];
+              return (
+                <motion.div key={f.id} style={{ y: reduce ? 0 : ys[i] }} className={`${fr.w} ${fr.mt}`}>
+                  <Link to="/gallery" aria-label="Open the gallery" className="block">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.92, rotate: 0 }}
+                      whileInView={{ opacity: 1, scale: 1, rotate: fr.rot }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.8, delay: i * 0.12, ease: [0.16, 1, 0.3, 1] }}
+                      whileHover={{ rotate: 0, scale: 1.05, y: -8 }}
+                      className={`group relative w-full overflow-hidden rounded-xl border border-white/15 bg-zinc-950 shadow-[0_30px_70px_-25px_rgba(0,0,0,0.95)] transition-[border-color,box-shadow] duration-300 hover:border-white/50 hover:shadow-[0_0_50px_-8px_rgba(255,255,255,0.3)] sm:rounded-2xl ${fr.ratio}`}
+                    >
+                      {f.type === "image" ? (
+                        <img src={f.thumb} alt="AURA gallery" loading="lazy" decoding="async" className="size-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                      ) : (
+                        <video
+                          src={`${f.src}#t=0.1`}
+                          muted
+                          loop
+                          playsInline
+                          preload="metadata"
+                          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                          onMouseLeave={(e) => e.currentTarget.pause()}
+                          className="size-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                      )}
+                      <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                      <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-full -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition-all duration-1000 group-hover:translate-x-[450%] group-hover:opacity-100" />
+                      {f.type === "video" && (
+                        <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full border border-white/25 bg-black/70 p-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-200 sm:left-3 sm:top-3 sm:px-2.5 sm:py-1">
+                          <Play className="size-2.5 fill-current sm:size-3" /> <span className="hidden sm:inline">Film</span>
+                        </span>
+                      )}
+                    </motion.div>
+                  </Link>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/access.ts ===
+// src/lib/access.ts
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+import { isStaffRole } from "@/lib/queries";
+
+// New functions/tables are not in the generated types yet.
+const sb = db as unknown as SupabaseClient;
+
+/**
+ * Pages anyone can open, even without a plan.
+ * "/login" and "/checkout" MUST stay here: people sign in and pay through them.
+ * Add any other public page here (matches the path itself and everything under it).
+ */
+export const PUBLIC_PATHS = [
+  "/",
+  "/pricing",
+  "/terms",
+  "/contact",
+  "/about",
+  "/ourteam",
+  "/login",
+  "/checkout",
+  // Anyone can buy these without a plan: the book and the seminars.
+  "/book",
+  "/seminars",
+  "/online-seminars",
+];
+
+export function isPublicPath(pathname: string): boolean {
+  const lower = pathname.toLowerCase();
+  const p = lower.length > 1 ? lower.replace(/\/+$/, "") : lower;
+  return PUBLIC_PATHS.some((base) =>
+    base === "/" ? p === "/" : p === base || p.startsWith(`${base}/`),
+  );
+}
+
+const ACCESS_STATUSES = ["active", "trialing"];
+
+export interface AccessState {
+  /** Staff, or an active/trialing subscription. */
+  hasAccess: boolean;
+  isStaff: boolean;
+  /** The user has (or had) a subscription row, e.g. an expired one. */
+  hadPlan: boolean;
+}
+
+/** Throws on a network/database error (callers must NOT treat that as "no plan"). */
+export async function fetchAccess(userId: string): Promise<AccessState> {
+  const { data: profile, error: profileError } = await sb
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+  if (profileError) throw new Error(profileError.message);
+
+  if (isStaffRole(String((profile as { role?: unknown } | null)?.role ?? "student"))) {
+    return { hasAccess: true, isStaff: true, hadPlan: false };
+  }
+
+  const { data: subs, error: subsError } = await sb
+    .from("subscriptions")
+    .select("status")
+    .eq("user_id", userId);
+  if (subsError) throw new Error(subsError.message);
+
+  const rows = (subs ?? []) as { status: string }[];
+  return {
+    hasAccess: rows.some((r) => ACCESS_STATUSES.includes(r.status)),
+    isStaff: false,
+    hadPlan: rows.length > 0,
+  };
+}
+
+/** Removes the caller's dead plan rows (never touches active ones). Payments are kept. */
+export async function cleanupDeadSubscriptions(): Promise<void> {
+  const { error } = await sb.rpc("cleanup_my_dead_subscriptions");
+  if (error) console.error("[access] cleanup_my_dead_subscriptions failed:", error.message);
+}
+=== END FILE ===
+
+=== FILE: src/routes/auth.callback.tsx ===
+// src/routes/auth.callback.tsx
+import { useEffect, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { useAuth } from "@/hooks/useAuth";
+import { clearCheckoutIntent, consumeCheckoutIntent } from "@/lib/checkout-intent";
+import { isPlanId, type PlanId } from "@/lib/plans";
+import { useI18n } from "@/lib/i18n";
+
+const TIMEOUT_MS = 12000;
+
+interface AuthCallbackSearch {
+  plan?: PlanId;
+  /** Το index signature είναι σκόπιμο: το validateSearch ΔΕΝ πρέπει να
+   *  πετάξει τα ?code / ?error του Supabase, αλλιώς χάνεται το PKCE code. */
+  [key: string]: unknown;
+}
+
+export const Route = createFileRoute("/auth/callback")({
+  validateSearch: (search: Record<string, unknown>): AuthCallbackSearch => ({
+    ...search,
+    plan: isPlanId(search["plan"]) ? search["plan"] : undefined,
+  }),
+  head: () => ({ meta: [{ title: "AURA — Sign in" }] }),
+  component: AuthCallbackPage,
+});
+
+function AuthCallbackPage() {
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const { plan: searchPlan } = Route.useSearch();
+  const { t } = useI18n();
+  const [failure, setFailure] = useState<string | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
+
+  // Τα σφάλματα OAuth έρχονται είτε στο query string είτε στο hash fragment.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const search = new URLSearchParams(window.location.search);
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const description =
+      search.get("error_description") ??
+      hash.get("error_description") ??
+      search.get("error") ??
+      hash.get("error");
+    if (description) setFailure(description.replace(/\+/g, " "));
+  }, []);
+
+  // Επιτυχία: πρώτα το URL, μετά το αποθηκευμένο intent. Αυτό σταματά το
+  // σιωπηλό fall-through στο /dashboard όταν το storage είναι άδειο.
+  useEffect(() => {
+    if (failure || loading || !user) return;
+    const plan = searchPlan ?? consumeCheckoutIntent();
+    if (searchPlan) clearCheckoutIntent(); // πέτα τυχόν παλιό leftover
+    if (plan) {
+      navigate({ to: "/checkout", search: { plan }, replace: true });
+    } else {
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [failure, loading, user, searchPlan, navigate]);
+
+  // Δικλείδα: αν το session δεν έρθει ποτέ, μην αφήνεις τον χρήστη σε loader.
+  useEffect(() => {
+    if (failure || user) return;
+    const timer = window.setTimeout(() => setTimedOut(true), TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [failure, user]);
+
+  const blocked = failure !== null || timedOut;
+
+  return (
+    <main
+      className="mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40"
+      aria-busy={!blocked}
+    >
+      {blocked ? (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">
+            {failure ? t("auth.errorKicker") : t("auth.timeoutKicker")}
+          </p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+            {failure ? t("auth.errorTitle") : t("auth.timeoutTitle")}
+          </h1>
+          <p className="mt-4 text-sm leading-relaxed text-neutral-400" role="alert">
+            {failure ?? t("auth.timeoutBody")}
+          </p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Link to="/login" search={searchPlan ? { plan: searchPlan } : {}}>
+              <ChromeButton type="button">{t("auth.backToLogin")}</ChromeButton>
+            </Link>
+            <Link to="/">
+              <ChromeButton type="button" variant="secondary">
+                {t("auth.goHome")}
+              </ChromeButton>
+            </Link>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">
+            {t("auth.finishingKicker")}
+          </p>
+          <h1 className="mt-5 text-3xl font-semibold tracking-tight text-neutral-100">
+            {t("auth.finishingTitle")}
+          </h1>
+          <div
+            className="mx-auto mt-8 h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
+            role="status"
+            aria-label={t("auth.finishingTitle")}
+          />
+        </>
+      )}
+    </main>
+  );
+}
+=== END FILE ===
+

@@ -1,0 +1,224 @@
+=== FILE: .output/public/assets/admin.notifications-D5vKvS7e.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./AnimatePresence-ClHpx5iG.js";import{t as a}from"./use-reduced-motion-CNAPwhZE.js";import{t as o}from"./react-D9fOyxUn.js";import{t as s}from"./supabase-DXn9ZPwL.js";import{y as c}from"./queries-B7Arqryn.js";import{t as l}from"./createLucideIcon-Dz5w4CtK.js";import{t as u}from"./arrow-left-Brxe6F5I.js";import{t as d}from"./book-open-l6w5YLVR.js";import{t as f}from"./circle-alert-Bs1x-kqg.js";import{t as p}from"./loader-circle-DdNdnF6-.js";import{t as m}from"./send-ClGHcKrI.js";import{t as h}from"./users-mt-IxESh.js";import{i as g,n as _,r as v}from"./States-BulpY35p.js";import{a as y,i as b,n as x,s as S,t as C}from"./chrome-DYZby3h2.js";var w=l(`bell-off`,[[`path`,{d:`M10.268 21a2 2 0 0 0 3.464 0`,key:`vwvbt9`}],[`path`,{d:`M17 17H4a1 1 0 0 1-.74-1.673C4.59 13.956 6 12.499 6 8a6 6 0 0 1 .258-1.742`,key:`178tsu`}],[`path`,{d:`m2 2 20 20`,key:`1ooewy`}],[`path`,{d:`M8.668 3.01A6 6 0 0 1 18 8c0 2.687.77 4.653 1.707 6.05`,key:`1hqiys`}]]),T=l(`bell-ring`,[[`path`,{d:`M10.268 21a2 2 0 0 0 3.464 0`,key:`vwvbt9`}],[`path`,{d:`M22 8c0-2.3-.8-4.3-2-6`,key:`5bb3ad`}],[`path`,{d:`M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326`,key:`11g9vi`}],[`path`,{d:`M4 2C2.8 3.7 2 5.7 2 8`,key:`tap9e0`}]]),E=l(`bell`,[[`path`,{d:`M10.268 21a2 2 0 0 0 3.464 0`,key:`vwvbt9`}],[`path`,{d:`M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326`,key:`11g9vi`}]]),D=l(`calendar-check`,[[`path`,{d:`M8 2v4`,key:`1cmpym`}],[`path`,{d:`M16 2v4`,key:`4m81vk`}],[`rect`,{width:`18`,height:`18`,x:`3`,y:`4`,rx:`2`,key:`1hopcy`}],[`path`,{d:`M3 10h18`,key:`8toen8`}],[`path`,{d:`m9 16 2 2 4-4`,key:`19s6y9`}]]),O=l(`clipboard-check`,[[`rect`,{width:`8`,height:`4`,x:`8`,y:`2`,rx:`1`,ry:`1`,key:`tgr4d6`}],[`path`,{d:`M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2`,key:`116196`}],[`path`,{d:`m9 14 2 2 4-4`,key:`df797q`}]]),k=l(`user-plus`,[[`path`,{d:`M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2`,key:`1yyitq`}],[`circle`,{cx:`9`,cy:`7`,r:`4`,key:`nufk8`}],[`line`,{x1:`19`,x2:`19`,y1:`8`,y2:`14`,key:`1bvyxn`}],[`line`,{x1:`22`,x2:`16`,y1:`11`,y2:`11`,key:`1shjgl`}]]),A=e(n());function j(){return typeof window>`u`?`unsupported`:window.isSecureContext?!(`serviceWorker`in navigator)||!(`PushManager`in window)||!(`Notification`in window)?`unsupported`:Notification.permission===`denied`?`denied`:`check`:`insecure`}async function M(){let e=j();if(e!==`check`)return e;try{return await(await navigator.serviceWorker.getRegistration(`/sw.js`))?.pushManager.getSubscription()&&Notification.permission===`granted`?`enabled`:`disabled`}catch{return`disabled`}}async function N(){let e=j();throw Error(e===`insecure`?`Οι ειδοποιήσεις χρειάζονται HTTPS. Το site τρέχει σε http.`:e===`unsupported`?`Ο browser δεν υποστηρίζει push ειδοποιήσεις.`:e===`denied`?`Οι ειδοποιήσεις είναι μπλοκαρισμένες. Επίτρεψέ τες από το εικονίδιο κλειδαριάς δίπλα στη διεύθυνση.`:`Λείπει το VITE_VAPID_PUBLIC_KEY.`)}async function P(){let e=await(await navigator.serviceWorker.getRegistration(`/sw.js`))?.pushManager.getSubscription();e&&(await s.rpc(`unregister_push_subscription`,{p_endpoint:e.endpoint}),await e.unsubscribe())}async function F(){let{error:e}=await s.from(`admin_notifications`).insert({type:`test`,title:`Δοκιμαστική ειδοποίηση`,body:`Οι ειδοποιήσεις του AURA λειτουργούν σωστά.`,url:`/admin/notifications`});if(e)throw Error(e.message)}async function I(e=30){let{data:t,error:n}=await s.from(`admin_notifications`).select(`id, created_at, type, title, body, url`).order(`created_at`,{ascending:!1}).limit(e);if(n)throw Error(n.message);return t??[]}var L=t(),R=[`admin`,`super_admin`,`operations`],z=[{type:`new_member`,icon:k,label:`Νέο μέλος`,text:`Κάποιος πληρώνει και ξεκινά συνδρομή.`},{type:`seminar_booking`,icon:D,label:`Κράτηση σεμιναρίου`,text:`Κλείνεται μία θέση σε σεμινάριο.`},{type:`seminar_full`,icon:h,label:`Σεμινάριο γεμάτο`,text:`Ένα σεμινάριο φτάνει τη μέγιστη χωρητικότητα.`},{type:`book_order`,icon:d,label:`Παραγγελία βιβλίου`,text:`Αγοράζεται ένα βιβλίο.`},{type:`review_submission`,icon:O,label:`Νέο review`,text:`Ένας μαθητής στέλνει εργασία στο review queue.`}],B=e=>z.find(t=>t.type===e)?.icon??E,V=new Intl.DateTimeFormat(`el-GR`,{day:`2-digit`,month:`short`,hour:`2-digit`,minute:`2-digit`});function H(){let e=a(),[t,n]=(0,A.useState)(void 0),[r,i]=(0,A.useState)(null);(0,A.useEffect)(()=>{let e=!0;return c().then(t=>e&&n(t?.role??null)).catch(t=>e&&i(t.message)),()=>{e=!1}},[]);let s=!!t&&R.includes(t);return(0,L.jsxs)(`main`,{className:`relative min-h-screen overflow-x-hidden px-4 pb-24 pt-28 text-white sm:px-6 sm:pt-36 md:px-10`,children:[(0,L.jsx)(o.div,{"aria-hidden":!0,className:`pointer-events-none absolute left-1/2 top-0 hidden aspect-square w-[min(900px,120%)] -translate-x-1/2 -translate-y-1/3 rounded-full md:block`,style:{background:`radial-gradient(circle, rgba(255,255,255,0.09) 0%, rgba(170,180,190,0.04) 40%, transparent 70%)`},animate:e?void 0:{opacity:[.4,1,.4]},transition:{duration:8,repeat:1/0,ease:`easeInOut`}}),(0,L.jsxs)(`div`,{className:`relative mx-auto max-w-4xl`,children:[t===void 0&&!r&&(0,L.jsx)(v,{rows:3}),r&&(0,L.jsx)(_,{message:r}),t!==void 0&&!s&&(0,L.jsx)(S,{inner:`p-8 text-center`,children:(0,L.jsx)(g,{reason:`Μόνο διαχειριστές έχουν πρόσβαση στις ειδοποιήσεις.`})}),s&&(0,L.jsx)(U,{})]})]})}function U(){let e=a(),[t,n]=(0,A.useState)(null),[c,l]=(0,A.useState)(!1),[d,h]=(0,A.useState)(null),[g,D]=(0,A.useState)(!1),[O,k]=(0,A.useState)(null),[j,R]=(0,A.useState)(null),H=(0,A.useCallback)(async()=>n(await M()),[]);(0,A.useEffect)(()=>{H()},[H]),(0,A.useEffect)(()=>{let e=!0;I().then(t=>e&&k(t)).catch(t=>e&&R(t.message));let t=s.channel(`admin-notifications-feed`).on(`postgres_changes`,{event:`INSERT`,schema:`public`,table:`admin_notifications`},e=>{k(t=>[e.new,...t??[]].slice(0,30))}).subscribe();return()=>{e=!1,s.removeChannel(t)}},[]);async function U(){l(!0),h(null);try{t===`enabled`?await P():await N(),await H()}catch(e){h(e.message)}finally{l(!1)}}async function G(){l(!0),h(null),D(!1);try{await F(),D(!0),setTimeout(()=>D(!1),4e3)}catch(e){h(e.message)}finally{l(!1)}}let K=t===`enabled`,q=t===`unsupported`||t===`insecure`||t===`denied`;return(0,L.jsxs)(o.div,{initial:`hidden`,animate:`show`,variants:{show:{transition:{staggerChildren:.1}}},className:`space-y-10`,children:[(0,L.jsxs)(o.header,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:y}}},className:`border-b border-white/10 pb-8`,children:[(0,L.jsxs)(r,{to:`/admin`,className:`mb-5 inline-flex items-center gap-2 text-xs text-white/50 outline-none transition-colors hover:text-white focus-visible:text-white`,children:[(0,L.jsx)(u,{className:`size-3.5`}),` Πίσω στο Admin`]}),(0,L.jsxs)(`div`,{className:`mb-3 flex items-center gap-3 text-xs uppercase tracking-[0.35em] text-white/50`,children:[(0,L.jsx)(`span`,{className:`h-px w-10 bg-gradient-to-r from-white/70 to-transparent`}),`Alerts`]}),(0,L.jsx)(`h1`,{className:`text-3xl font-extrabold uppercase tracking-tight sm:text-5xl`,children:(0,L.jsx)(b,{children:`Ειδοποιήσεις`})})]}),(0,L.jsx)(o.section,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:y}}},children:(0,L.jsxs)(S,{inner:`p-6 sm:p-8`,children:[(0,L.jsxs)(`div`,{className:`flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between`,children:[(0,L.jsxs)(`div`,{className:`flex items-start gap-5`,children:[(0,L.jsxs)(`div`,{className:`relative shrink-0`,children:[K&&!e&&(0,L.jsx)(o.span,{"aria-hidden":!0,className:`absolute inset-0 rounded-2xl border border-white/60`,animate:{scale:[1,1.5],opacity:[.6,0]},transition:{duration:2.2,repeat:1/0,ease:`easeOut`}}),(0,L.jsx)(`span`,{className:`relative flex size-14 items-center justify-center rounded-2xl text-neutral-950`,style:K?{backgroundImage:C,boxShadow:`0 0 34px rgba(255,255,255,0.5), inset 0 1px 0 rgba(255,255,255,0.95)`}:{background:`rgba(255,255,255,0.06)`,color:`rgba(255,255,255,0.6)`,boxShadow:`inset 0 0 0 1px rgba(255,255,255,0.15)`},children:K?(0,L.jsx)(T,{className:`size-6`}):q?(0,L.jsx)(w,{className:`size-6`}):(0,L.jsx)(E,{className:`size-6`})})]}),(0,L.jsxs)(`div`,{children:[(0,L.jsx)(`h2`,{className:`text-lg font-bold text-white`,children:t===null?`Έλεγχος…`:K?`Οι ειδοποιήσεις είναι ενεργές`:`Οι ειδοποιήσεις είναι ανενεργές`}),(0,L.jsxs)(`p`,{className:`mt-1 max-w-md text-sm leading-relaxed text-white/55`,children:[t===`insecure`&&`Το site τρέχει σε http. Οι ειδοποιήσεις του Chrome λειτουργούν μόνο σε https (ή localhost).`,t===`unsupported`&&`Αυτός ο browser δεν υποστηρίζει push ειδοποιήσεις.`,t===`denied`&&`Έχεις μπλοκάρει τις ειδοποιήσεις. Επίτρεψέ τες από το εικονίδιο δίπλα στη διεύθυνση του site και ανανέωσε τη σελίδα.`,(t===`enabled`||t===`disabled`)&&`Ενεργοποίησέ τες σε κάθε browser ή συσκευή όπου θέλεις να λαμβάνεις ειδοποιήσεις. Ο Chrome πρέπει να είναι ανοιχτός.`]})]})]}),(0,L.jsxs)(`div`,{className:`flex shrink-0 flex-col gap-3 sm:items-end`,children:[(0,L.jsxs)(x,{type:`button`,solid:!K,onClick:()=>void U(),disabled:c||q||t===null,children:[c?(0,L.jsx)(p,{className:`size-4 animate-spin`}):K?(0,L.jsx)(w,{className:`size-4`}):(0,L.jsx)(T,{className:`size-4`}),K?`Απενεργοποίηση`:`Ενεργοποίηση`]}),K&&(0,L.jsxs)(x,{type:`button`,solid:!1,onClick:()=>void G(),disabled:c,children:[(0,L.jsx)(m,{className:`size-4`}),` Δοκιμαστική`]})]})]}),(0,L.jsx)(i,{children:g&&(0,L.jsx)(o.p,{initial:{opacity:0,y:-6},animate:{opacity:1,y:0},exit:{opacity:0},className:`mt-5 text-sm font-semibold text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.6)]`,children:`Στάλθηκε. Η ειδοποίηση πρέπει να εμφανιστεί σε λίγα δευτερόλεπτα.`})}),d&&(0,L.jsxs)(`p`,{role:`alert`,className:`mt-5 flex items-start gap-2 rounded-xl border border-white/20 bg-white/[0.05] p-3 text-sm text-white/85`,children:[(0,L.jsx)(f,{className:`mt-0.5 size-4 shrink-0`}),` `,d]})]})}),(0,L.jsxs)(o.section,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:y}}},children:[(0,L.jsx)(W,{children:`Πότε ειδοποιείσαι`}),(0,L.jsx)(`div`,{className:`grid gap-4 sm:grid-cols-2`,children:z.map((e,t)=>(0,L.jsx)(o.div,{whileHover:{y:-4},className:`group ${t===z.length-1&&z.length%2==1?`sm:col-span-2`:``}`,children:(0,L.jsx)(S,{inner:`p-5`,children:(0,L.jsxs)(`div`,{className:`flex items-start gap-4`,children:[(0,L.jsx)(`span`,{className:`flex size-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/60 text-zinc-200 transition-all duration-300 group-hover:border-white/50 group-hover:text-white group-hover:shadow-[0_0_24px_rgba(255,255,255,0.35)]`,children:(0,L.jsx)(e.icon,{className:`size-5`})}),(0,L.jsxs)(`div`,{children:[(0,L.jsx)(`h3`,{className:`text-sm font-semibold text-white`,children:e.label}),(0,L.jsx)(`p`,{className:`mt-1 text-sm leading-relaxed text-white/50`,children:e.text})]})]})})},e.type))})]}),(0,L.jsxs)(o.section,{variants:{hidden:{opacity:0,y:18},show:{opacity:1,y:0,transition:{duration:.7,ease:y}}},children:[(0,L.jsx)(W,{children:`Πρόσφατες ειδοποιήσεις`}),j&&(0,L.jsx)(_,{message:j}),!O&&!j&&(0,L.jsx)(v,{rows:3}),O&&O.length===0&&(0,L.jsx)(S,{inner:`p-8 text-center`,children:(0,L.jsx)(`p`,{className:`text-sm text-white/45`,children:`Δεν υπάρχουν ειδοποιήσεις ακόμη.`})}),O&&O.length>0&&(0,L.jsx)(S,{inner:`p-2 sm:p-3`,children:(0,L.jsx)(`ul`,{className:`divide-y divide-white/[0.06]`,children:(0,L.jsx)(i,{initial:!1,children:O.map(e=>{let t=B(e.type),n=(0,L.jsxs)(`div`,{className:`flex items-start gap-4 rounded-xl px-3 py-3.5 transition-colors hover:bg-white/[0.04]`,children:[(0,L.jsx)(`span`,{className:`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/[0.05] text-white/80`,children:(0,L.jsx)(t,{className:`size-4`})}),(0,L.jsxs)(`div`,{className:`min-w-0 flex-1`,children:[(0,L.jsx)(`p`,{className:`text-sm font-semibold text-white`,children:e.title}),e.body&&(0,L.jsx)(`p`,{className:`mt-0.5 break-words text-sm text-white/55`,children:e.body})]}),(0,L.jsx)(`span`,{className:`shrink-0 text-xs text-white/35`,children:V.format(new Date(e.created_at))})]});return(0,L.jsx)(o.li,{layout:!0,initial:{opacity:0,y:-12},animate:{opacity:1,y:0},transition:{duration:.4,ease:y},children:e.url&&e.type!==`test`?(0,L.jsx)(r,{to:e.url,children:n}):n},e.id)})})})})]})]})}function W({children:e}){return(0,L.jsxs)(`h2`,{className:`mb-4 flex items-center gap-3 px-1 text-xs font-semibold uppercase tracking-[0.3em] text-white/65`,children:[(0,L.jsx)(`span`,{className:`size-1.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]`}),e]})}export{H as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/stop-plan-CbqsacCL.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./useNavigate-BR9bgUfC.js";import{t as a}from"./react-D9fOyxUn.js";import{t as o}from"./supabase-DXn9ZPwL.js";import{t as s}from"./useAuth-B1WX5JkE.js";import{t as c}from"./createLucideIcon-Dz5w4CtK.js";import{t as l}from"./circle-check-DcupJV4n.js";import{t as u}from"./loader-circle-DdNdnF6-.js";import{n as d}from"./plans-BkcWWgXs.js";import{t as f}from"./ChromeButton-CdfVnEPs.js";import{n as p,r as m}from"./useSubscription-CI-f8eKe.js";var h=c(`triangle-alert`,[[`path`,{d:`m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3`,key:`wmoenq`}],[`path`,{d:`M12 9v4`,key:`juzpu7`}],[`path`,{d:`M12 17h.01`,key:`p32p05`}]]),g=e(n());async function _(){let{data:e,error:t}=await o.functions.invoke(`cancel-subscription`,{body:{}});if(t){let e=t.context;if(e&&typeof e.json==`function`)try{let t=await e.json();if(t?.error)throw Error(t.error)}catch(e){if(e instanceof Error&&e.message)throw e}throw Error(t.message||`Η ακύρωση απέτυχε.`)}if(e?.error)throw Error(e.error);if(!e?.subscription)throw Error(`Το Stripe δεν επέστρεψε κατάσταση συνδρομής.`);return e.subscription}var v=t(),y=`STOP MY PLAN`;function b(e){if(!e)return`—`;let t=new Date(e);return Number.isNaN(t.getTime())?`—`:new Intl.DateTimeFormat(`el-GR`,{day:`2-digit`,month:`long`,year:`numeric`}).format(t)}function x(){let e=i(),{session:t,loading:n}=s(),o=t?.user.id,{subscription:c,loading:x,error:S,refresh:C}=m(o,{includeInactive:!0}),[w,T]=(0,g.useState)(!1),[E,D]=(0,g.useState)(``),[O,k]=(0,g.useState)(!1),[A,j]=(0,g.useState)(null),[M,N]=(0,g.useState)(null);(0,g.useEffect)(()=>{!n&&!t&&e({to:`/login`,replace:!0})},[n,t,e]);let P=n||!!o&&x,F=d(c?.plan_id),I=c!=null&&p(c.status),L=c?.cancel_at_period_end??!1,R=E.trim()===y,z=w&&R&&!O;async function B(){if(z){k(!0),j(null);try{let e=await _();N({currentPeriodEnd:e.currentPeriodEnd}),C()}catch(e){j(e.message)}finally{k(!1)}}}if(P)return(0,v.jsx)(`main`,{className:`mx-auto max-w-lg px-5 pb-24 pt-32 sm:pt-40`,"aria-busy":`true`,children:(0,v.jsxs)(`div`,{className:`animate-pulse space-y-4`,children:[(0,v.jsx)(`div`,{className:`h-4 w-1/3 rounded bg-white/5`}),(0,v.jsx)(`div`,{className:`h-40 rounded-2xl bg-white/5`})]})});if(!t)return null;if(!I)return(0,v.jsxs)(`main`,{className:`mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40`,children:[(0,v.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:`ΤΟ ΠΑΚΕΤΟ ΜΟΥ`}),(0,v.jsx)(`h1`,{className:`mt-5 text-2xl font-semibold tracking-tight text-neutral-100`,children:`Δεν υπάρχει ενεργή συνδρομή προς ακύρωση`}),(0,v.jsx)(`p`,{className:`mt-3 text-sm text-neutral-400`,children:S??`Δεν βρέθηκε πακέτο συνδεδεμένο με τον λογαριασμό σου.`}),(0,v.jsx)(r,{to:`/profile`,className:`mt-8 inline-block`,children:(0,v.jsx)(f,{type:`button`,variant:`secondary`,children:`Πίσω στο προφίλ`})})]});let V=b(c.current_period_end);if(M||L){let e=M?b(M.currentPeriodEnd):V;return(0,v.jsx)(`main`,{className:`mx-auto max-w-lg px-5 pb-24 pt-32 sm:pt-40`,children:(0,v.jsxs)(a.div,{initial:{opacity:0,y:12},animate:{opacity:1,y:0},transition:{duration:.4,ease:[.16,1,.3,1]},className:`rounded-2xl border border-white/10 bg-white/[0.03] p-8 text-center`,children:[(0,v.jsx)(l,{className:`mx-auto size-10 text-emerald-400`}),(0,v.jsx)(`h1`,{className:`mt-4 text-2xl font-semibold text-white`,children:`Το πακέτο σου θα σταματήσει`}),(0,v.jsxs)(`p`,{className:`mt-3 text-sm text-white/70`,children:[`Κρατάς πλήρη πρόσβαση μέχρι`,` `,(0,v.jsx)(`span`,{className:`font-semibold text-white`,children:e}),`. Μετά από αυτή την ημερομηνία δεν θα χρεωθείς ξανά και η συνδρομή δεν θα ανανεωθεί.`]}),(0,v.jsx)(r,{to:`/profile`,className:`mt-8 inline-block`,children:(0,v.jsx)(f,{type:`button`,children:`Πίσω στο προφίλ`})})]})})}return(0,v.jsx)(`main`,{className:`mx-auto max-w-lg px-5 pb-24 pt-32 sm:pt-40`,children:(0,v.jsxs)(a.div,{initial:{opacity:0,y:12},animate:{opacity:1,y:0},transition:{duration:.4,ease:[.16,1,.3,1]},children:[(0,v.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:`ΤΟ ΠΑΚΕΤΟ ΜΟΥ`}),(0,v.jsx)(`h1`,{className:`mt-5 text-3xl font-semibold tracking-tight text-neutral-100`,children:`Σταμάτησε το πακέτο σου`}),(0,v.jsxs)(`div`,{className:`mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5`,children:[(0,v.jsx)(`p`,{className:`text-sm text-white/60`,children:`Τρέχον πακέτο`}),(0,v.jsx)(`p`,{className:`mt-1 text-lg font-semibold text-white`,children:F?.name??c.plan_id}),F&&(0,v.jsxs)(`p`,{className:`mt-1 text-sm text-white/50`,children:[F.priceLabel,` / μήνα`]})]}),(0,v.jsxs)(`div`,{className:`mt-5 flex items-start gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4`,children:[(0,v.jsx)(h,{className:`mt-0.5 size-5 shrink-0 text-amber-400`}),(0,v.jsxs)(`p`,{className:`text-sm leading-relaxed text-amber-100/90`,children:[`Δεν χρεώνεσαι ξανά και δεν χάνεις τίποτα από ό,τι έχεις ήδη πληρώσει: κρατάς πρόσβαση μέχρι`,` `,(0,v.jsx)(`span`,{className:`font-semibold text-white`,children:V}),`. Από την επόμενη περίοδο χρέωσης η συνδρομή απλώς δεν θα ανανεωθεί.`]})]}),(0,v.jsxs)(`div`,{className:`mt-6 space-y-5`,children:[(0,v.jsxs)(`label`,{className:`flex items-start gap-3 text-sm text-white/80`,children:[(0,v.jsx)(`input`,{type:`checkbox`,checked:w,onChange:e=>T(e.target.checked),className:`mt-0.5 size-4 shrink-0 rounded border-white/20 bg-transparent accent-white`}),(0,v.jsxs)(`span`,{children:[`Διάβασα και συμφωνώ με τους`,` `,(0,v.jsx)(r,{to:`/terms`,target:`_blank`,rel:`noopener noreferrer`,className:`underline underline-offset-4 hover:text-white`,children:`Όρους Χρήσης`}),`.`]})]}),(0,v.jsxs)(`div`,{children:[(0,v.jsxs)(`label`,{htmlFor:`stop-phrase`,className:`mb-1.5 block text-xs uppercase tracking-[0.2em] text-white/40`,children:[`Γράψε «`,y,`» για επιβεβαίωση`]}),(0,v.jsx)(`input`,{id:`stop-phrase`,type:`text`,value:E,onChange:e=>D(e.target.value),placeholder:y,autoComplete:`off`,spellCheck:!1,className:`w-full rounded-lg border border-white/15 bg-black/30 px-4 py-2.5 text-sm text-white placeholder:text-white/25 focus:outline-none focus:ring-2 focus:ring-white/30`})]})]}),A&&(0,v.jsx)(`p`,{role:`alert`,className:`mt-4 rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-300`,children:A}),(0,v.jsxs)(`div`,{className:`mt-8 flex flex-wrap gap-3`,children:[(0,v.jsxs)(f,{type:`button`,onClick:B,disabled:!z,children:[O&&(0,v.jsx)(u,{className:`mr-2 size-4 animate-spin`}),`Confirm`]}),(0,v.jsx)(r,{to:`/profile`,children:(0,v.jsx)(f,{type:`button`,variant:`secondary`,children:`Άσε το πακέτο μου όπως είναι`})})]})]})})}export{x as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/about-BFy08YsB.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as logo_default } from "./logo-Q3fdx5bu.mjs";
+import { t as Footer } from "./Footer-CDaciXSR.mjs";
+import { n as developer_default, r as founder_default, t as cofounder_default } from "./developer-BEywxc1M.mjs";
+import { a as useTransform, c as useScroll, l as motion } from "../_libs/framer-motion+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/about-BFy08YsB.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var teamProfiles = [
+	{
+		id: "01",
+		name: "ΘΕΟΠΙΣΤΟΣ",
+		role: "FOUNDER • CREATOR • CREATIVE DIRECTOR • HEAD EDUCATOR",
+		image: founder_default,
+		paragraphs: [
+			"Ο Θεόπιστος είναι ο δημιουργός και η δημιουργική δύναμη πίσω από την AURA.",
+			"Με πολυετή εμπειρία στον χώρο της κομμωτικής, της επαγγελματικής εκπαίδευσης και της δημιουργίας, έχει αφιερώσει την πορεία του όχι μόνο στην εξέλιξη της τεχνικής, αλλά και στην κατανόηση του τι πραγματικά δημιουργεί έναν ολοκληρωμένο επαγγελματία.",
+			"Δεν πιστεύει στην εκπαίδευση που βασίζεται απλώς στην αντιγραφή. Πιστεύει στην κατανόηση. Στην παρατήρηση. Στη σκέψη πριν από την πράξη.",
+			"Με αυτό το όραμα δημιούργησε την AURA: ένα σύγχρονο εκπαιδευτικό σύστημα που δεν έχει στόχο απλώς να διδάξει τεχνικές, αλλά να βοηθήσει κάθε επαγγελματία να αναπτύξει τον δικό του τρόπο σκέψης, κρίσης και δημιουργίας.",
+			"Ως FOUNDER, CREATIVE DIRECTOR και HEAD EDUCATOR, καθοδηγεί τη δημιουργική και εκπαιδευτική κατεύθυνση της AURA.",
+			"Στόχος του είναι να δημιουργήσει μια νέα γενιά επαγγελματιών που δεν ακολουθούν απλώς τεχνικές και τάσεις. Τις κατανοούν. Τις εξελίσσουν. Και δημιουργούν τις δικές τους."
+		],
+		mottos: ["OBSERVE. ANALYZE. DESIGN. EXECUTE. EVALUATE. EVOLVE.", "WE DON’T FOLLOW TRENDS. WE SPAWN THEM."],
+		reverse: false
+	},
+	{
+		id: "02",
+		name: "ΑΓΓΕΛΟΣ",
+		role: "PARTNER • STRATEGIC DEVELOPMENT • HEAD EDUCATOR",
+		image: cofounder_default,
+		paragraphs: [
+			"Ο Άγγελος αποτελεί σημαντικό μέλος της AURA και ενεργό κομμάτι της εξέλιξης και της κατεύθυνσής της.",
+			"Με κοινό όραμα, υψηλά standards και πάθος για την επαγγελματική εξέλιξη, συμμετέχει ενεργά τόσο στην ανάπτυξη της AURA όσο και στη δημιουργία μιας νέας εκπαιδευτικής κουλτούρας.",
+			"Ως HEAD EDUCATOR, στόχος του δεν είναι απλώς να μεταφέρει τεχνικές. Στόχος του είναι να μεταφέρει γνώση. Να αναπτύσσει επαγγελματική σκέψη. Να βοηθά κάθε εκπαιδευόμενο να κατανοήσει το γιατί πίσω από κάθε επιλογή.",
+			"Για τον Άγγελο, η εξέλιξη δεν σταματά ποτέ. Κάθε τεχνική μπορεί να βελτιωθεί. Κάθε επαγγελματίας μπορεί να εξελιχθεί. Και κάθε νέα γνώση μπορεί να γίνει το επόμενο βήμα.",
+			"Μέσα από την AURA, συμμετέχει στη δημιουργία μιας κοινότητας ανθρώπων που δεν θέλουν απλώς να είναι καλοί στη δουλειά τους. Θέλουν να γίνουν εξαιρετικοί."
+		],
+		mottos: ["KNOWLEDGE CREATES CONFIDENCE.", "CONFIDENCE CREATES EXCELLENCE."],
+		reverse: true
+	},
+	{
+		id: "03",
+		name: "ΜΑΝΟΣ",
+		role: "PROGRAMMER • DIGITAL CREATOR • ONLINE ACADEMY",
+		image: developer_default,
+		paragraphs: [
+			"Ο Μάνος αποτελεί τη δύναμη πίσω από την ψηφιακή εξέλιξη της AURA.",
+			"Παρότι μόλις 17 ετών, ξεκίνησε να ασχολείται με τον προγραμματισμό από τα 15 του και έχει ήδη αναπτύξει σημαντικές γνώσεις και εμπειρία στον χώρο της τεχνολογίας και της ψηφιακής δημιουργίας.",
+			"Ως PROGRAMMER, βρίσκεται πίσω από τη δημιουργία και την ανάπτυξη της Online Academy της AURA.",
+			"Ο ρόλος του είναι να μετατρέπει το όραμα, τη γνώση και το εκπαιδευτικό σύστημα της AURA σε μια σύγχρονη ψηφιακή εμπειρία.",
+			"Για τον Μάνο, η τεχνολογία δεν είναι απλώς ένα εργαλείο. Είναι ένας τρόπος να δημιουργείς χωρίς όρια.",
+			"Η παρουσία του στην ομάδα αντιπροσωπεύει τη νέα γενιά δημιουργών. Ανθρώπους που ξεκινούν νωρίς. Μαθαίνουν γρήγορα. Και δεν περιμένουν το μέλλον. Το δημιουργούν."
+		],
+		mottos: ["THE NEXT GENERATION IS ALREADY HERE.", "WE ARE BUILDING THE DIGITAL FUTURE OF AURA."],
+		reverse: false
+	}
+];
+var fadeInUp = {
+	initial: {
+		opacity: 0,
+		y: 40
+	},
+	whileInView: {
+		opacity: 1,
+		y: 0
+	},
+	viewport: {
+		once: true,
+		margin: "-80px"
+	},
+	transition: {
+		duration: .9,
+		ease: [
+			.16,
+			1,
+			.3,
+			1
+		]
+	}
+};
+function ProfileBlock({ profile }) {
+	const ref = (0, import_react.useRef)(null);
+	const { scrollYProgress } = useScroll({
+		target: ref,
+		offset: ["start end", "end start"]
+	});
+	const yImage = useTransform(scrollYProgress, [0, 1], [-60, 60]);
+	const yText = useTransform(scrollYProgress, [0, 1], [25, -25]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		ref,
+		className: "relative border-b border-zinc-900/80 py-24 md:py-36 overflow-hidden",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[500px] w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200/5 via-black to-black blur-[130px]" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: `mx-auto max-w-7xl px-5 sm:px-8 grid gap-12 lg:gap-20 items-center lg:grid-cols-12 ${profile.reverse ? "lg:flex-row-reverse" : ""}`,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				...fadeInUp,
+				className: `lg:col-span-5 relative group ${profile.reverse ? "lg:order-2" : "lg:order-1"}`,
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-zinc-700/50 bg-zinc-950 shadow-[0_0_50px_rgba(255,255,255,0.03)]",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-0 top-0 z-10 h-[1px] bg-gradient-to-r from-transparent via-zinc-200 to-transparent opacity-70" }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.img, {
+							src: profile.image,
+							alt: profile.name,
+							style: { y: yImage },
+							className: "h-[115%] w-full object-cover object-center grayscale contrast-110 transition-all duration-700 group-hover:grayscale-0 group-hover:scale-105"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" })
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "absolute -top-6 -left-4 font-mono text-5xl font-extralight tracking-tighter text-zinc-800/50 select-none",
+					children: profile.id
+				})]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				...fadeInUp,
+				style: { y: yText },
+				className: `lg:col-span-7 flex flex-col justify-center ${profile.reverse ? "lg:order-1" : "lg:order-2"}`,
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", {
+						className: "inline-block origin-left scale-x-105 text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400",
+						children: ["// ", profile.role]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+						className: "mt-4 text-4xl font-extrabold uppercase tracking-tight text-white sm:text-6xl lg:text-7xl",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "bg-gradient-to-r from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]",
+							children: profile.name
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-8 space-y-4 text-sm sm:text-base leading-relaxed font-extralight text-zinc-300",
+						children: profile.paragraphs.map((p, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: p }, idx))
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-10 space-y-3 pt-6 border-t border-zinc-900",
+						children: profile.mottos.map((motto, idx) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "relative rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-5 py-3.5 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-400/40 to-transparent" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "inline-block origin-left scale-x-105 text-xs sm:text-sm font-extralight uppercase tracking-[0.35em] text-zinc-100",
+								children: motto
+							})]
+						}, idx))
+					})
+				]
+			})]
+		})]
+	});
+}
+function AboutPage() {
+	const { scrollYProgress } = useScroll();
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "relative min-h-screen bg-[#050505] text-zinc-100 selection:bg-zinc-200 selection:text-black",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				className: "fixed top-0 left-0 right-0 z-50 h-[2px] bg-gradient-to-r from-zinc-700 via-white to-zinc-700 origin-left",
+				style: { scaleX: scrollYProgress }
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.header, {
+				...fadeInUp,
+				className: "relative mx-auto max-w-7xl px-5 pt-36 pb-20 sm:px-8 sm:pt-48 border-b border-zinc-900",
+				children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "flex flex-col items-center gap-10 md:flex-row md:items-center md:gap-16",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "relative shrink-0 w-48 sm:w-60 md:w-72 aspect-square flex items-center justify-center",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "absolute inset-0 bg-white/5 rounded-full blur-3xl pointer-events-none" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+							src: logo_default,
+							alt: "AURA Logo",
+							className: "w-full h-full object-contain [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_75%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_75%)]"
+						})]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "flex-1 max-w-3xl text-center md:text-left",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "inline-flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-950 px-4 py-1 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-1.5 w-1.5 rounded-full bg-white animate-pulse" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+									className: "inline-block scale-x-110 origin-left text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400",
+									children: "ABOUT AURA"
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h1", {
+								className: "mt-6 text-4xl font-extrabold uppercase tracking-tight sm:text-6xl lg:text-7xl leading-[1.05]",
+								children: [
+									"ΕΜΕΙΣ ΧΤΙΖΟΥΜΕ",
+									" ",
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "bg-gradient-to-r from-white via-zinc-300 to-zinc-600 bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]",
+										children: "ΕΠΑΓΓΕΛΜΑΤΙΕΣ."
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+								className: "mt-6 max-w-2xl text-base sm:text-lg font-extralight leading-relaxed text-zinc-400",
+								children: [
+									"Η ",
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("strong", {
+										className: "font-normal text-zinc-100",
+										children: "AURA"
+									}),
+									" δεν είναι μια απλή πλατφόρμα. Είναι το λειτουργικό σύστημα του σύγχρονου barber: μέθοδος, πρακτική, αξιολόγηση και πιστοποίηση που βασίζεται σε αποδείξεις."
+								]
+							})
+						]
+					})]
+				})
+			}), teamProfiles.map((profile) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ProfileBlock, { profile }, profile.name))] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Footer, {})
+		]
+	});
+}
+//#endregion
+export { AboutPage as component };
+
+=== END FILE ===
+

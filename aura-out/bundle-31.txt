@@ -1,0 +1,1303 @@
+=== FILE: src/components/aura/elite/EliteCommunity.tsx ===
+// src/components/aura/elite/EliteCommunity.tsx
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
+import {
+  AlertCircle,
+  ArrowDown,
+  ChevronRight,
+  ChevronLeft,
+  ChevronUp,
+  Copy,
+  FileText,
+  Gem,
+  Loader2,
+  Lock,
+  Mic,
+  Paperclip,
+  Pause,
+  Pencil,
+  Play,
+  Plus,
+  Reply,
+  Send,
+  Smile,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+import {
+  MAX_FILE_BYTES,
+  displayName,
+  useEliteChat,
+  type EliteMessage,
+  type Member,
+} from "@/lib/useEliteChat";
+import {
+  LIVE_BARS,
+  MAX_VOICE_MS,
+  MIN_VOICE_MS,
+  useVoiceRecorder,
+  type VoiceClip,
+} from "@/lib/useVoiceRecorder";
+
+/* ------------------------------------------------------------------ */
+/* Constants + helpers                                                 */
+/* ------------------------------------------------------------------ */
+
+const QUICK = ["❤️", "😂", "😮", "😢", "😡", "👍"];
+const EMOJI_GRID = [
+  "😀", "😁", "😂", "🤣", "😊", "😍", "😘", "😎", "🤩", "🥳", "😏", "🤔",
+  "😮", "😢", "😭", "😡", "🙏", "👍", "👎", "👏", "🙌", "💪", "🔥", "💎",
+  "❤️", "🖤", "🤍", "💯", "✨", "⭐", "🚀", "🎯", "💈", "✂️", "👑", "🏆",
+];
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+function timeOf(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const today = new Date();
+  const y = new Date();
+  y.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return "Today";
+  if (d.toDateString() === y.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" });
+}
+
+function fmtSize(bytes: number | null): string {
+  if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fmtClock(ms: number): string {
+  const total = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function initials(m?: Member | null): string {
+  return displayName(m).slice(0, 1).toUpperCase();
+}
+
+function renderBody(text: string, usernames: Set<string>): ReactNode {
+  return text.split(/(@[a-zA-Z0-9_]{3,20})/g).map((part, i) =>
+    part.startsWith("@") && usernames.has(part.slice(1).toLowerCase()) ? (
+      <span key={i} className="ec-mention">
+        {part}
+      </span>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Small pieces                                                        */
+/* ------------------------------------------------------------------ */
+
+function Avatar({
+  member,
+  size = 40,
+  badge = false,
+  online = false,
+}: {
+  member?: Member | null;
+  size?: number;
+  badge?: boolean;
+  online?: boolean;
+}) {
+  return (
+    <span className="ec-avatar" style={{ width: size, height: size }}>
+      <span className="ec-avatar-in">
+        {member?.avatar_url ? (
+          <img src={member.avatar_url} alt="" loading="lazy" referrerPolicy="no-referrer" />
+        ) : (
+          <span style={{ fontSize: size * 0.4 }}>{initials(member)}</span>
+        )}
+      </span>
+      {badge && (
+        <span className="ec-avatar-gem" aria-hidden>
+          <Gem className="size-2.5" />
+        </span>
+      )}
+      {online && <span className="ec-online" aria-label="Online" />}
+    </span>
+  );
+}
+
+function EliteBadge({ small = false }: { small?: boolean }) {
+  return (
+    <span className={`ec-badge ${small ? "ec-badge-sm" : ""}`}>
+      <Gem className="size-3" aria-hidden />
+      Elite
+    </span>
+  );
+}
+
+/** Faceted chrome diamond, shown in the banner when /elite-bust.jpg is missing. */
+function ChromeGem() {
+  return (
+    <svg className="ec-gem-art" viewBox="0 0 200 200" aria-hidden>
+      <defs>
+        <linearGradient id="ecg-a" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset=".45" stopColor="#a3abb8" />
+          <stop offset="1" stopColor="#3b4048" />
+        </linearGradient>
+        <linearGradient id="ecg-b" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#eef1f6" />
+          <stop offset=".5" stopColor="#6b7280" />
+          <stop offset="1" stopColor="#1c1e22" />
+        </linearGradient>
+        <linearGradient id="ecg-c" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" stopOpacity=".95" />
+          <stop offset="1" stopColor="#8b93a1" stopOpacity=".55" />
+        </linearGradient>
+      </defs>
+      <g stroke="rgba(255,255,255,.4)" strokeWidth=".8" strokeLinejoin="round">
+        <polygon points="40,70 70,34 130,34 160,70" fill="url(#ecg-c)" />
+        <polygon points="70,34 100,70 40,70" fill="url(#ecg-a)" />
+        <polygon points="130,34 160,70 100,70" fill="url(#ecg-b)" />
+        <polygon points="70,34 130,34 100,70" fill="url(#ecg-c)" opacity=".75" />
+        <polygon points="40,70 80,70 100,172" fill="url(#ecg-a)" />
+        <polygon points="80,70 120,70 100,172" fill="url(#ecg-c)" opacity=".85" />
+        <polygon points="120,70 160,70 100,172" fill="url(#ecg-b)" />
+      </g>
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Voice message player (Instagram style)                              */
+/* ------------------------------------------------------------------ */
+
+const SPEEDS = [1, 1.5, 2];
+const PLAYER_BARS = 34;
+
+// Only one voice message plays at a time.
+let activeAudio: HTMLAudioElement | null = null;
+let activeStop: (() => void) | null = null;
+
+function resampleBars(src: number[] | null, n: number): number[] {
+  if (!src || src.length === 0) {
+    return Array.from({ length: n }, (_, i) => 22 + Math.round(Math.abs(Math.sin(i * 1.7)) * 46));
+  }
+  return Array.from({ length: n }, (_, i) => {
+    const a = Math.floor((i * src.length) / n);
+    const b = Math.max(a + 1, Math.floor(((i + 1) * src.length) / n));
+    let peak = 0;
+    for (let j = a; j < b && j < src.length; j += 1) peak = Math.max(peak, src[j] ?? 0);
+    return Math.max(12, Math.min(100, peak));
+  });
+}
+
+const VoiceBubble = memo(function VoiceBubble({ msg, url }: { msg: EliteMessage; url?: string }) {
+  const src = msg.localUrl ?? url;
+  const total = Math.max(1000, msg.voice_duration_ms ?? 1000);
+  const bars = useMemo(() => resampleBars(msg.voice_waveform, PLAYER_BARS), [msg.voice_waveform]);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rafRef = useRef<number | undefined>(undefined);
+  const seekingRef = useRef(false);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [failed, setFailed] = useState(false);
+
+  const stopTick = useCallback(() => {
+    if (rafRef.current !== undefined) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = undefined;
+    }
+  }, []);
+
+  const tick = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (!seekingRef.current) setProgress(Math.min(1, (a.currentTime * 1000) / total));
+    rafRef.current = requestAnimationFrame(tick);
+  }, [total]);
+
+  const pause = useCallback(() => {
+    audioRef.current?.pause();
+    stopTick();
+    setPlaying(false);
+  }, [stopTick]);
+
+  // New source (e.g. local blob replaced by the signed url) or unmount: reset.
+  useEffect(
+    () => () => {
+      stopTick();
+      const a = audioRef.current;
+      if (a) {
+        a.pause();
+        a.removeAttribute("src");
+        a.load();
+      }
+      if (activeAudio === a) {
+        activeAudio = null;
+        activeStop = null;
+      }
+      audioRef.current = null;
+    },
+    [src, stopTick],
+  );
+
+  const ensureAudio = (): HTMLAudioElement | null => {
+    if (!src) return null;
+    if (audioRef.current) return audioRef.current;
+    const a = new Audio();
+    a.preload = "metadata";
+    a.src = src;
+    a.playbackRate = speed;
+    a.onended = () => {
+      stopTick();
+      setPlaying(false);
+      setProgress(0);
+      a.currentTime = 0;
+      if (activeAudio === a) {
+        activeAudio = null;
+        activeStop = null;
+      }
+    };
+    a.onerror = () => {
+      stopTick();
+      setPlaying(false);
+      setFailed(true);
+    };
+    audioRef.current = a;
+    return a;
+  };
+
+  const toggle = async () => {
+    if (playing) {
+      pause();
+      return;
+    }
+    const a = ensureAudio();
+    if (!a) return;
+    if (activeAudio && activeAudio !== a) activeStop?.();
+    activeAudio = a;
+    activeStop = pause;
+    try {
+      a.playbackRate = speed;
+      await a.play();
+      setFailed(false);
+      setPlaying(true);
+      stopTick();
+      rafRef.current = requestAnimationFrame(tick);
+    } catch {
+      setFailed(true);
+      setPlaying(false);
+    }
+  };
+
+  const seekTo = (ratio: number) => {
+    const a = ensureAudio();
+    const r = Math.max(0, Math.min(1, ratio));
+    setProgress(r);
+    if (a) {
+      try {
+        a.currentTime = (r * total) / 1000;
+      } catch {
+        /* some formats cannot seek before they are loaded */
+      }
+    }
+  };
+
+  const ratioFrom = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    return rect.width ? (e.clientX - rect.left) / rect.width : 0;
+  };
+
+  const cycleSpeed = () => {
+    const next = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1;
+    setSpeed(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
+  };
+
+  const started = playing || progress > 0;
+  const label = failed ? "Can’t play" : fmtClock(started ? total * (1 - progress) : total);
+
+  return (
+    <div className={`ec-voice ${failed ? "ec-voice-fail" : ""}`}>
+      <button
+        type="button"
+        className="ec-voice-play"
+        onClick={() => void toggle()}
+        disabled={!src}
+        aria-label={playing ? "Pause voice message" : "Play voice message"}
+      >
+        {playing ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4" fill="currentColor" />}
+      </button>
+
+      <div
+        className="ec-voice-wave"
+        role="slider"
+        tabIndex={0}
+        aria-label="Voice message position"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+        onPointerDown={(e) => {
+          seekingRef.current = true;
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          seekTo(ratioFrom(e));
+        }}
+        onPointerMove={(e) => {
+          if (seekingRef.current) seekTo(ratioFrom(e));
+        }}
+        onPointerUp={() => {
+          seekingRef.current = false;
+        }}
+        onPointerCancel={() => {
+          seekingRef.current = false;
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowRight") seekTo(progress + 0.05);
+          if (e.key === "ArrowLeft") seekTo(progress - 0.05);
+        }}
+      >
+        {bars.map((h, i) => (
+          <i key={i} className={i / bars.length < progress ? "on" : ""} style={{ height: `${h}%` }} />
+        ))}
+      </div>
+
+      <span className="ec-voice-time">{label}</span>
+
+      {started && !failed && (
+        <button type="button" className="ec-voice-speed" onClick={cycleSpeed} aria-label="Playback speed">
+          {speed}x
+        </button>
+      )}
+    </div>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/* Message row                                                         */
+/* ------------------------------------------------------------------ */
+
+interface RowProps {
+  meId: string;
+  msg: EliteMessage;
+  mine: boolean;
+  showHead: boolean;
+  author?: Member;
+  members: Record<string, Member>;
+  reply: { name: string; text: string } | null;
+  seers: Member[] | null;
+  url?: string;
+  usernames: Set<string>;
+  onMenu: (id: string, el: HTMLElement, mine: boolean) => void;
+  onReact: (id: string, emoji: string) => void;
+  onSeen: (id: string) => void;
+  onJump: (id: string) => void;
+  onMedia: () => void;
+}
+
+const Row = memo(function Row({
+  meId,
+  msg,
+  mine,
+  showHead,
+  author,
+  members,
+  reply,
+  seers,
+  url,
+  usernames,
+  onMenu,
+  onReact,
+  onSeen,
+  onJump,
+  onMedia,
+}: RowProps) {
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const pressTimer = useRef<number | undefined>(undefined);
+
+  const cancelPress = () => {
+    if (pressTimer.current !== undefined) {
+      window.clearTimeout(pressTimer.current);
+      pressTimer.current = undefined;
+    }
+  };
+
+  const startPress = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "touch" || msg.pending || msg.deleted_at) return;
+    const el = e.currentTarget;
+    cancelPress();
+    pressTimer.current = window.setTimeout(() => onMenu(msg.id, el, mine), 420);
+  };
+
+  useEffect(() => cancelPress, []);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const r of msg.reactions) {
+      const list = map.get(r.emoji) ?? [];
+      list.push(r.user_id);
+      map.set(r.emoji, list);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1].length - a[1].length);
+  }, [msg.reactions]);
+
+  const isImage = Boolean(msg.attachment_type?.startsWith("image/"));
+  const isVoice = Boolean(msg.attachment_type?.startsWith("audio/"));
+  const name = displayName(author);
+
+  if (msg.deleted_at) {
+    return (
+      <div id={`msg-${msg.id}`} className={`ec-row ${mine ? "ec-mine" : ""}`}>
+        {!mine && <div className="ec-av-col" />}
+        <div className="ec-col">
+          <div className="ec-tomb">{mine ? "You deleted a message" : `${name} deleted a message`}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      id={`msg-${msg.id}`}
+      className={`ec-row ${mine ? "ec-mine" : ""} ${msg.fresh ? "ec-pop" : ""} ${showHead ? "ec-head" : ""}`}
+    >
+      {!mine && <div className="ec-av-col">{showHead ? <Avatar member={author} size={44} badge /> : null}</div>}
+
+      <div className="ec-col">
+        {!mine && showHead && (
+          <div className="ec-meta">
+            <span className="ec-name">{name}</span>
+            <EliteBadge small />
+            <span className="ec-time">{timeOf(msg.created_at)}</span>
+          </div>
+        )}
+
+        <div className="ec-bubble-wrap">
+          <div
+            ref={bubbleRef}
+            className={`ec-bubble ${mine ? "ec-bubble-mine" : ""} ${isVoice ? "ec-bubble-voice" : ""} ${msg.pending ? "ec-pending" : ""}`}
+            title={new Date(msg.created_at).toLocaleString()}
+            onDoubleClick={() => !msg.pending && onReact(msg.id, "❤️")}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (!msg.pending && bubbleRef.current) onMenu(msg.id, bubbleRef.current, mine);
+            }}
+            onPointerDown={startPress}
+            onPointerUp={cancelPress}
+            onPointerLeave={cancelPress}
+            onPointerCancel={cancelPress}
+            onTouchMove={cancelPress}
+          >
+            {reply && (
+              <button type="button" className="ec-quote" onClick={() => msg.reply_to && onJump(msg.reply_to)}>
+                <span className="ec-quote-name">{reply.name}</span>
+                <span className="ec-quote-text">{reply.text}</span>
+              </button>
+            )}
+
+            {isVoice && <VoiceBubble msg={msg} url={url} />}
+
+            {msg.attachment_name && isImage && (
+              <a href={url} target="_blank" rel="noreferrer" className="ec-img-link" aria-label="Open image">
+                {url ? (
+                  <img src={url} alt={msg.attachment_name} loading="lazy" onLoad={onMedia} />
+                ) : (
+                  <span className="ec-img-skel" />
+                )}
+              </a>
+            )}
+
+            {msg.attachment_name && !isImage && !isVoice && (
+              <a href={url} target="_blank" rel="noreferrer" className="ec-file" download={msg.attachment_name}>
+                <FileText className="size-5 shrink-0" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block truncate">{msg.attachment_name}</span>
+                  <span className="block text-[11px] opacity-60">{fmtSize(msg.attachment_size)}</span>
+                </span>
+              </a>
+            )}
+
+            {msg.body && <p className="ec-text">{renderBody(msg.body, usernames)}</p>}
+
+            {msg.edited_at && <span className="ec-edited">Edited</span>}
+          </div>
+
+          {!msg.pending && (
+            <button
+              type="button"
+              className="ec-more"
+              aria-label="Message options"
+              onClick={(e) => {
+                const el = bubbleRef.current ?? e.currentTarget;
+                onMenu(msg.id, el, mine);
+              }}
+            >
+              <Smile className="size-4" />
+            </button>
+          )}
+
+          {grouped.length > 0 && (
+            <div className="ec-reacts">
+              {grouped.map(([emoji, ids]) => {
+                const iReacted = ids.includes(meId);
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    className={`ec-react ${iReacted ? "ec-react-on" : ""}`}
+                    title={ids.map((id) => displayName(members[id])).join(", ")}
+                    onClick={() => onReact(msg.id, emoji)}
+                  >
+                    <span>{emoji}</span>
+                    <span>{ids.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {mine && <div className="ec-time-mine">{msg.pending ? "Sending…" : timeOf(msg.created_at)}</div>}
+
+        {seers && seers.length > 0 && (
+          <button type="button" className="ec-seen" onClick={() => onSeen(msg.id)}>
+            <span className="ec-seen-avs">
+              {seers.slice(0, 3).map((s) => (
+                <Avatar key={s.id} member={s} size={18} />
+              ))}
+            </span>
+            Seen by {seers.length}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/* Message menu (emoji bar + actions), Instagram style                 */
+/* ------------------------------------------------------------------ */
+
+interface MenuState {
+  id: string;
+  rect: DOMRect;
+  mine: boolean;
+}
+
+function MessageMenu({
+  state,
+  msg,
+  myReaction,
+  onClose,
+  onReact,
+  onReply,
+  onCopy,
+  onEdit,
+  onDelete,
+}: {
+  state: MenuState;
+  msg: EliteMessage;
+  myReaction?: string;
+  onClose: () => void;
+  onReact: (emoji: string) => void;
+  onReply: () => void;
+  onCopy: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [more, setMore] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
+  const vw = typeof window === "undefined" ? 400 : window.innerWidth;
+  const vh = typeof window === "undefined" ? 800 : window.innerHeight;
+  const width = Math.min(320, vw - 16);
+  const left = Math.max(8, Math.min(state.mine ? state.rect.right - width : state.rect.left, vw - width - 8));
+  const above = state.rect.top > 120;
+  const top = above ? Math.max(8, state.rect.top - 64) : Math.min(vh - 260, state.rect.bottom + 8);
+
+  return (
+    <div className="ec-menu-layer" onPointerDown={onClose}>
+      <div
+        className="ec-menu"
+        style={{ left, top, width }}
+        onPointerDown={(e) => e.stopPropagation()}
+        role="menu"
+        aria-label="Message actions"
+      >
+        <div className="ec-emoji-bar">
+          {QUICK.map((e) => (
+            <button
+              key={e}
+              type="button"
+              className={`ec-emoji-btn ${myReaction === e ? "ec-emoji-on" : ""}`}
+              onClick={() => onReact(e)}
+              aria-label={`React ${e}`}
+            >
+              {e}
+            </button>
+          ))}
+          <button type="button" className="ec-emoji-btn" onClick={() => setMore((m) => !m)} aria-label="More emojis">
+            <Plus className="size-5" />
+          </button>
+        </div>
+
+        {more && (
+          <div className="ec-emoji-grid ec-menu-grid">
+            {EMOJI_GRID.map((e) => (
+              <button key={e} type="button" onClick={() => onReact(e)}>
+                {e}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="ec-actions">
+          {confirm ? (
+            <div className="ec-confirm">
+              <p>Delete this message for everyone?</p>
+              <div>
+                <button type="button" onClick={() => setConfirm(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="ec-danger" onClick={onDelete}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button type="button" role="menuitem" onClick={onReply}>
+                <Reply className="size-4" /> Reply
+              </button>
+              {msg.body && (
+                <button type="button" role="menuitem" onClick={onCopy}>
+                  <Copy className="size-4" /> Copy
+                </button>
+              )}
+              {state.mine && !msg.attachment_type?.startsWith("audio/") && (
+                <button type="button" role="menuitem" onClick={onEdit}>
+                  <Pencil className="size-4" /> Edit
+                </button>
+              )}
+              {state.mine && (
+                <button type="button" role="menuitem" className="ec-danger" onClick={() => setConfirm(true)}>
+                  <Trash2 className="size-4" /> Delete
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Sheets                                                              */
+/* ------------------------------------------------------------------ */
+
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="ec-sheet-layer" onPointerDown={onClose}>
+      <div
+        className="ec-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div className="ec-sheet-head">
+          <h2>{title}</h2>
+          <button type="button" className="ec-iconbtn ec-iconbtn-sm" onClick={onClose} aria-label="Close">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="ec-sheet-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function MemberRow({ m, online, you }: { m: Member; online: boolean; you: boolean }) {
+  return (
+    <li className="ec-member">
+      <Avatar member={m} size={40} badge online={online} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm">
+          {displayName(m)}
+          {you ? <span className="ec-you"> (you)</span> : null}
+        </p>
+        {m.username ? <p className="truncate text-[11px] text-white/40">@{m.username}</p> : null}
+      </div>
+      <EliteBadge small />
+    </li>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Composer                                                            */
+/* ------------------------------------------------------------------ */
+
+function Composer({
+  members,
+  sending,
+  replyTo,
+  replyName,
+  editing,
+  onCancelReply,
+  onCancelEdit,
+  onSend,
+  onEditSubmit,
+  onSendVoice,
+  onTyping,
+}: {
+  members: Member[];
+  sending: boolean;
+  replyTo: EliteMessage | null;
+  replyName: string;
+  editing: EliteMessage | null;
+  onCancelReply: () => void;
+  onCancelEdit: () => void;
+  onSend: (text: string, file: File | null) => Promise<boolean>;
+  onEditSubmit: (id: string, text: string) => Promise<boolean>;
+  onSendVoice: (clip: VoiceClip) => Promise<boolean>;
+  onTyping: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [caret, setCaret] = useState(0);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
+  const [slide, setSlide] = useState({ dx: 0, dy: 0 });
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const gesture = useRef({ down: false, x: 0, y: 0, t0: 0, cancelArmed: false });
+  const finishing = useRef(false);
+
+  const rec = useVoiceRecorder();
+  const recActive = rec.state !== "idle";
+  const holding = recActive && !locked;
+  const cancelArmed = holding && slide.dx < -110;
+  const lockArmed = holding && slide.dy < -40;
+
+  // Entering edit mode loads the old text; entering reply mode focuses the box.
+  useEffect(() => {
+    if (editing) {
+      setText(editing.body);
+      setFile(null);
+      requestAnimationFrame(() => ref.current?.focus());
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    if (replyTo) requestAnimationFrame(() => ref.current?.focus());
+  }, [replyTo]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 132)}px`;
+  }, [text, recActive]);
+
+  useEffect(() => {
+    if (!file || !file.type.startsWith("image/")) {
+      setPreview(null);
+      return;
+    }
+    const u = URL.createObjectURL(file);
+    setPreview(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+
+  useEffect(() => {
+    if (rec.error) setFileError(rec.error);
+  }, [rec.error]);
+
+  useEffect(() => {
+    if (recActive) setEmojiOpen(false);
+  }, [recActive]);
+
+  const mention = useMemo(() => {
+    const m = /(?:^|\s)@([a-zA-Z0-9_]{0,20})$/.exec(text.slice(0, caret));
+    if (!m) return null;
+    const q = (m[1] ?? "").toLowerCase();
+    const list = members.filter((x) => x.username && x.username.toLowerCase().startsWith(q)).slice(0, 5);
+    return list.length ? { q, list } : null;
+  }, [text, caret, members]);
+
+  const insertMention = (username: string) => {
+    const before = text.slice(0, caret).replace(/@[a-zA-Z0-9_]{0,20}$/, `@${username} `);
+    const next = before + text.slice(caret);
+    setText(next);
+    requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.setSelectionRange(before.length, before.length);
+      setCaret(before.length);
+    });
+  };
+
+  const canSend = (text.trim().length > 0 || Boolean(file)) && !sending;
+  const showMic = !editing && text.trim().length === 0 && !file;
+
+  const submit = async () => {
+    if (!canSend) return;
+    if (editing) {
+      const ok = await onEditSubmit(editing.id, text);
+      if (ok) {
+        setText("");
+        onCancelEdit();
+      }
+      return;
+    }
+    const ok = await onSend(text, file);
+    if (ok) {
+      setText("");
+      setFile(null);
+      setEmojiOpen(false);
+    }
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      if (editing) {
+        setText("");
+        onCancelEdit();
+      } else if (replyTo) onCancelReply();
+      setEmojiOpen(false);
+      return;
+    }
+    const coarse = typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+    if (e.key === "Enter" && !e.shiftKey && !coarse && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      void submit();
+    }
+  };
+
+  const pickFile = (f: File | undefined) => {
+    setFileError(null);
+    if (!f) return;
+    if (f.size > MAX_FILE_BYTES) {
+      setFileError("Files can be up to 10 MB.");
+      return;
+    }
+    setFile(f);
+  };
+
+  /* ---------------- voice messages ---------------- */
+
+  const resetGesture = () => {
+    gesture.current.down = false;
+    gesture.current.cancelArmed = false;
+    setLocked(false);
+    setSlide({ dx: 0, dy: 0 });
+  };
+
+  const finishVoice = async () => {
+    if (finishing.current) return;
+    finishing.current = true;
+    resetGesture();
+    try {
+      const clip = await rec.stop();
+      if (!clip) return;
+      if (clip.durationMs < MIN_VOICE_MS) {
+        setFileError("Hold the mic to record a voice message.");
+        return;
+      }
+      await onSendVoice(clip);
+    } finally {
+      finishing.current = false;
+    }
+  };
+
+  const cancelVoice = () => {
+    resetGesture();
+    rec.cancel();
+  };
+
+  // auto-send when the time limit is reached
+  const finishRef = useRef(finishVoice);
+  finishRef.current = finishVoice;
+  useEffect(() => {
+    if (rec.elapsedMs >= MAX_VOICE_MS && (rec.state === "recording" || rec.state === "paused")) {
+      void finishRef.current();
+    }
+  }, [rec.elapsedMs, rec.state]);
+
+  const onMicDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    // Already recording in locked mode: this press sends it.
+    if (rec.state !== "idle") {
+      if (locked) {
+        e.preventDefault();
+        void finishVoice();
+      }
+      return;
+    }
+
+    setFileError(null);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* ignore */
+    }
+    gesture.current = { down: true, x: e.clientX, y: e.clientY, t0: Date.now(), cancelArmed: false };
+    setSlide({ dx: 0, dy: 0 });
+
+    void (async () => {
+      const ok = await rec.start();
+      if (!ok) {
+        gesture.current.down = false;
+        return;
+      }
+      navigator.vibrate?.(12);
+      // finger already lifted while the permission prompt was open: keep recording, locked
+      if (!gesture.current.down) setLocked(true);
+    })();
+  };
+
+  const onMicMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const g = gesture.current;
+    if (!g.down || locked) return;
+    const dx = Math.min(0, e.clientX - g.x);
+    const dy = Math.min(0, e.clientY - g.y);
+    setSlide({ dx, dy });
+    g.cancelArmed = dx < -110;
+    if (dy < -80 && rec.state === "recording") {
+      g.down = false;
+      setSlide({ dx: 0, dy: 0 });
+      setLocked(true);
+      navigator.vibrate?.(10);
+    }
+  };
+
+  const onMicUp = () => {
+    const g = gesture.current;
+    if (!g.down) return;
+    g.down = false;
+    if (rec.state === "starting" || locked) return; // the start() continuation locks it
+    const held = Date.now() - g.t0;
+    if (held < 350) {
+      // a quick tap: keep recording hands-free
+      setSlide({ dx: 0, dy: 0 });
+      setLocked(true);
+      return;
+    }
+    if (g.cancelArmed) {
+      cancelVoice();
+      return;
+    }
+    void finishVoice();
+  };
+
+  const onMicCancel = () => {
+    const g = gesture.current;
+    if (!g.down) return;
+    g.down = false;
+    if (!locked && rec.state === "recording") cancelVoice();
+  };
+
+  const onMicKey = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    if (e.repeat) return;
+    if (rec.state === "idle") {
+      setFileError(null);
+      void rec.start().then((ok) => {
+        if (ok) setLocked(true);
+      });
+    } else if (rec.state === "recording" || rec.state === "paused") {
+      void finishVoice();
+    }
+  };
+
+  const slots = Array.from({ length: LIVE_BARS }, (_, i) => {
+    const v = rec.live[rec.live.length - LIVE_BARS + i];
+    return v === undefined ? 0.06 : v;
+  });
+
+  return (
+    <div className="ec-composer-wrap">
+      {(replyTo || editing) && !recActive && (
+        <div className="ec-ctx">
+          <div className="min-w-0">
+            <span className="ec-ctx-title">{editing ? "Editing message" : `Replying to ${replyName}`}</span>
+            <span className="ec-ctx-text">{(editing ?? replyTo)?.body || (replyTo ? replyTo.attachment_name : "") || "Attachment"}</span>
+          </div>
+          <button
+            type="button"
+            className="ec-iconbtn ec-iconbtn-sm"
+            aria-label="Cancel"
+            onClick={() => {
+              if (editing) {
+                setText("");
+                onCancelEdit();
+              } else onCancelReply();
+            }}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+
+      {file && !recActive && (
+        <div className="ec-attach-preview">
+          {preview ? <img src={preview} alt="" /> : <FileText className="size-5" aria-hidden />}
+          <span className="truncate">{file.name}</span>
+          <button type="button" className="ec-iconbtn ec-iconbtn-sm" onClick={() => setFile(null)} aria-label="Remove attachment">
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+
+      {fileError && (
+        <p className="ec-inline-error" role="alert">
+          {fileError}
+        </p>
+      )}
+
+      {mention && !recActive && (
+        <ul className="ec-mentions" role="listbox" aria-label="Mention a member">
+          {mention.list.map((m) => (
+            <li key={m.id}>
+              <button type="button" onClick={() => insertMention(m.username as string)}>
+                <Avatar member={m} size={28} />
+                <span>{displayName(m)}</span>
+                <span className="opacity-50">@{m.username}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {emojiOpen && !recActive && (
+        <div className="ec-emoji-grid ec-emoji-pop">
+          {EMOJI_GRID.map((e) => (
+            <button
+              key={e}
+              type="button"
+              onClick={() => {
+                setText((t) => t + e);
+                ref.current?.focus();
+              }}
+            >
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className={`ec-composer ${recActive ? "ec-composer-rec" : ""}`}>
+        <input
+          ref={fileRef}
+          type="file"
+          hidden
+          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,text/plain,.doc,.docx"
+          onChange={(e) => {
+            pickFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+
+        {holding && (
+          <span
+            className={`ec-lock ${lockArmed ? "ec-lock-on" : ""}`}
+            style={{ transform: `translateY(${Math.max(slide.dy * 0.35, -30)}px)` }}
+            aria-hidden
+          >
+            <Lock className="size-4" />
+            <ChevronUp className="size-4" />
+          </span>
+        )}
+
+        {!recActive && (
+          <>
+            <button
+              type="button"
+              className="ec-compbtn"
+              aria-label="Attach a file"
+              onClick={() => fileRef.current?.click()}
+              disabled={Boolean(editing)}
+            >
+              <Paperclip className="size-5" />
+            </button>
+
+            <textarea
+              ref={ref}
+              value={text}
+              rows={1}
+              placeholder={editing ? "Edit your message…" : "Type a message…"}
+              aria-label="Message"
+              enterKeyHint="send"
+              maxLength={4000}
+              onChange={(e) => {
+                setText(e.target.value);
+                setCaret(e.target.selectionStart ?? e.target.value.length);
+                if (!editing) onTyping();
+              }}
+              onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+              onKeyDown={onKeyDown}
+              onFocus={() => window.setTimeout(() => ref.current?.scrollIntoView({ block: "nearest" }), 250)}
+            />
+
+            <button
+              type="button"
+              className="ec-compbtn"
+              aria-label="Emoji"
+              aria-expanded={emojiOpen}
+              onClick={() => setEmojiOpen((o) => !o)}
+            >
+              <Smile className="size-5" />
+            </button>
+          </>
+        )}
+
+        {recActive && (
+          <div className="ec-rec" role="status" aria-label="Recording voice message">
+            <button
+              type="button"
+              className={`ec-rec-trash ${cancelArmed ? "ec-rec-trash-armed" : ""}`}
+              aria-label="Discard recording"
+              onClick={cancelVoice}
+            >
+              <Trash2 className="size-4" />
+            </button>
+            <span className={`ec-rec-dot ${rec.state === "paused" ? "ec-rec-dot-paused" : ""}`} aria-hidden />
+            <span className="ec-rec-time">{fmtClock(rec.elapsedMs)}</span>
+            <div className="ec-rec-wave" aria-hidden>
+              {slots.map((v, i) => (
+                <i key={i} style={{ height: `${Math.max(10, v * 100)}%` }} />
+              ))}
+            </div>
+            {locked ? (
+              <button
+                type="button"
+                className="ec-compbtn"
+                onClick={rec.togglePause}
+                aria-label={rec.state === "paused" ? "Resume recording" : "Pause recording"}
+              >
+                {rec.state === "paused" ? <Mic className="size-5" /> : <Pause className="size-5" />}
+              </button>
+            ) : (
+              <span className="ec-rec-slide" style={{ opacity: Math.max(0.15, 1 + slide.dx / 110) }}>
+                <ChevronLeft className="size-4" /> Slide to cancel
+              </span>
+            )}
+          </div>
+        )}
+
+        {recActive || showMic ? (
+          <button
+            type="button"
+            className={`ec-send ec-mic ${holding ? "ec-mic-hot" : ""}`}
+            aria-label={recActive ? "Send voice message" : "Hold to record a voice message"}
+            disabled={sending && !recActive}
+            style={
+              holding
+                ? { transform: `translate(${slide.dx * 0.5}px, ${slide.dy * 0.5}px) scale(1.18)`, transition: "none" }
+                : undefined
+            }
+            onPointerDown={onMicDown}
+            onPointerMove={onMicMove}
+            onPointerUp={onMicUp}
+            onPointerCancel={onMicCancel}
+            onKeyDown={onMicKey}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            {sending && !recActive ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : recActive && locked ? (
+              <Send className="size-5" style={{ marginLeft: -2 }} />
+            ) : (
+              <Mic className="size-5" />
+            )}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="ec-send"
+            aria-label={editing ? "Save edit" : "Send message"}
+            disabled={!canSend}
+            onClick={() => void submit()}
+          >
+            {sending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" style={{ marginLeft: -2 }} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main                                                                */
+/* ------------------------------------------------------------------ */
+
+export default function EliteCommunity({ meId, meName }: { meId: string; meName: string }) {
+  const chat = useEliteChat(meId);
+  const { messages, members, memberIds, reads, online, urls, markRead, setActionError } = chat;
+
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [seenFor, setSeenFor] = useState<string | null>(null);
+  const [newCount, setNewCount] = useState(0);
+  const [bustOk, setBustOk] = useState(true);
+  const [viewport, setViewport] = useState<{ h: number; top: number } | null>(null);
+
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
+  const initialisedRef = useRef(false);
+  const lastIdRef = useRef<string | undefined>(undefined);
+  const preserveRef = useRef<number | null>(null);
+
+  /* ---------- derived data ---------- */
+
+  const memberList = useMemo(
+    () => memberIds.map((id) => members[id]).filter((m): m is Member => Boolean(m)),
+    [memberIds, members],
+  );
+
+  const usernames = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of Object.values(members)) if (m.username) s.add(m.username.toLowerCase());
+    return s;
+  }, [members]);
+
+  const byId = useMemo(() => {
+    const map = new Map<string, EliteMessage>();
+    for (const m of messages) map.set(m.id, m);
+    return map;
+  }, [messages]);
+
+  
+[TRUNCATED: file is 94287 bytes, first 40960 included]
+=== END FILE ===
+

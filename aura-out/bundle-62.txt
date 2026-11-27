@@ -1,0 +1,1315 @@
+=== FILE: src/routes/pricing.tsx ===
+// src/routes/pricing.tsx
+import { useRef, type ReactNode } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { Check, ShieldCheck, Undo2, X, Zap } from "lucide-react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import ChromeCursor from "@/components/aura/ChromeCursor";
+import PricingCards from "@/components/aura/PricingCards";
+import { AURA_PLANS } from "@/lib/plans";
+import { seo } from "@/lib/seo";
+
+export const Route = createFileRoute("/pricing")({
+  head: () =>
+    seo({
+      title: "Πλάνα & Τιμές",
+      description:
+        "AURA Basic, Pro και Elite: τρία επίπεδα εκπαίδευσης για barbers. Videos, Certification, αξιολογήσεις και κοινότητα. Ακύρωση ανά πάσα στιγμή.",
+      path: "/pricing",
+    }),
+  component: PricingPage,
+});
+
+const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
+
+function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 44, filter: "blur(8px)" }}
+      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+      transition={{ duration: 0.95, ease: EASE, delay }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/* ---------------- comparison data ---------------- */
+
+type Cell = boolean | string;
+interface Row { label: string; values: [Cell, Cell, Cell] }
+
+const GROUPS: { title: string; rows: Row[] }[] = [
+  {
+    title: "Εκπαίδευση",
+    rows: [
+      { label: "Μηνιαία εκπαιδευτικά videos", values: [true, true, true] },
+      { label: "Προχωρημένα videos κουρεμάτων", values: [false, true, true] },
+      { label: "Αποκλειστικά ELITE μαθήματα", values: [false, false, true] },
+      { label: "AURA Certification", values: [false, true, true] },
+      { label: "AURA Elite Challenges", values: [false, false, true] },
+      { label: "Early Access σε νέα videos", values: [false, false, true] },
+    ],
+  },
+  {
+    title: "Αξιολόγηση & εξέλιξη",
+    rows: [
+      { label: "Review System", values: [true, true, true] },
+      { label: "Προσωπικό AURA Portfolio", values: [false, false, true] },
+      { label: "Προσωπική αξιολόγηση από εκπαιδευτή", values: [false, false, "Έως 4 / μήνα"] },
+      { label: "Αναλυτικό feedback & προτάσεις", values: [false, false, true] },
+      { label: "Personal Progress Tracking", values: [false, false, true] },
+    ],
+  },
+  {
+    title: "Κοινότητα & καριέρα",
+    rows: [
+      { label: "AURA Social Access", values: [true, true, true] },
+      { label: "AURA Find Job", values: [true, true, true] },
+      { label: "Ιδιωτική κοινότητα ELITE", values: [false, false, true] },
+      { label: "VIP Community Status", values: [false, false, true] },
+      { label: "Δημοσίευση εργασιών στην Ακαδημία", values: [false, false, true] },
+      { label: "Προτεραιότητα στο Support", values: [false, false, true] },
+    ],
+  },
+  {
+    title: "Εκπτώσεις",
+    rows: [
+      { label: "E-book AURA Professional Hair Method", values: [false, "50%", "50%"] },
+      { label: "Φυσικό AURA Hair Method Book", values: [false, "25%", "50%"] },
+      { label: "AURA Online Seminars", values: [false, false, "25%"] },
+      { label: "Προϊόντα FORZA BRAVA", values: [false, "10%", "10%"] },
+    ],
+  },
+  {
+    title: "Ευελιξία",
+    rows: [{ label: "Ακύρωση ανά πάσα στιγμή", values: [true, true, true] }],
+  },
+];
+
+function CellView({ v }: { v: Cell }) {
+  if (v === true)
+    return (
+      <span className="pp-tick" role="img" aria-label="Περιλαμβάνεται">
+        <Check className="size-3.5" strokeWidth={3} />
+      </span>
+    );
+  if (v === false)
+    return (
+      <span className="pp-cross" role="img" aria-label="Δεν περιλαμβάνεται">
+        <X className="size-3.5" />
+      </span>
+    );
+  return <span className="pp-val">{v}</span>;
+}
+
+const FAQ = [
+  {
+    q: "Μπορώ να ακυρώσω τη συνδρομή μου;",
+    a: "Ναι. Όλα τα πλάνα έχουν δυνατότητα ακύρωσης ανά πάσα στιγμή, χωρίς δέσμευση.",
+  },
+  {
+    q: "Πώς γίνεται η χρέωση;",
+    a: "Η συνδρομή είναι μηνιαία και η πληρωμή γίνεται με ασφάλεια μέσω Viva.com. Ξεκινάς από τη σελίδα checkout αφού συνδεθείς.",
+  },
+  {
+    q: "Σε ποιες εκπτώσεις έχω πρόσβαση;",
+    a: "Το PRO δίνει 50% στο E-book, 25% στο φυσικό βιβλίο και 10% στα FORZA BRAVA. Το ELITE προσθέτει 50% στο φυσικό βιβλίο και 25% στα Online Seminars.",
+  },
+  {
+  q: "Μπορώ να αναβαθμίσω το πλάνο μου;",
+  a: "Ναι. Πληρώνεις μόνο τη διαφορά από το τρέχον πλάνο σου και από εκείνη τη μέρα η συνδρομή ανανεώνεται κάθε μήνα με τη νέα τιμή.",
+},
+];
+
+/* ---------------- hero ---------------- */
+
+function Hero() {
+  const ref = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const y = useTransform(scrollYProgress, [0, 1], [0, reduce ? 0 : 140]);
+  const opacity = useTransform(scrollYProgress, [0, 0.9], [1, 0]);
+
+  return (
+    <section ref={ref} className="relative px-5 pb-20 pt-10 text-center sm:pb-28">
+      <div className="pp-ring" aria-hidden />
+      <motion.div style={{ y, opacity }} className="relative mx-auto max-w-3xl">
+        <motion.span
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: EASE }}
+          className="chrome-text text-[11px] font-semibold uppercase tracking-[0.5em]"
+        >
+          Aura Academy · Πλάνα
+        </motion.span>
+        <motion.h1
+          initial={{ opacity: 0, y: 28, filter: "blur(10px)" }}
+          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 1.1, ease: EASE, delay: 0.15 }}
+          className="pp-title mt-6 text-4xl font-bold tracking-tight sm:text-6xl"
+        >
+          Διάλεξε το επίπεδό σου
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: EASE, delay: 0.35 }}
+          className="mx-auto mt-6 max-w-xl text-sm leading-relaxed text-white/55 sm:text-base"
+        >
+          Τρία επίπεδα εκπαίδευσης για barbers που θέλουν να εξελιχθούν. Ξεκίνα από εκεί που
+          σου ταιριάζει και ακύρωσε ανά πάσα στιγμή.
+        </motion.p>
+      </motion.div>
+    </section>
+  );
+}
+
+/* ---------------- page ---------------- */
+
+function PricingPage() {
+  const reduce = useReducedMotion();
+
+  return (
+    <div className="pp-root relative min-h-screen w-full overflow-x-clip bg-aura-bg pt-28 text-white sm:pt-32">
+      <style>{css}</style>
+      <div className="aura-grain" aria-hidden />
+      <ChromeCursor />
+      <div className="hero-atmosphere absolute inset-0" aria-hidden />
+      <div className="pp-grid absolute inset-0" aria-hidden />
+      {!reduce && (
+        <>
+          <motion.div className="pp-orb left-[4%] top-[8%] h-80 w-80" animate={{ y: [0, -34, 0], x: [0, 18, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }} aria-hidden />
+          <motion.div className="pp-orb right-[3%] top-[48%] h-[26rem] w-[26rem]" animate={{ y: [0, 30, 0], x: [0, -22, 0] }} transition={{ duration: 19, repeat: Infinity, ease: "easeInOut" }} aria-hidden />
+        </>
+      )}
+
+      <div className="relative z-10">
+        <Hero />
+
+        {/* plans */}
+        <section id="plans" className="mx-auto max-w-6xl scroll-mt-28 px-5 pb-24 sm:px-8">
+          <PricingCards />
+        </section>
+
+        {/* trust strip */}
+        <section className="mx-auto max-w-5xl px-5 pb-28 sm:px-8">
+          <Reveal>
+            <div className="pp-trust grid gap-px overflow-hidden rounded-2xl sm:grid-cols-3">
+              {[
+                { icon: Undo2, t: "Ακύρωση ανά πάσα στιγμή", d: "Χωρίς δέσμευση και χωρίς κρυφές χρεώσεις." },
+                { icon: ShieldCheck, t: "Ασφαλής πληρωμή", d: "Οι πληρωμές γίνονται μέσω Viva.com." },
+                { icon: Zap, t: "Γρήγορη έναρξη", d: "Πρόσβαση μόλις ολοκληρωθεί η πληρωμή." },
+              ].map(({ icon: Icon, t, d }) => (
+                <div key={t} className="pp-trust-item flex flex-col items-center gap-3 px-6 py-8 text-center">
+                  <span className="pp-icon"><Icon className="size-5 text-white/85" /></span>
+                  <h3 className="text-sm font-semibold tracking-wide">{t}</h3>
+                  <p className="text-xs leading-relaxed text-white/50">{d}</p>
+                </div>
+              ))}
+            </div>
+          </Reveal>
+        </section>
+
+        {/* comparison */}
+        <section className="mx-auto max-w-5xl px-5 pb-28 sm:px-8" aria-labelledby="compare-title">
+          <Reveal>
+            <div className="mb-10 text-center">
+              <span className="chrome-text text-[11px] font-semibold uppercase tracking-[0.5em]">Σύγκριση</span>
+              <h2 id="compare-title" className="pp-title mt-4 text-3xl font-bold tracking-tight sm:text-5xl">
+                Τι περιλαμβάνει το κάθε πλάνο
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-sm text-white/50">
+                Δες με μια ματιά τι κερδίζεις σε κάθε επίπεδο.
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div className="pp-table-wrap">
+              <table className="pp-table w-full min-w-[680px] border-collapse text-left">
+                <caption className="sr-only">Σύγκριση των πλάνων AURA Basic, Pro και Elite</caption>
+                <thead>
+                  <tr>
+                    <th scope="col" className="pp-th-label">Προνόμιο</th>
+                    {AURA_PLANS.map((p) => (
+                      <th key={p.id} scope="col" className={`pp-th ${p.highlight ? "pp-col-hi" : ""}`}>
+                        <span className="block text-xs font-bold tracking-[0.2em]">{p.name}</span>
+                        <span className="mt-1 block text-[11px] font-normal text-white/50">{p.priceLabel} / μήνα</span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {GROUPS.map((g) => (
+                    <GroupRows key={g.title} title={g.title} rows={g.rows} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Reveal>
+        </section>
+
+        {/* faq */}
+        <section className="mx-auto max-w-3xl px-5 pb-28 sm:px-8" aria-labelledby="faq-title">
+          <Reveal>
+            <h2 id="faq-title" className="pp-title mb-8 text-center text-3xl font-bold tracking-tight sm:text-4xl">
+              Συχνές ερωτήσεις
+            </h2>
+          </Reveal>
+          <div className="space-y-3">
+            {FAQ.map((f, i) => (
+              <Reveal key={f.q} delay={i * 0.08}>
+                <details className="pp-faq group">
+                  <summary>
+                    <span>{f.q}</span>
+                    <span className="pp-plus" aria-hidden />
+                  </summary>
+                  <p className="px-6 pb-6 text-sm leading-relaxed text-white/60">{f.a}</p>
+                </details>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
+        {/* final cta */}
+        <section className="mx-auto max-w-3xl px-5 pb-32 text-center sm:px-8">
+          <Reveal>
+            <div className="pp-cta px-6 py-14 sm:px-12">
+              <h2 className="pp-title text-3xl font-bold tracking-tight sm:text-5xl">Ξεκίνα την εξέλιξή σου</h2>
+              <p className="mx-auto mt-5 max-w-md text-sm leading-relaxed text-white/55">
+                Διάλεξε το πλάνο σου και μπες στο AURA system.
+              </p>
+              <div className="mt-8 flex justify-center">
+                <ChromeButton
+                  type="button"
+                  onClick={() => document.getElementById("plans")?.scrollIntoView({ behavior: "smooth" })}
+                >
+                  ΔΕΣ ΤΑ ΠΛΑΝΑ
+                </ChromeButton>
+              </div>
+            </div>
+          </Reveal>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function GroupRows({ title, rows }: { title: string; rows: Row[] }) {
+  return (
+    <>
+      <tr>
+        <th colSpan={4} scope="colgroup" className="pp-group">{title}</th>
+      </tr>
+      {rows.map((r) => (
+        <tr key={r.label} className="pp-row">
+          <th scope="row" className="pp-label">{r.label}</th>
+          {r.values.map((v, i) => (
+            <td key={i} className={`pp-cell ${AURA_PLANS[i]?.highlight ? "pp-col-hi" : ""}`}>
+              <CellView v={v} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+/* ---------------- styles ---------------- */
+
+const css = `
+@keyframes pp-spin { to { transform: rotate(360deg); } }
+@keyframes pp-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@keyframes pp-pulse { 0%,100% { opacity: .5; } 50% { opacity: .95; } }
+
+.pp-grid {
+  background-image: linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 50% at 50% 18%, #000 15%, transparent 75%);
+          mask-image: radial-gradient(ellipse 75% 50% at 50% 18%, #000 15%, transparent 75%);
+  pointer-events: none;
+}
+.pp-orb { position: absolute; border-radius: 9999px; pointer-events: none; filter: blur(46px);
+  background: radial-gradient(circle at 35% 30%, rgba(232,236,242,.15), rgba(160,168,180,.05) 45%, transparent 70%); }
+.pp-ring {
+  position: absolute; left: 50%; top: 50%; width: min(640px, 90vw); aspect-ratio: 1; transform: translate(-50%, -52%);
+  border-radius: 9999px; pointer-events: none; opacity: .55;
+  background: conic-gradient(from 0deg, transparent 0 60%, rgba(232,236,242,.35) 80%, transparent 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1px));
+  animation: pp-spin 20s linear infinite;
+}
+.pp-title {
+  background: linear-gradient(110deg, #6b7280 0%, #f8fafc 22%, #9ca3af 42%, #ffffff 58%, #8b93a1 78%, #f1f5f9 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: pp-shimmer 7s linear infinite;
+}
+
+.pp-trust { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08); }
+.pp-trust-item { background: linear-gradient(180deg, rgba(20,21,27,.95), rgba(9,10,13,.97)); }
+.pp-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.16); background: radial-gradient(circle at 30% 25%, rgba(255,255,255,.14), rgba(255,255,255,.02));
+  box-shadow: 0 0 28px -8px rgba(232,236,242,.5); }
+
+.pp-table-wrap { overflow-x: auto; border-radius: 1.2rem; border: 1px solid rgba(255,255,255,.1);
+  background: linear-gradient(180deg, rgba(20,21,27,.94), rgba(9,10,13,.97)); box-shadow: 0 30px 80px -40px rgba(0,0,0,.9); }
+.pp-th-label, .pp-th { padding: 1.4rem 1rem; font-size: 11px; letter-spacing: .25em; text-transform: uppercase; color: rgba(255,255,255,.45); border-bottom: 1px solid rgba(255,255,255,.1); }
+.pp-th { text-align: center; color: #f1f5f9; }
+.pp-th-label { position: sticky; left: 0; z-index: 2; background: rgba(14,15,19,.98); }
+.pp-col-hi { background: linear-gradient(180deg, rgba(232,236,242,.08), rgba(232,236,242,.03)); }
+.pp-group { padding: 1.1rem 1rem .6rem; text-align: left; font-size: 10px; letter-spacing: .4em; text-transform: uppercase; color: rgba(255,255,255,.4);
+  background: rgba(255,255,255,.025); }
+.pp-label { position: sticky; left: 0; z-index: 1; padding: .95rem 1rem; text-align: left; font-size: 13px; font-weight: 400; color: rgba(255,255,255,.8);
+  background: rgba(12,13,17,.98); border-top: 1px solid rgba(255,255,255,.05); }
+.pp-cell { padding: .85rem 1rem; text-align: center; border-top: 1px solid rgba(255,255,255,.05); }
+.pp-row { transition: background .25s; }
+.pp-row:hover .pp-cell, .pp-row:hover .pp-label { background-color: rgba(255,255,255,.035); }
+.pp-tick { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 9999px; color: #f8fafc;
+  border: 1px solid rgba(232,236,242,.5); background: rgba(255,255,255,.08); box-shadow: 0 0 16px -2px rgba(232,236,242,.6); }
+.pp-cross { display: inline-grid; place-items: center; width: 24px; height: 24px; color: rgba(255,255,255,.25); }
+.pp-val { font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #f1f5f9; text-shadow: 0 0 14px rgba(232,236,242,.5); }
+
+.pp-faq { border-radius: 1rem; border: 1px solid rgba(255,255,255,.1); background: linear-gradient(180deg, rgba(20,21,27,.92), rgba(9,10,13,.95)); transition: border-color .3s; }
+.pp-faq:hover, .pp-faq[open] { border-color: rgba(232,236,242,.3); }
+.pp-faq summary { display: flex; cursor: pointer; list-style: none; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.3rem 1.5rem; font-size: 14px; font-weight: 500; }
+.pp-faq summary::-webkit-details-marker { display: none; }
+.pp-plus { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
+.pp-plus::before, .pp-plus::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; background: #e8ecf2; transition: transform .3s; }
+.pp-plus::after { transform: rotate(90deg); }
+.pp-faq[open] .pp-plus::after { transform: rotate(0deg); }
+
+.pp-cta { position: relative; overflow: hidden; border-radius: 1.6rem; border: 1px solid rgba(255,255,255,.12);
+  background: radial-gradient(70% 90% at 50% 0%, rgba(232,236,242,.12), transparent 70%), linear-gradient(180deg, rgba(22,23,29,.95), rgba(9,10,13,.97)); }
+
+@media (prefers-reduced-motion: reduce) { .pp-ring, .pp-title { animation: none !important; } }
+`;
+=== END FILE ===
+
+=== FILE: src/routes/review/haircuts/index.tsx ===
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { getMyProfile, getHaircutReviewQueue } from "@/lib/queries";
+import { isAdminRole } from "@/lib/roles";
+import { useAsync } from "@/lib/useAsync";
+import { EmptyState, ErrorState, LoadingSkeleton, LockedState } from "@/components/aura/States";
+import { Scissors, ShieldAlert, Clock, ChevronRight, User } from "lucide-react";
+
+export const Route = createFileRoute("/review/haircuts/")({ component: HaircutReviewQueue });
+
+function HaircutReviewQueue() {
+  const profile = useAsync(getMyProfile, []);
+  const admin = profile.data ? isAdminRole(profile.data.role) : false;
+  const queue = useAsync(async () => (admin ? getHaircutReviewQueue() : []), [admin]);
+
+  return (
+    <main className="mx-auto min-h-screen max-w-5xl px-4 sm:px-6 py-16 text-white relative">
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[500px] h-[250px] bg-orange-600/10 blur-[120px] pointer-events-none rounded-full" />
+
+      <header className="mb-12 relative z-10 border-b border-white/10 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-orange-400 text-xs font-semibold tracking-widest uppercase mb-3 shadow-inner">
+            <Scissors className="w-3.5 h-3.5" />
+            Admin Hub
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+            Ουρά Αξιολόγησης Κουρεμάτων
+          </h1>
+        </div>
+        {queue.data && queue.data.length > 0 && (
+          <div className="px-4 py-2 rounded-2xl bg-zinc-900/80 border border-white/10 text-xs text-zinc-400 backdrop-blur-md flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping" />
+            <strong className="text-white font-bold">{queue.data.length}</strong> εκκρεμείς αξιολογήσεις
+          </div>
+        )}
+      </header>
+
+      <div className="relative z-10">
+        {profile.loading && <LoadingSkeleton rows={3} />}
+        {profile.error && <ErrorState message={profile.error} />}
+
+        {profile.data && !admin && (
+          <div className="p-8 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <LockedState reason="Μόνο admins έχουν πρόσβαση στην ουρά αξιολόγησης κουρεμάτων." />
+          </div>
+        )}
+
+        {admin && (
+          <>
+            {queue.loading && <LoadingSkeleton rows={4} />}
+            {queue.error && <ErrorState message={queue.error} />}
+            {queue.data && queue.data.length === 0 && (
+              <div className="p-12 rounded-3xl bg-zinc-950/80 border border-white/10 shadow-[0_0_30px_-5px_rgba(0,0,0,0.8)] backdrop-blur-xl text-center">
+                <EmptyState title="Καμία εκκρεμής υποβολή" hint="Όταν ένας student υποβάλει review κουρέματος, θα εμφανιστεί εδώ." />
+              </div>
+            )}
+            {queue.data && queue.data.length > 0 && (
+              <div className="rounded-3xl border border-white/10 bg-zinc-950/80 shadow-[0_0_40px_-10px_rgba(0,0,0,0.9)] backdrop-blur-xl overflow-hidden">
+                <ul className="divide-y divide-white/5">
+                  {queue.data.map((row) => (
+                    <li key={row.id} className="group">
+                      <Link
+                        to="/review/haircuts/$haircutId"
+                        params={{ haircutId: row.id }}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 transition-all duration-300 hover:bg-gradient-to-r hover:from-white/[0.04] hover:to-white/[0.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50"
+                      >
+                        <div className="flex items-start gap-4 min-w-0">
+                          <div className="p-3 rounded-2xl bg-black/60 border border-white/10 text-orange-400 group-hover:border-orange-500/40 group-hover:scale-105 transition-all duration-300 shrink-0">
+                            <Clock className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-base font-bold text-white group-hover:text-orange-400 transition-colors">
+                              {row.method_description.slice(0, 60)}
+                              {row.method_description.length > 60 ? "…" : ""}
+                            </p>
+                            <p className="flex items-center gap-2 truncate text-xs text-zinc-400 mt-1">
+                              <span className="flex items-center gap-1 text-zinc-300">
+                                <User className="w-3.5 h-3.5 text-zinc-500" />
+                                {row.student?.full_name ?? "Άγνωστος μαθητής"}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 self-end sm:self-center shrink-0">
+                          <span className="rounded-full bg-orange-500/10 border border-orange-500/20 px-3.5 py-1 text-xs font-semibold tracking-wide text-orange-400 uppercase">
+                            {row.status}
+                          </span>
+                          <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500 transition-all duration-300">
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/checkout-intent-CYMuNmEZ.js ===
+import{r as e}from"./plans-BkcWWgXs.js";var t=`aura.checkout.intent`,n=18e5;function r(){try{return typeof window>`u`?null:window.localStorage}catch{return null}}function i(t){if(!t)return null;try{let r=JSON.parse(t);return!e(r.plan)||typeof r.savedAt!=`number`||Date.now()-r.savedAt>n?null:r.plan}catch{return null}}function a(e){let n=r();if(n)try{let r={plan:e,savedAt:Date.now()};n.setItem(t,JSON.stringify(r))}catch{}}function o(){let e=r();return e?i(e.getItem(t)):null}function s(){let e=o();return c(),e}function c(){let e=r();if(e)try{e.removeItem(t)}catch{}}export{a as i,s as n,o as r,c as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/terms-CLxjJxS-.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{t as n}from"./proxy-ftrNcNdG.js";import{t as r}from"./Footer-Bkdzkq98.js";var i=e(),a={initial:{opacity:0,y:30},animate:{opacity:1,y:0},transition:{duration:.8,ease:[.16,1,.3,1]}};function o(){return(0,i.jsxs)(`div`,{className:`relative min-h-screen bg-[#050505] text-zinc-100 selection:bg-zinc-200 selection:text-black`,children:[(0,i.jsxs)(`main`,{className:`mx-auto max-w-4xl px-5 pt-36 pb-24 sm:px-8 sm:pt-44`,children:[(0,i.jsxs)(n.div,{...a,className:`text-center md:text-left`,children:[(0,i.jsxs)(`div`,{className:`inline-flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-950 px-3.5 py-1 backdrop-blur-md`,children:[(0,i.jsx)(`span`,{className:`h-1.5 w-1.5 rounded-full bg-white animate-pulse`}),(0,i.jsx)(`span`,{className:`inline-block scale-x-110 origin-left text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400`,children:`LEGAL AGREEMENT`})]}),(0,i.jsxs)(`h1`,{className:`mt-6 text-3xl font-extrabold uppercase tracking-tight sm:text-5xl md:text-6xl`,children:[`TERMS &`,` `,(0,i.jsx)(`span`,{className:`bg-gradient-to-r from-white via-zinc-300 to-zinc-600 bg-clip-text text-transparent`,children:`PRIVACY POLICY`})]}),(0,i.jsx)(`p`,{className:`mt-4 text-xs font-extralight uppercase tracking-[0.3em] text-zinc-500`,children:`Last Updated: September 2026`})]}),(0,i.jsxs)(n.div,{...a,className:`mt-12 space-y-10 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-6 backdrop-blur-xl sm:p-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] text-sm font-extralight leading-relaxed text-zinc-300`,children:[(0,i.jsxs)(`section`,{className:`space-y-3`,children:[(0,i.jsx)(`h2`,{className:`text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2`,children:`1. ACCEPTANCE OF TERMS`}),(0,i.jsx)(`p`,{children:`By accessing or using the AURA — Hair Method Academy platform ("AURA"), you agree to be bound by these Terms of Service and Privacy Policy. If you do not agree, you may not access or use our services or register for online courses.`})]}),(0,i.jsxs)(`section`,{className:`space-y-3`,children:[(0,i.jsx)(`h2`,{className:`text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2`,children:`2. EDUCATIONAL CONTENT & INTELLECTUAL PROPERTY`}),(0,i.jsx)(`p`,{children:`All video materials, geometric techniques, diagrams, downloadable assets, and evaluation frameworks are the exclusive intellectual property of AURA — Hair Method. Unauthorised recording, distribution, or sharing of account access is strictly prohibited and will result in immediate termination of access without refund.`})]}),(0,i.jsxs)(`section`,{className:`space-y-3`,children:[(0,i.jsx)(`h2`,{className:`text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2`,children:`3. PRIVACY & DATA COLLECTION`}),(0,i.jsx)(`p`,{children:`We collect minimal personal information necessary to deliver our educational platform services: full name, email address, submitted practical assignments (photos/videos), and course progress data. Your data is stored securely and will never be sold or shared with unauthorized third parties.`})]}),(0,i.jsxs)(`section`,{className:`space-y-3`,children:[(0,i.jsx)(`h2`,{className:`text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2`,children:`4. APPOINTMENTS & BOOKINGS`}),(0,i.jsx)(`p`,{children:`When booking an in-person session, seminar, or evaluation appointment through our platform, you agree to provide accurate contact details. Confirmation and scheduling specifics will be communicated via email or telephone.`})]}),(0,i.jsx)(`div`,{className:`pt-6 border-t border-zinc-900 text-center`,children:(0,i.jsx)(t,{to:`/login`,className:`inline-block rounded-full border border-zinc-700 px-6 py-2.5 text-xs uppercase tracking-[0.3em] text-zinc-200 transition-colors hover:border-white hover:text-white`,children:`← Back to Sign In`})})]})]}),(0,i.jsx)(r,{})]})}export{o as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/terms-mJJCToXf.mjs ===
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as Footer } from "./Footer-CDaciXSR.mjs";
+import { l as motion } from "../_libs/framer-motion+[...].mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/terms-mJJCToXf.js
+var import_jsx_runtime = require_jsx_runtime();
+var fadeInUp = {
+	initial: {
+		opacity: 0,
+		y: 30
+	},
+	animate: {
+		opacity: 1,
+		y: 0
+	},
+	transition: {
+		duration: .8,
+		ease: [
+			.16,
+			1,
+			.3,
+			1
+		]
+	}
+};
+function TermsPage() {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "relative min-h-screen bg-[#050505] text-zinc-100 selection:bg-zinc-200 selection:text-black",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+			className: "mx-auto max-w-4xl px-5 pt-36 pb-24 sm:px-8 sm:pt-44",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				...fadeInUp,
+				className: "text-center md:text-left",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "inline-flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-950 px-3.5 py-1 backdrop-blur-md",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "h-1.5 w-1.5 rounded-full bg-white animate-pulse" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+							className: "inline-block scale-x-110 origin-left text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400",
+							children: "LEGAL AGREEMENT"
+						})]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("h1", {
+						className: "mt-6 text-3xl font-extrabold uppercase tracking-tight sm:text-5xl md:text-6xl",
+						children: [
+							"TERMS &",
+							" ",
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "bg-gradient-to-r from-white via-zinc-300 to-zinc-600 bg-clip-text text-transparent",
+								children: "PRIVACY POLICY"
+							})
+						]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-4 text-xs font-extralight uppercase tracking-[0.3em] text-zinc-500",
+						children: "Last Updated: September 2026"
+					})
+				]
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				...fadeInUp,
+				className: "mt-12 space-y-10 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-6 backdrop-blur-xl sm:p-10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] text-sm font-extralight leading-relaxed text-zinc-300",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "space-y-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2",
+							children: "1. ACCEPTANCE OF TERMS"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "By accessing or using the AURA — Hair Method Academy platform (\"AURA\"), you agree to be bound by these Terms of Service and Privacy Policy. If you do not agree, you may not access or use our services or register for online courses." })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "space-y-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2",
+							children: "2. EDUCATIONAL CONTENT & INTELLECTUAL PROPERTY"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "All video materials, geometric techniques, diagrams, downloadable assets, and evaluation frameworks are the exclusive intellectual property of AURA — Hair Method. Unauthorised recording, distribution, or sharing of account access is strictly prohibited and will result in immediate termination of access without refund." })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "space-y-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2",
+							children: "3. PRIVACY & DATA COLLECTION"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "We collect minimal personal information necessary to deliver our educational platform services: full name, email address, submitted practical assignments (photos/videos), and course progress data. Your data is stored securely and will never be sold or shared with unauthorized third parties." })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+						className: "space-y-3",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "text-xs font-bold uppercase tracking-[0.3em] text-white border-b border-zinc-800 pb-2",
+							children: "4. APPOINTMENTS & BOOKINGS"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "When booking an in-person session, seminar, or evaluation appointment through our platform, you agree to provide accurate contact details. Confirmation and scheduling specifics will be communicated via email or telephone." })]
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "pt-6 border-t border-zinc-900 text-center",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+							to: "/login",
+							className: "inline-block rounded-full border border-zinc-700 px-6 py-2.5 text-xs uppercase tracking-[0.3em] text-zinc-200 transition-colors hover:border-white hover:text-white",
+							children: "← Back to Sign In"
+						})
+					})
+				]
+			})]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Footer, {})]
+	});
+}
+//#endregion
+export { TermsPage as component };
+
+=== END FILE ===
+
+=== FILE: .output/server/_tanstack-start-manifest_v-CUIgUNEG.mjs ===
+//#region node_modules/.nitro/vite/services/ssr/assets/_tanstack-start-manifest_v-CUIgUNEG.js
+var tsrStartManifest = () => ({ routes: {
+	__root__: {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/__root.tsx",
+		children: [
+			"/",
+			"/about",
+			"/book",
+			"/contact",
+			"/cookie-policy",
+			"/dashboard",
+			"/elite",
+			"/gallery",
+			"/haircut-review",
+			"/login",
+			"/messages",
+			"/method",
+			"/online-seminars",
+			"/pricing",
+			"/profile",
+			"/seminars",
+			"/stop-plan",
+			"/terms",
+			"/academy/$slug",
+			"/admin/book",
+			"/admin/inbox",
+			"/admin/notifications",
+			"/auth/callback",
+			"/checkout/return",
+			"/courses/$slug",
+			"/lesson/$lessonId",
+			"/practice/$assignmentId",
+			"/review/$submissionId",
+			"/verify/$id",
+			"/academy/",
+			"/admin/",
+			"/checkout/",
+			"/courses/",
+			"/review/",
+			"/admin/courses/$courseId",
+			"/admin/courses/new",
+			"/review/haircuts/$haircutId",
+			"/review/haircuts/haircut",
+			"/admin/courses/",
+			"/review/haircuts/"
+		],
+		preloads: [
+			"/assets/index-CxH9z1Zx.js",
+			"/assets/jsx-runtime-BkSabwWG.js",
+			"/assets/useRouter-C8taXhX3.js",
+			"/assets/link-BhBo0Yh6.js",
+			"/assets/lazyRouteComponent-CNoRSiag.js",
+			"/assets/useNavigate-BR9bgUfC.js",
+			"/assets/client-CKVMbL1z.js",
+			"/assets/AnimatePresence-ClHpx5iG.js",
+			"/assets/react-D9fOyxUn.js",
+			"/assets/supabase-DXn9ZPwL.js",
+			"/assets/useAuth-B1WX5JkE.js",
+			"/assets/roles-D-HGCJsI.js",
+			"/assets/logo-BoiBWv1N.js",
+			"/assets/message-circle-DpgrN90q.js",
+			"/assets/messages-CXx8ZzPc.js",
+			"/assets/shield-check-Djau1VnD.js",
+			"/assets/x-DCxPHqh1.js",
+			"/assets/messagingQueries-DN5myh0K.js",
+			"/assets/auth.callback-J8TDGUE9.js",
+			"/assets/preload-helper-Czpn1I53.js",
+			"/assets/login-BGRel2QT.js",
+			"/assets/academy._slug-snKSkque.js",
+			"/assets/checkout.index-BpbaWFWK.js",
+			"/assets/checkout.return-BUPj3cb4.js",
+			"/assets/courses._slug-CYu-mVBG.js",
+			"/assets/lesson._lessonId-BYxe1JmO.js",
+			"/assets/practice._assignmentId-Dk1FjmfQ.js",
+			"/assets/review._submissionId-DqIfqt3t.js",
+			"/assets/verify._id-9S8vnhZE.js",
+			"/assets/admin.courses._courseId-BB4tbnNk.js",
+			"/assets/_haircutId-B6elcldG.js"
+		],
+		scripts: [{ attrs: {
+			type: "module",
+			async: !0,
+			src: "/assets/index-CxH9z1Zx.js"
+		} }]
+	},
+	"/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/routes-fJ5ts8L7.js",
+			"/assets/proxy-ftrNcNdG.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/use-spring-DdCN5x2x.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-right-D_t5sPRj.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/book-DfGxqo-T.js",
+			"/assets/crown-QxIH2HsF.js",
+			"/assets/eye-8YoOALhG.js",
+			"/assets/images-BKsLEZPR.js",
+			"/assets/layers-Cp6xWl69.js",
+			"/assets/play-BfnBKg7d.js",
+			"/assets/scissors-CHiVLmLi.js",
+			"/assets/user-BFT04SdI.js",
+			"/assets/users-mt-IxESh.js",
+			"/assets/Footer-Bkdzkq98.js",
+			"/assets/developer-BD9wcHX1.js",
+			"/assets/chrome-DYZby3h2.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/ChromeCursor-Bd--RrJo.js",
+			"/assets/gallery-Dk-eIjdF.js",
+			"/assets/aura-DdP8jhxG.js"
+		]
+	},
+	"/about": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/about.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/about-B-G3PyHQ.js",
+			"/assets/proxy-ftrNcNdG.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/Footer-Bkdzkq98.js",
+			"/assets/developer-BD9wcHX1.js"
+		]
+	},
+	"/book": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/book.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/book-BfccH79X.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/use-spring-DdCN5x2x.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/book-DfGxqo-T.js",
+			"/assets/crown-QxIH2HsF.js",
+			"/assets/layers-Cp6xWl69.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/plus-qBfxbRGB.js",
+			"/assets/scissors-CHiVLmLi.js",
+			"/assets/book-DN8DL8gW.js",
+			"/assets/chrome-DYZby3h2.js",
+			"/assets/react-stripe.umd-CtLSNhXm.js"
+		]
+	},
+	"/contact": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/contact.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/contact-ae2V9TPP.js",
+			"/assets/db-DXn9ZPwL.js",
+			"/assets/Footer-Bkdzkq98.js",
+			"/assets/ChromeButton-CdfVnEPs.js"
+		]
+	},
+	"/cookie-policy": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/cookie-policy.tsx",
+		children: void 0,
+		preloads: ["/assets/cookie-policy-BNWqltRU.js"]
+	},
+	"/dashboard": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/dashboard.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/dashboard--lHvzaaV.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-right-D_t5sPRj.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/crown-QxIH2HsF.js",
+			"/assets/gem-CdTGHu1B.js",
+			"/assets/lock-DHD2dW60.js",
+			"/assets/shield-DjyPlGo5.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js"
+		]
+	},
+	"/elite": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/elite.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/elite-BuLnQzEn.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/crown-QxIH2HsF.js",
+			"/assets/gem-CdTGHu1B.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/lock-DHD2dW60.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/db-DXn9ZPwL.js"
+		]
+	},
+	"/gallery": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/gallery.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/gallery-CPurb_1Y.js",
+			"/assets/proxy-ftrNcNdG.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-right-D_t5sPRj.js",
+			"/assets/chevron-left-eEe2n3pc.js",
+			"/assets/chevron-right-LS5pF-bM.js",
+			"/assets/play-BfnBKg7d.js",
+			"/assets/scissors-CHiVLmLi.js",
+			"/assets/gallery-Dk-eIjdF.js"
+		]
+	},
+	"/haircut-review": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/haircut-review.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/haircut-review-V8bAVsPd.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/circle-check-DcupJV4n.js",
+			"/assets/scissors-CHiVLmLi.js"
+		]
+	},
+	"/login": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/login.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/login-CkVMxxjA.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/useAuth-CfZB9gr3.js",
+			"/assets/checkout-intent-CYMuNmEZ.js",
+			"/assets/ChromeCursor-Bd--RrJo.js",
+			"/assets/AuraMark-BT6lLCpe.js"
+		]
+	},
+	"/messages": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/messages.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/messages-BVXzCx_l.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/phone-CFEnp_vY.js",
+			"/assets/send-ClGHcKrI.js",
+			"/assets/video-Bh1cdfCM.js",
+			"/assets/States-BulpY35p.js"
+		]
+	},
+	"/method": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/method.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/method-BzRLtaFi.js",
+			"/assets/Footer-Bkdzkq98.js",
+			"/assets/ChromeButton-CdfVnEPs.js"
+		]
+	},
+	"/online-seminars": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/online-seminars.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/online-seminars-CgPspnDP.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/arrow-right-D_t5sPRj.js",
+			"/assets/calendar-NogZYPsc.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/clock-CqoNLjzH.js",
+			"/assets/onlineSeminars-BWTplH_L.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/mail-B0XmtP5t.js",
+			"/assets/phone-CFEnp_vY.js",
+			"/assets/user-BFT04SdI.js",
+			"/assets/users-mt-IxESh.js",
+			"/assets/video-Bh1cdfCM.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/react-stripe.umd-CtLSNhXm.js"
+		]
+	},
+	"/pricing": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/pricing.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/pricing-CZ1XLkT8.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/chevron-down-CMzGfsmT.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/checkout-intent-CYMuNmEZ.js",
+			"/assets/useSubscription-CI-f8eKe.js",
+			"/assets/ChromeCursor-Bd--RrJo.js"
+		]
+	},
+	"/profile": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/profile.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/profile-5CgIYQAn.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/courses-LEqLhg7m.js",
+			"/assets/useSubscription-CI-f8eKe.js"
+		]
+	},
+	"/seminars": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/seminars.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/seminars-_obHVRjY.js",
+			"/assets/use-transform-Csj7YyAF.js",
+			"/assets/use-spring-DdCN5x2x.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/arrow-right-D_t5sPRj.js",
+			"/assets/calendar-NogZYPsc.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/chevron-left-eEe2n3pc.js",
+			"/assets/chevron-right-LS5pF-bM.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/mail-B0XmtP5t.js",
+			"/assets/map-pin-BnQggz49.js",
+			"/assets/phone-CFEnp_vY.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/user-BFT04SdI.js",
+			"/assets/users-mt-IxESh.js",
+			"/assets/video-Bh1cdfCM.js",
+			"/assets/seminars-JQUi2JVQ.js"
+		]
+	},
+	"/stop-plan": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/stop-plan.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/stop-plan-CbqsacCL.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/circle-check-DcupJV4n.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/useSubscription-CI-f8eKe.js"
+		]
+	},
+	"/terms": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/terms.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/terms-CLxjJxS-.js",
+			"/assets/proxy-ftrNcNdG.js",
+			"/assets/Footer-Bkdzkq98.js"
+		]
+	},
+	"/academy/$slug": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/academy.$slug.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/academy._slug-CNuNeyi7.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/arrow-right-D_t5sPRj.js",
+			"/assets/clock-CqoNLjzH.js",
+			"/assets/layers-Cp6xWl69.js",
+			"/assets/users-mt-IxESh.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/chrome-DYZby3h2.js"
+		]
+	},
+	"/admin/book": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.book.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.book-BFzT9Y31.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/chevron-down-CMzGfsmT.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/copy-CMIpwlCB.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/mail-B0XmtP5t.js",
+			"/assets/map-pin-BnQggz49.js",
+			"/assets/phone-CFEnp_vY.js",
+			"/assets/refresh-cw-DyxcL6uw.js",
+			"/assets/book-DN8DL8gW.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/chrome-DYZby3h2.js"
+		]
+	},
+	"/admin/inbox": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.inbox.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.inbox-CUP3omLV.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/db-DXn9ZPwL.js"
+		]
+	},
+	"/admin/notifications": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.notifications.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.notifications-D5vKvS7e.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/send-ClGHcKrI.js",
+			"/assets/users-mt-IxESh.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/chrome-DYZby3h2.js"
+		]
+	},
+	"/auth/callback": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/auth.callback.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/auth.callback-DWZY6muH.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/useAuth-CfZB9gr3.js",
+			"/assets/checkout-intent-CYMuNmEZ.js"
+		]
+	},
+	"/checkout/return": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/checkout.return.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/checkout.return-Bi3mkH5b.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/checkout-intent-CYMuNmEZ.js",
+			"/assets/useSubscription-CI-f8eKe.js"
+		]
+	},
+	"/courses/$slug": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/courses.$slug.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/courses._slug-Bi8l0Fjl.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/lock-DHD2dW60.js",
+			"/assets/play-BfnBKg7d.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/courses-LEqLhg7m.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/ChromeCursor-Bd--RrJo.js"
+		]
+	},
+	"/lesson/$lessonId": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/lesson.$lessonId.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/lesson._lessonId-DUxPKgcw.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js"
+		]
+	},
+	"/practice/$assignmentId": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/practice.$assignmentId.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/practice._assignmentId-DOVpzOcu.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/award-DqqZqsrp.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/circle-check-DcupJV4n.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/MediaThumb-CuzlgNR-.js"
+		]
+	},
+	"/review/$submissionId": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/review.$submissionId.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/review._submissionId-DWg_2qgx.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/award-DqqZqsrp.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/circle-check-DcupJV4n.js",
+			"/assets/file-text-DWpyfNHk.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/MediaThumb-CuzlgNR-.js"
+		]
+	},
+	"/verify/$id": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/verify.$id.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/verify._id-yrEr0rMk.js",
+			"/assets/db-DXn9ZPwL.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/ChromeCursor-Bd--RrJo.js",
+			"/assets/AuraMark-BT6lLCpe.js"
+		]
+	},
+	"/academy/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/academy.index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/academy.index-SW8mJI0Y.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/chevron-down-CMzGfsmT.js",
+			"/assets/circle-CSxX3fzC.js",
+			"/assets/crown-QxIH2HsF.js",
+			"/assets/images-BKsLEZPR.js",
+			"/assets/instagram-DKDIOVOj.js",
+			"/assets/loader-circle-DdNdnF6-.js",
+			"/assets/lock-DHD2dW60.js",
+			"/assets/map-pin-BnQggz49.js",
+			"/assets/trash-2-DU4LXWLE.js",
+			"/assets/plus-qBfxbRGB.js",
+			"/assets/send-ClGHcKrI.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/chrome-DYZby3h2.js"
+		]
+	},
+	"/admin/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.index-DPPDTCZ2.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/createLucideIcon-Dz5w4CtK.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/calendar-NogZYPsc.js",
+			"/assets/check-l8y3aT-v.js",
+			"/assets/chevron-left-eEe2n3pc.js",
+			"/assets/chevron-right-LS5pF-bM.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/circle-check-DcupJV4n.js",
+			"/assets/circle-CSxX3fzC.js",
+			"/assets/eye-8YoOALhG.js",
+			"/assets/onlineSeminars-BWTplH_L.js",
+			"/assets/graduation-cap-KbC_XaK8.js",
+			"/assets/lock-DHD2dW60.js",
+			"/assets/mail-B0XmtP5t.js",
+			"/assets/map-pin-BnQggz49.js",
+			"/assets/trash-2-DU4LXWLE.js",
+			"/assets/phone-CFEnp_vY.js",
+			"/assets/plus-qBfxbRGB.js",
+			"/assets/refresh-cw-DyxcL6uw.js",
+			"/assets/scissors-CHiVLmLi.js",
+			"/assets/shield-DjyPlGo5.js",
+			"/assets/user-BFT04SdI.js",
+			"/assets/users-mt-IxESh.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js",
+			"/assets/chrome-DYZby3h2.js",
+			"/assets/seminars-JQUi2JVQ.js"
+		]
+	},
+	"/checkout/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/checkout.index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/checkout.index-CTxlpDb9.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/ChromeButton-CdfVnEPs.js",
+			"/assets/checkout-intent-CYMuNmEZ.js",
+			"/assets/react-stripe.umd-CtLSNhXm.js",
+			"/assets/useSubscription-CI-f8eKe.js"
+		]
+	},
+	"/courses/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/courses.index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/courses.index-z2H8rYUh.js",
+			"/assets/book-open-l6w5YLVR.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/courses-LEqLhg7m.js",
+			"/assets/ChromeButton-CdfVnEPs.js"
+		]
+	},
+	"/review/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/review.index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/review.index-BrdS8biq.js",
+			"/assets/use-reduced-motion-CNAPwhZE.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/chevron-right-LS5pF-bM.js",
+			"/assets/clock-CqoNLjzH.js",
+			"/assets/shield-alert-B8o1doM_.js",
+			"/assets/sparkles-gf6_8K8H.js",
+			"/assets/user-BFT04SdI.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js"
+		]
+	},
+	"/admin/courses/$courseId": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.courses.$courseId.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.courses._courseId-D6ODeYd6.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/courses-LEqLhg7m.js",
+			"/assets/VideoEntryForm-CRQira0Y.js"
+		]
+	},
+	"/admin/courses/new": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.courses.new.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.courses.new-CcCAsjca.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/courses-LEqLhg7m.js",
+			"/assets/VideoEntryForm-CRQira0Y.js"
+		]
+	},
+	"/review/haircuts/$haircutId": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/review/haircuts/$haircutId.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/_haircutId-D4GsTO_E.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/arrow-left-Brxe6F5I.js",
+			"/assets/award-DqqZqsrp.js",
+			"/assets/circle-alert-Bs1x-kqg.js",
+			"/assets/circle-check-DcupJV4n.js",
+			"/assets/scissors-CHiVLmLi.js",
+			"/assets/shield-alert-B8o1doM_.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js"
+		]
+	},
+	"/admin/courses/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/admin.courses.index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/admin.courses.index-Cw0jMneg.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/plans-BkcWWgXs.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/courses-LEqLhg7m.js",
+			"/assets/ChromeButton-CdfVnEPs.js"
+		]
+	},
+	"/review/haircuts/": {
+		filePath: "/Users/manosmarkogiannakis/Downloads/aura-lumina-main/src/routes/review/haircuts/index.tsx",
+		children: void 0,
+		preloads: [
+			"/assets/haircuts-B61qYPwn.js",
+			"/assets/queries-B7Arqryn.js",
+			"/assets/chevron-right-LS5pF-bM.js",
+			"/assets/clock-CqoNLjzH.js",
+			"/assets/scissors-CHiVLmLi.js",
+			"/assets/shield-alert-B8o1doM_.js",
+			"/assets/user-BFT04SdI.js",
+			"/assets/useAsync-CZJ1G06G.js",
+			"/assets/States-BulpY35p.js"
+		]
+	}
+} });
+//#endregion
+export { tsrStartManifest };
+
+=== END FILE ===
+

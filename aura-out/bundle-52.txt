@@ -1,0 +1,1811 @@
+=== FILE: .output/server/_libs/supabase__postgrest-js.mjs ===
+//#region node_modules/@supabase/postgrest-js/dist/index.mjs
+/**
+* Default number of retry attempts.
+*/
+var DEFAULT_MAX_RETRIES = 3;
+/**
+* Default exponential backoff delay function.
+* Delays: 1s, 2s, 4s, 8s, ... (max 30s)
+*
+* @param attemptIndex - Zero-based index of the retry attempt
+* @returns Delay in milliseconds before the next retry
+*/
+var getRetryDelay = (attemptIndex) => Math.min(1e3 * 2 ** attemptIndex, 3e4);
+/**
+* Status codes that are safe to retry.
+* 520 = Cloudflare timeout/connection errors (transient)
+* 503 = PostgREST schema cache not yet loaded (transient, signals retry via Retry-After header)
+*/
+var RETRYABLE_STATUS_CODES = [520, 503];
+/**
+* HTTP methods that are safe to retry (idempotent operations).
+*/
+var RETRYABLE_METHODS = [
+	"GET",
+	"HEAD",
+	"OPTIONS"
+];
+/**
+* Error format
+*
+* Returned by every PostgREST request that fails. When something fails, the
+* single most useful field is usually `hint` — Postgres often returns the
+* actionable fix there, not in `message`. Always log the full object (e.g.
+* `console.error(error)`); logging only `error.message` hides the hint.
+*
+* Read the fields in roughly this order of usefulness:
+*
+* - `hint` — actionable guidance from the database when available. For
+*   permission-denied errors (`42501`), this is the literal SQL to fix the
+*   problem, e.g.
+*   `"Grant the required privileges to the current role with: GRANT SELECT ON public.users TO anon;"`.
+*   Missing column? `hint` suggests the column you probably meant. Whenever
+*   Postgres knows the fix, it puts it in `hint`.
+* - `code` — stable error code from PostgREST (e.g. `PGRST301`) or Postgres
+*   (e.g. `42501`). Branch on this rather than on `message` text.
+* - `details` — extra context, often the offending value, key, or row.
+* - `message` — human-readable summary. Useful in UI strings; less useful
+*   for debugging.
+*
+* {@link https://postgrest.org/en/stable/api.html?highlight=options#errors-and-http-status-codes}
+*/
+var PostgrestError = class extends Error {
+	/**
+	* @example
+	* ```ts
+	* import PostgrestError from '@supabase/postgrest-js'
+	*
+	* throw new PostgrestError({
+	*   message: 'Row level security prevented the request',
+	*   details: 'RLS denied the insert',
+	*   hint: 'Check your policies',
+	*   code: 'PGRST301',
+	* })
+	* ```
+	*/
+	constructor(context) {
+		super(context.message);
+		this.name = "PostgrestError";
+		this.details = context.details;
+		this.hint = context.hint;
+		this.code = context.code;
+	}
+	toJSON() {
+		return {
+			name: this.name,
+			message: this.message,
+			details: this.details,
+			hint: this.hint,
+			code: this.code
+		};
+	}
+};
+function _typeof(o) {
+	"@babel/helpers - typeof";
+	return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(o$1) {
+		return typeof o$1;
+	} : function(o$1) {
+		return o$1 && "function" == typeof Symbol && o$1.constructor === Symbol && o$1 !== Symbol.prototype ? "symbol" : typeof o$1;
+	}, _typeof(o);
+}
+function toPrimitive(t, r) {
+	if ("object" != _typeof(t) || !t) return t;
+	var e = t[Symbol.toPrimitive];
+	if (void 0 !== e) {
+		var i = e.call(t, r || "default");
+		if ("object" != _typeof(i)) return i;
+		throw new TypeError("@@toPrimitive must return a primitive value.");
+	}
+	return ("string" === r ? String : Number)(t);
+}
+function toPropertyKey(t) {
+	var i = toPrimitive(t, "string");
+	return "symbol" == _typeof(i) ? i : i + "";
+}
+function _defineProperty(e, r, t) {
+	return (r = toPropertyKey(r)) in e ? Object.defineProperty(e, r, {
+		value: t,
+		enumerable: !0,
+		configurable: !0,
+		writable: !0
+	}) : e[r] = t, e;
+}
+function ownKeys(e, r) {
+	var t = Object.keys(e);
+	if (Object.getOwnPropertySymbols) {
+		var o = Object.getOwnPropertySymbols(e);
+		r && (o = o.filter(function(r$1) {
+			return Object.getOwnPropertyDescriptor(e, r$1).enumerable;
+		})), t.push.apply(t, o);
+	}
+	return t;
+}
+function _objectSpread2(e) {
+	for (var r = 1; r < arguments.length; r++) {
+		var t = null != arguments[r] ? arguments[r] : {};
+		r % 2 ? ownKeys(Object(t), !0).forEach(function(r$1) {
+			_defineProperty(e, r$1, t[r$1]);
+		}) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function(r$1) {
+			Object.defineProperty(e, r$1, Object.getOwnPropertyDescriptor(t, r$1));
+		});
+	}
+	return e;
+}
+/**
+* Sleep for a given number of milliseconds.
+* If an AbortSignal is provided, the sleep resolves early when the signal is aborted.
+*/
+function sleep(ms, signal) {
+	return new Promise((resolve) => {
+		if (signal === null || signal === void 0 ? void 0 : signal.aborted) {
+			resolve();
+			return;
+		}
+		const id = setTimeout(() => {
+			signal === null || signal === void 0 || signal.removeEventListener("abort", onAbort);
+			resolve();
+		}, ms);
+		function onAbort() {
+			clearTimeout(id);
+			resolve();
+		}
+		signal === null || signal === void 0 || signal.addEventListener("abort", onAbort);
+	});
+}
+/**
+* Check if a request should be retried based on method and status code.
+*/
+function shouldRetry(method, status, attemptCount, retryEnabled) {
+	if (!retryEnabled || attemptCount >= DEFAULT_MAX_RETRIES) return false;
+	if (!RETRYABLE_METHODS.includes(method)) return false;
+	if (!RETRYABLE_STATUS_CODES.includes(status)) return false;
+	return true;
+}
+var PostgrestBuilder = class {
+	/**
+	* Creates a builder configured for a specific PostgREST request.
+	*
+	* @example Using supabase-js (recommended)
+	* ```ts
+	* import { createClient } from '@supabase/supabase-js'
+	*
+	* const supabase = createClient('https://xyzcompany.supabase.co', 'your-publishable-key')
+	* const { data, error } = await supabase.from('users').select('*')
+	* ```
+	*
+	* @category Database
+	*
+	* @example Standalone import for bundle-sensitive environments
+	* ```ts
+	* import { PostgrestQueryBuilder } from '@supabase/postgrest-js'
+	*
+	* const builder = new PostgrestQueryBuilder(
+	*   new URL('https://xyzcompany.supabase.co/rest/v1/users'),
+	*   { headers: new Headers({ apikey: '[REDACTED]' }) }
+	* )
+	* ```
+	*/
+	constructor(builder) {
+		var _builder$shouldThrowO, _builder$isMaybeSingl, _builder$shouldStripN, _builder$urlLengthLim, _builder$retry;
+		this.shouldThrowOnError = false;
+		this.retryEnabled = true;
+		this.method = builder.method;
+		this.url = builder.url;
+		this.headers = new Headers(builder.headers);
+		this.schema = builder.schema;
+		this.body = builder.body;
+		this.shouldThrowOnError = (_builder$shouldThrowO = builder.shouldThrowOnError) !== null && _builder$shouldThrowO !== void 0 ? _builder$shouldThrowO : false;
+		this.signal = builder.signal;
+		this.isMaybeSingle = (_builder$isMaybeSingl = builder.isMaybeSingle) !== null && _builder$isMaybeSingl !== void 0 ? _builder$isMaybeSingl : false;
+		this.shouldStripNulls = (_builder$shouldStripN = builder.shouldStripNulls) !== null && _builder$shouldStripN !== void 0 ? _builder$shouldStripN : false;
+		this.urlLengthLimit = (_builder$urlLengthLim = builder.urlLengthLimit) !== null && _builder$urlLengthLim !== void 0 ? _builder$urlLengthLim : 8e3;
+		this.retryEnabled = (_builder$retry = builder.retry) !== null && _builder$retry !== void 0 ? _builder$retry : true;
+		if (builder.fetch) this.fetch = builder.fetch;
+		else this.fetch = fetch;
+	}
+	/**
+	* If there's an error with the query, throwOnError will reject the promise by
+	* throwing the error instead of returning it as part of a successful response.
+	*
+	* {@link https://github.com/supabase/supabase-js/issues/92}
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*/
+	throwOnError() {
+		this.shouldThrowOnError = true;
+		return this;
+	}
+	/**
+	* Strip null values from the response data. Properties with `null` values
+	* will be omitted from the returned JSON objects.
+	*
+	* Requires PostgREST 11.2.0+.
+	*
+	* {@link https://docs.postgrest.org/en/stable/references/api/resource_representation.html#stripped-nulls}
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `select()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select()
+	*   .stripNulls()
+	* ```
+	*
+	* @exampleSql With `select()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text, bio text);
+	*
+	* insert into
+	*   characters (id, name, bio)
+	* values
+	*   (1, 'Luke', null),
+	*   (2, 'Leia', 'Princess of Alderaan');
+	* ```
+	*
+	* @exampleResponse With `select()`
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "id": 1,
+	*       "name": "Luke"
+	*     },
+	*     {
+	*       "id": 2,
+	*       "name": "Leia",
+	*       "bio": "Princess of Alderaan"
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	stripNulls() {
+		if (this.headers.get("Accept") === "text/csv") throw new Error("stripNulls() cannot be used with csv()");
+		this.shouldStripNulls = true;
+		return this;
+	}
+	/**
+	* Set an HTTP header on this single PostgREST request, overriding any header
+	* with the same name set on the client.
+	*
+	* This is an advanced escape hatch for one-off needs (passing a custom
+	* `Authorization` for a single query, attaching a tracing header, etc.).
+	* Most callers do not need it: configure client-wide headers via the
+	* `headers` option when constructing the client, and authentication via
+	* Supabase Auth.
+	*
+	* @param name - HTTP header name
+	* @param value - HTTP header value
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*/
+	setHeader(name, value) {
+		this.headers = new Headers(this.headers);
+		this.headers.set(name, value);
+		return this;
+	}
+	/**
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* Configure retry behavior for this request.
+	*
+	* By default, retries are enabled for idempotent requests (GET, HEAD, OPTIONS)
+	* that fail with network errors or specific HTTP status codes (503, 520).
+	* Retries use exponential backoff (1s, 2s, 4s) with a maximum of 3 attempts.
+	*
+	* @param enabled - Whether to enable retries for this request
+	*
+	* @example
+	* ```ts
+	* // Disable retries for a specific query
+	* const { data, error } = await supabase
+	*   .from('users')
+	*   .select()
+	*   .retry(false)
+	* ```
+	*/
+	retry(enabled) {
+		this.retryEnabled = enabled;
+		return this;
+	}
+	then(onfulfilled, onrejected) {
+		var _this = this;
+		if (this.schema === void 0) {} else if (["GET", "HEAD"].includes(this.method)) this.headers.set("Accept-Profile", this.schema);
+		else this.headers.set("Content-Profile", this.schema);
+		if (this.method !== "GET" && this.method !== "HEAD") this.headers.set("Content-Type", "application/json");
+		if (this.shouldStripNulls) {
+			const currentAccept = this.headers.get("Accept");
+			if (currentAccept === "application/vnd.pgrst.object+json") this.headers.set("Accept", "application/vnd.pgrst.object+json;nulls=stripped");
+			else if (!currentAccept || currentAccept === "application/json") this.headers.set("Accept", "application/vnd.pgrst.array+json;nulls=stripped");
+		}
+		const _fetch = this.fetch;
+		const executeWithRetry = async () => {
+			let attemptCount = 0;
+			while (true) {
+				const headers = {};
+				_this.headers.forEach((value, key) => {
+					headers[key] = value;
+				});
+				if (attemptCount > 0) headers["X-Retry-Count"] = String(attemptCount);
+				let res$1;
+				try {
+					res$1 = await _fetch(_this.url.toString(), {
+						method: _this.method,
+						headers,
+						body: JSON.stringify(_this.body, (_, value) => typeof value === "bigint" ? value.toString() : value),
+						signal: _this.signal
+					});
+				} catch (fetchError) {
+					if ((fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) === "AbortError" || (fetchError === null || fetchError === void 0 ? void 0 : fetchError.code) === "ABORT_ERR") throw fetchError;
+					if (!RETRYABLE_METHODS.includes(_this.method)) throw fetchError;
+					if (_this.retryEnabled && attemptCount < DEFAULT_MAX_RETRIES) {
+						const delay = getRetryDelay(attemptCount);
+						attemptCount++;
+						await sleep(delay, _this.signal);
+						continue;
+					}
+					throw fetchError;
+				}
+				if (shouldRetry(_this.method, res$1.status, attemptCount, _this.retryEnabled)) {
+					var _res$headers$get, _res$headers;
+					const retryAfterHeader = (_res$headers$get = (_res$headers = res$1.headers) === null || _res$headers === void 0 ? void 0 : _res$headers.get("Retry-After")) !== null && _res$headers$get !== void 0 ? _res$headers$get : null;
+					const delay = retryAfterHeader !== null ? Math.max(0, parseInt(retryAfterHeader, 10) || 0) * 1e3 : getRetryDelay(attemptCount);
+					await res$1.text();
+					attemptCount++;
+					await sleep(delay, _this.signal);
+					continue;
+				}
+				return await _this.processResponse(res$1);
+			}
+		};
+		let res = executeWithRetry();
+		if (!this.shouldThrowOnError) res = res.catch((fetchError) => {
+			var _fetchError$name2;
+			let errorDetails = "";
+			let hint = "";
+			let code = "";
+			const cause = fetchError === null || fetchError === void 0 ? void 0 : fetchError.cause;
+			if (cause) {
+				var _cause$message, _cause$code, _fetchError$name, _cause$name;
+				const causeMessage = (_cause$message = cause === null || cause === void 0 ? void 0 : cause.message) !== null && _cause$message !== void 0 ? _cause$message : "";
+				const causeCode = (_cause$code = cause === null || cause === void 0 ? void 0 : cause.code) !== null && _cause$code !== void 0 ? _cause$code : "";
+				errorDetails = `${(_fetchError$name = fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) !== null && _fetchError$name !== void 0 ? _fetchError$name : "FetchError"}: ${fetchError === null || fetchError === void 0 ? void 0 : fetchError.message}`;
+				errorDetails += `\n\nCaused by: ${(_cause$name = cause === null || cause === void 0 ? void 0 : cause.name) !== null && _cause$name !== void 0 ? _cause$name : "Error"}: ${causeMessage}`;
+				if (causeCode) errorDetails += ` (${causeCode})`;
+				if (cause === null || cause === void 0 ? void 0 : cause.stack) errorDetails += `\n${cause.stack}`;
+			} else {
+				var _fetchError$stack;
+				errorDetails = (_fetchError$stack = fetchError === null || fetchError === void 0 ? void 0 : fetchError.stack) !== null && _fetchError$stack !== void 0 ? _fetchError$stack : "";
+			}
+			const urlLength = this.url.toString().length;
+			if ((fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) === "AbortError" || (fetchError === null || fetchError === void 0 ? void 0 : fetchError.code) === "ABORT_ERR") {
+				code = "";
+				hint = "Request was aborted (timeout or manual cancellation)";
+				if (urlLength > this.urlLengthLimit) hint += `. Note: Your request URL is ${urlLength} characters, which may exceed server limits. If selecting many fields, consider using views. If filtering with large arrays (e.g., .in('id', [many IDs])), consider using an RPC function to pass values server-side.`;
+			} else if ((cause === null || cause === void 0 ? void 0 : cause.name) === "HeadersOverflowError" || (cause === null || cause === void 0 ? void 0 : cause.code) === "UND_ERR_HEADERS_OVERFLOW") {
+				code = "";
+				hint = "HTTP headers exceeded server limits (typically 16KB)";
+				if (urlLength > this.urlLengthLimit) hint += `. Your request URL is ${urlLength} characters. If selecting many fields, consider using views. If filtering with large arrays (e.g., .in('id', [200+ IDs])), consider using an RPC function instead.`;
+			}
+			return {
+				success: false,
+				error: {
+					message: `${(_fetchError$name2 = fetchError === null || fetchError === void 0 ? void 0 : fetchError.name) !== null && _fetchError$name2 !== void 0 ? _fetchError$name2 : "FetchError"}: ${fetchError === null || fetchError === void 0 ? void 0 : fetchError.message}`,
+					details: errorDetails,
+					hint,
+					code
+				},
+				data: null,
+				count: null,
+				status: 0,
+				statusText: ""
+			};
+		});
+		return res.then(onfulfilled, onrejected);
+	}
+	/**
+	* Process a fetch response and return the standardized postgrest response.
+	*/
+	async processResponse(res) {
+		var _this2 = this;
+		let error = null;
+		let data = null;
+		let count = null;
+		let status = res.status;
+		let statusText = res.statusText;
+		if (res.ok) {
+			var _this$headers$get2, _res$headers$get2;
+			if (_this2.method !== "HEAD") {
+				var _this$headers$get;
+				const body = await res.text();
+				if (body === "") {} else if (_this2.headers.get("Accept") === "text/csv") data = body;
+				else if (_this2.headers.get("Accept") && ((_this$headers$get = _this2.headers.get("Accept")) === null || _this$headers$get === void 0 ? void 0 : _this$headers$get.includes("application/vnd.pgrst.plan+text"))) data = body;
+				else try {
+					data = JSON.parse(body);
+				} catch (_unused) {
+					error = { message: body };
+					data = null;
+					if (_this2.shouldThrowOnError) throw new PostgrestError({
+						message: body,
+						details: "",
+						hint: "",
+						code: ""
+					});
+				}
+			}
+			const countHeader = (_this$headers$get2 = _this2.headers.get("Prefer")) === null || _this$headers$get2 === void 0 ? void 0 : _this$headers$get2.match(/count=(exact|planned|estimated)/);
+			const contentRange = (_res$headers$get2 = res.headers.get("content-range")) === null || _res$headers$get2 === void 0 ? void 0 : _res$headers$get2.split("/");
+			if (countHeader && contentRange && contentRange.length > 1) count = parseInt(contentRange[1]);
+			if (_this2.isMaybeSingle && Array.isArray(data)) if (data.length > 1) {
+				error = {
+					code: "PGRST116",
+					details: `Results contain ${data.length} rows, application/vnd.pgrst.object+json requires 1 row`,
+					hint: null,
+					message: "JSON object requested, multiple (or no) rows returned"
+				};
+				data = null;
+				count = null;
+				status = 406;
+				statusText = "Not Acceptable";
+				if (_this2.shouldThrowOnError) {
+					var _error$hint;
+					throw new PostgrestError(_objectSpread2(_objectSpread2({}, error), {}, { hint: (_error$hint = error.hint) !== null && _error$hint !== void 0 ? _error$hint : "" }));
+				}
+			} else if (data.length === 1) data = data[0];
+			else data = null;
+		} else {
+			const body = await res.text();
+			try {
+				error = JSON.parse(body);
+				if (Array.isArray(error) && res.status === 404) {
+					data = [];
+					error = null;
+					status = 200;
+					statusText = "OK";
+				}
+			} catch (_unused2) {
+				if (res.status === 404 && body === "") {
+					status = 204;
+					statusText = "No Content";
+				} else error = { message: body };
+			}
+			if (error && _this2.shouldThrowOnError) throw new PostgrestError(error);
+		}
+		return {
+			success: error === null,
+			error,
+			data,
+			count,
+			status,
+			statusText
+		};
+	}
+	/**
+	* Override the type of the returned `data`.
+	*
+	* @typeParam NewResult - The new result type to override with
+	* @deprecated Use overrideTypes<yourType, { merge: false }>() method at the end of your call chain instead
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*/
+	returns() {
+		/* istanbul ignore next */
+		return this;
+	}
+	/**
+	* Override the type of the returned `data` field in the response.
+	*
+	* @typeParam NewResult - The new type to cast the response data to
+	* @typeParam Options - Optional type configuration (defaults to { merge: true })
+	* @typeParam Options.merge - When true, merges the new type with existing return type. When false, replaces the existing types entirely (defaults to true)
+	* @example
+	* ```typescript
+	* // Merge with existing types (default behavior)
+	* const query = supabase
+	*   .from('users')
+	*   .select()
+	*   .overrideTypes<{ custom_field: string }>()
+	*
+	* // Replace existing types completely
+	* const replaceQuery = supabase
+	*   .from('users')
+	*   .select()
+	*   .overrideTypes<{ id: number; name: string }, { merge: false }>()
+	* ```
+	* @returns A PostgrestBuilder instance with the new type
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example Complete Override type of successful response
+	* ```ts
+	* const { data } = await supabase
+	*   .from('countries')
+	*   .select()
+	*   .overrideTypes<Array<MyType>, { merge: false }>()
+	* ```
+	*
+	* @exampleResponse Complete Override type of successful response
+	* ```ts
+	* let x: typeof data // MyType[]
+	* ```
+	*
+	* @example Complete Override type of object response
+	* ```ts
+	* const { data } = await supabase
+	*   .from('countries')
+	*   .select()
+	*   .maybeSingle()
+	*   .overrideTypes<MyType, { merge: false }>()
+	* ```
+	*
+	* @exampleResponse Complete Override type of object response
+	* ```ts
+	* let x: typeof data // MyType | null
+	* ```
+	*
+	* @example Partial Override type of successful response
+	* ```ts
+	* const { data } = await supabase
+	*   .from('countries')
+	*   .select()
+	*   .overrideTypes<Array<{ status: "A" | "B" }>>()
+	* ```
+	*
+	* @exampleResponse Partial Override type of successful response
+	* ```ts
+	* let x: typeof data // Array<CountryRowProperties & { status: "A" | "B" }>
+	* ```
+	*
+	* @example Partial Override type of object response
+	* ```ts
+	* const { data } = await supabase
+	*   .from('countries')
+	*   .select()
+	*   .maybeSingle()
+	*   .overrideTypes<{ status: "A" | "B" }>()
+	* ```
+	*
+	* @exampleResponse Partial Override type of object response
+	* ```ts
+	* let x: typeof data // CountryRowProperties & { status: "A" | "B" } | null
+	* ```
+	*
+	* @example Merge vs replace existing types
+	* ```typescript
+	* // Merge with existing types (default behavior)
+	* const query = supabase
+	*   .from('users')
+	*   .select()
+	*   .overrideTypes<{ custom_field: string }>()
+	*
+	* // Replace existing types completely
+	* const replaceQuery = supabase
+	*   .from('users')
+	*   .select()
+	*   .overrideTypes<{ id: number; name: string }, { merge: false }>()
+	* ```
+	*/
+	overrideTypes() {
+		return this;
+	}
+};
+var PostgrestTransformBuilder = class extends PostgrestBuilder {
+	throwOnError() {
+		return super.throwOnError();
+	}
+	/**
+	* Perform a SELECT on the query result.
+	*
+	* By default, `.insert()`, `.update()`, `.upsert()`, and `.delete()` do not
+	* return modified rows. By calling this method, modified rows are returned in
+	* `data`.
+	*
+	* @param columns - The columns to retrieve, separated by commas
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `upsert()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .upsert({ id: 1, name: 'Han Solo' })
+	*   .select()
+	* ```
+	*
+	* @exampleSql With `upsert()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Han');
+	* ```
+	*
+	* @exampleResponse With `upsert()`
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "id": 1,
+	*       "name": "Han Solo"
+	*     }
+	*   ],
+	*   "status": 201,
+	*   "statusText": ""
+	* }
+	* ```
+	*/
+	select(columns) {
+		let quoted = false;
+		const cleanedColumns = (columns !== null && columns !== void 0 ? columns : "*").split("").map((c) => {
+			if (/\s/.test(c) && !quoted) return "";
+			if (c === "\"") quoted = !quoted;
+			return c;
+		}).join("");
+		this.url.searchParams.set("select", cleanedColumns);
+		this.headers.append("Prefer", "return=representation");
+		return this;
+	}
+	/**
+	* Order the query result by `column`.
+	*
+	* You can call this method multiple times to order by multiple columns.
+	*
+	* You can order referenced tables, but it only affects the ordering of the
+	* parent table if you use `!inner` in the query.
+	*
+	* @param column - The column to order by
+	* @param options - Named parameters
+	* @param options.ascending - If `true`, the result will be in ascending order
+	* @param options.nullsFirst - If `true`, `null`s appear first. If `false`,
+	* `null`s appear last.
+	* @param options.referencedTable - Set this to order a referenced table by
+	* its columns
+	* @param options.foreignTable - Deprecated, use `options.referencedTable`
+	* instead
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `select()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select('id, name')
+	*   .order('id', { ascending: false })
+	* ```
+	*
+	* @exampleSql With `select()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse With `select()`
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "id": 3,
+	*       "name": "Han"
+	*     },
+	*     {
+	*       "id": 2,
+	*       "name": "Leia"
+	*     },
+	*     {
+	*       "id": 1,
+	*       "name": "Luke"
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*
+	* @exampleDescription On a referenced table
+	* Ordering with `referencedTable` doesn't affect the ordering of the
+	* parent table.
+	*
+	* @example On a referenced table
+	* ```ts
+	*   const { data, error } = await supabase
+	*     .from('orchestral_sections')
+	*     .select(`
+	*       name,
+	*       instruments (
+	*         name
+	*       )
+	*     `)
+	*     .order('name', { referencedTable: 'instruments', ascending: false })
+	*
+	* ```
+	*
+	* @exampleSql On a referenced table
+	* ```sql
+	* create table
+	*   orchestral_sections (id int8 primary key, name text);
+	* create table
+	*   instruments (
+	*     id int8 primary key,
+	*     section_id int8 not null references orchestral_sections,
+	*     name text
+	*   );
+	*
+	* insert into
+	*   orchestral_sections (id, name)
+	* values
+	*   (1, 'strings'),
+	*   (2, 'woodwinds');
+	* insert into
+	*   instruments (id, section_id, name)
+	* values
+	*   (1, 1, 'harp'),
+	*   (2, 1, 'violin');
+	* ```
+	*
+	* @exampleResponse On a referenced table
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "name": "strings",
+	*       "instruments": [
+	*         {
+	*           "name": "violin"
+	*         },
+	*         {
+	*           "name": "harp"
+	*         }
+	*       ]
+	*     },
+	*     {
+	*       "name": "woodwinds",
+	*       "instruments": []
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*
+	* @exampleDescription Order parent table by a referenced table
+	* Ordering with `referenced_table(col)` affects the ordering of the
+	* parent table.
+	*
+	* @example Order parent table by a referenced table
+	* ```ts
+	*   const { data, error } = await supabase
+	*     .from('instruments')
+	*     .select(`
+	*       name,
+	*       section:orchestral_sections (
+	*         name
+	*       )
+	*     `)
+	*     .order('section(name)', { ascending: true })
+	*
+	* ```
+	*
+	* @exampleSql Order parent table by a referenced table
+	* ```sql
+	* create table
+	*   orchestral_sections (id int8 primary key, name text);
+	* create table
+	*   instruments (
+	*     id int8 primary key,
+	*     section_id int8 not null references orchestral_sections,
+	*     name text
+	*   );
+	*
+	* insert into
+	*   orchestral_sections (id, name)
+	* values
+	*   (1, 'strings'),
+	*   (2, 'woodwinds');
+	* insert into
+	*   instruments (id, section_id, name)
+	* values
+	*   (1, 2, 'flute'),
+	*   (2, 1, 'violin');
+	* ```
+	*
+	* @exampleResponse Order parent table by a referenced table
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "name": "violin",
+	*       "orchestral_sections": {"name": "strings"}
+	*     },
+	*     {
+	*       "name": "flute",
+	*       "orchestral_sections": {"name": "woodwinds"}
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	order(column, { ascending = true, nullsFirst, foreignTable, referencedTable = foreignTable } = {}) {
+		const key = referencedTable ? `${referencedTable}.order` : "order";
+		const existingOrder = this.url.searchParams.get(key);
+		this.url.searchParams.set(key, `${existingOrder ? `${existingOrder},` : ""}${column}.${ascending ? "asc" : "desc"}${nullsFirst === void 0 ? "" : nullsFirst ? ".nullsfirst" : ".nullslast"}`);
+		return this;
+	}
+	/**
+	* Limit the query result by `rows`.
+	*
+	* @param rows - The maximum number of rows to return
+	* @param options - Named parameters
+	* @param options.referencedTable - Set this to limit rows of referenced
+	* tables instead of the parent table
+	* @param options.foreignTable - Deprecated, use `options.referencedTable`
+	* instead
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `select()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select('name')
+	*   .limit(1)
+	* ```
+	*
+	* @exampleSql With `select()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse With `select()`
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "name": "Luke"
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*
+	* @example On a referenced table
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('orchestral_sections')
+	*   .select(`
+	*     name,
+	*     instruments (
+	*       name
+	*     )
+	*   `)
+	*   .limit(1, { referencedTable: 'instruments' })
+	* ```
+	*
+	* @exampleSql On a referenced table
+	* ```sql
+	* create table
+	*   orchestral_sections (id int8 primary key, name text);
+	* create table
+	*   instruments (
+	*     id int8 primary key,
+	*     section_id int8 not null references orchestral_sections,
+	*     name text
+	*   );
+	*
+	* insert into
+	*   orchestral_sections (id, name)
+	* values
+	*   (1, 'strings');
+	* insert into
+	*   instruments (id, section_id, name)
+	* values
+	*   (1, 1, 'harp'),
+	*   (2, 1, 'violin');
+	* ```
+	*
+	* @exampleResponse On a referenced table
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "name": "strings",
+	*       "instruments": [
+	*         {
+	*           "name": "violin"
+	*         }
+	*       ]
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	limit(rows, { foreignTable, referencedTable = foreignTable } = {}) {
+		const key = typeof referencedTable === "undefined" ? "limit" : `${referencedTable}.limit`;
+		this.url.searchParams.set(key, `${rows}`);
+		return this;
+	}
+	/**
+	* Limit the query result by starting at an offset `from` and ending at the offset `to`.
+	* Only records within this range are returned.
+	* This respects the query order and if there is no order clause the range could behave unexpectedly.
+	* The `from` and `to` values are 0-based and inclusive: `range(1, 3)` will include the second, third
+	* and fourth rows of the query.
+	*
+	* @param from - The starting index from which to limit the result
+	* @param to - The last index to which to limit the result
+	* @param options - Named parameters
+	* @param options.referencedTable - Set this to limit rows of referenced
+	* tables instead of the parent table
+	* @param options.foreignTable - Deprecated, use `options.referencedTable`
+	* instead
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `select()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select('name')
+	*   .range(0, 1)
+	* ```
+	*
+	* @exampleSql With `select()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse With `select()`
+	* ```json
+	* {
+	*   "data": [
+	*     {
+	*       "name": "Luke"
+	*     },
+	*     {
+	*       "name": "Leia"
+	*     }
+	*   ],
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	range(from, to, { foreignTable, referencedTable = foreignTable } = {}) {
+		const keyOffset = typeof referencedTable === "undefined" ? "offset" : `${referencedTable}.offset`;
+		const keyLimit = typeof referencedTable === "undefined" ? "limit" : `${referencedTable}.limit`;
+		this.url.searchParams.set(keyOffset, `${from}`);
+		this.url.searchParams.set(keyLimit, `${to - from + 1}`);
+		return this;
+	}
+	/**
+	* Set the AbortSignal for the fetch request.
+	*
+	* @param signal - The AbortSignal to use for the fetch request
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @remarks
+	* You can use this to set a timeout for the request.
+	*
+	* @exampleDescription Aborting requests in-flight
+	* You can use an [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController) to abort requests.
+	* Note that `status` and `statusText` don't mean anything for aborted requests as the request wasn't fulfilled.
+	*
+	* @example Aborting requests in-flight
+	* ```ts
+	* const ac = new AbortController()
+	*
+	* const { data, error } = await supabase
+	*   .from('very_big_table')
+	*   .select()
+	*   .abortSignal(ac.signal)
+	*
+	* // Abort the request after 100 ms
+	* setTimeout(() => ac.abort(), 100)
+	* ```
+	*
+	* @exampleResponse Aborting requests in-flight
+	* ```json
+	*   {
+	*     "error": {
+	*       "message": "AbortError: The user aborted a request.",
+	*       "details": "",
+	*       "hint": "The request was aborted locally via the provided AbortSignal.",
+	*       "code": ""
+	*     },
+	*     "status": 0,
+	*     "statusText": ""
+	*   }
+	*
+	* ```
+	*
+	* @example Set a timeout
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('very_big_table')
+	*   .select()
+	*   .abortSignal(AbortSignal.timeout(1000 /* ms *\/))
+	* ```
+	*
+	* @exampleResponse Set a timeout
+	* ```json
+	*   {
+	*     "error": {
+	*       "message": "FetchError: The user aborted a request.",
+	*       "details": "",
+	*       "hint": "",
+	*       "code": ""
+	*     },
+	*     "status": 0,
+	*     "statusText": ""
+	*   }
+	*
+	* ```
+	*/
+	abortSignal(signal) {
+		this.signal = signal;
+		return this;
+	}
+	/**
+	* Return `data` as a single object instead of an array of objects.
+	*
+	* Query result must be one row (e.g. using `.limit(1)`), otherwise this
+	* returns an error.
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `select()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select('name')
+	*   .limit(1)
+	*   .single()
+	* ```
+	*
+	* @exampleSql With `select()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse With `select()`
+	* ```json
+	* {
+	*   "data": {
+	*     "name": "Luke"
+	*   },
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	single() {
+		this.headers.set("Accept", "application/vnd.pgrst.object+json");
+		return this;
+	}
+	/**
+	* Return `data` as a single object instead of an array of objects.
+	*
+	* Query result must be zero or one row (e.g. using `.limit(1)`), otherwise
+	* this returns an error.
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example With `select()`
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select()
+	*   .eq('name', 'Katniss')
+	*   .maybeSingle()
+	* ```
+	*
+	* @exampleSql With `select()`
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse With `select()`
+	* ```json
+	* {
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	maybeSingle() {
+		this.isMaybeSingle = true;
+		return this;
+	}
+	/**
+	* Return `data` as a string in CSV format.
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @exampleDescription Return data as CSV
+	* By default, the data is returned in JSON format, but can also be returned as Comma Separated Values.
+	*
+	* @example Return data as CSV
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select()
+	*   .csv()
+	* ```
+	*
+	* @exampleSql Return data as CSV
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse Return data as CSV
+	* ```json
+	* {
+	*   "data": "id,name\n1,Luke\n2,Leia\n3,Han",
+	*   "status": 200,
+	*   "statusText": "OK"
+	* }
+	* ```
+	*/
+	csv() {
+		this.headers.set("Accept", "text/csv");
+		return this;
+	}
+	/**
+	* Return `data` as an object in [GeoJSON](https://geojson.org) format.
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*/
+	geojson() {
+		this.headers.set("Accept", "application/geo+json");
+		return this;
+	}
+	/**
+	* Return `data` as the EXPLAIN plan for the query.
+	*
+	* You need to enable the
+	* [db_plan_enabled](https://supabase.com/docs/guides/database/debugging-performance#enabling-explain)
+	* setting before using this method.
+	*
+	* @param options - Named parameters
+	*
+	* @param options.analyze - If `true`, the query will be executed and the
+	* actual run time will be returned
+	*
+	* @param options.verbose - If `true`, the query identifier will be returned
+	* and `data` will include the output columns of the query
+	*
+	* @param options.settings - If `true`, include information on configuration
+	* parameters that affect query planning
+	*
+	* @param options.buffers - If `true`, include information on buffer usage
+	*
+	* @param options.wal - If `true`, include information on WAL record generation
+	*
+	* @param options.format - The format of the output, can be `"text"` (default)
+	* or `"json"`
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @exampleDescription Get the execution plan
+	* By default, the data is returned in TEXT format, but can also be returned as JSON by using the `format` parameter.
+	*
+	* @example Get the execution plan
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select()
+	*   .explain()
+	* ```
+	*
+	* @exampleSql Get the execution plan
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse Get the execution plan
+	* ```js
+	* Aggregate  (cost=33.34..33.36 rows=1 width=112)
+	*   ->  Limit  (cost=0.00..18.33 rows=1000 width=40)
+	*         ->  Seq Scan on characters  (cost=0.00..22.00 rows=1200 width=40)
+	* ```
+	*
+	* @exampleDescription Get the execution plan with analyze and verbose
+	* By default, the data is returned in TEXT format, but can also be returned as JSON by using the `format` parameter.
+	*
+	* @example Get the execution plan with analyze and verbose
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('characters')
+	*   .select()
+	*   .explain({analyze:true,verbose:true})
+	* ```
+	*
+	* @exampleSql Get the execution plan with analyze and verbose
+	* ```sql
+	* create table
+	*   characters (id int8 primary key, name text);
+	*
+	* insert into
+	*   characters (id, name)
+	* values
+	*   (1, 'Luke'),
+	*   (2, 'Leia'),
+	*   (3, 'Han');
+	* ```
+	*
+	* @exampleResponse Get the execution plan with analyze and verbose
+	* ```js
+	* Aggregate  (cost=33.34..33.36 rows=1 width=112) (actual time=0.041..0.041 rows=1 loops=1)
+	*   Output: NULL::bigint, count(ROW(characters.id, characters.name)), COALESCE(json_agg(ROW(characters.id, characters.name)), '[]'::json), NULLIF(current_setting('response.headers'::text, true), ''::text), NULLIF(current_setting('response.status'::text, true), ''::text)
+	*   ->  Limit  (cost=0.00..18.33 rows=1000 width=40) (actual time=0.005..0.006 rows=3 loops=1)
+	*         Output: characters.id, characters.name
+	*         ->  Seq Scan on public.characters  (cost=0.00..22.00 rows=1200 width=40) (actual time=0.004..0.005 rows=3 loops=1)
+	*               Output: characters.id, characters.name
+	* Query Identifier: -4730654291623321173
+	* Planning Time: 0.407 ms
+	* Execution Time: 0.119 ms
+	* ```
+	*/
+	explain({ analyze = false, verbose = false, settings = false, buffers = false, wal = false, format = "text" } = {}) {
+		var _this$headers$get;
+		const options = [
+			analyze ? "analyze" : null,
+			verbose ? "verbose" : null,
+			settings ? "settings" : null,
+			buffers ? "buffers" : null,
+			wal ? "wal" : null
+		].filter(Boolean).join("|");
+		const forMediatype = (_this$headers$get = this.headers.get("Accept")) !== null && _this$headers$get !== void 0 ? _this$headers$get : "application/json";
+		this.headers.set("Accept", `application/vnd.pgrst.plan+${format}; for="${forMediatype}"; options=${options};`);
+		if (format === "json") return this;
+		else return this;
+	}
+	/**
+	* Dry-run this request: execute the query but discard the changes.
+	*
+	* Server-side, PostgREST runs the query inside a transaction and rolls it back
+	* instead of committing. The response still contains the data that *would* have
+	* been returned — `RETURNING` clauses execute and RLS, triggers, and constraints
+	* are all evaluated — but no row is actually inserted, updated, or deleted.
+	*
+	* This affects only the single request it is chained to. The JS caller has no
+	* handle on the transaction: supabase-js does not group multiple queries into
+	* one transaction. For multi-statement transactional logic, use a database
+	* function (`supabase.rpc(...)`).
+	*
+	* Sets the `Prefer: tx=rollback` header. See PostgREST's docs on transaction
+	* preferences for the underlying mechanism.
+	*
+	* @category Database
+	* @subcategory Using modifiers
+	*
+	* @example Validate an insert without persisting
+	* ```ts
+	* const { data, error } = await supabase
+	*   .from('countries')
+[TRUNCATED: file is 105548 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: src/components/aura/VideoEntryForm.tsx ===
+// src/components/aura/VideoEntryForm.tsx
+import { useCallback, useState } from "react";
+import { motion } from "motion/react";
+import VideoDropzone, { type VideoUploadMeta } from "@/components/aura/VideoDropzone";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { COURSE_CATEGORIES, type CourseCategory, type AuraCourse } from "@/lib/courses.types";
+import type { AuraLevel } from "@/lib/database.types";
+import type { CourseInput } from "@/lib/courses";
+import type { PlanId } from "@/lib/plans";
+
+interface VideoEntryFormProps {
+  course: AuraCourse | null;
+  saving: boolean;
+  error: string | null;
+  notice: string | null;
+  onSave: (input: CourseInput) => void;
+  onDelete?: () => void;
+  /** Called right after a video finishes uploading, so the parent can
+   *  persist it (setCourseVideo) — separate from the title/category Save
+   *  button so a big upload never gets lost if the admin doesn't also
+   *  click Save. */
+  onVideoUploaded: (path: string, durationSeconds: number | null, meta: VideoUploadMeta) => void;
+  onVideoCleared: () => void;
+  videoPath: string | null;
+  courseId: string | null;
+}
+
+// Matches the real `aura_level` Postgres enum exactly (verified via
+// pg_enum — see check-aura-level.sql). Do not add/rename values here
+// without also updating the enum in the database, or inserts will fail
+// with "invalid input value for enum aura_level" (Postgres 22P02).
+const LEVELS: { key: AuraLevel; label: string }[] = [
+  { key: "foundation", label: "Foundation" },
+  { key: "professional", label: "Professional" },
+  { key: "advanced", label: "Advanced" },
+  { key: "master", label: "Master" },
+  { key: "educator", label: "Educator" },
+];
+
+// Simplified to 2 real-world choices instead of listing all 4 AURA_PLANS:
+// "low" makes a course visible to every paying subscriber (low/mid/high/
+// limited all rank >= low, per planUnlocks in courses.types.ts). "limited"
+// gates a course exclusively to Limited Edition Physical Book buyers —
+// who, thanks to the same hierarchy, still see every "ALL" course too.
+const PLAN_CHOICES: { key: PlanId; label: string }[] = [
+  { key: "low", label: "ALL" },
+  { key: "limited", label: "LIMITED" },
+];
+
+export default function VideoEntryForm({
+  course,
+  saving,
+  error,
+  notice,
+  onSave,
+  onDelete,
+  onVideoUploaded,
+  onVideoCleared,
+  videoPath,
+  courseId,
+}: VideoEntryFormProps) {
+  const [title, setTitle] = useState(course?.title ?? "");
+  const [summary, setSummary] = useState(course?.summary ?? "");
+  const [category, setCategory] = useState<CourseCategory>(course?.category ?? "graduation");
+  const [level, setLevel] = useState<AuraLevel>(course?.level ?? "foundation");
+  const [requiredPlan, setRequiredPlan] = useState<PlanId>(course?.required_plan ?? "low");
+  const [status, setStatus] = useState<"draft" | "published" | "archived">(
+    (course?.status as "draft" | "published" | "archived") ?? "draft",
+  );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      onSave({ title, summary, category, level, requiredPlan, status });
+    },
+    [title, summary, category, level, requiredPlan, status, onSave],
+  );
+
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      onSubmit={handleSubmit}
+      className="space-y-8"
+    >
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Τίτλος
+        </label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          placeholder="π.χ. Graduation Bob — Βασική Τεχνική"
+          className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-neutral-100 outline-none transition focus:border-white/30"
+        />
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Κατηγορία
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {COURSE_CATEGORIES.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setCategory(c.key)}
+              className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${
+                category === c.key
+                  ? "border-white/60 bg-white/10 text-white"
+                  : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"
+              }`}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Επίπεδο
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {LEVELS.map((l) => (
+            <button
+              key={l.key}
+              type="button"
+              onClick={() => setLevel(l.key)}
+              className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${
+                level === l.key
+                  ? "border-white/60 bg-white/10 text-white"
+                  : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Περιγραφή
+        </label>
+        <textarea
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          rows={4}
+          placeholder="Σύντομη περιγραφή του βίντεο…"
+          className="mt-2 w-full resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-relaxed text-neutral-100 outline-none transition focus:border-white/30"
+        />
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Πλάνο πρόσβασης
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {PLAN_CHOICES.map((choice) => (
+            <button
+              key={choice.key}
+              type="button"
+              onClick={() => setRequiredPlan(choice.key)}
+              className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${
+                requiredPlan === choice.key
+                  ? "border-white/60 bg-white/10 text-white"
+                  : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"
+              }`}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Βίντεο
+        </label>
+        <div className="mt-2">
+          {courseId ? (
+            <VideoDropzone
+              courseId={courseId}
+              videoPath={videoPath}
+              onUploaded={onVideoUploaded}
+              onCleared={onVideoCleared}
+              disabled={saving}
+            />
+          ) : (
+            <p className="rounded-xl border border-dashed border-white/15 bg-white/[0.02] px-4 py-6 text-center text-xs text-neutral-500">
+              Αποθήκευσε πρώτα τον τίτλο για να ξεκλειδώσει το upload βίντεο.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-[10px] uppercase tracking-[0.35em] text-neutral-500">
+          Κατάσταση
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(
+            [
+              { key: "draft", label: "Πρόχειρο" },
+              { key: "published", label: "Δημοσιευμένο" },
+              { key: "archived", label: "Αρχειοθετημένο" },
+            ] as const
+          ).map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setStatus(s.key)}
+              className={`rounded-full border px-4 py-2 text-[11px] uppercase tracking-[0.25em] transition ${
+                status === s.key
+                  ? "border-white/60 bg-white/10 text-white"
+                  : "border-white/10 text-neutral-400 hover:border-white/30 hover:text-neutral-200"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? (
+        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          {error}
+        </p>
+      ) : null}
+      {notice ? (
+        <p className="rounded-xl border border-white/15 bg-white/[0.03] px-4 py-3 text-sm text-neutral-300">
+          {notice}
+        </p>
+      ) : null}
+
+      <div className="flex flex-wrap items-center gap-4 pt-2">
+        <ChromeButton type="submit" disabled={saving}>
+          {saving ? "ΑΠΟΘΗΚΕΥΣΗ…" : "ΑΠΟΘΗΚΕΥΣΗ"}
+        </ChromeButton>
+        {onDelete ? (
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={saving}
+            className="text-[11px] uppercase tracking-[0.3em] text-red-400/80 transition hover:text-red-400"
+          >
+            Διαγραφή
+          </button>
+        ) : null}
+      </div>
+    </motion.form>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/lib/book.ts ===
+// src/lib/book.ts
+import { supabase } from "@/lib/supabase";
+
+export interface BookSettings {
+  id: number;
+  title: string;
+  price_cents: number;
+  shipping_cents: number;
+  currency: string;
+  stock: number | null;
+  is_active: boolean;
+  updated_at: string;
+}
+
+export type BookOrderStatus =
+  | "pending"
+  | "paid"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "refunded";
+
+export interface BookOrder {
+  id: string;
+  created_at: string;
+  status: BookOrderStatus;
+  quantity: number;
+  unit_price_cents: number;
+  /** Price per copy before the member discount (null on older orders). */
+  list_unit_price_cents?: number | null;
+  discount_percent?: number | null;
+  shipping_cents: number;
+  total_cents: number;
+  currency: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  address_line1: string;
+  address_line2: string | null;
+  city: string;
+  region: string | null;
+  postal_code: string;
+  country: string;
+  notes: string | null;
+  tracking_number: string | null;
+  admin_note: string | null;
+  paid_at: string | null;
+  shipped_at: string | null;
+}
+
+export interface ShippingInput {
+  quantity: number;
+  fullName: string;
+  email: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  notes: string;
+}
+
+export function formatMoney(cents: number, currency = "eur"): string {
+  return new Intl.NumberFormat("el-GR", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);
+}
+
+const ERROR_TEXT: Record<string, string> = {
+  invalid_input: "Please check your details and try again.",
+  sold_out: "Sorry, there are not enough copies left.",
+  book_unavailable: "The book is not available for ordering right now.",
+  not_found: "We could not find this order.",
+  server_error: "Something went wrong on our side. Please try again.",
+};
+
+async function invoke<T>(name: string, body: unknown): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(name, { body });
+
+  if (error) {
+    const res = (error as { context?: Response }).context;
+    if (res && typeof res.json === "function") {
+      try {
+        const payload = (await res.json()) as { error?: string };
+        if (payload?.error) throw new Error(ERROR_TEXT[payload.error] ?? payload.error);
+      } catch (e) {
+        if (e instanceof Error && e.message) throw e;
+      }
+    }
+    throw new Error(error.message || "Request failed.");
+  }
+
+  const payload = data as { error?: string } | null;
+  if (payload?.error) throw new Error(ERROR_TEXT[payload.error] ?? payload.error);
+  return data as T;
+}
+
+/* ------------------------------ public ------------------------------ */
+
+export async function getBookSettings(): Promise<BookSettings | null> {
+  const { data, error } = await supabase
+    .from("book_settings")
+    .select("*")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as BookSettings | null) ?? null;
+}
+
+export function createBookCheckout(input: ShippingInput) {
+  return invoke<{
+    /** Viva's secure payment page: the customer is sent here to pay. */
+    redirectUrl: string;
+    orderId: string;
+    /** Final amount to be charged (member price + shipping), decided by the server. */
+    totalCents: number;
+    unitPriceCents?: number;
+    discountPercent?: number;
+  }>(
+    "create-book-checkout",
+    input,
+  );
+}
+
+export function confirmBookOrder(orderId: string) {
+  return invoke<{ status: BookOrderStatus }>("confirm-book-order", { orderId });
+}
+
+/* ------------------------------- admin ------------------------------ */
+
+export async function updateBookSettings(patch: {
+  title: string;
+  price_cents: number;
+  shipping_cents: number;
+  stock: number | null;
+  is_active: boolean;
+}): Promise<BookSettings> {
+  const { data, error } = await supabase
+    .from("book_settings")
+    .upsert({ id: 1, ...patch })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as BookSettings;
+}
+
+export async function getBookOrders(): Promise<BookOrder[]> {
+  const { data, error } = await supabase
+    .from("book_orders")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as BookOrder[];
+}
+
+export async function updateBookOrder(
+  id: string,
+  patch: {
+    status: BookOrderStatus;
+    tracking_number: string | null;
+    admin_note: string | null;
+    shipped_at?: string;
+  },
+): Promise<BookOrder> {
+  const { data, error } = await supabase
+    .from("book_orders")
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data as BookOrder;
+}
+=== END FILE ===
+

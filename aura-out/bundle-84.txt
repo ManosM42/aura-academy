@@ -1,0 +1,1012 @@
+=== FILE: src/components/ui/menubar.tsx ===
+import * as React from "react";
+import * as MenubarPrimitive from "@radix-ui/react-menubar";
+import { Check, ChevronRight, Circle } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+function MenubarMenu({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Menu>) {
+  return <MenubarPrimitive.Menu {...props} />;
+}
+
+function MenubarGroup({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Group>) {
+  return <MenubarPrimitive.Group {...props} />;
+}
+
+function MenubarPortal({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Portal>) {
+  return <MenubarPrimitive.Portal {...props} />;
+}
+
+function MenubarRadioGroup({ ...props }: React.ComponentProps<typeof MenubarPrimitive.RadioGroup>) {
+  return <MenubarPrimitive.RadioGroup {...props} />;
+}
+
+function MenubarSub({ ...props }: React.ComponentProps<typeof MenubarPrimitive.Sub>) {
+  return <MenubarPrimitive.Sub data-slot="menubar-sub" {...props} />;
+}
+
+const Menubar = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.Root>
+>(({ className, ...props }, ref) => (
+  <MenubarPrimitive.Root
+    ref={ref}
+    className={cn(
+      "flex h-9 items-center space-x-1 rounded-md border bg-background p-1 shadow-sm",
+      className,
+    )}
+    {...props}
+  />
+));
+Menubar.displayName = MenubarPrimitive.Root.displayName;
+
+const MenubarTrigger = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.Trigger>
+>(({ className, ...props }, ref) => (
+  <MenubarPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "flex cursor-default select-none items-center rounded-sm px-3 py-1 text-sm font-medium outline-none focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+      className,
+    )}
+    {...props}
+  />
+));
+MenubarTrigger.displayName = MenubarPrimitive.Trigger.displayName;
+
+const MenubarSubTrigger = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.SubTrigger>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.SubTrigger> & {
+    inset?: boolean;
+  }
+>(({ className, inset, children, ...props }, ref) => (
+  <MenubarPrimitive.SubTrigger
+    ref={ref}
+    className={cn(
+      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[state=open]:bg-accent data-[state=open]:text-accent-foreground",
+      inset && "pl-8",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+    <ChevronRight className="ml-auto h-4 w-4" />
+  </MenubarPrimitive.SubTrigger>
+));
+MenubarSubTrigger.displayName = MenubarPrimitive.SubTrigger.displayName;
+
+const MenubarSubContent = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.SubContent>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.SubContent>
+>(({ className, ...props }, ref) => (
+  <MenubarPrimitive.SubContent
+    ref={ref}
+    className={cn(
+      "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-menubar-content-transform-origin)",
+      className,
+    )}
+    {...props}
+  />
+));
+MenubarSubContent.displayName = MenubarPrimitive.SubContent.displayName;
+
+const MenubarContent = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.Content>
+>(({ className, align = "start", alignOffset = -4, sideOffset = 8, ...props }, ref) => (
+  <MenubarPrimitive.Portal>
+    <MenubarPrimitive.Content
+      ref={ref}
+      align={align}
+      alignOffset={alignOffset}
+      sideOffset={sideOffset}
+      className={cn(
+        "z-50 min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-menubar-content-transform-origin)",
+        className,
+      )}
+      {...props}
+    />
+  </MenubarPrimitive.Portal>
+));
+MenubarContent.displayName = MenubarPrimitive.Content.displayName;
+
+const MenubarItem = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.Item> & {
+    inset?: boolean;
+  }
+>(({ className, inset, ...props }, ref) => (
+  <MenubarPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      inset && "pl-8",
+      className,
+    )}
+    {...props}
+  />
+));
+MenubarItem.displayName = MenubarPrimitive.Item.displayName;
+
+const MenubarCheckboxItem = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.CheckboxItem>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.CheckboxItem>
+>(({ className, children, ...props }, ref) => (
+  <MenubarPrimitive.CheckboxItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <MenubarPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </MenubarPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </MenubarPrimitive.CheckboxItem>
+));
+MenubarCheckboxItem.displayName = MenubarPrimitive.CheckboxItem.displayName;
+
+const MenubarRadioItem = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.RadioItem>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.RadioItem>
+>(({ className, children, ...props }, ref) => (
+  <MenubarPrimitive.RadioItem
+    ref={ref}
+    className={cn(
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <MenubarPrimitive.ItemIndicator>
+        <Circle className="h-4 w-4 fill-current" />
+      </MenubarPrimitive.ItemIndicator>
+    </span>
+    {children}
+  </MenubarPrimitive.RadioItem>
+));
+MenubarRadioItem.displayName = MenubarPrimitive.RadioItem.displayName;
+
+const MenubarLabel = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.Label> & {
+    inset?: boolean;
+  }
+>(({ className, inset, ...props }, ref) => (
+  <MenubarPrimitive.Label
+    ref={ref}
+    className={cn("px-2 py-1.5 text-sm font-semibold", inset && "pl-8", className)}
+    {...props}
+  />
+));
+MenubarLabel.displayName = MenubarPrimitive.Label.displayName;
+
+const MenubarSeparator = React.forwardRef<
+  React.ElementRef<typeof MenubarPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof MenubarPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <MenubarPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    {...props}
+  />
+));
+MenubarSeparator.displayName = MenubarPrimitive.Separator.displayName;
+
+const MenubarShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
+  return (
+    <span
+      className={cn("ml-auto text-xs tracking-widest text-muted-foreground", className)}
+      {...props}
+    />
+  );
+};
+MenubarShortcut.displayname = "MenubarShortcut";
+
+export {
+  Menubar,
+  MenubarMenu,
+  MenubarTrigger,
+  MenubarContent,
+  MenubarItem,
+  MenubarSeparator,
+  MenubarLabel,
+  MenubarCheckboxItem,
+  MenubarRadioGroup,
+  MenubarRadioItem,
+  MenubarPortal,
+  MenubarSubContent,
+  MenubarSubTrigger,
+  MenubarGroup,
+  MenubarSub,
+  MenubarShortcut,
+};
+
+=== END FILE ===
+
+=== FILE: src/components/ui/resizable.tsx ===
+import { GripVertical } from "lucide-react";
+import { Group, Panel, Separator } from "react-resizable-panels";
+
+import { cn } from "@/lib/utils";
+
+const ResizablePanelGroup = ({ className, ...props }: React.ComponentProps<typeof Group>) => (
+  <Group
+    className={cn("flex h-full w-full data-[panel-group-direction=vertical]:flex-col", className)}
+    {...props}
+  />
+);
+
+const ResizablePanel = Panel;
+
+const ResizableHandle = ({
+  withHandle,
+  className,
+  ...props
+}: React.ComponentProps<typeof Separator> & {
+  withHandle?: boolean;
+}) => (
+  <Separator
+    className={cn(
+      "relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
+      className,
+    )}
+    {...props}
+  >
+    {withHandle && (
+      <div className="z-10 flex h-4 w-3 items-center justify-center rounded-sm border bg-border">
+        <GripVertical className="h-2.5 w-2.5" />
+      </div>
+    )}
+  </Separator>
+);
+
+export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
+
+=== END FILE ===
+
+=== FILE: src/components/ui/select.tsx ===
+"use client";
+
+import * as React from "react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { Check, ChevronDown, ChevronUp } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+const Select = SelectPrimitive.Root;
+
+const SelectGroup = SelectPrimitive.Group;
+
+const SelectValue = SelectPrimitive.Value;
+
+const SelectTrigger = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background cursor-pointer data-[placeholder]:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+    <SelectPrimitive.Icon asChild>
+      <ChevronDown className="h-4 w-4 opacity-50" />
+    </SelectPrimitive.Icon>
+  </SelectPrimitive.Trigger>
+));
+SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
+
+const SelectScrollUpButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollUpButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollUpButton>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.ScrollUpButton
+    ref={ref}
+    className={cn("flex cursor-default items-center justify-center py-1", className)}
+    {...props}
+  >
+    <ChevronUp className="h-4 w-4" />
+  </SelectPrimitive.ScrollUpButton>
+));
+SelectScrollUpButton.displayName = SelectPrimitive.ScrollUpButton.displayName;
+
+const SelectScrollDownButton = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.ScrollDownButton>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.ScrollDownButton>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.ScrollDownButton
+    ref={ref}
+    className={cn("flex cursor-default items-center justify-center py-1", className)}
+    {...props}
+  >
+    <ChevronDown className="h-4 w-4" />
+  </SelectPrimitive.ScrollDownButton>
+));
+SelectScrollDownButton.displayName = SelectPrimitive.ScrollDownButton.displayName;
+
+const SelectContent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
+>(({ className, children, position = "popper", ...props }, ref) => (
+  <SelectPrimitive.Portal>
+    <SelectPrimitive.Content
+      ref={ref}
+      className={cn(
+        "relative z-50 max-h-(--radix-select-content-available-height) min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-(--radix-select-content-transform-origin)",
+        position === "popper" &&
+          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+        className,
+      )}
+      position={position}
+      {...props}
+    >
+      <SelectScrollUpButton />
+      <SelectPrimitive.Viewport
+        className={cn(
+          "p-1",
+          position === "popper" &&
+            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]",
+        )}
+      >
+        {children}
+      </SelectPrimitive.Viewport>
+      <SelectScrollDownButton />
+    </SelectPrimitive.Content>
+  </SelectPrimitive.Portal>
+));
+SelectContent.displayName = SelectPrimitive.Content.displayName;
+
+const SelectLabel = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Label>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Label>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.Label
+    ref={ref}
+    className={cn("px-2 py-1.5 text-sm font-semibold", className)}
+    {...props}
+  />
+));
+SelectLabel.displayName = SelectPrimitive.Label.displayName;
+
+const SelectItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className,
+    )}
+    {...props}
+  >
+    <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
+      <SelectPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </SelectPrimitive.ItemIndicator>
+    </span>
+    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+  </SelectPrimitive.Item>
+));
+SelectItem.displayName = SelectPrimitive.Item.displayName;
+
+const SelectSeparator = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <SelectPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 my-1 h-px bg-muted", className)}
+    {...props}
+  />
+));
+SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
+
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+};
+
+=== END FILE ===
+
+=== FILE: src/integrations/supabase/types.ts ===
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          barber_level: string
+          bio: string
+          created_at: string
+          display_name: string
+          id: string
+          location: string
+          preferences: Json
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          barber_level?: string
+          bio?: string
+          created_at?: string
+          display_name?: string
+          id: string
+          location?: string
+          preferences?: Json
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          barber_level?: string
+          bio?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          location?: string
+          preferences?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
+
+=== END FILE ===
+
+=== FILE: src/lib/discounts.ts ===
+// src/lib/discounts.ts
+//
+// Member discounts for the physical book and the online seminars.
+//
+// IMPORTANT: this file only DISPLAYS prices. The amount Stripe really charges
+// is decided by the edge functions (create-book-checkout / create-online-checkout)
+// through public.aura_quote(), from the caller's verified session.
+import { useEffect, useState } from "react";
+import { db } from "@/lib/db";
+import { isPlanId, type PlanId } from "@/lib/plans";
+
+export interface MyDiscounts {
+  /** Active plan of the signed-in user, or null for guests / no active plan. */
+  plan: PlanId | null;
+  bookPercent: number;
+  seminarPercent: number;
+  loading: boolean;
+}
+
+const NONE: MyDiscounts = { plan: null, bookPercent: 0, seminarPercent: 0, loading: false };
+
+function clampPercent(v: unknown): number {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
+
+/**
+ * Same maths as public.aura_apply_percent(): integer cents, rounded half up.
+ * 4900 cents at 25% -> 3675.
+ */
+export function applyPercent(cents: number, percent: number): number {
+  const p = clampPercent(percent);
+  return Math.max(0, Math.floor((cents * (100 - p) + 50) / 100));
+}
+
+async function fetchMyDiscounts(): Promise<MyDiscounts> {
+  const { data, error } = await db.rpc("get_my_discounts");
+  if (error || !data) {
+    if (error) console.error("get_my_discounts:", error.message);
+    return NONE;
+  }
+  const row = data as { plan?: unknown; book_percent?: unknown; online_seminar_percent?: unknown };
+  return {
+    plan: isPlanId(row.plan) ? row.plan : null,
+    bookPercent: clampPercent(row.book_percent),
+    seminarPercent: clampPercent(row.online_seminar_percent),
+    loading: false,
+  };
+}
+
+/** Discounts of the current visitor. Re-reads when they sign in or out. */
+export function useMyDiscounts(): MyDiscounts {
+  const [state, setState] = useState<MyDiscounts>({ ...NONE, loading: true });
+
+  useEffect(() => {
+    let active = true;
+
+    const load = () => {
+      void fetchMyDiscounts()
+        .then((next) => active && setState(next))
+        .catch(() => active && setState(NONE));
+    };
+
+    load();
+    const { data: sub } = db.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") load();
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  return state;
+}
+
+/* ------------------------------------------------------------------ */
+/* Public discount table (for marketing pop-ups: "PRO saves 25%…")     */
+/* ------------------------------------------------------------------ */
+
+export type DiscountProduct = "book" | "online_seminar";
+export type DiscountTable = Record<PlanId, Record<DiscountProduct, number>>;
+
+/** Used until the database answers, and if it cannot be reached. Same as aura-discounts.sql. */
+const DEFAULT_TABLE: DiscountTable = {
+  low: { book: 0, online_seminar: 0 },
+  mid: { book: 25, online_seminar: 0 },
+  high: { book: 50, online_seminar: 25 },
+};
+
+/** Percentages per plan, read from public.plan_discounts (readable by everyone). */
+export function usePlanDiscountTable(): DiscountTable {
+  const [table, setTable] = useState<DiscountTable>(DEFAULT_TABLE);
+
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      const { data, error } = await db.from("plan_discounts").select("plan_id, product, percent");
+      if (!active || error || !Array.isArray(data) || data.length === 0) return;
+
+      const next: DiscountTable = {
+        low: { ...DEFAULT_TABLE.low },
+        mid: { ...DEFAULT_TABLE.mid },
+        high: { ...DEFAULT_TABLE.high },
+      };
+      for (const row of data as { plan_id: unknown; product: unknown; percent: unknown }[]) {
+        if (!isPlanId(row.plan_id)) continue;
+        if (row.product === "book" || row.product === "online_seminar") {
+          next[row.plan_id][row.product] = clampPercent(row.percent);
+        }
+      }
+      setTable(next);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return table;
+}
+
+=== END FILE ===
+
+=== FILE: src/lib/error-page.ts ===
+export function renderErrorPage(): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>This page didn't load</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font: 15px/1.5 system-ui, -apple-system, sans-serif; background: #fafafa; color: #111; display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 1.5rem; }
+      .card { max-width: 28rem; width: 100%; text-align: center; padding: 2rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
+      p { color: #4b5563; margin: 0 0 1.5rem; }
+      .actions { display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
+      a, button { padding: 0.5rem 1rem; border-radius: 0.375rem; font: inherit; cursor: pointer; text-decoration: none; border: 1px solid transparent; }
+      .primary { background: #111; color: #fff; }
+      .secondary { background: #fff; color: #111; border-color: #d1d5db; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>This page didn't load</h1>
+      <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      <div class="actions">
+        <button class="primary" onclick="location.reload()">Try again</button>
+        <a class="secondary" href="/">Go home</a>
+      </div>
+    </div>
+  </body>
+</html>`;
+}
+
+=== END FILE ===
+
+=== FILE: src/lib/messagingQueries.ts ===
+// src/lib/messagingQueries.ts
+import { supabase } from "@/lib/supabase";
+import { getCurrentUserId } from "@/lib/queries";
+import type { Profile } from "@/lib/database.types";
+import type { ConversationOtherUser, ConversationSummary, Message } from "@/lib/messaging.types";
+
+// --- Profile lookup (για το UserProfileModal) ----------------
+
+export async function getProfileById(userId: string): Promise<Profile> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+  if (error) throw error;
+  return data as Profile;
+}
+
+// --- Δημιουργία / εύρεση 1:1 συνομιλίας -----------------------
+
+export async function getOrCreateDirectConversation(
+  otherUserId: string,
+): Promise<string> {
+  const { data, error } = await supabase.rpc(
+    "get_or_create_direct_conversation",
+    { other_user_id: otherUserId },
+  );
+  if (error) throw error;
+  return data as string;
+}
+
+// --- Λίστα συνομιλιών (δεξί panel στο /messages) --------------
+
+export async function getMyConversations(): Promise<ConversationSummary[]> {
+  const uid = await getCurrentUserId();
+
+  const { data: myRows, error: myErr } = await supabase
+    .from("conversation_participants")
+    .select("conversation_id, last_read_at")
+    .eq("user_id", uid);
+  if (myErr) throw myErr;
+
+  const convIds = (myRows ?? []).map((r) => r.conversation_id as string);
+  if (convIds.length === 0) return [];
+
+  const [{ data: others, error: othErr }, { data: msgs, error: msgErr }] =
+    await Promise.all([
+      supabase
+        .from("conversation_participants")
+        .select("conversation_id, profiles(id, full_name, avatar_url, role)")
+        .in("conversation_id", convIds)
+        .neq("user_id", uid),
+      supabase
+        .from("messages")
+        .select("*")
+        .in("conversation_id", convIds)
+        .order("created_at", { ascending: false }),
+    ]);
+  if (othErr) throw othErr;
+  if (msgErr) throw msgErr;
+
+  const lastReadByConv = new Map<string, string | null>(
+    (myRows ?? []).map((r) => [
+      r.conversation_id as string,
+      r.last_read_at as string | null,
+    ]),
+  );
+
+  const otherByConv = new Map<string, ConversationOtherUser>();
+  for (const row of (others ?? []) as unknown as {
+    conversation_id: string;
+    profiles: ConversationOtherUser | null;
+  }[]) {
+    if (row.profiles) otherByConv.set(row.conversation_id, row.profiles);
+  }
+
+  const lastMsgByConv = new Map<string, Message>();
+  for (const m of (msgs ?? []) as Message[]) {
+    if (!lastMsgByConv.has(m.conversation_id)) {
+      lastMsgByConv.set(m.conversation_id, m);
+    }
+  }
+
+  return convIds
+    .map((id) => {
+      const lastMessage = lastMsgByConv.get(id) ?? null;
+      const lastRead = lastReadByConv.get(id);
+      const unread =
+        !!lastMessage &&
+        lastMessage.sender_id !== uid &&
+        (!lastRead || new Date(lastMessage.created_at) > new Date(lastRead));
+      return {
+        conversationId: id,
+        otherUser: otherByConv.get(id) ?? null,
+        lastMessage,
+        unread,
+      };
+    })
+    .sort((a, b) => {
+      const at = a.lastMessage?.created_at ?? "";
+      const bt = b.lastMessage?.created_at ?? "";
+      return bt.localeCompare(at);
+    });
+}
+
+// --- Μηνύματα μιας συνομιλίας ---------------------------------
+
+export async function getConversationMessages(
+  conversationId: string,
+): Promise<Message[]> {
+  const { data, error } = await supabase
+    .from("messages")
+    .select("*")
+    .eq("conversation_id", conversationId)
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  return (data ?? []) as Message[];
+}
+
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+): Promise<Message> {
+  const uid = await getCurrentUserId();
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error("Το μήνυμα είναι κενό.");
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({
+      conversation_id: conversationId,
+      sender_id: uid,
+      content: trimmed,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as Message;
+}
+
+export async function markConversationRead(
+  conversationId: string,
+): Promise<void> {
+  const uid = await getCurrentUserId();
+  const { error } = await supabase
+    .from("conversation_participants")
+    .update({ last_read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .eq("user_id", uid);
+  if (error) throw error;
+}
+=== END FILE ===
+
+=== FILE: src/routes/contact.tsx ===
+import { createFileRoute } from "@tanstack/react-router";
+import ContactForm from "@/components/aura/ContactForm";
+import Footer from "@/components/aura/Footer";
+
+export const Route = createFileRoute("/contact")({
+  head: () => ({
+    meta: [
+      { title: "AURA — Επικοινωνία" },
+      { name: "description", content: "Στείλε μήνυμα ή κλείσε ραντεβού με την AURA Academy." },
+    ],
+  }),
+  component: ContactPage,
+});
+
+function ContactPage() {
+  return (
+    <>
+      <main className="mx-auto max-w-6xl px-5 pb-24 pt-32 sm:px-8 sm:pt-40">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1.2fr] lg:gap-16">
+          <header>
+            <p className="text-[11px] uppercase tracking-[0.5em] text-neutral-600">CONTACT</p>
+            <h1 className="mt-5 text-4xl font-semibold leading-[1.05] tracking-tight text-neutral-100 sm:text-5xl">
+              ΜΙΛΑ ΜΑΣ.
+            </h1>
+            <p className="mt-6 text-base leading-relaxed text-neutral-400">
+              Ρώτα για τη μέθοδο, τα πακέτα ή την πιστοποίηση — ή κλείσε ραντεβού για να
+              συζητήσουμε το επίπεδό σου και τους στόχους σου.
+            </p>
+
+            <dl className="mt-10 space-y-6 border-t border-white/10 pt-8">
+              <div>
+                <dt className="text-[11px] uppercase tracking-[0.25em] text-neutral-600">
+                  Χρόνος απάντησης
+                </dt>
+                <dd className="mt-2 text-sm text-neutral-300">1–2 εργάσιμες ημέρες</dd>
+              </div>
+              <div>
+                <dt className="text-[11px] uppercase tracking-[0.25em] text-neutral-600">
+                  Ραντεβού
+                </dt>
+                <dd className="mt-2 text-sm text-neutral-300">
+                  Δήλωσε προτιμώμενη ώρα και επιβεβαιώνουμε με email.
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[11px] uppercase tracking-[0.25em] text-neutral-600">
+                  Υπάρχοντες μαθητές
+                </dt>
+                <dd className="mt-2 text-sm text-neutral-300">
+                  Για θέματα λογαριασμού ή χρέωσης, ανάφερέ το στο μήνυμά σου.
+                </dd>
+              </div>
+            </dl>
+          </header>
+
+          <ContactForm />
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/Footer-Bkdzkq98.js ===
+import{t as e}from"./jsx-runtime-BkSabwWG.js";import{t}from"./link-BhBo0Yh6.js";import{t as n}from"./instagram-DKDIOVOj.js";var r=e();function i(){return(0,r.jsxs)(`footer`,{className:`relative w-full overflow-x-hidden border-t border-white/[0.06] bg-aura-bg2 px-6 py-16`,children:[(0,r.jsxs)(`div`,{className:`mx-auto flex max-w-6xl flex-col items-center gap-8 text-center md:flex-row md:items-start md:justify-between md:text-left`,children:[(0,r.jsxs)(`div`,{children:[(0,r.jsx)(`span`,{className:`chrome-text font-aura text-lg font-extrabold uppercase tracking-[0.4em]`,children:`Λ U R Λ`}),(0,r.jsx)(`p`,{className:`font-aura mt-3 max-w-xs text-sm text-aura-text-secondary`,children:`The operating system for the modern barber. Learn. Practice. Prove.`})]}),(0,r.jsxs)(`div`,{className:`flex flex-col sm:flex-row gap-10 items-center md:items-start`,children:[(0,r.jsx)(`nav`,{className:`font-aura flex gap-10 text-sm text-aura-text-secondary`,children:(0,r.jsxs)(`div`,{className:`flex flex-col gap-2 items-center md:items-start`,children:[(0,r.jsx)(t,{to:`/about`,className:`transition-colors hover:text-aura-white`,children:`About`}),(0,r.jsx)(t,{to:`/contact`,className:`transition-colors hover:text-aura-white`,children:`Contact`}),(0,r.jsx)(t,{to:`/pricing`,className:`transition-colors hover:text-aura-white`,children:`Pricing`}),(0,r.jsx)(t,{to:`/method`,className:`transition-colors hover:text-aura-white`,children:`Method`}),(0,r.jsx)(t,{to:`/terms`,className:`transition-colors hover:text-aura-white`,children:`Terms`})]})}),(0,r.jsx)(`div`,{className:`flex flex-col gap-2 items-center md:items-start`,children:(0,r.jsxs)(`a`,{href:`https://www.instagram.com/aura_.method/?__pwa=1`,target:`_blank`,rel:`noopener noreferrer`,className:`font-aura flex items-center gap-2 text-sm text-aura-text-secondary transition-colors hover:text-aura-white`,"aria-label":`Instagram`,children:[(0,r.jsx)(n,{className:`size-4`}),(0,r.jsx)(`span`,{children:`Instagram`})]})})]})]}),(0,r.jsx)(`div`,{className:`chrome-line mx-auto mt-12 h-px max-w-6xl`}),(0,r.jsxs)(`p`,{className:`font-aura mt-8 text-center text-xs text-aura-text-muted`,children:[`© `,new Date().getFullYear(),` ΛURΛ. HAIR METHOD.`]})]})}export{i as t};
+=== END FILE ===
+
+=== FILE: .output/public/assets/MediaThumb-CuzlgNR-.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{M as r}from"./queries-B7Arqryn.js";var i=e(n(),1),a=t(),o=/\.(mp4|mov|webm|m4v)$/i;function s({path:e}){let[t,n]=(0,i.useState)(null),[s,c]=(0,i.useState)(!1);return(0,i.useEffect)(()=>{let t=!0;return n(null),c(!1),r(e).then(e=>t&&n(e)).catch(()=>t&&c(!0)),()=>{t=!1}},[e]),s?(0,a.jsx)(`div`,{className:`flex h-28 w-full items-center justify-center rounded-lg border border-red-500/30 bg-red-500/5 text-xs text-red-300`,children:`Αποτυχία φόρτωσης`}):t?o.test(e)?(0,a.jsx)(`video`,{src:t,controls:!0,className:`h-28 w-full rounded-lg bg-black object-cover`}):(0,a.jsx)(`img`,{src:t,alt:`Submission media`,className:`h-28 w-full rounded-lg object-cover`,loading:`lazy`}):(0,a.jsx)(`div`,{className:`h-28 w-full animate-pulse rounded-lg bg-white/5`})}export{s as t};
+=== END FILE ===
+

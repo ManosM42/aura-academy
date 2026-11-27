@@ -1,0 +1,1717 @@
+=== FILE: .output/server/_ssr/login-LK40hlVC.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { _ as useNavigate, g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+import { r as useReducedMotion, u as AnimatePresence } from "../_libs/framer-motion+[...].mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { t as useAuth } from "./useAuth-CbY7IiR3.mjs";
+import { n as consumeCheckoutIntent, r as peekCheckoutIntent } from "./checkout-intent-Cw-r21JH.mjs";
+import { t as ChromeCursor } from "./ChromeCursor-BJgZMGhf.mjs";
+import { t as Route } from "./login-DKszdqUF.mjs";
+import { t as AuraMark } from "./AuraMark-Bx5oMvbX.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/login-LK40hlVC.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var TURNSTILE_SITE_KEY = "0x4AAAAAAFuQC8D2OUlnvZo3";
+var turnstilePromise = null;
+function loadTurnstile() {
+	if (typeof window === "undefined") return Promise.resolve();
+	if (window.turnstile) return Promise.resolve();
+	if (!turnstilePromise) turnstilePromise = new Promise((resolve, reject) => {
+		const s = document.createElement("script");
+		s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+		s.async = true;
+		s.defer = true;
+		s.onload = () => resolve();
+		s.onerror = () => {
+			turnstilePromise = null;
+			reject(/* @__PURE__ */ new Error("Captcha failed to load"));
+		};
+		document.head.appendChild(s);
+	});
+	return turnstilePromise;
+}
+function CaptchaBox({ onToken, resetSignal }) {
+	const ref = (0, import_react.useRef)(null);
+	const widgetId = (0, import_react.useRef)(null);
+	const onTokenRef = (0, import_react.useRef)(onToken);
+	onTokenRef.current = onToken;
+	(0, import_react.useEffect)(() => {
+		let cancelled = false;
+		loadTurnstile().then(() => {
+			if (cancelled || !ref.current || !window.turnstile) return;
+			widgetId.current = window.turnstile.render(ref.current, {
+				sitekey: TURNSTILE_SITE_KEY,
+				theme: "dark",
+				callback: (t) => onTokenRef.current(t),
+				"expired-callback": () => onTokenRef.current(null),
+				"error-callback": () => onTokenRef.current(null)
+			});
+		}).catch(() => onTokenRef.current(null));
+		return () => {
+			cancelled = true;
+			if (widgetId.current && window.turnstile) window.turnstile.remove(widgetId.current);
+			widgetId.current = null;
+		};
+	}, []);
+	(0, import_react.useEffect)(() => {
+		if (resetSignal === 0) return;
+		if (widgetId.current && window.turnstile) window.turnstile.reset(widgetId.current);
+		onTokenRef.current(null);
+	}, [resetSignal]);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+		ref,
+		className: "flex min-h-[65px] justify-center"
+	});
+}
+var EASE = [
+	.22,
+	1,
+	.36,
+	1
+];
+var USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+var container = {
+	hidden: {},
+	show: { transition: { staggerChildren: .06 } }
+};
+var item = {
+	hidden: {
+		opacity: 0,
+		y: 12
+	},
+	show: {
+		opacity: 1,
+		y: 0,
+		transition: {
+			duration: .5,
+			ease: EASE
+		}
+	}
+};
+function passwordStrength(pw) {
+	let s = 0;
+	if (pw.length >= 8) s++;
+	if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
+	if (/\d/.test(pw)) s++;
+	if (/[^A-Za-z0-9]/.test(pw)) s++;
+	return s;
+}
+function useUsernameCheck(value, enabled) {
+	const [status, setStatus] = (0, import_react.useState)("idle");
+	(0, import_react.useEffect)(() => {
+		if (!enabled || !value) {
+			setStatus("idle");
+			return;
+		}
+		if (!USERNAME_RE.test(value)) {
+			setStatus("invalid");
+			return;
+		}
+		setStatus("checking");
+		let cancelled = false;
+		const t = window.setTimeout(async () => {
+			const { data, error } = await supabase.rpc("is_username_available", { p_username: value });
+			if (cancelled) return;
+			setStatus(error ? "error" : data ? "available" : "taken");
+		}, 400);
+		return () => {
+			cancelled = true;
+			window.clearTimeout(t);
+		};
+	}, [value, enabled]);
+	return status;
+}
+var usernameHint = {
+	idle: {
+		text: "3–20 characters: letters, numbers, underscore.",
+		tone: "text-aura-text-muted"
+	},
+	invalid: {
+		text: "Use 3–20 lowercase letters, numbers or underscores.",
+		tone: "text-red-400/90"
+	},
+	checking: {
+		text: "Checking availability…",
+		tone: "text-aura-text-muted"
+	},
+	available: {
+		text: "Username is available ✓",
+		tone: "text-emerald-300/90"
+	},
+	taken: {
+		text: "That username is already taken.",
+		tone: "text-red-400/90"
+	},
+	error: {
+		text: "Couldn't verify availability. You can still try.",
+		tone: "text-amber-300/90"
+	}
+};
+function Field({ id, label, hint, hintTone = "text-aura-text-muted", right, ...props }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+		variants: item,
+		className: "flex flex-col gap-2",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("label", {
+				htmlFor: id,
+				className: "font-aura text-[0.7rem] uppercase tracking-[0.2em] text-aura-text-muted",
+				children: label
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "relative",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+					id,
+					name: id,
+					...props,
+					className: "lg-input font-aura w-full rounded-lg border border-white/10 bg-black/40 px-4 py-3 text-sm text-aura-text outline-none placeholder:text-aura-text-muted disabled:opacity-60"
+				}), right && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "absolute inset-y-0 right-2 flex items-center",
+					children: right
+				})]
+			}),
+			hint && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: `font-aura text-[0.7rem] ${hintTone}`,
+				children: hint
+			})
+		]
+	});
+}
+function Message({ kind, children }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.p, {
+		initial: {
+			opacity: 0,
+			y: -6
+		},
+		animate: {
+			opacity: 1,
+			y: 0
+		},
+		role: kind === "error" ? "alert" : "status",
+		className: `font-aura rounded-lg border px-3.5 py-2.5 text-sm ${kind === "error" ? "border-red-400/20 bg-red-500/[0.07] text-red-300/95" : "border-white/15 bg-white/[0.04] text-aura-text"}`,
+		children
+	});
+}
+function EyeButton({ shown, onClick }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+		type: "button",
+		onClick,
+		"aria-label": shown ? "Hide password" : "[REDACTED]",
+		className: "rounded-md p-2 text-aura-text-muted transition-colors hover:text-white",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+			width: "18",
+			height: "18",
+			viewBox: "0 0 24 24",
+			fill: "none",
+			stroke: "currentColor",
+			strokeWidth: "1.6",
+			strokeLinecap: "round",
+			strokeLinejoin: "round",
+			"aria-hidden": true,
+			children: shown ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3 3l18 18" }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.6 7.6A16.6 16.6 0 0 0 2.5 12S6 18 12 18c1.3 0 2.5-.3 3.6-.8" }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M9.9 9.9a3 3 0 0 0 4.2 4.2" })
+			] }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M2.5 12S6 6 12 6s9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("circle", {
+				cx: "12",
+				cy: "12",
+				r: "3"
+			})] })
+		})
+	});
+}
+function StrengthBar({ value }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "mt-1",
+		"aria-live": "polite",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+			className: "flex gap-1.5",
+			children: [
+				0,
+				1,
+				2,
+				3
+			].map((i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "h-[3px] flex-1 rounded-full transition-all duration-500",
+				style: {
+					background: i < value ? "linear-gradient(90deg,#9ca3af,#ffffff)" : "rgba(255,255,255,0.08)",
+					boxShadow: i < value ? "0 0 10px rgba(255,255,255,0.35)" : "none"
+				}
+			}, i))
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "font-aura mt-1.5 block text-[0.7rem] text-aura-text-muted",
+			children: [
+				"Too weak",
+				"Weak",
+				"Okay",
+				"Strong",
+				"Excellent"
+			][value]
+		})]
+	});
+}
+var GoogleIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 48 48",
+	"aria-hidden": true,
+	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+		fill: "currentColor",
+		d: "M43.6 20.5h-1.9V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.3 4.1 29.4 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.2-.1-2.3-.4-3.5z"
+	})
+});
+var AppleIcon = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", {
+	width: "16",
+	height: "16",
+	viewBox: "0 0 24 24",
+	"aria-hidden": true,
+	children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", {
+		fill: "currentColor",
+		d: "M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"
+	})
+});
+function LoginPage() {
+	const navigate = useNavigate();
+	const { plan: searchPlan, mode: searchMode } = Route.useSearch();
+	const { user, loading } = useAuth();
+	const reduceMotion = useReducedMotion();
+	const [mode, setMode] = (0, import_react.useState)(searchMode === "reset" ? "update" : "signin");
+	const [recovery, setRecovery] = (0, import_react.useState)(searchMode === "reset");
+	const [sent, setSent] = (0, import_react.useState)(null);
+	const [fullName, setFullName] = (0, import_react.useState)("");
+	const [username, setUsername] = (0, import_react.useState)("");
+	const [email, setEmail] = (0, import_react.useState)("");
+	const [password, setPassword] = (0, import_react.useState)("");
+	const [showPw, setShowPw] = (0, import_react.useState)(false);
+	const [agreed, setAgreed] = (0, import_react.useState)(false);
+	const [error, setError] = (0, import_react.useState)(null);
+	const [notice, setNotice] = (0, import_react.useState)(null);
+	const [needsResend, setNeedsResend] = (0, import_react.useState)(false);
+	const [submitting, setSubmitting] = (0, import_react.useState)(false);
+	const [oauthLoading, setOauthLoading] = (0, import_react.useState)(null);
+	const [captchaToken, setCaptchaToken] = (0, import_react.useState)(null);
+	const [captchaReset, setCaptchaReset] = (0, import_react.useState)(0);
+	const cardRef = (0, import_react.useRef)(null);
+	const routingRef = (0, import_react.useRef)(false);
+	const captchaRequired = Boolean(TURNSTILE_SITE_KEY);
+	const showCaptcha = mode === "signin" || mode === "signup" || mode === "forgot";
+	const busy = submitting || oauthLoading !== null;
+	const usernameStatus = useUsernameCheck(username, mode === "signup" || mode === "username");
+	const strength = passwordStrength(password);
+	const goAfterAuth = (0, import_react.useCallback)(() => {
+		const plan = searchPlan ?? consumeCheckoutIntent();
+		if (plan) navigate({
+			to: "/checkout",
+			search: { plan }
+		});
+		else navigate({ to: "/dashboard" });
+	}, [navigate, searchPlan]);
+	const continueAfterAuth = (0, import_react.useCallback)(async (userId) => {
+		if (routingRef.current) return;
+		routingRef.current = true;
+		const { data, error: profileError } = await supabase.from("profiles").select("username").eq("id", userId).maybeSingle();
+		if (profileError) {
+			console.error("[login] profile lookup failed:", profileError.message);
+			goAfterAuth();
+			return;
+		}
+		if (!data?.username) {
+			routingRef.current = false;
+			setMode("username");
+			return;
+		}
+		goAfterAuth();
+	}, [goAfterAuth]);
+	(0, import_react.useEffect)(() => {
+		if (loading || !user || recovery) return;
+		continueAfterAuth(user.id);
+	}, [
+		loading,
+		user,
+		recovery,
+		continueAfterAuth
+	]);
+	(0, import_react.useEffect)(() => {
+		const { data } = supabase.auth.onAuthStateChange((event) => {
+			if (event === "PASSWORD_RECOVERY") {
+				setRecovery(true);
+				setMode("update");
+			}
+		});
+		return () => data.subscription.unsubscribe();
+	}, []);
+	const redirectBase = () => {
+		const plan = searchPlan ?? peekCheckoutIntent();
+		return `${window.location.origin}/login${plan ? `?plan=${plan}` : ""}`;
+	};
+	function changeMode(next) {
+		setMode(next);
+		setError(null);
+		setNotice(null);
+		setNeedsResend(false);
+		setPassword("");
+		setShowPw(false);
+	}
+	function burnCaptcha() {
+		setCaptchaToken(null);
+		setCaptchaReset((n) => n + 1);
+	}
+	function guardCaptcha() {
+		if (captchaRequired && !captchaToken) {
+			setError("Please complete the security check first.");
+			return false;
+		}
+		return true;
+	}
+	function guardTerms() {
+		if (!agreed) {
+			setError("You must agree to the Terms of Service & Privacy Policy to proceed.");
+			return false;
+		}
+		return true;
+	}
+	function onCardMove(e) {
+		const el = cardRef.current;
+		if (!el) return;
+		const r = el.getBoundingClientRect();
+		el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+		el.style.setProperty("--my", `${e.clientY - r.top}px`);
+	}
+	async function handleSignIn(e) {
+		e.preventDefault();
+		setError(null);
+		setNotice(null);
+		setNeedsResend(false);
+		if (!guardTerms() || !guardCaptcha()) return;
+		const cleanEmail = email.trim();
+		if (!cleanEmail || !password) {
+			setError("Enter your email and password.");
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const { data, error: err } = await supabase.auth.signInWithPassword({
+				email: cleanEmail,
+				password,
+				options: { captchaToken: captchaToken ?? void 0 }
+			});
+			if (err) {
+				if (/confirm/i.test(err.message)) {
+					setNeedsResend(true);
+					setError("Your email isn't verified yet. Check your inbox or resend the link.");
+				} else setError(err.message);
+				return;
+			}
+			if (data.user) await continueAfterAuth(data.user.id);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Something went wrong.");
+		} finally {
+			burnCaptcha();
+			setSubmitting(false);
+		}
+	}
+	async function handleSignUp(e) {
+		e.preventDefault();
+		setError(null);
+		setNotice(null);
+		if (!guardTerms() || !guardCaptcha()) return;
+		const cleanEmail = email.trim();
+		const cleanName = fullName.trim();
+		if (!USERNAME_RE.test(username)) {
+			setError("Choose a valid username (3–20 lowercase letters, numbers or underscores).");
+			return;
+		}
+		if (usernameStatus === "taken") {
+			setError("That username is already taken.");
+			return;
+		}
+		if (!cleanEmail) {
+			setError("Enter your email.");
+			return;
+		}
+		if (password.length < 8) {
+			setError("Password must be at least 8 characters.");
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const { data, error: err } = await supabase.auth.signUp({
+				email: cleanEmail,
+				password,
+				options: {
+					emailRedirectTo: redirectBase(),
+					captchaToken: captchaToken ?? void 0,
+					data: {
+						username,
+						full_name: cleanName || null
+					}
+				}
+			});
+			if (err) {
+				setError(err.message);
+				return;
+			}
+			if (data.user && data.user.identities && data.user.identities.length === 0) {
+				setError("An account with this email already exists. Try signing in instead.");
+				return;
+			}
+			if (data.session && data.user) await continueAfterAuth(data.user.id);
+			else {
+				setSent({
+					kind: "confirm",
+					email: cleanEmail
+				});
+				changeMode("sent");
+			}
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Something went wrong.");
+		} finally {
+			burnCaptcha();
+			setSubmitting(false);
+		}
+	}
+	async function handleForgot(e) {
+		e.preventDefault();
+		setError(null);
+		if (!guardCaptcha()) return;
+		const cleanEmail = email.trim();
+		if (!cleanEmail) {
+			setError("Enter your email.");
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const { error: err } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+				redirectTo: `${window.location.origin}/login?mode=reset`,
+				captchaToken: captchaToken ?? void 0
+			});
+			if (err) {
+				setError(err.message);
+				return;
+			}
+			setSent({
+				kind: "reset",
+				email: cleanEmail
+			});
+			changeMode("sent");
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Something went wrong.");
+		} finally {
+			burnCaptcha();
+			setSubmitting(false);
+		}
+	}
+	async function handleUpdatePassword(e) {
+		e.preventDefault();
+		setError(null);
+		if (password.length < 8) {
+			setError("Password must be at least 8 characters.");
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const { error: err } = await supabase.auth.updateUser({ password });
+			if (err) {
+				setError(err.message);
+				return;
+			}
+			setRecovery(false);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Something went wrong.");
+		} finally {
+			setSubmitting(false);
+		}
+	}
+	async function handleSaveUsername(e) {
+		e.preventDefault();
+		setError(null);
+		if (!user) {
+			setError("Your session expired. Please sign in again.");
+			return;
+		}
+		if (!USERNAME_RE.test(username)) {
+			setError("Choose a valid username (3–20 lowercase letters, numbers or underscores).");
+			return;
+		}
+		if (usernameStatus === "taken") {
+			setError("That username is already taken.");
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const { error: err } = await supabase.from("profiles").upsert({
+				id: user.id,
+				username,
+				updated_at: (/* @__PURE__ */ new Date()).toISOString()
+			}, { onConflict: "id" });
+			if (err) {
+				setError(err.code === "23505" ? "That username is already taken." : err.message);
+				return;
+			}
+			supabase.auth.updateUser({ data: { username } });
+			goAfterAuth();
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "Something went wrong.");
+		} finally {
+			setSubmitting(false);
+		}
+	}
+	async function handleOAuth(provider) {
+		setError(null);
+		setNotice(null);
+		if (!guardTerms()) return;
+		setOauthLoading(provider);
+		const { error: err } = await supabase.auth.signInWithOAuth({
+			provider,
+			options: { redirectTo: redirectBase() }
+		});
+		if (err) {
+			setError(err.message);
+			setOauthLoading(null);
+		}
+	}
+	async function handleResend() {
+		const target = sent?.email ?? email.trim();
+		if (!target) {
+			setError("Enter your email first.");
+			return;
+		}
+		if (!guardCaptcha() && mode !== "sent") return;
+		setSubmitting(true);
+		setError(null);
+		try {
+			const { error: err } = await supabase.auth.resend({
+				type: "signup",
+				email: target,
+				options: {
+					emailRedirectTo: redirectBase(),
+					captchaToken: captchaToken ?? void 0
+				}
+			});
+			if (err) setError(err.message);
+			else setNotice("Verification email sent again.");
+		} finally {
+			burnCaptcha();
+			setSubmitting(false);
+		}
+	}
+	const termsBox = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+		variants: item,
+		className: "flex items-start gap-3 rounded-xl border border-white/10 bg-black/40 p-3.5",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+			type: "checkbox",
+			id: "terms-checkbox",
+			checked: agreed,
+			onChange: (e) => {
+				setAgreed(e.target.checked);
+				if (e.target.checked) setError(null);
+			},
+			disabled: busy,
+			className: "mt-0.5 h-4 w-4 cursor-pointer rounded border-white/20 bg-black/60 accent-white"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+			htmlFor: "terms-checkbox",
+			className: "font-aura cursor-pointer select-none text-xs font-extralight leading-relaxed text-aura-text-secondary",
+			children: [
+				"I agree to the",
+				" ",
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/terms",
+					className: "text-white underline underline-offset-4 transition-colors hover:text-neutral-300",
+					children: "Terms of Service"
+				}),
+				" ",
+				"and",
+				" ",
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+					to: "/terms",
+					className: "text-white underline underline-offset-4 transition-colors hover:text-neutral-300",
+					children: "Privacy Policy"
+				}),
+				"."
+			]
+		})]
+	});
+	const socials = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+		variants: item,
+		className: "grid grid-cols-2 gap-3",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			className: "lg-social font-aura",
+			onClick: () => handleOAuth("google"),
+			disabled: busy,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(GoogleIcon, {}), oauthLoading === "google" ? "Redirecting…" : "Google"]
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("button", {
+			type: "button",
+			className: "lg-social font-aura",
+			onClick: () => handleOAuth("apple"),
+			disabled: busy,
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AppleIcon, {}), oauthLoading === "apple" ? "Redirecting…" : "Apple"]
+		})]
+	});
+	const divider = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+		variants: item,
+		className: "flex items-center gap-4",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "h-px flex-1 bg-gradient-to-r from-transparent to-white/15",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "font-aura text-[0.65rem] uppercase tracking-[0.28em] text-aura-text-muted",
+				children: "or"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "h-px flex-1 bg-gradient-to-l from-transparent to-white/15",
+				"aria-hidden": true
+			})
+		]
+	});
+	const messages = /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+		error && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
+			kind: "error",
+			children: error
+		}),
+		notice && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Message, {
+			kind: "notice",
+			children: notice
+		}),
+		needsResend && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+			type: "button",
+			onClick: handleResend,
+			disabled: busy,
+			className: "font-aura text-left text-sm text-white underline underline-offset-4 hover:text-neutral-300 disabled:opacity-60",
+			children: "Resend verification email"
+		})
+	] });
+	const submitDisabled = busy || showCaptcha && captchaRequired && !captchaToken;
+	const titles = {
+		signin: {
+			title: "Enter the Academy",
+			sub: "Sign in to continue mastering the craft."
+		},
+		signup: {
+			title: "Create Your Account",
+			sub: "Begin your path. Learn. Practice. Prove."
+		},
+		forgot: {
+			title: "Reset Password",
+			sub: "We'll email you a secure link."
+		},
+		update: {
+			title: "New Password",
+			sub: "Choose a strong password to secure your account."
+		},
+		username: {
+			title: "Claim Your Name",
+			sub: "Pick a username to finish setting up your profile."
+		},
+		sent: sent?.kind === "reset" ? {
+			title: "Link Sent",
+			sub: `If ${sent.email} has an account, a reset link is on its way.`
+		} : {
+			title: "Check Your Inbox",
+			sub: `We sent a verification link to ${sent?.email ?? "your email"}.`
+		}
+	};
+	const redirecting = !loading && !!user && mode !== "username" && mode !== "update" && !recovery;
+	function renderBody() {
+		if (redirecting) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "flex flex-col items-center gap-4 py-10",
+			children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+				className: "lg-spinner",
+				"aria-hidden": true
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "font-aura text-sm text-aura-text-secondary",
+				children: "Preparing your account…"
+			})]
+		});
+		if (mode === "signin") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.form, {
+			variants: container,
+			initial: "hidden",
+			animate: "show",
+			onSubmit: handleSignIn,
+			noValidate: true,
+			className: "flex flex-col gap-4",
+			children: [
+				socials,
+				divider,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+					id: "login-email",
+					label: "Email",
+					type: "email",
+					autoComplete: "email",
+					placeholder: "you@example.com",
+					value: email,
+					onChange: (e) => setEmail(e.target.value),
+					disabled: busy
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+					id: "login-password",
+					label: "Password",
+					type: showPw ? "text" : "password",
+					autoComplete: "current-password",
+					placeholder: "••••••••",
+					value: password,
+					onChange: (e) => setPassword(e.target.value),
+					disabled: busy,
+					right: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EyeButton, {
+						shown: showPw,
+						onClick: () => setShowPw((s) => !s)
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					variants: item,
+					className: "-mt-1 text-right",
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: () => changeMode("forgot"),
+						className: "font-aura text-xs text-aura-text-secondary underline-offset-4 transition-colors hover:text-white hover:underline",
+						children: "Forgot password?"
+					})
+				}),
+				termsBox,
+				messages,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					variants: item,
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "submit",
+						disabled: submitDisabled || !agreed,
+						className: "w-full disabled:opacity-50",
+						children: submitting ? "Please wait…" : "SIGN IN"
+					})
+				})
+			]
+		});
+		if (mode === "signup") {
+			const hint = usernameHint[usernameStatus];
+			return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.form, {
+				variants: container,
+				initial: "hidden",
+				animate: "show",
+				onSubmit: handleSignUp,
+				noValidate: true,
+				className: "flex flex-col gap-4",
+				children: [
+					socials,
+					divider,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+						id: "signup-name",
+						label: "Full name (optional)",
+						type: "text",
+						autoComplete: "name",
+						placeholder: "Ada Lovelace",
+						value: fullName,
+						onChange: (e) => setFullName(e.target.value.slice(0, 60)),
+						disabled: busy
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+						id: "signup-username",
+						label: "Username",
+						type: "text",
+						autoComplete: "username",
+						autoCapitalize: "none",
+						spellCheck: false,
+						placeholder: "your_handle",
+						value: username,
+						onChange: (e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20)),
+						disabled: busy,
+						hint: hint.text,
+						hintTone: hint.tone
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+						id: "signup-email",
+						label: "Email",
+						type: "email",
+						autoComplete: "email",
+						placeholder: "you@example.com",
+						value: email,
+						onChange: (e) => setEmail(e.target.value),
+						disabled: busy
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+						id: "signup-password",
+						label: "Password",
+						type: showPw ? "text" : "password",
+						autoComplete: "new-password",
+						placeholder: "At least 8 characters",
+						value: password,
+						onChange: (e) => setPassword(e.target.value),
+						disabled: busy,
+						right: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EyeButton, {
+							shown: showPw,
+							onClick: () => setShowPw((s) => !s)
+						})
+					}), password && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StrengthBar, { value: strength })] }),
+					termsBox,
+					messages,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+						variants: item,
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+							type: "submit",
+							disabled: submitDisabled || !agreed,
+							className: "w-full disabled:opacity-50",
+							children: submitting ? "Please wait…" : "CREATE ACCOUNT"
+						})
+					})
+				]
+			});
+		}
+		if (mode === "forgot") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.form, {
+			variants: container,
+			initial: "hidden",
+			animate: "show",
+			onSubmit: handleForgot,
+			noValidate: true,
+			className: "flex flex-col gap-4",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+					id: "forgot-email",
+					label: "Email",
+					type: "email",
+					autoComplete: "email",
+					placeholder: "you@example.com",
+					value: email,
+					onChange: (e) => setEmail(e.target.value),
+					disabled: busy
+				}),
+				messages,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					variants: item,
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "submit",
+						disabled: submitDisabled,
+						className: "w-full disabled:opacity-50",
+						children: submitting ? "Please wait…" : "SEND RESET LINK"
+					})
+				})
+			]
+		});
+		if (mode === "update") return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.form, {
+			variants: container,
+			initial: "hidden",
+			animate: "show",
+			onSubmit: handleUpdatePassword,
+			noValidate: true,
+			className: "flex flex-col gap-4",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+					id: "new-password",
+					label: "New password",
+					type: showPw ? "text" : "password",
+					autoComplete: "new-password",
+					placeholder: "At least 8 characters",
+					value: password,
+					onChange: (e) => setPassword(e.target.value),
+					disabled: busy,
+					right: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EyeButton, {
+						shown: showPw,
+						onClick: () => setShowPw((s) => !s)
+					})
+				}), password && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(StrengthBar, { value: strength })] }),
+				messages,
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					variants: item,
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+						type: "submit",
+						disabled: busy,
+						className: "w-full disabled:opacity-50",
+						children: submitting ? "Please wait…" : "UPDATE PASSWORD"
+					})
+				})
+			]
+		});
+		if (mode === "username") {
+			const hint = usernameHint[usernameStatus];
+			return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.form, {
+				variants: container,
+				initial: "hidden",
+				animate: "show",
+				onSubmit: handleSaveUsername,
+				noValidate: true,
+				className: "flex flex-col gap-4",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Field, {
+						id: "claim-username",
+						label: "Username",
+						type: "text",
+						autoCapitalize: "none",
+						spellCheck: false,
+						placeholder: "your_handle",
+						value: username,
+						onChange: (e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20)),
+						disabled: busy,
+						hint: hint.text,
+						hintTone: hint.tone
+					}),
+					messages,
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+						variants: item,
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+							type: "submit",
+							disabled: busy || usernameStatus === "taken" || usernameStatus === "invalid",
+							className: "w-full disabled:opacity-50",
+							children: submitting ? "Saving…" : "CONTINUE"
+						})
+					})
+				]
+			});
+		}
+		return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+			variants: container,
+			initial: "hidden",
+			animate: "show",
+			className: "flex flex-col items-center gap-5 text-center",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+					variants: item,
+					className: "lg-mail",
+					"aria-hidden": true,
+					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", {
+						width: "30",
+						height: "30",
+						viewBox: "0 0 24 24",
+						fill: "none",
+						stroke: "currentColor",
+						strokeWidth: "1.4",
+						strokeLinecap: "round",
+						strokeLinejoin: "round",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", {
+							x: "3",
+							y: "5",
+							width: "18",
+							height: "14",
+							rx: "2.5"
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M3.5 7l8.5 6 8.5-6" })]
+					})
+				}),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.p, {
+					variants: item,
+					className: "font-aura text-sm leading-relaxed text-aura-text-secondary",
+					children: sent?.kind === "reset" ? "Open the link in the email to choose a new password." : "Click the link in the email to verify your account. You'll land right back here."
+				}),
+				messages,
+				sent?.kind === "confirm" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+					variants: item,
+					className: "flex w-full flex-col gap-3",
+					children: [captchaRequired && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "font-aura text-xs text-aura-text-muted",
+						children: "Complete the check below to resend."
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						type: "button",
+						onClick: handleResend,
+						disabled: busy || captchaRequired && !captchaToken,
+						className: "lg-social font-aura w-full justify-center disabled:opacity-50",
+						children: submitting ? "Sending…" : "Resend email"
+					})]
+				})
+			]
+		});
+	}
+	const showSentCaptcha = mode === "sent" && sent?.kind === "confirm" && captchaRequired;
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "lg-root relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-5 py-12 text-aura-text",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("style", { children: css }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "aura-grain",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeCursor, {}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "hero-atmosphere absolute inset-0",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "lg-grid absolute inset-0",
+				"aria-hidden": true
+			}),
+			!reduceMotion && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				className: "lg-orb left-[8%] top-[12%] h-72 w-72",
+				animate: {
+					y: [
+						0,
+						-30,
+						0
+					],
+					x: [
+						0,
+						16,
+						0
+					]
+				},
+				transition: {
+					duration: 14,
+					repeat: Infinity,
+					ease: "easeInOut"
+				},
+				"aria-hidden": true
+			}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+				className: "lg-orb bottom-[8%] right-[6%] h-96 w-96",
+				animate: {
+					y: [
+						0,
+						26,
+						0
+					],
+					x: [
+						0,
+						-20,
+						0
+					]
+				},
+				transition: {
+					duration: 18,
+					repeat: Infinity,
+					ease: "easeInOut"
+				},
+				"aria-hidden": true
+			})] }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				initial: {
+					opacity: 0,
+					y: 28,
+					filter: "blur(8px)",
+					scale: .98
+				},
+				animate: {
+					opacity: 1,
+					y: 0,
+					filter: "blur(0px)",
+					scale: 1
+				},
+				transition: {
+					duration: 1.1,
+					ease: EASE
+				},
+				className: "relative z-10 w-full max-w-md",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+					className: "lg-glow",
+					"aria-hidden": true
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "lg-card-wrap",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "lg-card-border",
+						"aria-hidden": true
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						ref: cardRef,
+						onMouseMove: onCardMove,
+						className: "lg-card p-8 sm:p-10",
+						children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "lg-spot",
+								"aria-hidden": true
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "relative flex flex-col items-center text-center",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+										to: "/",
+										"aria-label": "AURA home",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+											initial: {
+												scale: .7,
+												opacity: 0
+											},
+											animate: {
+												scale: 1,
+												opacity: 1
+											},
+											transition: {
+												duration: .9,
+												ease: EASE,
+												delay: .2
+											},
+											children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AuraMark, {})
+										})
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "chrome-text font-aura mt-6 text-xs font-semibold uppercase tracking-[0.5em]",
+										children: "Aura"
+									}),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+										mode: "wait",
+										children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+											initial: {
+												opacity: 0,
+												y: 10
+											},
+											animate: {
+												opacity: 1,
+												y: 0
+											},
+											exit: {
+												opacity: 0,
+												y: -8
+											},
+											transition: {
+												duration: .3,
+												ease: EASE
+											},
+											children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+												className: "lg-title font-aura mt-4 text-3xl font-bold tracking-tight",
+												children: titles[mode].title
+											}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+												className: "font-aura mt-3 text-sm text-aura-text-secondary",
+												children: titles[mode].sub
+											})]
+										}, mode + (sent?.kind ?? ""))
+									})
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "relative mt-8",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AnimatePresence, {
+									mode: "wait",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(motion.div, {
+										initial: {
+											opacity: 0,
+											y: 14
+										},
+										animate: {
+											opacity: 1,
+											y: 0
+										},
+										exit: {
+											opacity: 0,
+											y: -10
+										},
+										transition: {
+											duration: .3,
+											ease: EASE
+										},
+										children: renderBody()
+									}, mode + (redirecting ? "-r" : ""))
+								}), (showCaptcha || showSentCaptcha) && !redirecting && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "mt-5",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CaptchaBox, {
+										onToken: setCaptchaToken,
+										resetSignal: captchaReset
+									})
+								})]
+							}),
+							!redirecting && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+								className: "chrome-line mx-auto mt-8 h-px w-2/3",
+								"aria-hidden": true
+							}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+								className: "font-aura relative mt-6 text-center text-sm text-aura-text-secondary",
+								children: [
+									mode === "signin" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+										"New to AURA?",
+										" ",
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+											type: "button",
+											disabled: busy,
+											onClick: () => changeMode("signup"),
+											className: "lg-link",
+											children: "Create an account"
+										})
+									] }),
+									mode === "signup" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+										"Already have an account?",
+										" ",
+										/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+											type: "button",
+											disabled: busy,
+											onClick: () => changeMode("signin"),
+											className: "lg-link",
+											children: "Sign in"
+										})
+									] }),
+									(mode === "forgot" || mode === "sent" || mode === "update") && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										disabled: busy,
+										onClick: () => {
+											setRecovery(false);
+											changeMode("signin");
+										},
+										className: "lg-link",
+										children: "← Back to sign in"
+									}),
+									mode === "username" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+										type: "button",
+										disabled: busy,
+										onClick: async () => {
+											await supabase
+[TRUNCATED: file is 45746 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/profile-CKQrofDi.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { B as uploadAvatar, L as updateMyProfile } from "./queries-DCA4yifx.mjs";
+import { t as useAsync } from "./useAsync-6CgggUJk.mjs";
+import { n as ErrorState, r as LoadingSkeleton } from "./States-CTtcXN7r.mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { t as useAuth } from "./useAuth-CcQ0JkjK.mjs";
+import { n as getPlan } from "./plans-sHsWJraA.mjs";
+import { d as getMyCompletedCourses } from "./courses-A6CEttdz.mjs";
+import { n as isCancellableStatus, r as useSubscription, t as isActiveStatus } from "./useSubscription-CNKMk-yc.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/profile-CKQrofDi.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+/** Stripe status -> ελληνική ετικέτα. */
+var STATUS_LABELS = {
+	active: "ΕΝΕΡΓΗ",
+	trialing: "ΔΟΚΙΜΑΣΤΙΚΗ",
+	past_due: "ΕΚΚΡΕΜΗΣ ΠΛΗΡΩΜΗ",
+	unpaid: "ΑΠΛΗΡΩΤΗ",
+	canceled: "ΑΚΥΡΩΜΕΝΗ",
+	incomplete: "ΗΜΙΤΕΛΗΣ",
+	incomplete_expired: "ΕΛΗΞΕ",
+	paused: "ΣΕ ΠΑΥΣΗ"
+};
+function formatDate$1(iso) {
+	if (!iso) return null;
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return null;
+	return new Intl.DateTimeFormat("el-GR", {
+		day: "2-digit",
+		month: "long",
+		year: "numeric"
+	}).format(date);
+}
+function SubscriptionCard({ userId }) {
+	const { subscription, loading, error } = useSubscription(userId, { includeInactive: true });
+	const shell = "mt-8 rounded-2xl border border-white/10 bg-black/40 p-5 sm:p-6";
+	const cta = "mt-4 inline-flex rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40";
+	if (loading) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("section", {
+		className: shell,
+		"aria-busy": "true",
+		"aria-label": "Συνδρομή",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+			className: "animate-pulse space-y-3",
+			children: [
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-3 w-24 rounded bg-white/10" }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-6 w-48 rounded bg-white/10" }),
+				/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-3 w-32 rounded bg-white/5" })
+			]
+		})
+	});
+	if (error) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: shell,
+		"aria-label": "Συνδρομή",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+			className: "text-[11px] uppercase tracking-[0.4em] text-white/40",
+			children: "ΣΥΝΔΡΟΜΗ"
+		}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+			className: "mt-3 text-sm text-white/70",
+			role: "alert",
+			children: ["Δεν μπορέσαμε να φορτώσουμε τη συνδρομή σου. ", error]
+		})]
+	});
+	if (!subscription) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: shell,
+		"aria-label": "Συνδρομή",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "text-[11px] uppercase tracking-[0.4em] text-white/40",
+				children: "ΣΥΝΔΡΟΜΗ"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+				className: "mt-3 text-lg font-medium text-white/90",
+				children: "Δεν έχεις ενεργό πακέτο"
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-2 text-sm text-white/60",
+				children: "Διάλεξε μέθοδο για να ξεκλειδώσεις την Academy."
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/pricing",
+				className: cta,
+				children: "ΔΕΣ ΤΑ ΠΑΚΕΤΑ"
+			})
+		]
+	});
+	const plan = getPlan(subscription.plan_id);
+	const active = isActiveStatus(subscription.status);
+	const statusLabel = STATUS_LABELS[subscription.status] ?? subscription.status.toUpperCase();
+	const periodEnd = formatDate$1(subscription.current_period_end);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: shell,
+		"aria-label": "Συνδρομή",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+				className: "flex flex-wrap items-start justify-between gap-4",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+					className: "min-w-0",
+					children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "text-[11px] uppercase tracking-[0.4em] text-white/40",
+							children: "ΤΟ ΠΑΚΕΤΟ ΜΟΥ"
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "mt-2 truncate text-xl font-semibold tracking-tight text-white",
+							children: plan?.name ?? subscription.plan_id
+						}),
+						plan && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							className: "mt-1 text-sm text-white/60",
+							children: [
+								plan.priceLabel,
+								" / μήνα · ",
+								plan.haircuts,
+								" κουρέματα"
+							]
+						})
+					]
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: active ? "shrink-0 rounded-full border border-white/25 bg-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white" : "shrink-0 rounded-full border border-white/15 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-white/50",
+					children: statusLabel
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("dl", {
+				className: "mt-5 grid gap-4 sm:grid-cols-2",
+				children: [periodEnd && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", {
+					className: "text-xs uppercase tracking-[0.2em] text-white/40",
+					children: subscription.cancel_at_period_end ? "ΛΗΓΕΙ" : "ΑΝΑΝΕΩΝΕΤΑΙ"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", {
+					className: "mt-1 text-sm text-white/80",
+					children: periodEnd
+				})] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("dt", {
+					className: "text-xs uppercase tracking-[0.2em] text-white/40",
+					children: "ΕΝΑΡΞΗ"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("dd", {
+					className: "mt-1 text-sm text-white/80",
+					children: formatDate$1(subscription.created_at) ?? "—"
+				})] })]
+			}),
+			subscription.cancel_at_period_end && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/70",
+				children: "Η συνδρομή έχει προγραμματιστεί για ακύρωση. Διατηρείς πρόσβαση μέχρι τη λήξη της τρέχουσας περιόδου."
+			}),
+			plan && plan.features.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+				className: "mt-5 flex flex-wrap gap-2",
+				children: plan.features.map((feature) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("li", {
+					className: "rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.15em] text-white/55",
+					children: feature
+				}, feature))
+			}),
+			!active && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/pricing",
+				className: cta,
+				children: "ΕΠΑΝΕΝΕΡΓΟΠΟΙΗΣΗ"
+			}),
+			isCancellableStatus(subscription.status) && !subscription.cancel_at_period_end && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+				to: "/stop-plan",
+				className: "mt-4 inline-flex rounded-lg border border-red-500/25 px-4 py-2 text-sm text-red-300/80 transition hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40",
+				children: "Stop Plan"
+			})
+		]
+	});
+}
+function formatDate(iso) {
+	const date = new Date(iso);
+	if (Number.isNaN(date.getTime())) return "—";
+	return date.toLocaleDateString("el-GR", {
+		day: "2-digit",
+		month: "long",
+		year: "numeric"
+	});
+}
+function CompletedCourses() {
+	const { data, error, loading } = useAsync(getMyCompletedCourses, []);
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+		className: "mt-16",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+				className: "text-[11px] uppercase tracking-[0.5em] text-neutral-500",
+				children: "ΟΛΟΚΛΗΡΩΜΕΝΑ COURSES"
+			}),
+			loading ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "mt-6 space-y-3",
+				children: [0, 1].map((i) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "h-16 animate-pulse rounded-xl bg-white/[0.04]" }, i))
+			}) : null,
+			error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-6 text-sm text-red-400",
+				role: "alert",
+				children: error instanceof Error ? error.message : String(error)
+			}) : null,
+			data && data.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+				className: "mt-6 text-sm text-neutral-500",
+				children: [
+					"Δεν έχεις ολοκληρώσει course ακόμη.",
+					" ",
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/courses",
+						className: "text-neutral-300 underline-offset-4 hover:underline",
+						children: "Δες τα courses"
+					}),
+					"."
+				]
+			}) : null,
+			data && data.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", {
+				className: "mt-6 space-y-3",
+				children: data.map((entry, i) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.li, {
+					initial: {
+						opacity: 0,
+						y: 12
+					},
+					animate: {
+						opacity: 1,
+						y: 0
+					},
+					transition: {
+						duration: .35,
+						delay: Math.min(i * .05, .3)
+					},
+					className: "flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.06] to-transparent px-5 py-4",
+					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "min-w-0",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+							className: "truncate text-sm font-medium text-neutral-100",
+							children: entry.course.title
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+							className: "mt-1 text-[10px] uppercase tracking-[0.3em] text-neutral-500",
+							children: [
+								formatDate(entry.completedAt),
+								" · ",
+								entry.course.step_count,
+								" ΒΗΜΑΤΑ",
+								entry.replays > 0 ? ` · ${entry.replays} REPLAY` : ""
+							]
+						})]
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+						to: "/courses/$slug",
+						params: { slug: entry.course.slug },
+						className: "shrink-0 rounded-full border border-white/20 px-5 py-2 text-[10px] uppercase tracking-[0.3em] text-neutral-200 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60",
+						children: "REPLAY"
+					})]
+				}, entry.course.id))
+			}) : null
+		]
+	});
+}
+function ProfilePage() {
+	const { profile, loading, session, refresh } = useAuth();
+	const [form, setForm] = (0, import_react.useState)({
+		full_name: "",
+		headline: "",
+		bio: "",
+		city: "",
+		instagram: ""
+	});
+	const [avatarUrl, setAvatarUrl] = (0, import_react.useState)(null);
+	const [busy, setBusy] = (0, import_react.useState)(false);
+	const [uploading, setUploading] = (0, import_react.useState)(false);
+	const [msg, setMsg] = (0, import_react.useState)(null);
+	const fileRef = (0, import_react.useRef)(null);
+	(0, import_react.useEffect)(() => {
+		if (profile) {
+			setForm({
+				full_name: profile.full_name ?? "",
+				headline: profile.headline ?? "",
+				bio: profile.bio ?? "",
+				city: profile.city ?? "",
+				instagram: profile.instagram ?? ""
+			});
+			setAvatarUrl(profile.avatar_url ?? null);
+		}
+	}, [profile]);
+	async function handleAvatar(file) {
+		if (!file) return;
+		setUploading(true);
+		setMsg(null);
+		try {
+			const url = await uploadAvatar(file);
+			await updateMyProfile({ avatar_url: url });
+			setAvatarUrl(url);
+			refresh();
+			setMsg("Η φωτογραφία ενημερώθηκε.");
+		} catch (e) {
+			setMsg("Αποτυχία: " + e.message);
+		} finally {
+			setUploading(false);
+			if (fileRef.current) fileRef.current.value = "";
+		}
+	}
+	async function handleSave() {
+		setBusy(true);
+		setMsg(null);
+		try {
+			await updateMyProfile(form);
+			refresh();
+			setMsg("Το προφίλ αποθηκεύτηκε.");
+		} catch (e) {
+			setMsg("Αποτυχία: " + e.message);
+		} finally {
+			setBusy(false);
+		}
+	}
+	const field = "w-full rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white/90 outline-none focus:border-white/30";
+	if (loading) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto min-h-screen max-w-2xl px-6 py-12 text-white",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingSkeleton, { rows: 4 })
+	});
+	if (!session || !profile) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("main", {
+		className: "mx-auto min-h-screen max-w-2xl px-6 py-12 text-white",
+		children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ErrorState, { message: "Πρέπει να συνδεθείς για να δεις το προφίλ σου." })
+	});
+	const initials = (form.full_name || "?").split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("main", {
+		className: "mx-auto min-h-screen max-w-2xl px-6 py-12 text-white",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("header", {
+				className: "mb-8",
+				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+					className: "text-xs uppercase tracking-[0.3em] text-white/40",
+					children: "Account"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+					className: "mt-2 text-2xl font-semibold",
+					children: "Το προφίλ μου"
+				})]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "mb-8 flex items-center gap-5",
+				children: [avatarUrl ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("img", {
+					src: avatarUrl,
+					alt: "Avatar",
+					className: "h-20 w-20 rounded-full object-cover ring-1 ring-white/20"
+				}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+					className: "flex h-20 w-20 items-center justify-center rounded-full bg-white/10 text-lg font-medium text-white/70",
+					children: initials || "?"
+				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+						ref: fileRef,
+						type: "file",
+						accept: "image/*",
+						className: "hidden",
+						onChange: (e) => handleAvatar(e.target.files?.[0])
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+						onClick: () => fileRef.current?.click(),
+						disabled: uploading,
+						className: "rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-50",
+						children: uploading ? "Ανέβασμα…" : "Αλλαγή φωτογραφίας"
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-1 text-xs text-white/40",
+						children: "JPG/PNG, έως 5MB."
+					})
+				] })]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "mb-8 grid grid-cols-3 gap-4 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-center text-sm",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-xs uppercase tracking-wide text-white/40",
+						children: "Ρόλος"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-1 text-white/80",
+						children: profile.role
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-xs uppercase tracking-wide text-white/40",
+						children: "Level"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-1 text-white/80",
+						children: profile.level
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "text-xs uppercase tracking-wide text-white/40",
+						children: "Status"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "mt-1 text-white/80",
+						children: profile.status
+					})] })
+				]
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SubscriptionCard, { userId: session.user.id }),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CompletedCourses, {}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("section", {
+				className: "mt-8 space-y-4",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, {
+						label: "Ονοματεπώνυμο",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							className: field,
+							value: form.full_name,
+							onChange: (e) => setForm({
+								...form,
+								full_name: e.target.value
+							})
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, {
+						label: "Τίτλος (headline)",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+							className: field,
+							placeholder: "π.χ. Master Barber · Athens",
+							value: form.headline,
+							onChange: (e) => setForm({
+								...form,
+								headline: e.target.value
+							})
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, {
+						label: "Bio",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("textarea", {
+							rows: 4,
+							className: field,
+							placeholder: "Πες λίγα λόγια για σένα, τη διαδρομή και το στυλ σου…",
+							value: form.bio,
+							onChange: (e) => setForm({
+								...form,
+								bio: e.target.value
+							})
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+						className: "grid gap-4 sm:grid-cols-2",
+						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, {
+							label: "Πόλη",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+								className: field,
+								value: form.city,
+								onChange: (e) => setForm({
+									...form,
+									city: e.target.value
+								})
+							})
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Labeled, {
+							label: "Instagram",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", {
+								className: field,
+								placeholder: "@username",
+								value: form.instagram,
+								onChange: (e) => setForm({
+									...form,
+									instagram: e.target.value
+								})
+							})
+						})]
+					})
+				]
+			}),
+			msg && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+				className: "mt-4 text-sm text-white/70",
+				role: "status",
+				children: msg
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
+				onClick: handleSave,
+				disabled: busy,
+				className: "mt-6 rounded-lg bg-white px-5 py-2.5 text-sm font-medium text-black transition hover:bg-white/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40",
+				children: busy ? "Αποθήκευση…" : "Αποθήκευση προφίλ"
+			})
+		]
+	});
+}
+function Labeled({ label, children }) {
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", {
+		className: "block",
+		children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+			className: "mb-1 block text-sm text-white/70",
+			children: label
+		}), children]
+	});
+}
+//#endregion
+export { ProfilePage as component };
+
+=== END FILE ===
+

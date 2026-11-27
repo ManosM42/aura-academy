@@ -1,0 +1,1617 @@
+=== FILE: .output/server/index.mjs ===
+globalThis.__nitro_main__ = import.meta.url;
+import { i as serve, r as NodeResponse } from "./_libs/h3-v2+rou3+srvx.mjs";
+import { i as toEventHandler, n as defineHandler, o as HTTPError, r as defineLazyEventHandler, t as H3Core } from "./_libs/h3+rou3+srvx.mjs";
+import { i as withoutTrailingSlash, n as joinURL, r as withLeadingSlash, t as decodePath } from "./_libs/ufo.mjs";
+import { promises } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+//#region #nitro-vite-setup
+function lazyService(loader) {
+	let promise, mod;
+	return { fetch(req) {
+		if (mod) return mod.fetch(req);
+		if (!promise) promise = loader().then((_mod) => mod = _mod.default || _mod);
+		return promise.then((mod) => mod.fetch(req));
+	} };
+}
+var services = { ["ssr"]: lazyService(() => import("./_ssr/ssr.mjs")) };
+globalThis.__nitro_vite_envs__ = services;
+//#endregion
+//#region node_modules/nitro/dist/runtime/internal/route-rules.mjs
+var headers = ((m) => function headersRouteRule(event) {
+	for (const [key, value] of Object.entries(m.options || {})) event.res.headers.set(key, value);
+});
+//#endregion
+//#region #nitro/virtual/public-assets-data
+var public_assets_data_default = {
+	"/favicon.ico": {
+		"type": "image/vnd.microsoft.icon",
+		"etag": "\"175d8-Brz9GVXTtMcJkpKR+oGuV9Z/sAk\"",
+		"mtime": "2026-11-06T20:56:56.905Z",
+		"size": 95704,
+		"path": "../public/favicon.ico"
+	},
+	"/site.webmanifest": {
+		"type": "application/manifest+json",
+		"etag": "\"136-qqNXIi4QP85FzEZsIUubVTvSIeo\"",
+		"mtime": "2026-11-06T20:56:56.904Z",
+		"size": 310,
+		"path": "../public/site.webmanifest"
+	},
+	"/assets/AnimatePresence-ClHpx5iG.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"10b4-dRJ9HkjP/NcfZnOxdziczm+A0T8\"",
+		"mtime": "2026-11-06T20:56:53.122Z",
+		"size": 4276,
+		"path": "../public/assets/AnimatePresence-ClHpx5iG.js"
+	},
+	"/assets/AuraMark-BT6lLCpe.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1b0-7LvxclKXb8gy8u9ClDDyymGRmhQ\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 432,
+		"path": "../public/assets/AuraMark-BT6lLCpe.js"
+	},
+	"/assets/ChromeButton-CdfVnEPs.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"351-SKXF8AxFzPBrIJD3EplRIR5xjvU\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 849,
+		"path": "../public/assets/ChromeButton-CdfVnEPs.js"
+	},
+	"/assets/ChromeCursor-Bd--RrJo.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3b9-QDGJHrI7svq5nD3ZfpBcPwfvZYI\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 953,
+		"path": "../public/assets/ChromeCursor-Bd--RrJo.js"
+	},
+	"/assets/EliteCommunity-eTSjqE7i.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"102f9-2kcGZGzeDQQkD/N9yFLw6yo3tDM\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 66297,
+		"path": "../public/assets/EliteCommunity-eTSjqE7i.js"
+	},
+	"/assets/Footer-Bkdzkq98.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"8af-EkK9Md2NqO/4kiTyQqCH//NVL8s\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 2223,
+		"path": "../public/assets/Footer-Bkdzkq98.js"
+	},
+	"/assets/MediaThumb-CuzlgNR-.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"370-2gEYBI3fwWyR6Cw/IDsrft5DuMM\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 880,
+		"path": "../public/assets/MediaThumb-CuzlgNR-.js"
+	},
+	"/assets/States-BulpY35p.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"616-GRkkyLx67tjOLyQ6XDd/7fpNTJA\"",
+		"mtime": "2026-11-06T20:56:53.123Z",
+		"size": 1558,
+		"path": "../public/assets/States-BulpY35p.js"
+	},
+	"/assets/VideoEntryForm-CRQira0Y.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"279a-2rfzB8hRKzIJgAsKkPtwJ7KLDP0\"",
+		"mtime": "2026-11-06T20:56:53.124Z",
+		"size": 10138,
+		"path": "../public/assets/VideoEntryForm-CRQira0Y.js"
+	},
+	"/assets/_haircutId-B6elcldG.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3a1-dzus1skuUU4vZ/A3yM11S7l/PIc\"",
+		"mtime": "2026-11-06T20:56:53.124Z",
+		"size": 929,
+		"path": "../public/assets/_haircutId-B6elcldG.js"
+	},
+	"/assets/_haircutId-D4GsTO_E.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1f09-IOv4KD4hJ9aFUUa6poma/7OAcsI\"",
+		"mtime": "2026-11-06T20:56:53.124Z",
+		"size": 7945,
+		"path": "../public/assets/_haircutId-D4GsTO_E.js"
+	},
+	"/assets/about-B-G3PyHQ.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"2b91-lE+E5IMeSlnKS2G+dwmHC0VQ9gw\"",
+		"mtime": "2026-11-06T20:56:53.124Z",
+		"size": 11153,
+		"path": "../public/assets/about-B-G3PyHQ.js"
+	},
+	"/assets/academy._slug-CNuNeyi7.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"17a4-gVJk1Ox85uIUflKdlhuutkGZ1tE\"",
+		"mtime": "2026-11-06T20:56:53.124Z",
+		"size": 6052,
+		"path": "../public/assets/academy._slug-CNuNeyi7.js"
+	},
+	"/sw.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"58f-BUYrEn69fbaHtxR9qIY0SCLTBAk\"",
+		"mtime": "2026-11-06T20:56:56.904Z",
+		"size": 1423,
+		"path": "../public/sw.js"
+	},
+	"/assets/academy.index-SW8mJI0Y.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"d689-I1BH8u7HizmAX4Rgdx+P1ZgMC1M\"",
+		"mtime": "2026-11-06T20:56:53.125Z",
+		"size": 54921,
+		"path": "../public/assets/academy.index-SW8mJI0Y.js"
+	},
+	"/assets/admin.book-BFzT9Y31.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"50d3-DKUJKc3wf6M3FEgtY3cjYFwePuA\"",
+		"mtime": "2026-11-06T20:56:53.125Z",
+		"size": 20691,
+		"path": "../public/assets/admin.book-BFzT9Y31.js"
+	},
+	"/assets/admin.courses._courseId-BB4tbnNk.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3ec-xoeIecJZRB3GCQxje7WRXVFFx3o\"",
+		"mtime": "2026-11-06T20:56:53.125Z",
+		"size": 1004,
+		"path": "../public/assets/admin.courses._courseId-BB4tbnNk.js"
+	},
+	"/assets/academy._slug-snKSkque.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3af-lK/yJx7Ude/GfmLBdDB04+/C5Ew\"",
+		"mtime": "2026-11-06T20:56:53.124Z",
+		"size": 943,
+		"path": "../public/assets/academy._slug-snKSkque.js"
+	},
+	"/robots.txt": {
+		"type": "text/plain; charset=utf-8",
+		"etag": "\"a0-CKGXSIe7TSsqDTmGm/nY1t/o5d0\"",
+		"mtime": "2026-11-06T20:56:56.904Z",
+		"size": 160,
+		"path": "../public/robots.txt"
+	},
+	"/assets/admin.courses._courseId-D6ODeYd6.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"da1-Hu/as/YeBlZYBAHUTvisrWvryw0\"",
+		"mtime": "2026-11-06T20:56:53.125Z",
+		"size": 3489,
+		"path": "../public/assets/admin.courses._courseId-D6ODeYd6.js"
+	},
+	"/assets/admin.inbox-CUP3omLV.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1b08-r4EZD05zx0OJqEzMVvddOfzanTM\"",
+		"mtime": "2026-11-06T20:56:53.126Z",
+		"size": 6920,
+		"path": "../public/assets/admin.inbox-CUP3omLV.js"
+	},
+	"/assets/admin.courses.index-Cw0jMneg.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"acc-yeY0eQNlw4TEJ6GTp2MUTQ0Gk9U\"",
+		"mtime": "2026-11-06T20:56:53.125Z",
+		"size": 2764,
+		"path": "../public/assets/admin.courses.index-Cw0jMneg.js"
+	},
+	"/assets/admin.courses.new-CcCAsjca.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"9e3-5T27/oM8X78ys1ycCqSK4tOfouM\"",
+		"mtime": "2026-11-06T20:56:53.126Z",
+		"size": 2531,
+		"path": "../public/assets/admin.courses.new-CcCAsjca.js"
+	},
+	"/assets/admin.index-DPPDTCZ2.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"b6a3-9dQ1/9Ut4oZFIdMNu7OK2hBu0lY\"",
+		"mtime": "2026-11-06T20:56:53.126Z",
+		"size": 46755,
+		"path": "../public/assets/admin.index-DPPDTCZ2.js"
+	},
+	"/assets/admin.notifications-D5vKvS7e.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"35dc-7efiQRfi1yLSup+IYpKrRwlC1hY\"",
+		"mtime": "2026-11-06T20:56:53.126Z",
+		"size": 13788,
+		"path": "../public/assets/admin.notifications-D5vKvS7e.js"
+	},
+	"/assets/arrow-right-D_t5sPRj.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"a5-XHJ2krzauuuVct3LIC4QXtEU/Ag\"",
+		"mtime": "2026-11-06T20:56:53.127Z",
+		"size": 165,
+		"path": "../public/assets/arrow-right-D_t5sPRj.js"
+	},
+	"/assets/arrow-left-Brxe6F5I.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"a5-vpfHk2MRH5j3Wet6rbvEZ31kYUM\"",
+		"mtime": "2026-11-06T20:56:53.126Z",
+		"size": 165,
+		"path": "../public/assets/arrow-left-Brxe6F5I.js"
+	},
+	"/assets/aura-DdP8jhxG.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"31-fMRI5dW26XpCK03FtQLyiBsuOGo\"",
+		"mtime": "2026-11-06T20:56:53.127Z",
+		"size": 49,
+		"path": "../public/assets/aura-DdP8jhxG.js"
+	},
+	"/assets/auth.callback-DWZY6muH.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"9bf-1dkezvLtw+H4A8I9COZpPg4eDdI\"",
+		"mtime": "2026-11-06T20:56:53.127Z",
+		"size": 2495,
+		"path": "../public/assets/auth.callback-DWZY6muH.js"
+	},
+	"/assets/award-DqqZqsrp.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"112-tdEV8A+/ZoS5x4+zATJeuyujYpM\"",
+		"mtime": "2026-11-06T20:56:53.128Z",
+		"size": 274,
+		"path": "../public/assets/award-DqqZqsrp.js"
+	},
+	"/assets/book-DN8DL8gW.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"7b2-e04fVWTrZhTXqd9gQgJYvkpchx8\"",
+		"mtime": "2026-11-06T20:56:53.129Z",
+		"size": 1970,
+		"path": "../public/assets/book-DN8DL8gW.js"
+	},
+	"/assets/book-open-l6w5YLVR.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"117-rArI9LPPZBL9n9YFpo5z8ae30i0\"",
+		"mtime": "2026-11-06T20:56:53.129Z",
+		"size": 279,
+		"path": "../public/assets/book-open-l6w5YLVR.js"
+	},
+	"/assets/auth.callback-J8TDGUE9.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"117c-m6F/B/o19yjBhxh7DEtX+bYOVzU\"",
+		"mtime": "2026-11-06T20:56:53.127Z",
+		"size": 4476,
+		"path": "../public/assets/auth.callback-J8TDGUE9.js"
+	},
+	"/assets/book-BfccH79X.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"8ce7-+W//8z+d0DizLJDsdUdKH4Mjniw\"",
+		"mtime": "2026-11-06T20:56:53.129Z",
+		"size": 36071,
+		"path": "../public/assets/book-BfccH79X.js"
+	},
+	"/assets/calendar-NogZYPsc.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"101-pVqMBJO8ypAiLeDBDE6pip2tXy8\"",
+		"mtime": "2026-11-06T20:56:53.129Z",
+		"size": 257,
+		"path": "../public/assets/calendar-NogZYPsc.js"
+	},
+	"/assets/check-l8y3aT-v.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"7c-FqLs8h+iQdAPdsVYAoUqh52jJ2o\"",
+		"mtime": "2026-11-06T20:56:53.129Z",
+		"size": 124,
+		"path": "../public/assets/check-l8y3aT-v.js"
+	},
+	"/assets/checkout.index-BpbaWFWK.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3bd-xEqtlXN7gUmVjuGIxpp6CIQeqHU\"",
+		"mtime": "2026-11-06T20:56:53.130Z",
+		"size": 957,
+		"path": "../public/assets/checkout.index-BpbaWFWK.js"
+	},
+	"/assets/book-DfGxqo-T.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"274-igTNYkLHiCb3J3McHvPK1pAK9MY\"",
+		"mtime": "2026-11-06T20:56:53.129Z",
+		"size": 628,
+		"path": "../public/assets/book-DfGxqo-T.js"
+	},
+	"/assets/checkout.index-CTxlpDb9.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"247c-6ZdCnBxfqJvLz8cu0BEsl+2uYAc\"",
+		"mtime": "2026-11-06T20:56:53.130Z",
+		"size": 9340,
+		"path": "../public/assets/checkout.index-CTxlpDb9.js"
+	},
+	"/assets/checkout-intent-CYMuNmEZ.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"25d-9V+qSvpYnTgIwsN96lB3khY4PEk\"",
+		"mtime": "2026-11-06T20:56:53.130Z",
+		"size": 605,
+		"path": "../public/assets/checkout-intent-CYMuNmEZ.js"
+	},
+	"/assets/checkout.return-BUPj3cb4.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3cf-KQmQZFtBN0YkH6xzz1oJXQaYQ8k\"",
+		"mtime": "2026-11-06T20:56:53.130Z",
+		"size": 975,
+		"path": "../public/assets/checkout.return-BUPj3cb4.js"
+	},
+	"/assets/checkout.return-Bi3mkH5b.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"14aa-bjzvQe7ngPPJW5cOdKYWDsOaE3Y\"",
+		"mtime": "2026-11-06T20:56:53.130Z",
+		"size": 5290,
+		"path": "../public/assets/checkout.return-Bi3mkH5b.js"
+	},
+	"/assets/chevron-down-CMzGfsmT.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"80-guELS0+5BpD1dMOEmb2aT/leUCU\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 128,
+		"path": "../public/assets/chevron-down-CMzGfsmT.js"
+	},
+	"/assets/chevron-left-eEe2n3pc.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"82-DQ9dej/VByl8V9H8ZfaQBVzhFPw\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 130,
+		"path": "../public/assets/chevron-left-eEe2n3pc.js"
+	},
+	"/assets/chevron-right-LS5pF-bM.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"82-beE8B+YYz4IjVXerWBz7hjitpns\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 130,
+		"path": "../public/assets/chevron-right-LS5pF-bM.js"
+	},
+	"/assets/chrome-DYZby3h2.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"eb9-qIjEaPfQO8oI5SmuQXpeyO09XsQ\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 3769,
+		"path": "../public/assets/chrome-DYZby3h2.js"
+	},
+	"/assets/book-yOoDu1sO.png": {
+		"type": "image/png",
+		"etag": "\"1e1da4-v/bzW9Zz/MexDZwR2JF3uPCU4bk\"",
+		"mtime": "2026-11-06T20:56:53.156Z",
+		"size": 1973668,
+		"path": "../public/assets/book-yOoDu1sO.png"
+	},
+	"/assets/circle-CSxX3fzC.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"82-lSPc7q8gtblbVdD9LnKWfQXbqZg\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 130,
+		"path": "../public/assets/circle-CSxX3fzC.js"
+	},
+	"/assets/circle-alert-Bs1x-kqg.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"fa-Ok5YnoegTCnPpf7nfkT9+ouRp7A\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 250,
+		"path": "../public/assets/circle-alert-Bs1x-kqg.js"
+	},
+	"/assets/circle-check-DcupJV4n.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"b2-3Eem9EKZ/bYg/G6cFB6voUros54\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 178,
+		"path": "../public/assets/circle-check-DcupJV4n.js"
+	},
+	"/assets/clock-CqoNLjzH.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"a9-aAGhfC7b6TOnDGrXv7RdosAL1gQ\"",
+		"mtime": "2026-11-06T20:56:53.132Z",
+		"size": 169,
+		"path": "../public/assets/clock-CqoNLjzH.js"
+	},
+	"/assets/contact-ae2V9TPP.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"26d8-jz5qEa8c0vm60ZiU0SXFIbc+r/c\"",
+		"mtime": "2026-11-06T20:56:53.132Z",
+		"size": 9944,
+		"path": "../public/assets/contact-ae2V9TPP.js"
+	},
+	"/assets/cofounder-Ca4r51v2.jpg": {
+		"type": "image/jpeg",
+		"etag": "\"106b2-UZ3WNWNhctsnj0rcBz9JIedKvBU\"",
+		"mtime": "2026-11-06T20:56:53.157Z",
+		"size": 67250,
+		"path": "../public/assets/cofounder-Ca4r51v2.jpg"
+	},
+	"/assets/copy-CMIpwlCB.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"ec-uHM9YddVFlM4vu3i8s3/se1TjGs\"",
+		"mtime": "2026-11-06T20:56:53.132Z",
+		"size": 236,
+		"path": "../public/assets/copy-CMIpwlCB.js"
+	},
+	"/assets/courses-LEqLhg7m.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"29b1-X29wr8tZRCre2tWDMKsvs1X2Rfs\"",
+		"mtime": "2026-11-06T20:56:53.132Z",
+		"size": 10673,
+		"path": "../public/assets/courses-LEqLhg7m.js"
+	},
+	"/assets/cookie-policy-BNWqltRU.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"b9e-YuyYd/+7jd3eZtbcfQSk/D8tyys\"",
+		"mtime": "2026-11-06T20:56:53.132Z",
+		"size": 2974,
+		"path": "../public/assets/cookie-policy-BNWqltRU.js"
+	},
+	"/assets/client-CKVMbL1z.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"340e5-LOAAPSlLieTfAcc/bEDns8JGhdQ\"",
+		"mtime": "2026-11-06T20:56:53.131Z",
+		"size": 213221,
+		"path": "../public/assets/client-CKVMbL1z.js"
+	},
+	"/assets/courses._slug-CYu-mVBG.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"41b-w2+NU5AE8RSGEbjzvFS1qQ5cp+U\"",
+		"mtime": "2026-11-06T20:56:53.133Z",
+		"size": 1051,
+		"path": "../public/assets/courses._slug-CYu-mVBG.js"
+	},
+	"/assets/courses._slug-Bi8l0Fjl.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3165-PgLCiEPTPsAJJ3cLPpgsaIsYBRM\"",
+		"mtime": "2026-11-06T20:56:53.133Z",
+		"size": 12645,
+		"path": "../public/assets/courses._slug-Bi8l0Fjl.js"
+	},
+	"/assets/createLucideIcon-Dz5w4CtK.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"4d0-ElRig+iTYv5Ba8fXcpYcTeHERzY\"",
+		"mtime": "2026-11-06T20:56:53.134Z",
+		"size": 1232,
+		"path": "../public/assets/createLucideIcon-Dz5w4CtK.js"
+	},
+	"/assets/courses.index-z2H8rYUh.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1e8e-xG3oGZlKcqNceTUK8NZA/BwSd/g\"",
+		"mtime": "2026-11-06T20:56:53.133Z",
+		"size": 7822,
+		"path": "../public/assets/courses.index-z2H8rYUh.js"
+	},
+	"/assets/crown-QxIH2HsF.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"16a-BtFrIapuheUvjBYhMl2auw9KyeE\"",
+		"mtime": "2026-11-06T20:56:53.134Z",
+		"size": 362,
+		"path": "../public/assets/crown-QxIH2HsF.js"
+	},
+	"/assets/db-DXn9ZPwL.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3b-u/P47oD9ZsQFerQdzkLheRgTKSg\"",
+		"mtime": "2026-11-06T20:56:53.134Z",
+		"size": 59,
+		"path": "../public/assets/db-DXn9ZPwL.js"
+	},
+	"/assets/dashboard--lHvzaaV.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"6896-JOfSXF0uGsl4g+tcD3G7Qr85OHE\"",
+		"mtime": "2026-11-06T20:56:53.134Z",
+		"size": 26774,
+		"path": "../public/assets/dashboard--lHvzaaV.js"
+	},
+	"/assets/developer-BD9wcHX1.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"88-IAV6ol9oFk9H01aYKCKoAKJHIr8\"",
+		"mtime": "2026-11-06T20:56:53.135Z",
+		"size": 136,
+		"path": "../public/assets/developer-BD9wcHX1.js"
+	},
+	"/assets/elite-BuLnQzEn.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1f8b-cPDF6EhKalXWKZbjxXQiohg/ONk\"",
+		"mtime": "2026-11-06T20:56:53.136Z",
+		"size": 8075,
+		"path": "../public/assets/elite-BuLnQzEn.js"
+	},
+	"/assets/eye-8YoOALhG.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"100-UiQXjpUqmzsjlyB8H/P2NnJG4Hw\"",
+		"mtime": "2026-11-06T20:56:53.136Z",
+		"size": 256,
+		"path": "../public/assets/eye-8YoOALhG.js"
+	},
+	"/assets/developer-DDzBeS5w.jpg": {
+		"type": "image/jpeg",
+		"etag": "\"7b54-PMcVM/nXh1FxWnVKv/QF5AV+Qzk\"",
+		"mtime": "2026-11-06T20:56:53.157Z",
+		"size": 31572,
+		"path": "../public/assets/developer-DDzBeS5w.jpg"
+	},
+	"/assets/aura-CtJu3i2Z.jpg": {
+		"type": "image/jpeg",
+		"etag": "\"28afaa-sZ4hm+KsZUcfjp1D7jRPGpv/1f4\"",
+		"mtime": "2026-11-06T20:56:53.155Z",
+		"size": 2666410,
+		"path": "../public/assets/aura-CtJu3i2Z.jpg"
+	},
+	"/assets/file-text-DWpyfNHk.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"181-b4ihhOfJQ9IPOdXCkfTg/B1SYnA\"",
+		"mtime": "2026-11-06T20:56:53.136Z",
+		"size": 385,
+		"path": "../public/assets/file-text-DWpyfNHk.js"
+	},
+	"/assets/founder-BOjw_skh.jpg": {
+		"type": "image/jpeg",
+		"etag": "\"8545-cVV40TYE8FPu1r+yXOs9IXZe7RI\"",
+		"mtime": "2026-11-06T20:56:53.157Z",
+		"size": 34117,
+		"path": "../public/assets/founder-BOjw_skh.jpg"
+	},
+	"/assets/gallery-CPurb_1Y.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"660d-ePMc6PZuLhsD6RaKQW5auhwgNag\"",
+		"mtime": "2026-11-06T20:56:53.136Z",
+		"size": 26125,
+		"path": "../public/assets/gallery-CPurb_1Y.js"
+	},
+	"/assets/gem-CdTGHu1B.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"14e-hrYpKmGwqc1kK2zPrG+MI54MTJU\"",
+		"mtime": "2026-11-06T20:56:53.137Z",
+		"size": 334,
+		"path": "../public/assets/gem-CdTGHu1B.js"
+	},
+	"/assets/graduation-cap-KbC_XaK8.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"14c-GxG88zTYdrD6kuOc1AGk1njRLs4\"",
+		"mtime": "2026-11-06T20:56:53.137Z",
+		"size": 332,
+		"path": "../public/assets/graduation-cap-KbC_XaK8.js"
+	},
+	"/assets/gallery-Dk-eIjdF.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1728-BziU7oJ6R6t5gCrt7ZG0WhZ3TvU\"",
+		"mtime": "2026-11-06T20:56:53.137Z",
+		"size": 5928,
+		"path": "../public/assets/gallery-Dk-eIjdF.js"
+	},
+	"/assets/haircut-review-V8bAVsPd.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1699-39wLNBnZJ+GU2RzcHI3ta2piOaA\"",
+		"mtime": "2026-11-06T20:56:53.137Z",
+		"size": 5785,
+		"path": "../public/assets/haircut-review-V8bAVsPd.js"
+	},
+	"/assets/haircuts-B61qYPwn.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"13cc-kInpE8MC8b5zrkHL53aSKZuidug\"",
+		"mtime": "2026-11-06T20:56:53.138Z",
+		"size": 5068,
+		"path": "../public/assets/haircuts-B61qYPwn.js"
+	},
+	"/assets/images-BKsLEZPR.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"172-wmzgn/eX6Uq8SXcEp6UziKHVowU\"",
+		"mtime": "2026-11-06T20:56:53.138Z",
+		"size": 370,
+		"path": "../public/assets/images-BKsLEZPR.js"
+	},
+	"/assets/index-CxH9z1Zx.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"52ff4-3bMSfpm+JhPI2z5XIvcQtQAYsLw\"",
+		"mtime": "2026-11-06T20:56:53.122Z",
+		"size": 339956,
+		"path": "../public/assets/index-CxH9z1Zx.js"
+	},
+	"/assets/instagram-DKDIOVOj.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"128-tvWQBeSJNzhqAps5n1HbfZzvoEE\"",
+		"mtime": "2026-11-06T20:56:53.138Z",
+		"size": 296,
+		"path": "../public/assets/instagram-DKDIOVOj.js"
+	},
+	"/assets/jsx-runtime-BkSabwWG.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3c1-VkW1xFbt56H2FC99QIi6PTzaFIo\"",
+		"mtime": "2026-11-06T20:56:53.138Z",
+		"size": 961,
+		"path": "../public/assets/jsx-runtime-BkSabwWG.js"
+	},
+	"/assets/layers-Cp6xWl69.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1a5-2igj5I77dzk8Ji212MnCWKLjGyA\"",
+		"mtime": "2026-11-06T20:56:53.139Z",
+		"size": 421,
+		"path": "../public/assets/layers-Cp6xWl69.js"
+	},
+	"/assets/lazyRouteComponent-CNoRSiag.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"13a6-uGBPzaJnSraiaEMNR2iqsQky6/g\"",
+		"mtime": "2026-11-06T20:56:53.139Z",
+		"size": 5030,
+		"path": "../public/assets/lazyRouteComponent-CNoRSiag.js"
+	},
+	"/assets/lesson._lessonId-BYxe1JmO.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"268-aEsE6iucA04Qx2ur0i8F8D4s27Q\"",
+		"mtime": "2026-11-06T20:56:53.139Z",
+		"size": 616,
+		"path": "../public/assets/lesson._lessonId-BYxe1JmO.js"
+	},
+	"/assets/lesson._lessonId-DUxPKgcw.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"fc2-QmLTCGPIL38f80TcsFB4GW+9Rn4\"",
+		"mtime": "2026-11-06T20:56:53.139Z",
+		"size": 4034,
+		"path": "../public/assets/lesson._lessonId-DUxPKgcw.js"
+	},
+	"/assets/link-BhBo0Yh6.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"688a-cdAvoLduR+pt7ZLUl8b9b3GIHYk\"",
+		"mtime": "2026-11-06T20:56:53.140Z",
+		"size": 26762,
+		"path": "../public/assets/link-BhBo0Yh6.js"
+	},
+	"/assets/loader-circle-DdNdnF6-.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"90-ELanz1UG8Qw5Rk6lepHI5HGulmY\"",
+		"mtime": "2026-11-06T20:56:53.140Z",
+		"size": 144,
+		"path": "../public/assets/loader-circle-DdNdnF6-.js"
+	},
+	"/assets/lock-DHD2dW60.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"ce-RI2H3Ba4ZZcvHoTxg/zYMCCAALk\"",
+		"mtime": "2026-11-06T20:56:53.140Z",
+		"size": 206,
+		"path": "../public/assets/lock-DHD2dW60.js"
+	},
+	"/assets/login-BGRel2QT.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"402-BbVTY2GEZfuhr3ZaIeY03cTGve0\"",
+		"mtime": "2026-11-06T20:56:53.140Z",
+		"size": 1026,
+		"path": "../public/assets/login-BGRel2QT.js"
+	},
+	"/assets/logo-BoiBWv1N.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"31-RLUgC6eci1ztDg8WgcdW2UUo/XQ\"",
+		"mtime": "2026-11-06T20:56:53.141Z",
+		"size": 49,
+		"path": "../public/assets/logo-BoiBWv1N.js"
+	},
+	"/assets/mail-B0XmtP5t.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"d5-0d26OXKaVmH3Psudbs3Y19OgNBc\"",
+		"mtime": "2026-11-06T20:56:53.141Z",
+		"size": 213,
+		"path": "../public/assets/mail-B0XmtP5t.js"
+	},
+	"/assets/logo-6MQltNE0.jpg": {
+		"type": "image/jpeg",
+		"etag": "\"1233c-99CpaGiJovygLYwIgZGSX8ppt3U\"",
+		"mtime": "2026-11-06T20:56:53.157Z",
+		"size": 74556,
+		"path": "../public/assets/logo-6MQltNE0.jpg"
+	},
+	"/assets/login-CkVMxxjA.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"6b75-ucvOQcbZAT6UfShXh48EO3UZoCo\"",
+		"mtime": "2026-11-06T20:56:53.140Z",
+		"size": 27509,
+		"path": "../public/assets/login-CkVMxxjA.js"
+	},
+	"/assets/map-pin-BnQggz49.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"103-RV/bI8CCDdcxRT+aiaLQv1Q04t0\"",
+		"mtime": "2026-11-06T20:56:53.141Z",
+		"size": 259,
+		"path": "../public/assets/map-pin-BnQggz49.js"
+	},
+	"/assets/message-circle-DpgrN90q.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"f1-IV/MMcfX5DUK0F0CT8dCWsy6RAM\"",
+		"mtime": "2026-11-06T20:56:53.142Z",
+		"size": 241,
+		"path": "../public/assets/message-circle-DpgrN90q.js"
+	},
+	"/assets/messages-BVXzCx_l.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"30dd-psAKz4GMAVNarFRlxEOYi2by02A\"",
+		"mtime": "2026-11-06T20:56:53.142Z",
+		"size": 12509,
+		"path": "../public/assets/messages-BVXzCx_l.js"
+	},
+	"/assets/messages-CXx8ZzPc.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"3ac5-GvVJqPUL3XrrlNwdMN2JK72Hyrs\"",
+		"mtime": "2026-11-06T20:56:53.142Z",
+		"size": 15045,
+		"path": "../public/assets/messages-CXx8ZzPc.js"
+	},
+	"/assets/messagingQueries-DN5myh0K.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"808-g7EIFUkKq9Bg/FmxFHtHM+CJ31o\"",
+		"mtime": "2026-11-06T20:56:53.142Z",
+		"size": 2056,
+		"path": "../public/assets/messagingQueries-DN5myh0K.js"
+	},
+	"/assets/method-BzRLtaFi.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"1712-S6uSuwrB21W67Lp8QUbVaLoEngA\"",
+		"mtime": "2026-11-06T20:56:53.142Z",
+		"size": 5906,
+		"path": "../public/assets/method-BzRLtaFi.js"
+	},
+	"/assets/online-seminars-CgPspnDP.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"37ba-Ysf/vgCYTYQ+CBpmGiPriuzImYo\"",
+		"mtime": "2026-11-06T20:56:53.143Z",
+		"size": 14266,
+		"path": "../public/assets/online-seminars-CgPspnDP.js"
+	},
+	"/assets/onlineSeminars-BWTplH_L.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"858-OiEsbvwRZ/UybJyFmnSq7KHSEr0\"",
+		"mtime": "2026-11-06T20:56:53.143Z",
+		"size": 2136,
+		"path": "../public/assets/onlineSeminars-BWTplH_L.js"
+	},
+	"/assets/p1-DxfqM1q8.webp": {
+		"type": "image/webp",
+		"etag": "\"db88-j1BtZRxUPaRmis88ZQ6+R1hx9w4\"",
+		"mtime": "2026-11-06T20:56:53.165Z",
+		"size": 56200,
+		"path": "../public/assets/p1-DxfqM1q8.webp"
+	},
+	"/assets/p10-BTbe5U6i.webp": {
+		"type": "image/webp",
+		"etag": "\"272fa-kCPI9SSbS5gDIEqeKwSFTcbtiy8\"",
+		"mtime": "2026-11-06T20:56:53.165Z",
+		"size": 160506,
+		"path": "../public/assets/p10-BTbe5U6i.webp"
+	},
+	"/assets/p1-Dfkg2gey.webp": {
+		"type": "image/webp",
+		"etag": "\"3baea-3l1S566P3NOzEjMW2mdpEdsGWFk\"",
+		"mtime": "2026-11-06T20:56:53.164Z",
+		"size": 244458,
+		"path": "../public/assets/p1-Dfkg2gey.webp"
+	},
+	"/assets/p11-Bhl4Ttju.webp": {
+		"type": "image/webp",
+		"etag": "\"631e-YX6g21XlZGnLs28F+uun0ux1kic\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 25374,
+		"path": "../public/assets/p11-Bhl4Ttju.webp"
+	},
+	"/assets/p10-ct-OJJx2.webp": {
+		"type": "image/webp",
+		"etag": "\"779e-0xMhUAC4RY0X/lLfSn337PeffXU\"",
+		"mtime": "2026-11-06T20:56:53.165Z",
+		"size": 30622,
+		"path": "../public/assets/p10-ct-OJJx2.webp"
+	},
+	"/assets/p11-BNyMRJFH.webp": {
+		"type": "image/webp",
+		"etag": "\"26b96-/2uzBaSBWFj0Wjhrp8AvGQkIglQ\"",
+		"mtime": "2026-11-06T20:56:53.165Z",
+		"size": 158614,
+		"path": "../public/assets/p11-BNyMRJFH.webp"
+	},
+	"/assets/p12-C7JqYkYQ.webp": {
+		"type": "image/webp",
+		"etag": "\"85d4-0SaBKlb0+xEVa5G5GMEvkGlHfyk\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 34260,
+		"path": "../public/assets/p12-C7JqYkYQ.webp"
+	},
+	"/assets/p12-B2hr7co2.webp": {
+		"type": "image/webp",
+		"etag": "\"375d4-7A3slPVFpmSYuFabCAe1iLxQ7sI\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 226772,
+		"path": "../public/assets/p12-B2hr7co2.webp"
+	},
+	"/assets/p13-DwC5xpsl.webp": {
+		"type": "image/webp",
+		"etag": "\"169ea-+q1gdajci/Cn/GW3MbRdrtA56b4\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 92650,
+		"path": "../public/assets/p13-DwC5xpsl.webp"
+	},
+	"/assets/p14-AvNLelO3.webp": {
+		"type": "image/webp",
+		"etag": "\"8072-EgByXZAc+SzwOb2KPZTAFL1rZYY\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 32882,
+		"path": "../public/assets/p14-AvNLelO3.webp"
+	},
+	"/assets/p15-B8EnvdRF.webp": {
+		"type": "image/webp",
+		"etag": "\"3ade4-1cPN+muBEbrnTBurB0vB2yavj2M\"",
+		"mtime": "2026-11-06T20:56:53.167Z",
+		"size": 241124,
+		"path": "../public/assets/p15-B8EnvdRF.webp"
+	},
+	"/assets/p14-BqgQc517.webp": {
+		"type": "image/webp",
+		"etag": "\"f614-qOLD60tpxLiAP2ySUfB939aFeeg\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 62996,
+		"path": "../public/assets/p14-BqgQc517.webp"
+	},
+	"/assets/p15-Nh1sGefC.webp": {
+		"type": "image/webp",
+		"etag": "\"f112-BMdeQYo7az2dK/xQ3bVn4XwF1Cg\"",
+		"mtime": "2026-11-06T20:56:53.167Z",
+		"size": 61714,
+		"path": "../public/assets/p15-Nh1sGefC.webp"
+	},
+	"/assets/p13-rdXs4SxX.webp": {
+		"type": "image/webp",
+		"etag": "\"394f2-5j8N94hxj6+eIo4knaqZMyR1SpM\"",
+		"mtime": "2026-11-06T20:56:53.166Z",
+		"size": 234738,
+		"path": "../public/assets/p13-rdXs4SxX.webp"
+	},
+	"/assets/p16-B_4NP8hN.webp": {
+		"type": "image/webp",
+		"etag": "\"592a-vDc8exvHViuB6moHPNyzSvmxHWI\"",
+		"mtime": "2026-11-06T20:56:53.167Z",
+		"size": 22826,
+		"path": "../public/assets/p16-B_4NP8hN.webp"
+	},
+	"/assets/p16-CugGudcG.webp": {
+		"type": "image/webp",
+		"etag": "\"b4e2-1xdxrAbFJ0PgklJQ+Dshier9MfA\"",
+		"mtime": "2026-11-06T20:56:53.167Z",
+		"size": 46306,
+		"path": "../public/assets/p16-CugGudcG.webp"
+	},
+	"/assets/p1-CuASdWto.jpg": {
+		"type": "image/jpeg",
+		"etag": "\"b6284-+Mzr0PUD2WZ9RaLZ2oWUTxummSs\"",
+		"mtime": "2026-11-06T20:56:53.162Z",
+		"size": 746116,
+		"path": "../public/assets/p1-CuASdWto.jpg"
+	},
+	"/assets/p17-BCBA4Tuv.webp": {
+		"type": "image/webp",
+		"etag": "\"6888-ThLHKLTu2r24b9uCJ+fSjjKgl5g\"",
+		"mtime": "2026-11-06T20:56:53.167Z",
+		"size": 26760,
+		"path": "../public/assets/p17-BCBA4Tuv.webp"
+	},
+	"/assets/p17-BLtCiSPP.webp": {
+		"type": "image/webp",
+		"etag": "\"1a264-0doOO/ehzy9nky5606ibGLixPXU\"",
+		"mtime": "2026-11-06T20:56:53.168Z",
+		"size": 107108,
+		"path": "../public/assets/p17-BLtCiSPP.webp"
+	},
+	"/assets/p18-DeBPEMMK.webp": {
+		"type": "image/webp",
+		"etag": "\"962a-K13Fbg9FHYB20SF3TTgqm8j0xGE\"",
+		"mtime": "2026-11-06T20:56:53.169Z",
+		"size": 38442,
+		"path": "../public/assets/p18-DeBPEMMK.webp"
+	},
+	"/assets/p19-CQBqRCiW.webp": {
+		"type": "image/webp",
+		"etag": "\"d242-hKW1b3dDiTc/mRHlr9jLsMssnJo\"",
+		"mtime": "2026-11-06T20:56:53.169Z",
+		"size": 53826,
+		"path": "../public/assets/p19-CQBqRCiW.webp"
+	},
+	"/assets/p18-Bl-wdZwf.webp": {
+		"type": "image/webp",
+		"etag": "\"2b4ea-267YQ0+yMA3rHYrzwLxS1qTpP4Y\"",
+		"mtime": "2026-11-06T20:56:53.168Z",
+		"size": 177386,
+		"path": "../public/assets/p18-Bl-wdZwf.webp"
+	},
+	"/assets/p2-BaZX45ej.webp": {
+		"type": "image/webp",
+		"etag": "\"7df0-LJnvBwipkM/eL8TaltozWiBJ7Tc\"",
+		"mtime": "2026-11-06T20:56:53.171Z",
+		"size": 32240,
+		"path": "../public/assets/p2-BaZX45ej.webp"
+	},
+	"/assets/p20-BrR1hrWx.webp": {
+		"type": "image/webp",
+		"etag": "\"a738-sh73FiSn3ZyWaeHdGwX27+9Hb1A\"",
+		"mtime": "2026-11-06T20:56:53.172Z",
+		"size": 42808,
+		"path": "../public/assets/p20-BrR1hrWx.webp"
+	},
+	"/assets/p2-B50SlM7Q.webp": {
+		"type": "image/webp",
+		"etag": "\"2698a-uQsHEOhVaKARi7oN60gdgNQswZA\"",
+		"mtime": "2026-11-06T20:56:53.170Z",
+		"size": 158090,
+		"path": "../public/assets/p2-B50SlM7Q.webp"
+	},
+	"/assets/p19-DcmXDsSS.webp": {
+		"type": "image/webp",
+		"etag": "\"38c1e-0aAxLW/hV0H7olJGviNXP5TnTsM\"",
+		"mtime": "2026-11-06T20:56:53.169Z",
+		"size": 232478,
+		"path": "../public/assets/p19-DcmXDsSS.webp"
+	},
+	"/assets/p22-Bz4eavKF.webp": {
+		"type": "image/webp",
+		"etag": "\"d6b6-M66YU7Z00YDjFnN5jtV+h+ad3Ho\"",
+		"mtime": "2026-11-06T20:56:53.173Z",
+		"size": 54966,
+		"path": "../public/assets/p22-Bz4eavKF.webp"
+	},
+	"/assets/p21-Aca6Y_5y.webp": {
+		"type": "image/webp",
+		"etag": "\"208d0-eCaUKZ+3JKpQDBx6zCIzHk5EtaA\"",
+		"mtime": "2026-11-06T20:56:53.172Z",
+		"size": 133328,
+		"path": "../public/assets/p21-Aca6Y_5y.webp"
+	},
+	"/assets/p2-n9pwelQO.mp4": {
+		"type": "video/mp4",
+		"etag": "\"508e6-SzDoCAMjFCuSjxjuhS+3E0LkHZo\"",
+		"mtime": "2026-11-06T20:56:53.171Z",
+		"size": 329958,
+		"path": "../public/assets/p2-n9pwelQO.mp4"
+	},
+	"/assets/p22-BvRFE_9Y.webp": {
+		"type": "image/webp",
+		"etag": "\"56204-Wpw/o+D5N7rqTTNPYevYTReeRRM\"",
+		"mtime": "2026-11-06T20:56:53.173Z",
+		"size": 352772,
+		"path": "../public/assets/p22-BvRFE_9Y.webp"
+	},
+	"/assets/p21-L3eD-xcP.webp": {
+		"type": "image/webp",
+		"etag": "\"63c6-h+go4MSwn4rb8vxX5Lv46hlTQd0\"",
+		"mtime": "2026-11-06T20:56:53.172Z",
+		"size": 25542,
+		"path": "../public/assets/p21-L3eD-xcP.webp"
+	},
+	"/assets/p23-DFTzd9QH.webp": {
+		"type": "image/webp",
+		"etag": "\"241c4-/AwAIbItdN5BOuCfompzmT0l6EI\"",
+		"mtime": "2026-11-06T20:56:53.175Z",
+		"size": 147908,
+		"path": "../public/assets/p23-DFTzd9QH.webp"
+	},
+	"/assets/p20-DOWsGXAV.webp": {
+		"type": "image/webp",
+		"etag": "\"337b0-m2g0x/LMJCIlBqkGBCG1ppBpc6c\"",
+		"mtime": "2026-11-06T20:56:53.172Z",
+		"size": 210864,
+		"path": "../public/assets/p20-DOWsGXAV.webp"
+	},
+	"/assets/p24-DIPoz_QP.webp": {
+		"type": "image/webp",
+		"etag": "\"a994-DDd7+dTBlQZ9LtwGQ4UJgpTMUT4\"",
+		"mtime": "2026-11-06T20:56:53.175Z",
+		"size": 43412,
+		"path": "../public/assets/p24-DIPoz_QP.webp"
+	},
+	"/assets/p24-CtdHCI96.webp": {
+		"type": "image/webp",
+		"etag": "\"45072-DJRwvksEUZuEO1VQlVilqQH4GOk\"",
+		"mtime": "2026-11-06T20:56:53.175Z",
+		"size": 282738,
+		"path": "../public/assets/p24-CtdHCI96.webp"
+	},
+	"/assets/p25-DtqXExwQ.webp": {
+		"type": "image/webp",
+		"etag": "\"b584-oVdKtbuPxPMOQTpX7P4QnWQJAQ0\"",
+		"mtime": "2026-11-06T20:56:53.176Z",
+		"size": 46468,
+		"path": "../public/assets/p25-DtqXExwQ.webp"
+	},
+	"/assets/p26-DEPI-mZL.webp": {
+		"type": "image/webp",
+		"etag": "\"f79e-s+zajymAwQokRT7gzsgIaY11e2k\"",
+		"mtime": "2026-11-06T20:56:53.176Z",
+		"size": 63390,
+		"path": "../public/assets/p26-DEPI-mZL.webp"
+	},
+	"/assets/p25-CiIKAido.webp": {
+		"type": "image/webp",
+		"etag": "\"3a7c8-RDimA5XFAcfA6GI/VGOQZDicDEU\"",
+		"mtime": "2026-11-06T20:56:53.175Z",
+		"size": 239560,
+		"path": "../public/assets/p25-CiIKAido.webp"
+	},
+	"/assets/p26-8vN_vTKD.webp": {
+		"type": "image/webp",
+		"etag": "\"39a3a-ryE8/mwv1WWU/tB1+1B4Libwsn4\"",
+		"mtime": "2026-11-06T20:56:53.176Z",
+		"size": 236090,
+		"path": "../public/assets/p26-8vN_vTKD.webp"
+	},
+	"/assets/p27-AvkUMYKv.webp": {
+		"type": "image/webp",
+		"etag": "\"2293c-VlxMJkwciCrDJNm6eZB7+DZCraA\"",
+		"mtime": "2026-11-06T20:56:53.177Z",
+		"size": 141628,
+		"path": "../public/assets/p27-AvkUMYKv.webp"
+	},
+	"/assets/p23-DBmPt2lk.webp": {
+		"type": "image/webp",
+		"etag": "\"86278-BLzRSG0kuGlFG9FUlcbbgmvydws\"",
+		"mtime": "2026-11-06T20:56:53.174Z",
+		"size": 549496,
+		"path": "../public/assets/p23-DBmPt2lk.webp"
+	},
+	"/assets/p27-DBPrMm0I.webp": {
+		"type": "image/webp",
+		"etag": "\"79c2-VYUseZQd9loHSGUev9B3aZ0zXAE\"",
+		"mtime": "2026-11-06T20:56:53.177Z",
+		"size": 31170,
+		"path": "../public/assets/p27-DBPrMm0I.webp"
+	},
+	"/assets/p-DlNFzDfP.mp4": {
+		"type": "video/mp4",
+		"etag": "\"33de2c-lIoHXCPfAwbVDS3WzJ2OFEsw3PQ\"",
+		"mtime": "2026-11-06T20:56:53.160Z",
+		"size": 3399212,
+		"path": "../public/assets/p-DlNFzDfP.mp4"
+	},
+	"/assets/p28-BdiN2J2C.webp": {
+		"type": "image/webp",
+		"etag": "\"4d31e-ty7A0k2ywuO7XgzBcOpeH5SqHJM\"",
+		"mtime": "2026-11-06T20:56:53.178Z",
+		"size": 316190,
+		"path": "../public/assets/p28-BdiN2J2C.webp"
+	},
+	"/assets/p28-Dby70wL4.webp": {
+		"type": "image/webp",
+		"etag": "\"3f0e-QdVWfY3OibaCQNi0XYc426Ifrg4\"",
+		"mtime": "2026-11-06T20:56:53.178Z",
+		"size": 16142,
+		"path": "../public/assets/p28-Dby70wL4.webp"
+	},
+	"/assets/p29-D89Kx1XG.webp": {
+		"type": "image/webp",
+		"etag": "\"4dd0-svAf8DpfndvUs0ZcIHc1BrIvD4o\"",
+		"mtime": "2026-11-06T20:56:53.178Z",
+		"size": 19920,
+		"path": "../public/assets/p29-D89Kx1XG.webp"
+	},
+	"/assets/p29-DJ930M1h.webp": {
+		"type": "image/webp",
+		"etag": "\"1f970-e8V9jBQ16U0faOHyflfcwCwvO0E\"",
+		"mtime": "2026-11-06T20:56:53.178Z",
+		"size": 129392,
+		"path": "../public/assets/p29-DJ930M1h.webp"
+	},
+	"/assets/p3-Cak6Rrxv.mp4": {
+		"type": "video/mp4",
+		"etag": "\"f4f8-0qszDhLKAw6x9Gs11oL6OtLt4fU\"",
+		"mtime": "2026-11-06T20:56:53.179Z",
+		"size": 62712,
+		"path": "../public/assets/p3-Cak6Rrxv.mp4"
+	},
+	"/assets/p30-B0asaAQv.webp": {
+		"type": "image/webp",
+		"etag": "\"8aa2-MqdV0FPx7PlB212vk/UpxGA9Z40\"",
+		"mtime": "2026-11-06T20:56:53.179Z",
+		"size": 35490,
+		"path": "../public/assets/p30-B0asaAQv.webp"
+	},
+	"/assets/p3-BherqmTG.webp": {
+		"type": "image/webp",
+		"etag": "\"8326-LKMhsOdQd6m7u3tB3HKNTej5lA4\"",
+		"mtime": "2026-11-06T20:56:53.178Z",
+		"size": 33574,
+		"path": "../public/assets/p3-BherqmTG.webp"
+	},
+	"/assets/p31-DCFX-dDr.webp": {
+		"type": "image/webp",
+		"etag": "\"16a06-AwkNfy3MgCTSNNIrvKFiF9fm+Bo\"",
+		"mtime": "2026-11-06T20:56:53.181Z",
+		"size": 92678,
+		"path": "../public/assets/p31-DCFX-dDr.webp"
+	},
+	"/assets/p3-CB_KgZkr.webp": {
+		"type": "image/webp",
+		"etag": "\"25c6c-P98IwUY3Lv5rXqgqaY5gPukNJ3k\"",
+		"mtime": "2026-11-06T20:56:53.179Z",
+		"size": 154732,
+		"path": "../public/assets/p3-CB_KgZkr.webp"
+	},
+	"/assets/p30-DpbLJVPm.webp": {
+		"type": "image/webp",
+		"etag": "\"25b32-v0Up0NXT+h1t5pGAi7UPLYOa4ew\"",
+		"mtime": "2026-11-06T20:56:53.180Z",
+		"size": 154418,
+		"path": "../public/assets/p30-DpbLJVPm.webp"
+	},
+	"/assets/p4-a09bsWEC.webp": {
+		"type": "image/webp",
+		"etag": "\"bc10-QOZffCSfwn2NpFECcApXPqPezu8\"",
+		"mtime": "2026-11-06T20:56:53.183Z",
+		"size": 48144,
+		"path": "../public/assets/p4-a09bsWEC.webp"
+	},
+	"/assets/p31-xo04UaV0.webp": {
+		"type": "image/webp",
+		"etag": "\"35082-5ZFip3O8QEuPx/YdMOuSeCU0yxM\"",
+		"mtime": "2026-11-06T20:56:53.182Z",
+		"size": 217218,
+		"path": "../public/assets/p31-xo04UaV0.webp"
+	},
+	"/assets/p4-BvYtXbTx.mp4": {
+		"type": "video/mp4",
+		"etag": "\"3a286-Ry2PQqstM9F59ydABCv2evbuLYE\"",
+		"mtime": "2026-11-06T20:56:53.183Z",
+		"size": 238214,
+		"path": "../public/assets/p4-BvYtXbTx.mp4"
+	},
+	"/assets/p5-DZJVp3cp.webp": {
+		"type": "image/webp",
+		"etag": "\"599e-m6q4G6bds41g/02U6LXaF0CjQks\"",
+		"mtime": "2026-11-06T20:56:53.184Z",
+		"size": 22942,
+		"path": "../public/assets/p5-DZJVp3cp.webp"
+	},
+	"/assets/p4-jdMdyCuP.webp": {
+		"type": "image/webp",
+		"etag": "\"31670-dLRuKRK+wgB2XhUaf+khbi5cAeo\"",
+		"mtime": "2026-11-06T20:56:53.184Z",
+		"size": 202352,
+		"path": "../public/assets/p4-jdMdyCuP.webp"
+	},
+	"/assets/p5-BjY4Jfcn.webp": {
+		"type": "image/webp",
+		"etag": "\"b600-p/G9hNz01BE1wq4h2DELxd6a6eM\"",
+		"mtime": "2026-11-06T20:56:53.184Z",
+		"size": 46592,
+		"path": "../public/assets/p5-BjY4Jfcn.webp"
+	},
+	"/assets/p6-BO3ser_C.webp": {
+		"type": "image/webp",
+		"etag": "\"9134-d9seDflC7syQP9ElTJgzZlfin5g\"",
+		"mtime": "2026-11-06T20:56:53.203Z",
+		"size": 37172,
+		"path": "../public/assets/p6-BO3ser_C.webp"
+	},
+	"/assets/p6-C_8SG3oR.webp": {
+		"type": "image/webp",
+		"etag": "\"42e2-HSCxUoXiwX9z8eqhYD3NF5qiWAg\"",
+		"mtime": "2026-11-06T20:56:53.204Z",
+		"size": 17122,
+		"path": "../public/assets/p6-C_8SG3oR.webp"
+	},
+	"/assets/p7-CNISI_iL.webp": {
+		"type": "image/webp",
+		"etag": "\"8a9c-u1O2W75FOe9DQA/zBI+GPu+ElBg\"",
+		"mtime": "2026-11-06T20:56:53.204Z",
+		"size": 35484,
+		"path": "../public/assets/p7-CNISI_iL.webp"
+	},
+	"/assets/p7-BZlZaIP0.webp": {
+		"type": "image/webp",
+		"etag": "\"22b58-+q2L9uQmbA/bvfMx3jwlxMptRGc\"",
+		"mtime": "2026-11-06T20:56:53.204Z",
+		"size": 142168,
+		"path": "../public/assets/p7-BZlZaIP0.webp"
+	},
+	"/assets/p6-CI4R7qUV.mp4": {
+		"type": "video/mp4",
+		"etag": "\"52a71-ZRnczebj/Rzy+rOpdmD4K1lrueQ\"",
+		"mtime": "2026-11-06T20:56:53.203Z",
+		"size": 338545,
+		"path": "../public/assets/p6-CI4R7qUV.mp4"
+	},
+	"/assets/p8-DwgghkDZ.webp": {
+		"type": "image/webp",
+		"etag": "\"15080-Nlao8TDE3XQCqzNO7+zVxjY3EZ8\"",
+		"mtime": "2026-11-06T20:56:53.207Z",
+		"size": 86144,
+		"path": "../public/assets/p8-DwgghkDZ.webp"
+	},
+	"/assets/p8-ZQb0iD8J.mp4": {
+		"type": "video/mp4",
+		"etag": "\"47365-xsRnFTt32blfKAf3i8hPH5umY+w\"",
+		"mtime": "2026-11-06T20:56:53.207Z",
+		"size": 291685,
+		"path": "../public/assets/p8-ZQb0iD8J.mp4"
+	},
+	"/assets/p7-CdVkApGO.mp4": {
+		"type": "video/mp4",
+		"etag": "\"8fe7e-ALLl2Couvky38wP/jldezG3R8tg\"",
+		"mtime": "2026-11-06T20:56:53.205Z",
+		"size": 589438,
+		"path": "../public/assets/p7-CdVkApGO.mp4"
+	},
+	"/assets/p8-cB675F2f.webp": {
+		"type": "image/webp",
+		"etag": "\"5e04e-PO48Awa+/LUrDVWvvFUBdtHZCJQ\"",
+		"mtime": "2026-11-06T20:56:53.208Z",
+		"size": 385102,
+		"path": "../public/assets/p8-cB675F2f.webp"
+	},
+	"/assets/p9-CMOgFHiX.webp": {
+		"type": "image/webp",
+		"etag": "\"28c7c-niXSvSS4M6okCk7JYUtNCBzm2wI\"",
+		"mtime": "2026-11-06T20:56:53.208Z",
+		"size": 167036,
+		"path": "../public/assets/p9-CMOgFHiX.webp"
+	},
+	"/assets/p9-xkrxj3qW.webp": {
+		"type": "image/webp",
+		"etag": "\"70f0-a68IgDRAXJOQOq5wjel0qup225E\"",
+		"mtime": "2026-11-06T20:56:53.208Z",
+		"size": 28912,
+		"path": "../public/assets/p9-xkrxj3qW.webp"
+	},
+	"/assets/phone-CFEnp_vY.js": {
+		"type": "text/javascript; charset=utf-8",
+		"etag": "\"142-4P0LMu9r4gcnT90LEoUGGDPHuAU\"",
+		"mtime": "2026-11-06T20:56:53.143Z",
+		"size": 322,
+		"path": "../public/assets/phone-CFEnp_vY.js"
+	},
+	"/assets/plans-BkcWWgXs.js": {
+		"type": "text/javascript; charset=utf-8
+[TRUNCATED: file is 61148 bytes, first 40960 included]
+=== END FILE ===
+
+=== FILE: aura-bundle.mjs ===
+// aura-bundle.mjs
+// Usage (from the project root): node aura-bundle.mjs [projectRoot]
+import fs from "node:fs";
+import path from "node:path";
+
+const ROOT = process.argv[2] ? path.resolve(process.argv[2]) : process.cwd();
+const OUT = path.join(ROOT, "aura-out");
+const MAX_CHUNK_BYTES = 60 * 1024;
+const MAX_FILE_BYTES = 40 * 1024;
+
+const SKIP_DIRS = new Set([
+  "node_modules", ".git", "dist", "build", ".next", ".temp",
+  "coverage", ".vercel", "aura-out",
+]);
+const TEXT_EXT = new Set([
+  ".ts", ".tsx", ".js", ".jsx", ".mjs", ".sql", ".json", ".toml", ".md",
+]);
+const SKIP_FILE = /^(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?)$|^\.env/;
+const KEYWORDS = /viva|payment|checkout|invoice|receipt|fiscal|mydata|aade|refund|webhook|order|subscription|billing|vat|email|migration/gi;
+
+const SECRET_ASSIGNMENT =
+  /((?:secret|password|passwd|token|api[_-]?key|service[_-]?role|authorization)["']?\s*[:=]\s*)(["'`])[^"'`\n]{8,}\2/gi;
+const JWT = /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
+
+function redact(text) {
+  return text
+    .replace(SECRET_ASSIGNMENT, "$1$2[REDACTED]$2")
+    .replace(JWT, "[REDACTED_JWT]");
+}
+
+function walk(dir, files = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (!SKIP_DIRS.has(entry.name)) walk(full, files);
+    } else if (
+      entry.isFile() &&
+      !SKIP_FILE.test(entry.name) &&
+      TEXT_EXT.has(path.extname(entry.name).toLowerCase())
+    ) {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+function score(relPath, content) {
+  const pathHits = (relPath.match(KEYWORDS) || []).length;
+  const contentHits = (content.match(KEYWORDS) || []).length;
+  return pathHits * 20 + Math.min(contentHits, 50);
+}
+
+function main() {
+  const records = walk(ROOT).map((full) => {
+    const rel = path.relative(ROOT, full).split(path.sep).join("/");
+    const raw = fs.readFileSync(full, "utf8");
+    return {
+      rel,
+      bytes: Buffer.byteLength(raw),
+      score: score(rel, raw),
+      content: redact(raw),
+    };
+  });
+
+  records.sort((a, b) => b.score - a.score || a.rel.localeCompare(b.rel));
+
+  fs.rmSync(OUT, { recursive: true, force: true });
+  fs.mkdirSync(OUT, { recursive: true });
+
+  const mapLines = records.map(
+    (r) => `${String(r.score).padStart(4)} | ${String(r.bytes).padStart(7)} B | ${r.rel}`
+  );
+  fs.writeFileSync(
+    path.join(OUT, "aura-map.txt"),
+    `score | size | path\n${mapLines.join("\n")}\n`
+  );
+
+  let chunkIndex = 1;
+  let chunk = "";
+  let chunkBytes = 0;
+  const flush = () => {
+    if (!chunk) return;
+    const name = `bundle-${String(chunkIndex).padStart(2, "0")}.txt`;
+    fs.writeFileSync(path.join(OUT, name), chunk);
+    chunkIndex += 1;
+    chunk = "";
+    chunkBytes = 0;
+  };
+
+  for (const r of records) {
+    let body = r.content;
+    let note = "";
+    if (Buffer.byteLength(body) > MAX_FILE_BYTES) {
+      body = Buffer.from(body).subarray(0, MAX_FILE_BYTES).toString("utf8");
+      note = `\n[TRUNCATED: file is ${r.bytes} bytes, first ${MAX_FILE_BYTES} included]`;
+    }
+    const block = `=== FILE: ${r.rel} ===\n${body}${note}\n=== END FILE ===\n\n`;
+    const size = Buffer.byteLength(block);
+    if (chunkBytes + size > MAX_CHUNK_BYTES) flush();
+    chunk += block;
+    chunkBytes += size;
+  }
+  flush();
+
+  console.log(`Files: ${records.length}. Bundles: ${chunkIndex - 1}. Output: ${OUT}`);
+}
+
+main();
+=== END FILE ===
+
+=== FILE: src/routes/about.tsx ===
+import { createFileRoute } from "@tanstack/react-router";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { useRef } from "react";
+import Footer from "@/components/aura/Footer";
+import logoImg from "@/assets/logo.jpg";
+import founderImg from "@/assets/founder.jpg";
+import cofounderImg from "@/assets/cofounder.jpg";
+import developerImg from "@/assets/developer.jpg";
+
+export const Route = createFileRoute("/about")({
+  head: () => ({
+    meta: [
+      { title: "AURA — Η Ομάδα" },
+      { name: "description", content: "Η ομάδα πίσω από την AURA Academy." },
+    ],
+  }),
+  component: AboutPage,
+});
+
+interface Profile {
+  id: string;
+  name: string;
+  role: string;
+  image: string;
+  paragraphs: string[];
+  mottos: string[];
+  reverse: boolean;
+}
+
+const teamProfiles: Profile[] = [
+  {
+    id: "01",
+    name: "ΘΕΟΠΙΣΤΟΣ",
+    role: "FOUNDER • CREATOR • CREATIVE DIRECTOR • HEAD EDUCATOR",
+    image: founderImg,
+    paragraphs: [
+      "Ο Θεόπιστος είναι ο δημιουργός και η δημιουργική δύναμη πίσω από την AURA.",
+      "Με πολυετή εμπειρία στον χώρο της κομμωτικής, της επαγγελματικής εκπαίδευσης και της δημιουργίας, έχει αφιερώσει την πορεία του όχι μόνο στην εξέλιξη της τεχνικής, αλλά και στην κατανόηση του τι πραγματικά δημιουργεί έναν ολοκληρωμένο επαγγελματία.",
+      "Δεν πιστεύει στην εκπαίδευση που βασίζεται απλώς στην αντιγραφή. Πιστεύει στην κατανόηση. Στην παρατήρηση. Στη σκέψη πριν από την πράξη.",
+      "Με αυτό το όραμα δημιούργησε την AURA: ένα σύγχρονο εκπαιδευτικό σύστημα που δεν έχει στόχο απλώς να διδάξει τεχνικές, αλλά να βοηθήσει κάθε επαγγελματία να αναπτύξει τον δικό του τρόπο σκέψης, κρίσης και δημιουργίας.",
+      "Ως FOUNDER, CREATIVE DIRECTOR και HEAD EDUCATOR, καθοδηγεί τη δημιουργική και εκπαιδευτική κατεύθυνση της AURA.",
+      "Στόχος του είναι να δημιουργήσει μια νέα γενιά επαγγελματιών που δεν ακολουθούν απλώς τεχνικές και τάσεις. Τις κατανοούν. Τις εξελίσσουν. Και δημιουργούν τις δικές τους.",
+    ],
+    mottos: [
+      "OBSERVE. ANALYZE. DESIGN. EXECUTE. EVALUATE. EVOLVE.",
+      "WE DON’T FOLLOW TRENDS. WE SPAWN THEM.",
+    ],
+    reverse: false,
+  },
+  {
+    id: "02",
+    name: "ΑΓΓΕΛΟΣ",
+    role: "PARTNER • STRATEGIC DEVELOPMENT • HEAD EDUCATOR",
+    image: cofounderImg,
+    paragraphs: [
+      "Ο Άγγελος αποτελεί σημαντικό μέλος της AURA και ενεργό κομμάτι της εξέλιξης και της κατεύθυνσής της.",
+      "Με κοινό όραμα, υψηλά standards και πάθος για την επαγγελματική εξέλιξη, συμμετέχει ενεργά τόσο στην ανάπτυξη της AURA όσο και στη δημιουργία μιας νέας εκπαιδευτικής κουλτούρας.",
+      "Ως HEAD EDUCATOR, στόχος του δεν είναι απλώς να μεταφέρει τεχνικές. Στόχος του είναι να μεταφέρει γνώση. Να αναπτύσσει επαγγελματική σκέψη. Να βοηθά κάθε εκπαιδευόμενο να κατανοήσει το γιατί πίσω από κάθε επιλογή.",
+      "Για τον Άγγελο, η εξέλιξη δεν σταματά ποτέ. Κάθε τεχνική μπορεί να βελτιωθεί. Κάθε επαγγελματίας μπορεί να εξελιχθεί. Και κάθε νέα γνώση μπορεί να γίνει το επόμενο βήμα.",
+      "Μέσα από την AURA, συμμετέχει στη δημιουργία μιας κοινότητας ανθρώπων που δεν θέλουν απλώς να είναι καλοί στη δουλειά τους. Θέλουν να γίνουν εξαιρετικοί.",
+    ],
+    mottos: [
+      "KNOWLEDGE CREATES CONFIDENCE.",
+      "CONFIDENCE CREATES EXCELLENCE.",
+    ],
+    reverse: true,
+  },
+  {
+    id: "03",
+    name: "ΜΑΝΟΣ",
+    role: "PROGRAMMER • DIGITAL CREATOR • ONLINE ACADEMY",
+    image: developerImg,
+    paragraphs: [
+      "Ο Μάνος αποτελεί τη δύναμη πίσω από την ψηφιακή εξέλιξη της AURA.",
+      "Παρότι μόλις 17 ετών, ξεκίνησε να ασχολείται με τον προγραμματισμό από τα 15 του και έχει ήδη αναπτύξει σημαντικές γνώσεις και εμπειρία στον χώρο της τεχνολογίας και της ψηφιακής δημιουργίας.",
+      "Ως PROGRAMMER, βρίσκεται πίσω από τη δημιουργία και την ανάπτυξη της Online Academy της AURA.",
+      "Ο ρόλος του είναι να μετατρέπει το όραμα, τη γνώση και το εκπαιδευτικό σύστημα της AURA σε μια σύγχρονη ψηφιακή εμπειρία.",
+      "Για τον Μάνο, η τεχνολογία δεν είναι απλώς ένα εργαλείο. Είναι ένας τρόπος να δημιουργείς χωρίς όρια.",
+      "Η παρουσία του στην ομάδα αντιπροσωπεύει τη νέα γενιά δημιουργών. Ανθρώπους που ξεκινούν νωρίς. Μαθαίνουν γρήγορα. Και δεν περιμένουν το μέλλον. Το δημιουργούν.",
+    ],
+    mottos: [
+      "THE NEXT GENERATION IS ALREADY HERE.",
+      "WE ARE BUILDING THE DIGITAL FUTURE OF AURA.",
+    ],
+    reverse: false,
+  },
+];
+
+const fadeInUp = {
+  initial: { opacity: 0, y: 40 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-80px" },
+  transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+};
+
+function ProfileBlock({ profile }: { profile: Profile }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start end", "end start"],
+  });
+
+  const yImage = useTransform(scrollYProgress, [0, 1], [-60, 60]);
+  const yText = useTransform(scrollYProgress, [0, 1], [25, -25]);
+
+  return (
+    <section
+      ref={ref}
+      className="relative border-b border-zinc-900/80 py-24 md:py-36 overflow-hidden"
+    >
+      {/* Chrome Radial Light Background */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[500px] w-full -translate-x-1/2 -translate-y-1/2 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-zinc-200/5 via-black to-black blur-[130px]" />
+
+      <div
+        className={`mx-auto max-w-7xl px-5 sm:px-8 grid gap-12 lg:gap-20 items-center lg:grid-cols-12 ${
+          profile.reverse ? "lg:flex-row-reverse" : ""
+        }`}
+      >
+        {/* Profile Image with Parallax & Metallic Framing */}
+        <motion.div
+          {...fadeInUp}
+          className={`lg:col-span-5 relative group ${
+            profile.reverse ? "lg:order-2" : "lg:order-1"
+          }`}
+        >
+          <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl border border-zinc-700/50 bg-zinc-950 shadow-[0_0_50px_rgba(255,255,255,0.03)]">
+            {/* Top specular reflection line */}
+            <div className="absolute inset-x-0 top-0 z-10 h-[1px] bg-gradient-to-r from-transparent via-zinc-200 to-transparent opacity-70" />
+
+            <motion.img
+              src={profile.image}
+              alt={profile.name}
+              style={{ y: yImage }}
+              className="h-[115%] w-full object-cover object-center grayscale contrast-110 transition-all duration-700 group-hover:grayscale-0 group-hover:scale-105"
+            />
+
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-60" />
+          </div>
+
+          <span className="absolute -top-6 -left-4 font-mono text-5xl font-extralight tracking-tighter text-zinc-800/50 select-none">
+            {profile.id}
+          </span>
+        </motion.div>
+
+        {/* Profile Description Container */}
+        <motion.div
+          {...fadeInUp}
+          style={{ y: yText }}
+          className={`lg:col-span-7 flex flex-col justify-center ${
+            profile.reverse ? "lg:order-1" : "lg:order-2"
+          }`}
+        >
+          {/* Subtitle / Role */}
+          <span className="inline-block origin-left scale-x-105 text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400">
+            // {profile.role}
+          </span>
+
+          {/* Metallic Title */}
+          <h2 className="mt-4 text-4xl font-extrabold uppercase tracking-tight text-white sm:text-6xl lg:text-7xl">
+            <span className="bg-gradient-to-r from-white via-zinc-200 to-zinc-500 bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]">
+              {profile.name}
+            </span>
+          </h2>
+
+          {/* Paragraphs */}
+          <div className="mt-8 space-y-4 text-sm sm:text-base leading-relaxed font-extralight text-zinc-300">
+            {profile.paragraphs.map((p, idx) => (
+              <p key={idx}>{p}</p>
+            ))}
+          </div>
+
+          {/* Mottos / Highlights Container */}
+          <div className="mt-10 space-y-3 pt-6 border-t border-zinc-900">
+            {profile.mottos.map((motto, idx) => (
+              <div
+                key={idx}
+                className="relative rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-5 py-3.5 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]"
+              >
+                <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-zinc-400/40 to-transparent" />
+                <p className="inline-block origin-left scale-x-105 text-xs sm:text-sm font-extralight uppercase tracking-[0.35em] text-zinc-100">
+                  {motto}
+                </p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function AboutPage() {
+  const { scrollYProgress } = useScroll();
+
+  return (
+    <div className="relative min-h-screen bg-[#050505] text-zinc-100 selection:bg-zinc-200 selection:text-black">
+      {/* Scroll Progress Line */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 z-50 h-[2px] bg-gradient-to-r from-zinc-700 via-white to-zinc-700 origin-left"
+        style={{ scaleX: scrollYProgress }}
+      />
+
+      <main>
+        {/* Hero / Header Section with Blended Logo */}
+        <motion.header
+          {...fadeInUp}
+          className="relative mx-auto max-w-7xl px-5 pt-36 pb-20 sm:px-8 sm:pt-48 border-b border-zinc-900"
+        >
+          <div className="flex flex-col items-center gap-10 md:flex-row md:items-center md:gap-16">
+            
+            {/* Logo image with 4-way radial blend gradient */}
+            <div className="relative shrink-0 w-48 sm:w-60 md:w-72 aspect-square flex items-center justify-center">
+              <div className="absolute inset-0 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+              <img
+                src={logoImg}
+                alt="AURA Logo"
+                className="w-full h-full object-contain [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_75%)] [-webkit-mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_75%)]"
+              />
+            </div>
+
+            {/* Title & Tagline */}
+            <div className="flex-1 max-w-3xl text-center md:text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-950 px-4 py-1 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
+                <span className="inline-block scale-x-110 origin-left text-[10px] font-extralight uppercase tracking-[0.4em] text-zinc-400">
+                  ABOUT AURA
+                </span>
+              </div>
+
+              <h1 className="mt-6 text-4xl font-extrabold uppercase tracking-tight sm:text-6xl lg:text-7xl leading-[1.05]">
+                ΕΜΕΙΣ ΧΤΙΖΟΥΜΕ{" "}
+                <span className="bg-gradient-to-r from-white via-zinc-300 to-zinc-600 bg-clip-text text-transparent drop-shadow-[0_2px_12px_rgba(255,255,255,0.15)]">
+                  ΕΠΑΓΓΕΛΜΑΤΙΕΣ.
+                </span>
+              </h1>
+
+              <p className="mt-6 max-w-2xl text-base sm:text-lg font-extralight leading-relaxed text-zinc-400">
+                Η <strong className="font-normal text-zinc-100">AURA</strong> δεν είναι μια απλή πλατφόρμα. Είναι το λειτουργικό σύστημα του σύγχρονου barber: μέθοδος, πρακτική, αξιολόγηση και πιστοποίηση που βασίζεται σε αποδείξεις.
+              </p>
+            </div>
+          </div>
+        </motion.header>
+
+        {/* Dynamic Scroll Profile Blocks */}
+        {teamProfiles.map((profile) => (
+          <ProfileBlock key={profile.name} profile={profile} />
+        ))}
+      </main>
+
+      <Footer />
+    </div>
+  );
+}
+=== END FILE ===
+

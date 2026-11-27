@@ -1,0 +1,1422 @@
+=== FILE: src/lib/useEliteChat.ts ===
+// src/lib/useEliteChat.ts
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
+import { db } from "@/lib/db";
+import type { VoiceClip } from "@/lib/useVoiceRecorder";
+
+// The elite_* tables are not in the generated types, so use an untyped client.
+const sb = db as unknown as SupabaseClient;
+
+export const BUCKET = "elite-chat";
+export const PAGE_SIZE = 40;
+export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const SELECT = "*, reactions:elite_reactions(user_id, emoji)";
+const TYPING_TTL_MS = 4000;
+
+export interface Reaction {
+  user_id: string;
+  emoji: string;
+}
+
+export interface EliteMessage {
+  id: string;
+  user_id: string;
+  body: string;
+  reply_to: string | null;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  attachment_size: number | null;
+  voice_duration_ms: number | null;
+  voice_waveform: number[] | null;
+  created_at: string;
+  edited_at: string | null;
+  deleted_at: string | null;
+  reactions: Reaction[];
+  pending?: boolean;
+  fresh?: boolean;
+  /** Local blob URL for voice messages I just sent (plays instantly). */
+  localUrl?: string;
+}
+
+export interface Member {
+  id: string;
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+}
+
+export function displayName(m?: Member | null): string {
+  return m?.full_name?.trim() || m?.username || "Member";
+}
+
+function sortMessages(list: EliteMessage[]): EliteMessage[] {
+  return [...list].sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+}
+
+function errMessage(e: unknown, fallback: string): string {
+  if (e && typeof e === "object" && "message" in e && typeof (e as any).message === "string") {
+    return (e as any).message as string;
+  }
+  return fallback;
+}
+
+function safeFileName(name: string): string {
+  return name.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
+}
+
+// crypto.randomUUID only exists on secure pages (https/localhost) and newer
+// browsers, so fall back gracefully instead of crashing on send.
+function uid(): string {
+  const c: Crypto | undefined = typeof crypto !== "undefined" ? crypto : undefined;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  if (c && typeof c.getRandomValues === "function") {
+    const b = c.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  }
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function useEliteChat(meId: string) {
+  const [messages, setMessages] = useState<EliteMessage[]>([]);
+  const [members, setMembers] = useState<Record<string, Member>>({});
+  const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [reads, setReads] = useState<Record<string, string>>({});
+  const [initialRead, setInitialRead] = useState<string | null>(null);
+  const [online, setOnline] = useState<string[]>([]);
+  const [typing, setTyping] = useState<Record<string, { name: string; at: number }>>({});
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const messagesRef = useRef<EliteMessage[]>([]);
+  const membersRef = useRef<Record<string, Member>>({});
+  const urlsRef = useRef<Record<string, string>>({});
+  const requestedRef = useRef<Set<string>>(new Set());
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const localUrlsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const urlsToFree = localUrlsRef.current;
+    return () => {
+      urlsToFree.forEach((u) => URL.revokeObjectURL(u));
+      urlsToFree.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+  useEffect(() => {
+    membersRef.current = members;
+  }, [members]);
+  useEffect(() => {
+    urlsRef.current = urls;
+  }, [urls]);
+
+  /* ------------------------------ helpers ------------------------------ */
+
+  const ensureProfiles = useCallback(async (ids: string[]) => {
+    const missing = Array.from(new Set(ids)).filter(
+      (id) => !membersRef.current[id] && !requestedRef.current.has(id),
+    );
+    if (missing.length === 0) return;
+    missing.forEach((id) => requestedRef.current.add(id));
+    const { data } = await sb.rpc("elite_profiles", { p_ids: missing });
+    if (!data) return;
+    setMembers((prev) => {
+      const next = { ...prev };
+      for (const row of data as Member[]) next[row.id] = row;
+      return next;
+    });
+  }, []);
+
+  const ensureUrls = useCallback(async (list: EliteMessage[]) => {
+    const paths = Array.from(
+      new Set(
+        list
+          .map((m) => m.attachment_path)
+          .filter((p): p is string => Boolean(p) && !urlsRef.current[p as string]),
+      ),
+    );
+    if (paths.length === 0) return;
+    const { data } = await sb.storage.from(BUCKET).createSignedUrls(paths, 3600);
+    if (!data) return;
+    setUrls((prev) => {
+      const next = { ...prev };
+      for (const row of data) {
+        if (row.path && row.signedUrl) next[row.path] = row.signedUrl;
+      }
+      return next;
+    });
+  }, []);
+
+  /* ----------------------------- initial load ---------------------------- */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      setLoading(true);
+      setError(null);
+
+      const [msgRes, memRes, readRes] = await Promise.all([
+        sb.from("elite_messages").select(SELECT).order("created_at", { ascending: false }).limit(PAGE_SIZE),
+        sb.rpc("elite_members"),
+        sb.from("elite_reads").select("user_id, last_read_at"),
+      ]);
+      if (cancelled) return;
+
+      if (msgRes.error) {
+        setError(msgRes.error.message);
+        setLoading(false);
+        return;
+      }
+
+      const rows = ((msgRes.data ?? []) as EliteMessage[]).slice().reverse();
+      setMessages(rows);
+      setHasMore((msgRes.data ?? []).length === PAGE_SIZE);
+
+      const memberRows = (memRes.data ?? []) as Member[];
+      const map: Record<string, Member> = {};
+      for (const m of memberRows) map[m.id] = m;
+      memberRows.forEach((m) => requestedRef.current.add(m.id));
+      membersRef.current = map;
+      setMembers(map);
+      setMemberIds(memberRows.map((m) => m.id));
+
+      const readMap: Record<string, string> = {};
+      for (const r of (readRes.data ?? []) as { user_id: string; last_read_at: string }[]) {
+        readMap[r.user_id] = r.last_read_at;
+      }
+      setReads(readMap);
+      setInitialRead(readMap[meId] ?? null);
+
+      void ensureProfiles(rows.map((m) => m.user_id));
+      void ensureUrls(rows);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [meId, ensureProfiles, ensureUrls]);
+
+  /* ----------------------- realtime: database changes ---------------------- */
+
+  useEffect(() => {
+    const channel = sb
+      .channel(`elite-db-${meId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "elite_messages" }, (p: any) => {
+        const row = p.new as EliteMessage;
+        setMessages((prev) =>
+          prev.some((m) => m.id === row.id)
+            ? prev
+            : sortMessages([...prev, { ...row, reactions: [], fresh: true }]),
+        );
+        setTyping((t) => {
+          if (!t[row.user_id]) return t;
+          const next = { ...t };
+          delete next[row.user_id];
+          return next;
+        });
+        void ensureProfiles([row.user_id]);
+        void ensureUrls([row]);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "elite_messages" }, (p: any) => {
+        const row = p.new as EliteMessage;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === row.id
+              ? {
+                  ...m,
+                  body: row.body,
+                  edited_at: row.edited_at,
+                  deleted_at: row.deleted_at,
+                  attachment_path: row.attachment_path,
+                  attachment_name: row.attachment_name,
+                  attachment_type: row.attachment_type,
+                  attachment_size: row.attachment_size,
+                  voice_duration_ms: row.voice_duration_ms ?? null,
+                  voice_waveform: row.voice_waveform ?? null,
+                  reactions: row.deleted_at ? [] : m.reactions,
+                  fresh: false,
+                }
+              : m,
+          ),
+        );
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "elite_reactions" }, (p: any) => {
+        if (p.eventType === "DELETE") {
+          const old = p.old as { message_id?: string; user_id?: string };
+          if (!old.message_id || !old.user_id) return;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === old.message_id
+                ? { ...m, reactions: m.reactions.filter((r) => r.user_id !== old.user_id) }
+                : m,
+            ),
+          );
+          return;
+        }
+        const r = p.new as { message_id: string; user_id: string; emoji: string };
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === r.message_id
+              ? {
+                  ...m,
+                  reactions: [
+                    ...m.reactions.filter((x) => x.user_id !== r.user_id),
+                    { user_id: r.user_id, emoji: r.emoji },
+                  ],
+                }
+              : m,
+          ),
+        );
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "elite_reads" }, (p: any) => {
+        const r = p.new as { user_id?: string; last_read_at?: string };
+        if (!r?.user_id || !r.last_read_at) return;
+        setReads((prev) => ({ ...prev, [r.user_id as string]: r.last_read_at as string }));
+      })
+      .subscribe();
+
+    return () => {
+      void sb.removeChannel(channel);
+    };
+  }, [meId, ensureProfiles, ensureUrls]);
+
+  /* -------------- realtime: typing + presence (private channel) ------------- */
+
+  useEffect(() => {
+    let cancelled = false;
+    let channel: RealtimeChannel | null = null;
+
+    void (async () => {
+      try {
+        await sb.realtime.setAuth();
+      } catch {
+        /* supabase-js sets auth itself on most versions */
+      }
+      if (cancelled) return;
+
+      channel = sb.channel("elite-community", {
+        config: { private: true, broadcast: { self: false }, presence: { key: meId } },
+      });
+
+      channel
+        .on("presence", { event: "sync" }, () => {
+          setOnline(Object.keys(channel?.presenceState() ?? {}));
+        })
+        .on("broadcast", { event: "typing" }, ({ payload }: any) => {
+          const id = payload?.user_id as string | undefined;
+          if (!id || id === meId) return;
+          setTyping((t) => ({
+            ...t,
+            [id]: { name: String(payload?.name || "Someone"), at: Date.now() },
+          }));
+        })
+        .subscribe(async (status) => {
+          if (status === "SUBSCRIBED") {
+            await channel?.track({ at: Date.now() });
+          }
+        });
+
+      channelRef.current = channel;
+    })();
+
+    const sweep = window.setInterval(() => {
+      const now = Date.now();
+      setTyping((t) => {
+        const entries = Object.entries(t);
+        const alive = entries.filter(([, v]) => now - v.at < TYPING_TTL_MS);
+        return alive.length === entries.length ? t : Object.fromEntries(alive);
+      });
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(sweep);
+      if (channel) void sb.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [meId]);
+
+  /* ------------------------------- read / seen ------------------------------ */
+
+  const lastMark = useRef(0);
+  const markTimer = useRef<number | undefined>(undefined);
+
+  const markRead = useCallback(() => {
+    const run = async () => {
+      lastMark.current = Date.now();
+      const { error: e } = await sb.rpc("mark_elite_read");
+      if (!e) setReads((r) => ({ ...r, [meId]: new Date().toISOString() }));
+    };
+    const since = Date.now() - lastMark.current;
+    if (since >= 1500) {
+      void run();
+    } else if (markTimer.current === undefined) {
+      markTimer.current = window.setTimeout(() => {
+        markTimer.current = undefined;
+        void run();
+      }, 1500 - since);
+    }
+  }, [meId]);
+
+  useEffect(
+    () => () => {
+      if (markTimer.current !== undefined) window.clearTimeout(markTimer.current);
+    },
+    [],
+  );
+
+  /* -------------------------------- typing --------------------------------- */
+
+  const lastTyping = useRef(0);
+  const notifyTyping = useCallback(
+    (name: string) => {
+      const now = Date.now();
+      if (now - lastTyping.current < 2500) return;
+      lastTyping.current = now;
+      void channelRef.current?.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { user_id: meId, name },
+      });
+    },
+    [meId],
+  );
+
+  /* -------------------------------- actions --------------------------------- */
+
+  const send = useCallback(
+    async (opts: { body: string; replyTo?: string | null; file?: File | null }): Promise<boolean> => {
+      const body = opts.body.trim();
+      const file = opts.file ?? null;
+      if (!body && !file) return false;
+      if (file && file.size > MAX_FILE_BYTES) {
+        setActionError("Files can be up to 10 MB.");
+        return false;
+      }
+
+      setSending(true);
+      setActionError(null);
+
+      const tempId = `tmp-${uid()}`;
+      const temp: EliteMessage = {
+        id: tempId,
+        user_id: meId,
+        body,
+        reply_to: opts.replyTo ?? null,
+        attachment_path: null,
+        attachment_name: file?.name ?? null,
+        attachment_type: file?.type ?? null,
+        attachment_size: file?.size ?? null,
+        voice_duration_ms: null,
+        voice_waveform: null,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        reactions: [],
+        pending: true,
+        fresh: true,
+      };
+      setMessages((prev) => [...prev, temp]);
+
+      let uploadedPath: string | null = null;
+      try {
+        if (file) {
+          uploadedPath = `${meId}/${Date.now()}-${uid().slice(0, 8)}-${safeFileName(file.name)}`;
+          const up = await sb.storage.from(BUCKET).upload(uploadedPath, file, {
+            contentType: file.type || undefined,
+            upsert: false,
+          });
+          if (up.error) throw up.error;
+        }
+
+        const { data, error: insertError } = await sb
+          .from("elite_messages")
+          .insert({
+            user_id: meId,
+            body,
+            reply_to: opts.replyTo ?? null,
+            attachment_path: uploadedPath,
+            attachment_name: file?.name ?? null,
+            attachment_type: file?.type ?? null,
+            attachment_size: file?.size ?? null,
+          })
+          .select(SELECT)
+          .single();
+        if (insertError) throw insertError;
+
+        const real = { ...(data as EliteMessage), fresh: true };
+        setMessages((prev) => {
+          const without = prev.filter((m) => m.id !== tempId);
+          return without.some((m) => m.id === real.id) ? without : sortMessages([...without, real]);
+        });
+        void ensureUrls([real]);
+        return true;
+      } catch (e) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        if (uploadedPath) void sb.storage.from(BUCKET).remove([uploadedPath]);
+        setActionError(errMessage(e, "Your message could not be sent."));
+        return false;
+      } finally {
+        setSending(false);
+      }
+    },
+    [meId, ensureUrls],
+  );
+
+  const sendVoice = useCallback(
+    async (clip: VoiceClip, replyTo?: string | null): Promise<boolean> => {
+      if (clip.blob.size > MAX_FILE_BYTES) {
+        setActionError("This voice message is too large.");
+        return false;
+      }
+
+      setSending(true);
+      setActionError(null);
+
+      const tempId = `tmp-${uid()}`;
+      const localUrl = URL.createObjectURL(clip.blob);
+      localUrlsRef.current.add(localUrl);
+
+      const temp: EliteMessage = {
+        id: tempId,
+        user_id: meId,
+        body: "",
+        reply_to: replyTo ?? null,
+        attachment_path: null,
+        attachment_name: "Voice message",
+        attachment_type: clip.mime,
+        attachment_size: clip.blob.size,
+        voice_duration_ms: clip.durationMs,
+        voice_waveform: clip.waveform,
+        created_at: new Date().toISOString(),
+        edited_at: null,
+        deleted_at: null,
+        reactions: [],
+        pending: true,
+        fresh: true,
+        localUrl,
+      };
+      setMessages((prev) => [...prev, temp]);
+
+      let uploadedPath: string | null = null;
+      try {
+        const ext = clip.mime.includes("mp4")
+          ? "m4a"
+          : clip.mime.includes("ogg")
+            ? "ogg"
+            : clip.mime.includes("mpeg")
+              ? "mp3"
+              : clip.mime.includes("wav")
+                ? "wav"
+                : "webm";
+        uploadedPath = `${meId}/${Date.now()}-${uid().slice(0, 8)}-voice.${ext}`;
+
+        const up = await sb.storage.from(BUCKET).upload(uploadedPath, clip.blob, {
+          contentType: clip.mime,
+          upsert: false,
+        });
+        if (up.error) throw up.error;
+
+        const { data, error: insertError } = await sb
+          .from("elite_messages")
+          .insert({
+            user_id: meId,
+            body: "",
+            reply_to: replyTo ?? null,
+            attachment_path: uploadedPath,
+            attachment_name: "Voice message",
+            attachment_type: clip.mime,
+            attachment_size: clip.blob.size,
+            voice_duration_ms: clip.durationMs,
+            voice_waveform: clip.waveform,
+          })
+          .select(SELECT)
+          .single();
+        if (insertError) throw insertError;
+
+        const real = { ...(data as EliteMessage), fresh: true, localUrl };
+        setMessages((prev) => {
+          const without = prev.filter((m) => m.id !== tempId);
+          // the realtime INSERT may already have added it: keep that row, attach the local url
+          return without.some((m) => m.id === real.id)
+            ? without.map((m) => (m.id === real.id ? { ...m, localUrl } : m))
+            : sortMessages([...without, real]);
+        });
+        void ensureUrls([real]);
+        return true;
+      } catch (e) {
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        localUrlsRef.current.delete(localUrl);
+        URL.revokeObjectURL(localUrl);
+        if (uploadedPath) void sb.storage.from(BUCKET).remove([uploadedPath]);
+        setActionError(errMessage(e, "Your voice message could not be sent."));
+        return false;
+      } finally {
+        setSending(false);
+      }
+    },
+    [meId, ensureUrls],
+  );
+
+  const edit = useCallback(async (id: string, body: string): Promise<boolean> => {
+    const text = body.trim();
+    const before = messagesRef.current.find((m) => m.id === id);
+    if (!before) return false;
+    if (!text && !before.attachment_path) return false;
+    if (text === before.body) return true;
+
+    setActionError(null);
+    setMessages((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, body: text, edited_at: new Date().toISOString() } : m)),
+    );
+    const { error: e } = await sb.rpc("edit_elite_message", { p_id: id, p_body: text });
+    if (e) {
+      setMessages((prev) => prev.map((m) => (m.id === id ? before : m)));
+      setActionError(errMessage(e, "Could not edit the message."));
+      return false;
+    }
+    return true;
+  }, []);
+
+  const remove = useCallback(async (id: string): Promise<boolean> => {
+    const before = messagesRef.current.find((m) => m.id === id);
+    if (!before) return false;
+
+    setActionError(null);
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? {
+              ...m,
+              body: "",
+              deleted_at: new Date().toISOString(),
+              attachment_path: null,
+              voice_duration_ms: null,
+              voice_waveform: null,
+              reactions: [],
+            }
+          : m,
+      ),
+    );
+    const { data, error: e } = await sb.rpc("delete_elite_message", { p_id: id });
+    if (e) {
+      setMessages((prev) => prev.map((m) => (m.id === id ? before : m)));
+      setActionError(errMessage(e, "Could not delete the message."));
+      return false;
+    }
+    if (typeof data === "string" && data) {
+      void sb.storage.from(BUCKET).remove([data]);
+    }
+    return true;
+  }, []);
+
+  const react = useCallback(
+    async (id: string, emoji: string) => {
+      const before = messagesRef.current.find((m) => m.id === id);
+      if (!before || before.deleted_at || id.startsWith("tmp-")) return;
+
+      const mine = before.reactions.find((r) => r.user_id === meId);
+      const removing = mine?.emoji === emoji;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === id
+            ? {
+                ...m,
+                reactions: removing
+                  ? m.reactions.filter((r) => r.user_id !== meId)
+                  : [...m.reactions.filter((r) => r.user_id !== meId), { user_id: meId, emoji }],
+              }
+            : m,
+        ),
+      );
+
+      const res = removing
+        ? await sb.from("elite_reactions").delete().eq("message_id", id).eq("user_id", meId)
+        : await sb
+            .from("elite_reactions")
+            .upsert({ message_id: id, user_id: meId, emoji }, { onConflict: "message_id,user_id" });
+
+      if (res.error) {
+        setMessages((prev) => prev.map((m) => (m.id === id ? before : m)));
+        setActionError(errMessage(res.error, "Could not save your reaction."));
+      }
+    },
+    [meId],
+  );
+
+  const loadOlder = useCallback(async (): Promise<boolean> => {
+    if (loadingMore || !hasMore) return false;
+    const oldest = messagesRef.current.find((m) => !m.id.startsWith("tmp-"));
+    if (!oldest) return false;
+
+    setLoadingMore(true);
+    const { data, error: e } = await sb
+      .from("elite_messages")
+      .select(SELECT)
+      .lt("created_at", oldest.created_at)
+      .order("created_at", { ascending: false })
+      .limit(PAGE_SIZE);
+
+    if (e) {
+      setActionError(e.message);
+      setLoadingMore(false);
+      return false;
+    }
+
+    const rows = ((data ?? []) as EliteMessage[]).slice().reverse();
+    setHasMore((data ?? []).length === PAGE_SIZE);
+    setMessages((prev) => {
+      const known = new Set(prev.map((m) => m.id));
+      return [...rows.filter((r) => !known.has(r.id)), ...prev];
+    });
+    void ensureProfiles(rows.map((m) => m.user_id));
+    void ensureUrls(rows);
+    setLoadingMore(false);
+    return rows.length > 0;
+  }, [loadingMore, hasMore, ensureProfiles, ensureUrls]);
+
+  const typingNames = useMemo(() => Object.values(typing).map((t) => t.name), [typing]);
+
+  return {
+    messages,
+    members,
+    memberIds,
+    reads,
+    initialRead,
+    online,
+    typingNames,
+    urls,
+    loading,
+    loadingMore,
+    hasMore,
+    error,
+    actionError,
+    setActionError,
+    sending,
+    send,
+    sendVoice,
+    edit,
+    remove,
+    react,
+    loadOlder,
+    markRead,
+    notifyTyping,
+  };
+}
+=== END FILE ===
+
+=== FILE: src/routes/admin.courses.index.tsx ===
+// src/routes/admin.courses.index.tsx
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import ChromeButton from "@/components/aura/ChromeButton";
+import { listAllCourses } from "@/lib/courses";
+import { getMyProfile } from "@/lib/queries";
+import { isContentRole } from "@/lib/roles";
+import { useAsync } from "@/lib/useAsync";
+import { getPlan } from "@/lib/plans";
+
+export const Route = createFileRoute("/admin/courses/")({
+  head: () => ({ meta: [{ title: "AURA — Διαχείριση Courses" }] }),
+  component: AdminCoursesPage,
+});
+
+async function loadAdminCourses() {
+  const profile = await getMyProfile();
+  if (!isContentRole(profile.role)) {
+    throw new Error("Δεν έχεις δικαίωμα διαχείρισης courses.");
+  }
+  return listAllCourses();
+}
+
+function AdminCoursesPage() {
+  const { data, error, loading } = useAsync(loadAdminCourses, []);
+
+  return (
+    <main className="mx-auto max-w-5xl px-5 pb-28 pt-28 sm:pt-32">
+      <div className="flex flex-wrap items-end justify-between gap-5">
+        <div>
+          <Link
+            to="/admin"
+            className="text-[10px] uppercase tracking-[0.4em] text-neutral-500 transition hover:text-neutral-200"
+          >
+            ← ADMIN
+          </Link>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-neutral-100">
+            Courses
+          </h1>
+        </div>
+        <Link to="/admin/courses/new">
+          <ChromeButton type="button">+ ΝΕΟ COURSE</ChromeButton>
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="mt-12 space-y-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-xl bg-white/[0.04]" />
+          ))}
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="mt-12 text-sm text-red-400" role="alert">
+          {error instanceof Error ? error.message : String(error)}
+        </p>
+      ) : null}
+
+      {data && data.length === 0 ? (
+        <p className="mt-12 text-sm text-neutral-500">Δεν υπάρχει κανένα course ακόμη.</p>
+      ) : null}
+
+      {data && data.length > 0 ? (
+        <ul className="mt-12 space-y-3">
+          {data.map((course, i) => (
+            <motion.li
+              key={course.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: Math.min(i * 0.04, 0.3) }}
+            >
+              <Link
+                to="/admin/courses/$courseId"
+                params={{ courseId: course.id }}
+                className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4 transition hover:border-white/30 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-neutral-100">
+                    {course.title}
+                  </p>
+                  <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-neutral-500">
+                    /{course.slug} · {course.step_count} ΒΗΜΑΤΑ ·{" "}
+                    {getPlan(course.required_plan)?.name ?? course.required_plan}
+                  </p>
+                </div>
+                <span
+                  className={[
+                    "shrink-0 rounded-full border px-3 py-1 text-[9px] uppercase tracking-[0.3em]",
+                    course.status === "published"
+                      ? "border-white/30 text-neutral-100"
+                      : "border-white/10 text-neutral-500",
+                  ].join(" ")}
+                >
+                  {course.status}
+                </span>
+              </Link>
+            </motion.li>
+          ))}
+        </ul>
+      ) : null}
+    </main>
+  );
+}
+=== END FILE ===
+
+=== FILE: .output/public/assets/auth.callback-DWZY6muH.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./useNavigate-BR9bgUfC.js";import{r as a,t as o}from"./auth.callback-J8TDGUE9.js";import{t as s}from"./ChromeButton-CdfVnEPs.js";import{t as c}from"./useAuth-CfZB9gr3.js";import{n as l,t as u}from"./checkout-intent-CYMuNmEZ.js";var d=e(n()),f=t(),p=12e3;function m(){let e=i(),{user:t,loading:n}=c(),{plan:m}=o.useSearch(),{t:h}=a(),[g,_]=(0,d.useState)(null),[v,y]=(0,d.useState)(!1);(0,d.useEffect)(()=>{if(typeof window>`u`)return;let e=new URLSearchParams(window.location.search),t=new URLSearchParams(window.location.hash.replace(/^#/,``)),n=e.get(`error_description`)??t.get(`error_description`)??e.get(`error`)??t.get(`error`);n&&_(n.replace(/\+/g,` `))},[]),(0,d.useEffect)(()=>{if(g||n||!t)return;let r=m??l();m&&u(),e(r?{to:`/checkout`,search:{plan:r},replace:!0}:{to:`/dashboard`,replace:!0})},[g,n,t,m,e]),(0,d.useEffect)(()=>{if(g||t)return;let e=window.setTimeout(()=>y(!0),p);return()=>window.clearTimeout(e)},[g,t]);let b=g!==null||v;return(0,f.jsx)(`main`,{className:`mx-auto max-w-lg px-5 pb-24 pt-32 text-center sm:pt-40`,"aria-busy":!b,children:b?(0,f.jsxs)(f.Fragment,{children:[(0,f.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:h(g?`auth.errorKicker`:`auth.timeoutKicker`)}),(0,f.jsx)(`h1`,{className:`mt-5 text-3xl font-semibold tracking-tight text-neutral-100`,children:h(g?`auth.errorTitle`:`auth.timeoutTitle`)}),(0,f.jsx)(`p`,{className:`mt-4 text-sm leading-relaxed text-neutral-400`,role:`alert`,children:g??h(`auth.timeoutBody`)}),(0,f.jsxs)(`div`,{className:`mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center`,children:[(0,f.jsx)(r,{to:`/login`,search:m?{plan:m}:{},children:(0,f.jsx)(s,{type:`button`,children:h(`auth.backToLogin`)})}),(0,f.jsx)(r,{to:`/`,children:(0,f.jsx)(s,{type:`button`,variant:`secondary`,children:h(`auth.goHome`)})})]})]}):(0,f.jsxs)(f.Fragment,{children:[(0,f.jsx)(`p`,{className:`text-[11px] uppercase tracking-[0.5em] text-neutral-600`,children:h(`auth.finishingKicker`)}),(0,f.jsx)(`h1`,{className:`mt-5 text-3xl font-semibold tracking-tight text-neutral-100`,children:h(`auth.finishingTitle`)}),(0,f.jsx)(`div`,{className:`mx-auto mt-8 h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none`,role:`status`,"aria-label":h(`auth.finishingTitle`)})]})})}export{m as component};
+=== END FILE ===
+
+=== FILE: .output/public/assets/onlineSeminars-BWTplH_L.js ===
+import{t as e}from"./supabase-DXn9ZPwL.js";import{t}from"./createLucideIcon-Dz5w4CtK.js";var n=t(`globe`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}],[`path`,{d:`M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20`,key:`13o1zl`}],[`path`,{d:`M2 12h20`,key:`9i4pu4`}]]);function r(e,t=`eur`){return new Intl.NumberFormat(`el-GR`,{style:`currency`,currency:t.toUpperCase()}).format(e/100)}async function i(){let{data:t,error:n}=await e.from(`online_seminars_public`).select(`*`).gte(`starts_at`,new Date().toISOString()).order(`starts_at`,{ascending:!0});if(n)throw n;return t??[]}async function a(){let{data:t,error:n}=await e.from(`online_seminars`).select(`*`).order(`starts_at`,{ascending:!1});if(n)throw n;return t??[]}async function o(t,n){let{error:r}=await(n?e.from(`online_seminars`).update(t).eq(`id`,n):e.from(`online_seminars`).insert(t));if(r)throw r}async function s(t,n){let{error:r}=await e.from(`online_seminars`).update({published:n}).eq(`id`,t);if(r)throw r}async function c(t){let{error:n}=await e.from(`online_seminars`).delete().eq(`id`,t);if(n)throw n}async function l(){let{data:t,error:n}=await e.from(`online_seminar_bookings`).select(`*, online_seminars(title, starts_at)`).order(`created_at`,{ascending:!1});if(n)throw n;return t??[]}async function u(t,n){let{error:r}=await e.from(`online_seminar_bookings`).update({status:n,paid_at:n===`paid`?new Date().toISOString():null}).eq(`id`,t);if(r)throw r}async function d(t){let n=e.supabaseUrl,r=e.supabaseKey,i;try{i=await fetch(`${n}/functions/v1/create-online-checkout`,{method:`POST`,headers:{"Content-Type":`application/json`,apikey:r,Authorization:`[REDACTED]`},body:JSON.stringify(t)})}catch{throw Error(`network_error`)}let a=await i.json().catch(()=>({}));if(!i.ok||!a?.clientSecret)throw console.error(`create-online-checkout:`,i.status,a),Error(a?.error??`server_error`);return a}async function f(t,n=12,r=1500){for(let i=0;i<n;i++){let{data:n}=await e.rpc(`get_online_booking_status`,{p_session:t});if(n===`paid`)return!0;await new Promise(e=>setTimeout(e,r))}return!1}export{i as a,s as c,n as d,l as i,d as l,r as n,o,a as r,u as s,c as t,f as u};
+=== END FILE ===
+
+=== FILE: .output/public/assets/verify._id-yrEr0rMk.js ===
+import{r as e,t}from"./jsx-runtime-BkSabwWG.js";import{r as n}from"./useRouter-C8taXhX3.js";import{t as r}from"./link-BhBo0Yh6.js";import{t as i}from"./react-D9fOyxUn.js";import{t as a}from"./verify._id-9S8vnhZE.js";import{t as o}from"./db-DXn9ZPwL.js";import{t as s}from"./ChromeButton-CdfVnEPs.js";import{t as c}from"./ChromeCursor-Bd--RrJo.js";import{t as l}from"./AuraMark-BT6lLCpe.js";var u=e(n()),d=t(),f=/^AURA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;function p(){let{id:e}=a.useParams(),[t,n]=(0,u.useState)(`loading`),[p,m]=(0,u.useState)(null);(0,u.useEffect)(()=>{let t=!0;async function r(){if(!f.test(e)){t&&n(`invalid`);return}let{data:r,error:i}=await o.rpc(`verify_certificate`,{cert_id:e});if(!t)return;let a=Array.isArray(r)?r[0]:void 0;i||!a?n(`invalid`):(m(a),n(`valid`))}return n(`loading`),r(),()=>{t=!1}},[e]);let h=p?.issued_at&&new Date(p.issued_at).toLocaleDateString(void 0,{year:`numeric`,month:`long`,day:`numeric`});return(0,d.jsxs)(`div`,{className:`relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-6 text-aura-text`,children:[(0,d.jsx)(`div`,{className:`aura-grain`,"aria-hidden":!0}),(0,d.jsx)(c,{}),(0,d.jsx)(`div`,{className:`hero-atmosphere absolute inset-0`,"aria-hidden":!0}),(0,d.jsxs)(i.div,{initial:{opacity:0,y:24,filter:`blur(6px)`},animate:{opacity:1,y:0,filter:`blur(0px)`},transition:{duration:1,ease:[.22,1,.36,1]},className:`chrome-field relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-aura-elevated to-aura-surface p-10 text-center shadow-[0_0_70px_-34px_rgba(255,255,255,0.35)]`,children:[(0,d.jsx)(`div`,{className:`chrome-line absolute left-8 right-8 top-0 h-px`}),(0,d.jsx)(`div`,{className:`flex justify-center`,children:(0,d.jsx)(l,{})}),(0,d.jsx)(`span`,{className:`chrome-text font-aura mt-6 inline-block text-xs font-semibold uppercase tracking-[0.5em]`,children:`Aura Certification`}),t===`loading`&&(0,d.jsx)(`p`,{className:`font-aura mt-8 text-sm text-aura-text-secondary`,children:`Verifying credential…`}),t===`valid`&&p&&(0,d.jsxs)(d.Fragment,{children:[(0,d.jsxs)(`div`,{className:`mt-8 flex flex-col items-center`,children:[(0,d.jsx)(`div`,{className:`flex h-16 w-16 items-center justify-center rounded-full border border-white/40 shadow-[0_0_24px_-4px_rgba(255,255,255,0.5)]`,children:(0,d.jsx)(`span`,{className:`chrome-text font-aura text-2xl font-bold`,children:`✓`})}),(0,d.jsx)(`h1`,{className:`chrome-text font-aura mt-6 text-3xl font-bold tracking-tight`,children:`Verified Credential`}),(0,d.jsxs)(`p`,{className:`font-aura mt-3 max-w-sm text-sm text-aura-text-secondary`,children:[`This certificate is authentic and issued by AURA`,p.holder_name?` to ${p.holder_name}`:``,`.`]})]}),(0,d.jsx)(`h2`,{className:`font-aura mt-8 text-xl font-bold text-aura-text`,children:p.title}),(0,d.jsxs)(`div`,{className:`certificate-strip mt-8 justify-center`,children:[(0,d.jsxs)(`div`,{className:`text-left`,children:[(0,d.jsx)(`p`,{className:`font-aura text-[0.6rem] uppercase tracking-[0.24em] text-aura-text-muted`,children:`Verification ID`}),(0,d.jsx)(`p`,{className:`font-aura mt-1 font-mono text-sm text-aura-text`,children:p.certificate_id})]}),h&&(0,d.jsxs)(`div`,{className:`text-left`,children:[(0,d.jsx)(`p`,{className:`font-aura text-[0.6rem] uppercase tracking-[0.24em] text-aura-text-muted`,children:`Issued`}),(0,d.jsx)(`p`,{className:`font-aura mt-1 text-sm text-aura-text`,children:h})]})]})]}),t===`invalid`&&(0,d.jsxs)(d.Fragment,{children:[(0,d.jsx)(`h1`,{className:`font-aura mt-8 text-3xl font-bold tracking-tight text-aura-text`,children:`Credential not recognized`}),(0,d.jsxs)(`p`,{className:`font-aura mt-3 text-sm text-aura-text-secondary`,children:[`The ID `,(0,d.jsx)(`span`,{className:`font-mono text-aura-text`,children:e}),` is not a valid AURA verification code.`]})]}),(0,d.jsx)(`div`,{className:`mt-10`,children:(0,d.jsx)(r,{to:`/`,children:(0,d.jsx)(s,{variant:`secondary`,children:`Back to AURA`})})}),(0,d.jsx)(`div`,{className:`chrome-line absolute bottom-0 left-8 right-8 h-px`})]})]})}export{p as component};
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/useAuth-CbY7IiR3.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { t as supabase } from "./supabase-CShTThZh.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/useAuth-CbY7IiR3.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+/**
+* Παρακολουθεί το Supabase session. Μόνο client-side — η εφαρμογή διαβάζει
+* το auth στον browser, όχι σε SSR.
+*/
+function useAuth() {
+	const [session, setSession] = (0, import_react.useState)(null);
+	const [user, setUser] = (0, import_react.useState)(null);
+	const [loading, setLoading] = (0, import_react.useState)(true);
+	(0, import_react.useEffect)(() => {
+		let mounted = true;
+		supabase.auth.getSession().then(({ data }) => {
+			if (!mounted) return;
+			setSession(data.session);
+			setUser(data.session?.user ?? null);
+			setLoading(false);
+		}).catch(() => {
+			if (mounted) setLoading(false);
+		});
+		const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+			if (!mounted) return;
+			setSession(next);
+			setUser(next?.user ?? null);
+			setLoading(false);
+		});
+		return () => {
+			mounted = false;
+			sub.subscription.unsubscribe();
+		};
+	}, []);
+	return {
+		session,
+		user,
+		loading,
+		signIn: (0, import_react.useCallback)(async (email, password) => {
+			const { error } = await supabase.auth.signInWithPassword({
+				email,
+				password
+			});
+			if (error) throw error;
+		}, []),
+		signUp: (0, import_react.useCallback)(async (email, password) => {
+			const { data, error } = await supabase.auth.signUp({
+				email,
+				password
+			});
+			if (error) throw error;
+			return { needsConfirmation: !data.session };
+		}, []),
+		signInWithGoogle: (0, import_react.useCallback)(async (planId) => {
+			const origin = typeof window !== "undefined" ? window.location.origin : {
+				"BASE_URL": "/",
+				"DEV": false,
+				"MODE": "production",
+				"PROD": true,
+				"SSR": true,
+				"TSS_DEV_SERVER": "false",
+				"TSS_DEV_SSR_STYLES_BASEPATH": "/",
+				"TSS_DEV_SSR_STYLES_ENABLED": "true",
+				"TSS_DISABLE_CSRF_MIDDLEWARE_WARNING": "false",
+				"TSS_INLINE_CSS_ENABLED": "false",
+				"TSS_ROUTER_BASEPATH": "",
+				"TSS_SERVER_FN_BASE": "/_serverFn/",
+				"VITE_SITE_URL": "https://theauramethod.site",
+				"VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_51Tz1z9LnBpuAzyZYa7FNcapCG3b0ZgWAkwLvhW9mydvYhmV9t85aVGeCUNXhqiEa5vOesAsGtGDp5pIwyxAtHIfi00VhTE7htd",
+				"VITE_SUPABASE_ANON_KEY": "[REDACTED_JWT]",
+				"VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_L9Swjao34Gznj1IT7lLPuA_cCWSetH5",
+				"VITE_SUPABASE_URL": "https://kvnpixezrebxuvgbznqr.supabase.co",
+				"VITE_TURNSTILE_SITE_KEY": "0x4AAAAAAFuQC8D2OUlnvZo3"
+			}["VITE_SITE_URL"] ?? "http://localhost:3000";
+			const callback = new URL("/auth/callback", origin);
+			if (planId) callback.searchParams.set("plan", planId);
+			const { error } = await supabase.auth.signInWithOAuth({
+				provider: "google",
+				options: {
+					redirectTo: callback.toString(),
+					queryParams: { prompt: "select_account" }
+				}
+			});
+			if (error) throw error;
+		}, []),
+		signOut: (0, import_react.useCallback)(async () => {
+			const { error } = await supabase.auth.signOut();
+			if (error) throw error;
+		}, [])
+	};
+}
+//#endregion
+export { useAuth as t };
+
+=== END FILE ===
+
+=== FILE: .output/server/_ssr/verify._id-hU6nPR20.mjs ===
+import { r as __toESM } from "../_runtime.mjs";
+import { t as db } from "./db-BETNILr1.mjs";
+import { r as require_react } from "../_libs/@stripe/react-stripe-js+[...].mjs";
+import { g as Link } from "../_libs/@tanstack/react-router+[...].mjs";
+import { n as require_jsx_runtime } from "../_libs/react+tanstack__react-query.mjs";
+import { t as motion } from "../_libs/motion.mjs";
+import { t as ChromeButton } from "./ChromeButton-CActtrBI.mjs";
+import { t as ChromeCursor } from "./ChromeCursor-BJgZMGhf.mjs";
+import { t as AuraMark } from "./AuraMark-Bx5oMvbX.mjs";
+import { t as Route } from "./verify._id-Cej-TZ9r.mjs";
+//#region node_modules/.nitro/vite/services/ssr/assets/verify._id-hU6nPR20.js
+var import_react = /* @__PURE__ */ __toESM(require_react());
+var import_jsx_runtime = require_jsx_runtime();
+var ID_PATTERN = /^AURA-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+function VerifyPage() {
+	const { id } = Route.useParams();
+	const [status, setStatus] = (0, import_react.useState)("loading");
+	const [cert, setCert] = (0, import_react.useState)(null);
+	(0, import_react.useEffect)(() => {
+		let active = true;
+		async function run() {
+			if (!ID_PATTERN.test(id)) {
+				if (active) setStatus("invalid");
+				return;
+			}
+			const { data, error } = await db.rpc("verify_certificate", { cert_id: id });
+			if (!active) return;
+			const row = Array.isArray(data) ? data[0] : void 0;
+			if (error || !row) setStatus("invalid");
+			else {
+				setCert(row);
+				setStatus("valid");
+			}
+		}
+		setStatus("loading");
+		run();
+		return () => {
+			active = false;
+		};
+	}, [id]);
+	const issued = cert?.issued_at && new Date(cert.issued_at).toLocaleDateString(void 0, {
+		year: "numeric",
+		month: "long",
+		day: "numeric"
+	});
+	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+		className: "relative flex min-h-screen items-center justify-center overflow-hidden bg-aura-bg px-6 text-aura-text",
+		children: [
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "aura-grain",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeCursor, {}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+				className: "hero-atmosphere absolute inset-0",
+				"aria-hidden": true
+			}),
+			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(motion.div, {
+				initial: {
+					opacity: 0,
+					y: 24,
+					filter: "blur(6px)"
+				},
+				animate: {
+					opacity: 1,
+					y: 0,
+					filter: "blur(0px)"
+				},
+				transition: {
+					duration: 1,
+					ease: [
+						.22,
+						1,
+						.36,
+						1
+					]
+				},
+				className: "chrome-field relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-aura-elevated to-aura-surface p-10 text-center shadow-[0_0_70px_-34px_rgba(255,255,255,0.35)]",
+				children: [
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "chrome-line absolute left-8 right-8 top-0 h-px" }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "flex justify-center",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(AuraMark, {})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+						className: "chrome-text font-aura mt-6 inline-block text-xs font-semibold uppercase tracking-[0.5em]",
+						children: "Aura Certification"
+					}),
+					status === "loading" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+						className: "font-aura mt-8 text-sm text-aura-text-secondary",
+						children: "Verifying credential…"
+					}),
+					status === "valid" && cert && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "mt-8 flex flex-col items-center",
+							children: [
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+									className: "flex h-16 w-16 items-center justify-center rounded-full border border-white/40 shadow-[0_0_24px_-4px_rgba(255,255,255,0.5)]",
+									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+										className: "chrome-text font-aura text-2xl font-bold",
+										children: "✓"
+									})
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+									className: "chrome-text font-aura mt-6 text-3xl font-bold tracking-tight",
+									children: "Verified Credential"
+								}),
+								/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+									className: "font-aura mt-3 max-w-sm text-sm text-aura-text-secondary",
+									children: [
+										"This certificate is authentic and issued by AURA",
+										cert.holder_name ? ` to ${cert.holder_name}` : "",
+										"."
+									]
+								})
+							]
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h2", {
+							className: "font-aura mt-8 text-xl font-bold text-aura-text",
+							children: cert.title
+						}),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "certificate-strip mt-8 justify-center",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "text-left",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-aura text-[0.6rem] uppercase tracking-[0.24em] text-aura-text-muted",
+									children: "Verification ID"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-aura mt-1 font-mono text-sm text-aura-text",
+									children: cert.certificate_id
+								})]
+							}), issued && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "text-left",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-aura text-[0.6rem] uppercase tracking-[0.24em] text-aura-text-muted",
+									children: "Issued"
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+									className: "font-aura mt-1 text-sm text-aura-text",
+									children: issued
+								})]
+							})]
+						})
+					] }),
+					status === "invalid" && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("h1", {
+						className: "font-aura mt-8 text-3xl font-bold tracking-tight text-aura-text",
+						children: "Credential not recognized"
+					}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("p", {
+						className: "font-aura mt-3 text-sm text-aura-text-secondary",
+						children: [
+							"The ID ",
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
+								className: "font-mono text-aura-text",
+								children: id
+							}),
+							" is not a valid AURA verification code."
+						]
+					})] }),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+						className: "mt-10",
+						children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
+							to: "/",
+							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ChromeButton, {
+								variant: "secondary",
+								children: "Back to AURA"
+							})
+						})
+					}),
+					/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "chrome-line absolute bottom-0 left-8 right-8 h-px" })
+				]
+			})
+		]
+	});
+}
+//#endregion
+export { VerifyPage as component };
+
+=== END FILE ===
+
+=== FILE: src/components/aura/Certification.tsx ===
+import { motion, useReducedMotion } from "motion/react";
+import ChromeButton from "./ChromeButton";
+
+export default function Certification() {
+  return (
+    <section id="certification" className="relative mx-auto max-w-6xl px-6 py-32">
+      <div className="grid items-center gap-12 md:grid-cols-2">
+        <motion.div
+          initial={{ opacity: 0, x: -30 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <span className="font-aura text-xs uppercase tracking-[0.5em] text-aura-text-muted">
+            Prestige, Verified
+          </span>
+          <h2 className="chrome-text font-aura mt-4 text-4xl font-extrabold tracking-tight md:text-5xl">
+            CERTIFICATION.
+          </h2>
+          <p className="font-aura mt-6 max-w-md text-sm leading-relaxed text-aura-text-secondary">
+            Every credential is issued with a unique, officially traceable
+            verification ID — a mark of mastery built to the standard of luxury
+            credentials, not participation certificates.
+          </p>
+          <div className="mt-8">
+            <ChromeButton>Claim Your Credential</ChromeButton>
+          </div>
+        </motion.div>
+
+        {/* certificate card */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+          className="group relative overflow-hidden rounded-2xl border border-white/15 bg-gradient-to-b from-aura-elevated to-aura-surface p-10 shadow-[0_0_60px_-30px_rgba(255,255,255,0.25)]"
+        >
+          <div className="chrome-line absolute left-8 right-8 top-0 h-px" />
+          <span className="chrome-text font-aura text-lg font-extrabold uppercase tracking-[0.4em]">
+            Aura
+          </span>
+          <p className="font-aura mt-8 text-xs uppercase tracking-[0.3em] text-aura-text-muted">
+            Certificate of Mastery
+          </p>
+          <h3 className="font-aura mt-3 text-2xl font-bold text-aura-text">
+            Advanced Fade Technique
+          </h3>
+          <p className="font-aura mt-2 text-sm text-aura-text-secondary">
+            Awarded for demonstrated, verified precision.
+          </p>
+
+          <div className="mt-10 flex items-end justify-between">
+            <div>
+              <p className="font-aura text-[10px] uppercase tracking-widest text-aura-text-muted">
+                Verification ID
+              </p>
+              <p className="font-aura mt-1 font-mono text-sm text-aura-text">
+                AURA-7F3C-9K21-B084
+              </p>
+            </div>
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-white/40 shadow-[0_0_20px_-4px_rgba(255,255,255,0.4)]">
+              <span className="chrome-text font-aura text-xl font-bold">A</span>
+            </div>
+          </div>
+
+          <div className="chrome-line absolute bottom-0 left-8 right-8 h-px" />
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/CompletedCourses.tsx ===
+// src/components/aura/CompletedCourses.tsx
+import { Link } from "@tanstack/react-router";
+import { motion } from "motion/react";
+import { getMyCompletedCourses } from "@/lib/courses";
+import { useAsync } from "@/lib/useAsync";
+
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("el-GR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+export default function CompletedCourses() {
+  const { data, error, loading } = useAsync(getMyCompletedCourses, []);
+
+  return (
+    <section className="mt-16">
+      <h2 className="text-[11px] uppercase tracking-[0.5em] text-neutral-500">
+        ΟΛΟΚΛΗΡΩΜΕΝΑ COURSES
+      </h2>
+
+      {loading ? (
+        <div className="mt-6 space-y-3">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-xl bg-white/[0.04]" />
+          ))}
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="mt-6 text-sm text-red-400" role="alert">
+          {error instanceof Error ? error.message : String(error)}
+        </p>
+      ) : null}
+
+      {data && data.length === 0 ? (
+        <p className="mt-6 text-sm text-neutral-500">
+          Δεν έχεις ολοκληρώσει course ακόμη.{" "}
+          <Link to="/courses" className="text-neutral-300 underline-offset-4 hover:underline">
+            Δες τα courses
+          </Link>
+          .
+        </p>
+      ) : null}
+
+      {data && data.length > 0 ? (
+        <ul className="mt-6 space-y-3">
+          {data.map((entry, i) => (
+            <motion.li
+              key={entry.course.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: Math.min(i * 0.05, 0.3) }}
+              className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-white/10 bg-gradient-to-r from-white/[0.06] to-transparent px-5 py-4"
+            >
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-neutral-100">
+                  {entry.course.title}
+                </p>
+                <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-neutral-500">
+                  {formatDate(entry.completedAt)} · {entry.course.step_count} ΒΗΜΑΤΑ
+                  {entry.replays > 0 ? ` · ${entry.replays} REPLAY` : ""}
+                </p>
+              </div>
+              <Link
+                to="/courses/$slug"
+                params={{ slug: entry.course.slug }}
+                className="shrink-0 rounded-full border border-white/20 px-5 py-2 text-[10px] uppercase tracking-[0.3em] text-neutral-200 transition hover:border-white/60 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+              >
+                REPLAY
+              </Link>
+            </motion.li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/aura/TeamGrid.tsx ===
+import { useState } from "react";
+
+interface Member {
+  name: string;
+  role: string;
+  bio: string;
+  photo: string;
+}
+
+const TEAM: Member[] = [
+  {
+    name: "Theopistos",
+    role: "Founder",
+    bio: "Δημιουργός της μεθόδου AURA. Έχτισε ένα σύστημα που δεν διδάσκει κουρέματα αλλά τρόπο σκέψης: παρατήρηση, ανάλυση, σχεδιασμός, εκτέλεση. Ο ρόλος του είναι να κρατά το standard της Ακαδημίας ψηλά και ασυμβίβαστο.",
+    photo: "/images/team/theopistos.jpg",
+  },
+  {
+    name: "Aggelos",
+    role: "Co-Founder",
+    bio: "Συνιδρυτής και υπεύθυνος εκπαιδευτικής δομής. Μετατρέπει τη μέθοδο σε επίπεδα, αποστολές και μετρήσιμα κριτήρια, ώστε κάθε μαθητής να ξέρει πάντα πού βρίσκεται και ποιο είναι το επόμενο βήμα του.",
+    photo: "/images/team/aggelos.jpg",
+  },
+  {
+    name: "Manos",
+    role: "Web Developer",
+    bio: "Υπεύθυνος για την πλατφόρμα AURA. Χτίζει το digital operating system της Ακαδημίας — από το lesson player και τα submissions μέχρι τα πιστοποιητικά και το admin panel.",
+    photo: "/images/team/manos.jpg",
+  },
+];
+
+function initialsOf(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+function MemberCard({ member }: { member: Member }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#0A0A0A] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:shadow-[0_0_40px_-14px_rgba(255,255,255,0.25)]">
+      <div className="mb-5 flex items-center gap-4">
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-white/15 bg-[#171717]">
+          {imageFailed ? (
+            <span className="flex h-full w-full items-center justify-center text-sm font-semibold tracking-wide text-neutral-300">
+              {initialsOf(member.name)}
+            </span>
+          ) : (
+            <img
+              src={member.photo}
+              alt={`${member.name} — ${member.role}`}
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+            />
+          )}
+        </div>
+        <div className="min-w-0">
+          <h3 className="truncate text-lg font-semibold tracking-wide text-neutral-100">
+            {member.name}
+          </h3>
+          <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">{member.role}</p>
+        </div>
+      </div>
+      <p className="text-sm leading-relaxed text-neutral-400">{member.bio}</p>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+      />
+    </article>
+  );
+}
+
+export default function TeamGrid() {
+  return (
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {TEAM.map((member) => (
+        <MemberCard key={member.name} member={member} />
+      ))}
+    </div>
+  );
+}
+=== END FILE ===
+
+=== FILE: src/components/ui/button.tsx ===
+import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
+import { cva, type VariantProps } from "class-variance-authority";
+
+import { cn } from "@/lib/utils";
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+        chrome: "chrome-button border border-chrome-dark bg-surface text-foreground hover:border-chrome-light hover:shadow-chrome",
+        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-9 px-4 py-2",
+        sm: "h-8 rounded-md px-3 text-xs",
+        lg: "h-10 rounded-md px-8",
+        xl: "h-13 rounded-sm px-7 text-[0.68rem] uppercase tracking-[0.16em]",
+        icon: "h-9 w-9",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  },
+);
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+  asChild?: boolean;
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+    return (
+      <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+    );
+  },
+);
+Button.displayName = "Button";
+
+export { Button, buttonVariants };
+
+=== END FILE ===
+
